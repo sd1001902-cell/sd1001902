@@ -1,0 +1,473 @@
+// ============ 九幽回廊 · 游戏内容数据（中式暗黑） ============
+
+const SLOTS = [
+  { id: 'weapon', n: '兵器', s: '兵' },
+  { id: 'helm',   n: '头冠', s: '冠' },
+  { id: 'chest',  n: '衣甲', s: '甲' },
+  { id: 'gloves', n: '护腕', s: '腕' },
+  { id: 'boots',  n: '鞋履', s: '履' },
+  { id: 'ring',   n: '扳指', s: '戒' },
+  { id: 'amulet', n: '玉佩', s: '佩' },
+];
+const SLOT_IDS = SLOTS.map(s => s.id);
+const SLOT_NAME = Object.fromEntries(SLOTS.map(s => [s.id, s.n]));
+const MAX_SOCKETS = { weapon: 3, helm: 2, chest: 3, gloves: 1, boots: 1, ring: 1, amulet: 1 };
+
+const RARITY = {
+  normal: { n: '凡品', aff: [0, 0] },
+  magic:  { n: '灵品', aff: [1, 2] },
+  rare:   { n: '宝品', aff: [3, 4] },
+  set:    { n: '套装', aff: [2, 2] },
+  legend: { n: '神兵', aff: [2, 3] },
+};
+const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
+
+const STAT_NAMES = {
+  atk: '攻击', hp: '气血', armor: '护甲', crit: '暴击率', critDmg: '暴击伤害',
+  spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
+  hpPct: '最大气血', armorPct: '护甲', regen: '每回合回复气血', thorns: '反震',
+  mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
+  dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果',
+  xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
+};
+const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak']);
+
+const BASES = {
+  weapon: [['柴刀', 1], ['铁剑', 1], ['青锋剑', 8], ['九环刀', 16], ['玄铁重剑', 26], ['斩妖剑', 40]],
+  helm:   [['布巾', 1], ['斗笠', 8], ['铁盔', 18], ['束发金冠', 30], ['鬼面', 42]],
+  chest:  [['布衣', 1], ['皮甲', 8], ['锁子甲', 18], ['鱼鳞甲', 30], ['明光铠', 42]],
+  gloves: [['布护腕', 1], ['铁护腕', 10], ['虎爪', 24], ['龙鳞护腕', 40]],
+  boots:  [['草鞋', 1], ['布靴', 10], ['铁履', 24], ['踏云靴', 40]],
+  ring:   [['扳指', 1]],
+  amulet: [['玉佩', 1]],
+};
+const AFFIXES = [
+  { k: 'atk',     r: [2, 5],   flat: true, w: 12, p: '锋锐的' },
+  { k: 'hp',      r: [8, 20],  flat: true, w: 12, p: '强健的' },
+  { k: 'armor',   r: [4, 10],  flat: true, w: 10, p: '坚实的' },
+  { k: 'crit',    r: [2, 6],   w: 7, p: '致命的' },
+  { k: 'critDmg', r: [10, 28], w: 7, p: '狠辣的' },
+  { k: 'spd',     r: [3, 8],   w: 9, p: '迅捷的', slots: ['boots', 'gloves', 'ring', 'amulet'] },
+  { k: 'leech',   r: [1, 3],   w: 5, p: '嗜血的' },
+  { k: 'res',     r: [4, 10],  w: 7, p: '辟邪的' },
+  { k: 'dmgPct',  r: [5, 14],  w: 8, p: '狂暴的' },
+  { k: 'elem',    r: [6, 18],  w: 5, p: '通灵的' },
+  { k: 'hpPct',   r: [4, 10],  w: 6, p: '养元的' },
+  { k: 'regen',   r: [1, 3],   flat: true, w: 5, p: '回春的' },
+  { k: 'thorns',  r: [3, 8],   flat: true, w: 4, p: '带刺的' },
+  { k: 'mf',      r: [8, 20],  w: 4, p: '有福的' },
+  { k: 'gf',      r: [10, 30], w: 4, p: '招财的' },
+  // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
+  { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: '先发的' },
+  { k: 'xBoss',   r: [8, 18],  w: 0, sp: true, fixed: true, p: '屠魁的' },
+  { k: 'xExec',   r: [15, 30], w: 0, sp: true, fixed: true, p: '断命的' },
+  { k: 'xBreak',  r: [20, 40], w: 0, sp: true, fixed: true, p: '破势的' },
+];
+const SP_AFFIXES = AFFIXES.filter(a => a.sp).map(a => a.k);
+const RARE_NAME_A = ['玄冥', '赤血', '太乙', '九幽', '无相', '青冥', '紫电', '寒霜', '修罗', '阴阳', '乾坤', '噬魂'];
+const RARE_NAME_B = { weapon: ['刃', '锋', '斩'], helm: ['冠', '盔', '面'], chest: ['甲', '袍', '铠'],
+  gloves: ['爪', '腕', '握'], boots: ['履', '步', '靴'], ring: ['戒', '环', '印'], amulet: ['佩', '珏', '符'] };
+
+const LEGENDS = [
+  { id: 'butcher',  n: '断魂斩马刀', slot: 'weapon', ch: 4, imp: { critDmg: 40 }, fx: 'execute',    d: '对气血低于 30% 的敌人伤害 +60%' },
+  { id: 'storm',    n: '紫电青霜',   slot: 'weapon', ch: 7, imp: { spd: 10 },     fx: 'chain',      d: '攻击有 20% 几率引来天雷，对所有敌人造成 50% 伤害' },
+  { id: 'reaper',   n: '饮血刀',     slot: 'weapon', ch: 5, imp: { leech: 4 },    fx: 'cleave',     d: '单体攻击会波及其他所有敌人，造成 35% 伤害' },
+  { id: 'glacier',  n: '寒魄玄铁剑', slot: 'weapon', ch: 6, imp: { elem: 15 },    fx: 'frostbite',  d: '攻击有 15% 几率定身目标' },
+  { id: 'seer',     n: '天机冠',     slot: 'helm', ch: 2,   imp: { crit: 6 },     fx: 'firstStrike', d: '每场战斗开始时抢先出手' },
+  { id: 'madman',   n: '狂僧面具',   slot: 'helm', ch: 4,   imp: { dmgPct: 10 },  fx: 'lowHpDmg',   d: '气血越低伤害越高，最多 +50%' },
+  { id: 'champion', n: '霸王盔',     slot: 'helm', ch: 6,   imp: { dmgPct: 8 },   fx: 'bossDmg',    d: '对精英和首领伤害 +35%' },
+  { id: 'warden',   n: '镇岳冠',     slot: 'helm', ch: 1,   imp: { hpPct: 8 },    fx: 'startShield', d: '战斗开始时获得 25% 最大气血的护体真气' },
+  { id: 'undying',  n: '不灭金身甲', slot: 'chest', ch: 8,  imp: { hpPct: 12 },   fx: 'cheatDeath', d: '每场战斗一次：受到致命伤害时保住一口气并恢复 30%' },
+  { id: 'throne',   n: '荆棘铠',     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: '反震额外造成相当于护甲 25% 的伤害' },
+  { id: 'vampire',  n: '血蝠袍',     slot: 'chest', ch: 3,  imp: { leech: 3 },    fx: 'vampire',    d: '吸血效果翻倍' },
+  { id: 'phoenix',  n: '凤羽霓裳',   slot: 'chest', ch: 9,  imp: { res: 12 },     fx: 'phoenix',    d: '每场战斗首次气血低于 30% 时浴火爆发，对所有敌人造成 300% 火焰伤害' },
+  { id: 'looter',   n: '摸金手',     slot: 'gloves', ch: 1, imp: { gf: 50 },      fx: 'lootKill',   d: '击杀敌人时 12% 几率额外掉落一件装备' },
+  { id: 'frenzy',   n: '疯魔护腕',   slot: 'gloves', ch: 3, imp: { spd: 6 },      fx: 'frenzy',     d: '每次攻击使本场速度 +4%，最多 +40%' },
+  { id: 'alchemist',n: '炼丹手',     slot: 'gloves', ch: 1, imp: { regen: 5 },    fx: 'potionPlus', d: '丹药恢复量 +60%' },
+  { id: 'ghost',    n: '踏雪无痕',   slot: 'boots', ch: 2,  imp: { spd: 8 },      fx: 'dodge',      d: '15% 几率闪避攻击' },
+  { id: 'momentum', n: '神行靴',     slot: 'boots', ch: 5,  imp: { spd: 10 },     fx: 'momentum',   d: '每击杀一个敌人，本场速度 +15%' },
+  { id: 'earth',    n: '镇山履',     slot: 'boots', ch: 3,  imp: { armorPct: 15 },fx: 'stoneSkin',  d: '受到的所有伤害 -12%' },
+  { id: 'soul',     n: '摄魂扳指',   slot: 'ring', ch: 2,   imp: { leech: 3 },    fx: 'killHeal',   d: '击杀敌人恢复 10% 最大气血' },
+  { id: 'twin',     n: '阴阳扳指',   slot: 'ring', ch: 8,   imp: { crit: 4 },     fx: 'doubleCast', d: '技能有 20% 几率连续施放两次' },
+  { id: 'greed',    n: '聚宝扳指',   slot: 'ring', ch: 6,   imp: { gf: 40, mf: 25 }, fx: 'lucky',   d: '精英和首领额外掉落 1 件装备' },
+  { id: 'surge',    n: '五行扳指',   slot: 'ring', ch: 7,   imp: { elem: 10 },    fx: 'elemSurge',  d: '术法伤害有 20% 几率翻倍' },
+  { id: 'abyssEye', n: '九幽之眼',   slot: 'amulet', ch: 9, imp: { critDmg: 30 }, fx: 'critStack',  d: '每次暴击使本场伤害 +5%，最多 10 层' },
+  { id: 'avenger',  n: '睚眦佩',     slot: 'amulet', ch: 5, imp: { armorPct: 15 },fx: 'revenge',    d: '受到攻击时 30% 几率立刻反击' },
+  { id: 'hourglass',n: '光阴玉',     slot: 'amulet', ch: 10, imp: { spd: 5 },      fx: 'cdr',        d: '所有技能冷却 -1' },
+  { id: 'deadcharm',n: '养尸玉',     slot: 'amulet', ch: 7, imp: { hpPct: 6 },    fx: 'undeadAlly', d: '每场战斗开始时唤出一具僵尸助战（所有职业）' },
+  // ---------- 职业传奇：改变一个技能的打法（ch：主要掉落的章节） ----------
+  { id: 'xuexuan',  n: '血旋风',     slot: 'weapon', cls: 'berserker', ch: 2, imp: { leech: 3 },   fx: 'whirl2',      d: '旋风刀连转两圈，每圈都按命中人数回血' },
+  { id: 'lieyanjia',n: '烈焰战甲',   slot: 'chest',  cls: 'berserker', ch: 4, imp: { hpPct: 10 },  fx: 'lieyanAll',   d: '烈焰刀变成横扫（每个 80%），让所有敌人灼烧' },
+  { id: 'pojunkui', n: '破军盔',     slot: 'helm',   cls: 'berserker', ch: 6, imp: { dmgPct: 10 }, fx: 'armorHunter', d: '对破甲的敌人，所有招式伤害 +40%' },
+  { id: 'yinxuejie',n: '饮血戒',     slot: 'ring',   cls: 'berserker', ch: 8, imp: { leech: 4 },   fx: 'bloodPlus',   d: '饮血斩冷却 -2，回血量翻倍' },
+  { id: 'hansuizhu',n: '寒髓珠',     slot: 'amulet', cls: 'mage',      ch: 2, imp: { elem: 12 },   fx: 'shatterBlast',d: '金光咒打碎冰冻（碎冰）时炸开，其他敌人受到这一击 60% 的伤害' },
+  { id: 'sanmei',   n: '三昧真火袍', slot: 'chest',  cls: 'mage',      ch: 4, imp: { elem: 15 },   fx: 'burn2',       d: '你挂上的灼烧伤害翻倍' },
+  { id: 'leiting',  n: '雷霆扳指',   slot: 'ring',   cls: 'mage',      ch: 6, imp: { crit: 5 },    fx: 'chainAll',    d: '掌心雷劈中所有敌人，不再限三个' },
+  { id: 'yinbaozhu',n: '引爆珠',     slot: 'weapon', cls: 'mage',      ch: 8, imp: { elem: 20 },   fx: 'detPlus',     d: '引爆符冷却 -1，每种状态的加成从 +80% 变成 +230%' },
+  { id: 'shiwangguan',n: '尸王冠',   slot: 'helm',   cls: 'necro',     ch: 2, imp: { minionPct: 20 }, fx: 'corpseBurst', d: '你的僵尸倒下时炸开，让所有敌人灼烧' },
+  { id: 'baigufan', n: '白骨幡',     slot: 'weapon', cls: 'necro',     ch: 4, imp: { minionPct: 25 }, fx: 'minionArmor', d: '僵尸的攻击会让敌人破甲；僵尸上限 +1' },
+  { id: 'shidudan', n: '尸毒丹',     slot: 'amulet', cls: 'necro',     ch: 6, imp: { elem: 12 },   fx: 'corpsePlague',d: '尸毒爆打中的敌人同时灼烧和中毒' },
+  { id: 'hanshipao',n: '寒尸袍',     slot: 'chest',  cls: 'necro',     ch: 8, imp: { hpPct: 10 },  fx: 'stormStun',   d: '百鬼夜行有 35% 几率让敌人眩晕' },
+  { id: 'qianzhen', n: '千针匣',     slot: 'gloves', cls: 'assassin',  ch: 2, imp: { crit: 5 },    fx: 'needle6',     d: '冰魄针一次发出六根' },
+  { id: 'yingsha',  n: '影杀靴',     slot: 'boots',  cls: 'assassin',  ch: 4, imp: { spd: 10 },    fx: 'shadow3',     d: '无影步冷却 -2，之后三次攻击必定暴击' },
+  { id: 'duoming',  n: '夺命刃',     slot: 'weapon', cls: 'assassin',  ch: 6, imp: { critDmg: 40 },fx: 'markSpread',  d: '被夺命印标记的敌人死去时，印记跳到下一个敌人' },
+  { id: 'huoyannang',n: '火焰镖囊',  slot: 'ring',   cls: 'assassin',  ch: 8, imp: { dmgPct: 8 },  fx: 'fanBurn',     d: '漫天花雨让所有敌人灼烧' },
+  { id: 'jingangchu',n: '金刚杵',    slot: 'weapon', cls: 'paladin',   ch: 2, imp: { dmgPct: 10 }, fx: 'hammerAll',   d: '降魔杵打所有敌人，并有 20% 几率眩晕' },
+  { id: 'budongxiang',n: '不动明王像',slot: 'amulet', cls: 'paladin',  ch: 4, imp: { armorPct: 15 }, fx: 'budong2',   d: '不动明王的护体翻倍；护体还在时，受到的伤害 -20%' },
+  { id: 'ganluping',n: '甘露瓶',     slot: 'ring',   cls: 'paladin',   ch: 6, imp: { healPct: 15 },fx: 'ganlu2',      d: '甘露回血翻倍，并清掉你身上的中毒和眩晕' },
+  { id: 'fuhutao',  n: '伏虎拳套',   slot: 'gloves', cls: 'paladin',   ch: 8, imp: { crit: 5 },    fx: 'fuhu2',       d: '伏虎拳同时让敌人破甲和眩晕（30%）' },
+];
+
+const SETS = [
+  { id: 'bloodrage', n: '修罗血战', cls: 'berserker',
+    pieces: [['weapon', '修罗战刀'], ['helm', '修罗血盔'], ['chest', '修罗战甲'], ['gloves', '修罗护腕']],
+    b2: { leech: 6 }, b2d: '吸血 +6%', b4: 'bloodrage', b4d: '气血低于 50% 时，伤害 +60%，速度 +30%' },
+  { id: 'bulwark', n: '铁壁铜墙', cls: 'berserker',
+    pieces: [['chest', '铜墙重甲'], ['boots', '铜墙战靴'], ['ring', '铜墙扳指'], ['amulet', '铜墙护心镜']],
+    b2: { armorPct: 40 }, b2d: '护甲 +40%', b4: 'bulwark', b4d: '受到攻击时反震 40% 伤害，并使旋风刀冷却 -1' },
+  { id: 'infernal', n: '三昧真火', cls: 'mage',
+    pieces: [['weapon', '真火拂尘'], ['helm', '真火道冠'], ['chest', '真火道袍'], ['gloves', '真火护腕']],
+    b2: { elem: 30 }, b2d: '术法伤害 +30%', b4: 'ignite', b4d: '真火符使敌人燃烧 3 回合（每回合 50% 攻击），真火符冷却 -1' },
+  { id: 'frost', n: '玄冰诀', cls: 'mage',
+    pieces: [['chest', '玄冰法袍'], ['boots', '玄冰云履'], ['ring', '玄冰扳指'], ['amulet', '玄冰玉佩']],
+    b2: { freeze: 15 }, b2d: '定身几率 +15%', b4: 'shatter', b4d: '对被定身的敌人伤害翻倍，寒冰诀冷却 -1' },
+  { id: 'bonelord', n: '尸王', cls: 'necro',
+    pieces: [['weapon', '尸王铃'], ['helm', '尸王斗笠'], ['chest', '尸王寿衣'], ['gloves', '尸王指套']],
+    b2: { minion: 1 }, b2d: '僵尸数量上限 +1', b4: 'boneLord', b4d: '僵尸的伤害和气血 +100%' },
+  { id: 'plague', n: '五毒教', cls: 'necro',
+    pieces: [['chest', '五毒蛊衣'], ['boots', '五毒蛇履'], ['ring', '五毒扳指'], ['amulet', '五毒蛊坛']],
+    b2: { poison: 30 }, b2d: '攻击附带中毒（每回合 30% 攻击，3 回合）', b4: 'plague', b4d: '中毒伤害 +150%，尸毒爆让所有敌人中毒' },
+  { id: 'shadowdance', n: '无影门', cls: 'assassin',
+    pieces: [['weapon', '无影双刺'], ['helm', '无影面罩'], ['chest', '无影夜行衣'], ['gloves', '无影指套']],
+    b2: { crit: 8 }, b2d: '暴击率 +8%', b4: 'shadowDance', b4d: '暴击时 35% 几率立刻追加一次攻击' },
+  { id: 'venomfang', n: '蛇信', cls: 'assassin',
+    pieces: [['chest', '蛇鳞软甲'], ['boots', '蛇行软靴'], ['ring', '蛇牙扳指'], ['amulet', '蛇胆玉佩']],
+    b2: { poison: 40 }, b2d: '攻击附带中毒（每回合 40% 攻击，3 回合）', b4: 'venomFang', b4d: '中毒的敌人受到伤害 +30%，淬毒镖冷却 -1' },
+  { id: 'oath', n: '金刚不坏', cls: 'paladin',
+    pieces: [['weapon', '金刚禅杖'], ['helm', '金刚僧帽'], ['chest', '金刚袈裟'], ['gloves', '金刚护腕']],
+    b2: { hpPct: 10 }, b2d: '最大气血 +10%', b4: 'holyLight', b4d: '般若心经冷却 -2，溢出的治疗转为护体真气' },
+  { id: 'wrath', n: '降魔', cls: 'paladin',
+    pieces: [['chest', '降魔僧衣'], ['boots', '降魔僧鞋'], ['ring', '降魔扳指'], ['amulet', '降魔念珠']],
+    b2: { elem: 30 }, b2d: '术法伤害 +30%（佛光也算）', b4: 'wrath', b4d: '降魔杵会砸中所有敌人' },
+];
+
+// 职业（id 沿用，名字和形象全换成东方）
+const CLASSES = {
+  berserker: {
+    n: '狂刀客', d: '浪迹江湖的刀客，血厚皮糙，越打越疯。挨打、出手都攒「怒意」，怒意过半招式更狠；血越少，伤害越高。', spr: 'blade',
+    base: { hp: 145, atk: 12, armor: 15, crit: 6, critDmg: 155, res: 20 }, per: { hp: 16.5, atk: 2.35, armor: 2.5 },
+    res: { n: '怒意', max: 100 },
+    skills: [
+      { id: 'liedi',     n: '裂地斩',   lv: 1,  cd: 3, wx: 'tu',   k: 'aoe', m: 0.6, d: '一刀劈裂地面，对所有敌人造成 60% 伤害' },
+      { id: 'lieyan',    n: '烈焰刀',   lv: 3,  cd: 3, wx: 'huo',  k: 'single', m: 1.5, d: '刀身燃火，造成 150% 伤害' },
+      { id: 'warcry',    n: '狮子吼',   lv: 6,  cd: 6, wx: 'tu', d: '3 回合内攻击 +40%、护甲 +50%，怒意 +30' },
+      { id: 'hanren',    n: '断骨',     lv: 9,  cd: 3, wx: 'shui', k: 'single', m: 1.4, d: '寒刃入骨，造成 140% 伤害' },
+      { id: 'bloodlust', n: '饮血斩',   lv: 12, cd: 4, wx: 'jin', d: '造成 180% 伤害，并恢复伤害量 50% 的气血' },
+      { id: 'whirl',     n: '旋风刀',   lv: 16, cd: 3, wx: 'jin', d: '对所有敌人造成 70% 伤害' },
+      { id: 'bawang',    n: '霸王卸甲', lv: 20, cd: 3, wx: 'jin', d: '吃掉全部怒意：造成 150% 伤害，每点怒意再 +2%（怒意满时 350%）' },
+      { id: 'butui',     n: '不退',     lv: 25, cd: 6, wx: 'tu', d: '2 回合内受到的伤害 -50%，挨的每一下都攒双倍怒意' },
+      { id: 'slash',     n: '劈砍',     lv: 1,  cd: 0, wx: 'jin', d: '造成 100% 物理伤害，怒意 +5' },
+    ],
+    tree: { n: '刀意', t: [
+      { id: 'furyUp',  n: '怒火',     d: '怒意获得 +10%', max: 5, st: { furyGain: 10 } },
+      { id: 'warUp',   n: '战意',     d: '伤害 +3%', max: 5, st: { dmgPct: 3 } },
+      { id: 'bloodUp', n: '饮血刀意', d: '饮血斩伤害 +15%', max: 5, st: { sk_bloodlust: 15 } },
+      { id: 'undying', n: '不死',     d: '每场战斗一次：受到致命伤时锁住 1 点气血，撑过下一回合', max: 1, fx: 'lastBreath' } ] } },
+  mage: {
+    n: '五行道士', d: '画符念咒，最会挂状态、引爆状态，身板最薄。按木→火→土→金→水的相生顺序出招，每接上一招叠一层「连」（每层伤害 +8%），断了就清零。每场开局自带一层护身符箓（35% 气血的护体）。', spr: 'taoist',
+    base: { hp: 140, atk: 12, armor: 9, crit: 8, critDmg: 160, res: 14 }, per: { hp: 19.5, atk: 3.3, armor: 2.3 },
+    res: { n: '连', max: 5 },
+    skills: [
+      { id: 'fireball',  n: '真火符',   lv: 1,  cd: 2, wx: 'huo', d: '造成 180% 火焰伤害' },
+      { id: 'frostnova', n: '寒冰诀',   lv: 3,  cd: 4, wx: 'shui', d: '对所有敌人造成 45% 冰冷伤害' },
+      { id: 'chain',     n: '掌心雷',   lv: 6,  cd: 3, wx: 'mu', d: '对最多 3 个敌人各造成 120% 雷电伤害' },
+      { id: 'luoshi',    n: '落石诀',   lv: 9,  cd: 4, wx: 'tu',  k: 'aoe', m: 0.9, d: '山石从天而降，对所有敌人造成 90% 伤害' },
+      { id: 'jinguang',  n: '金光咒',   lv: 12, cd: 2, wx: 'jin', k: 'single', m: 1.7, d: '一道金光，造成 170% 伤害' },
+      { id: 'lunzhuan',  n: '引爆符',   lv: 16, cd: 3, wx: 'huo', k: 'single', m: 1.4, d: '造成 140% 伤害；目标身上每有一种状态，再 +120%，然后把状态全部引爆清掉' },
+      { id: 'meteor',    n: '天降火雨', lv: 20, cd: 6, wx: 'huo', d: '对所有敌人造成 200% 火焰伤害' },
+      { id: 'wulei',     n: '五雷正法', lv: 25, cd: 4, wx: 'jin', d: '造成 190% 雷电伤害；「连」满 5 层时劈中所有敌人' },
+      { id: 'missile',   n: '灵符',     lv: 1,  cd: 0, wx: 'mu', d: '造成 110% 术法伤害' },
+    ],
+    tree: { n: '五行', t: [
+      { id: 'fireUp',  n: '火行', d: '真火符和天降火雨伤害 +12%', max: 5, st: { sk_fireball: 12, sk_meteor: 12 } },
+      { id: 'frostUp', n: '水行', d: '寒冰诀伤害 +15%，定身几率 +2%', max: 5, st: { sk_frostnova: 15, freeze: 2 } },
+      { id: 'lianUp',  n: '相生', d: '每层「连」的伤害加成再 +1%', max: 5, st: { lianPct: 1 } },
+      { id: 'archmage', n: '天师', d: '「连」上限 5 → 7；叠满的那一招必定暴击，然后「连」清零重新叠', max: 1, fx: 'tianshi' } ] } },
+  necro: {
+    n: '赶尸人', d: '湘西赶尸一脉，自己身板弱，靠摇铃驱使僵尸作战。在「武学」页排好「尸阵」：跳尸快攻、铁甲尸挡在前面、毒尸和阴火尸在后排挂状态。', spr: 'corpseman',
+    base: { hp: 125, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 12 }, per: { hp: 17, atk: 3.35, armor: 2.4 },
+    res: { n: '尸位' },
+    skills: [
+      { id: 'summon',    n: '摇铃唤尸', lv: 1,  cd: 2, wx: 'tu', d: '按尸阵补一具僵尸（基础尸位 3）' },
+      { id: 'jihuo',     n: '摇铃·集火', lv: 3, cd: 3, wx: 'jin', d: '所有僵尸立刻对目标各出手一次' },
+      { id: 'shidu',     n: '尸毒蔓',   lv: 6,  cd: 4, wx: 'mu',  k: 'aoe', m: 0.4, d: '尸毒蔓延，对所有敌人造成 40% 伤害' },
+      { id: 'corpse',    n: '尸爆',     lv: 9,  cd: 3, wx: 'huo', d: '引爆血最少的一具僵尸，按它剩余气血的 80% 打所有敌人' },
+      { id: 'yangshi',   n: '养尸符',   lv: 12, cd: 4, wx: 'shui', d: '所有僵尸恢复 30% 气血，3 回合内攻击 +30%' },
+      { id: 'curse',     n: '摄魂咒',   lv: 16, cd: 6, wx: 'shui', d: '3 回合内所有敌人伤害 -30%' },
+      { id: 'bonestorm', n: '百鬼夜行', lv: 20, cd: 5, wx: 'shui', d: '每具僵尸各对所有敌人造成一次 45% 伤害（僵尸越多越疼）' },
+      { id: 'tudun',     n: '土遁葬',   lv: 25, cd: 4, wx: 'tu',  k: 'aoe', m: 1.0, heal: 'minion', d: '大地翻涌，对所有敌人造成 100% 伤害，并给你的僵尸回 30% 气血' },
+      { id: 'bonespear', n: '镇魂钉',   lv: 1,  cd: 0, wx: 'jin', d: '造成 60% 术法伤害；钉中的敌人，僵尸会优先去咬' },
+    ],
+    tree: { n: '御尸', t: [
+      { id: 'skelUp',   n: '炼尸',     d: '僵尸的气血和伤害 +12%', max: 5, st: { minionPct: 12 } },
+      { id: 'ironUp',   n: '铁尸',     d: '铁甲尸气血 +15%，挨打时反震 +10%', max: 5, st: { ironPct: 15 } },
+      { id: 'poisonUp', n: '尸毒',     d: '你和僵尸挂的中毒伤害 +15%', max: 5, st: { poisonPct: 15 } },
+      { id: 'boneArmy', n: '万尸朝宗', d: '尸位 +1', max: 1, fx: 'boneArmy' } ] } },
+  assassin: {
+    n: '夜行刺客', d: '暗器出身，最快、最狠，专杀一个。出手攒「杀意」（最多 5 点），用夺命印、影杀一口气花掉；开战先手，群攻弱。', spr: 'assassin',
+    base: { hp: 112, atk: 12, armor: 9, crit: 14, critDmg: 165, spd: 10, res: 14 }, per: { hp: 14.5, atk: 2.75, armor: 1.9 },
+    res: { n: '杀意', max: 5 },
+    skills: [
+      { id: 'venom',      n: '淬毒镖',   lv: 1,  cd: 3, wx: 'mu', ki: 1, d: '造成 120% 伤害并使目标中毒，杀意 +1' },
+      { id: 'shadowstep', n: '无影步',   lv: 3,  cd: 5, wx: 'shui', ki: 2, d: '3 回合内闪避 +40%，下一次攻击必定暴击，杀意 +2' },
+      { id: 'bingpo',     n: '冰魄针',   lv: 6,  cd: 3, wx: 'shui', k: 'multi', m: 0.6, hits: 3, ki: 1, d: '连发三根冰针，每根 60% 伤害，随机命中，杀意 +1' },
+      { id: 'deathmark',  n: '夺命印',   lv: 9,  cd: 4, wx: 'shui', fin: 1, d: '终结技：造成 250% 伤害，每点杀意再 +25%，并打上夺命印 3 回合（被标记的敌人受到伤害 +50%）' },
+      { id: 'fan',        n: '漫天花雨', lv: 12, cd: 3, wx: 'jin', d: '暗器齐发，对所有敌人造成 60% 伤害' },
+      { id: 'dici',       n: '地刺',     lv: 16, cd: 3, wx: 'tu',   k: 'single', m: 1.6, ki: 1, d: '地刺破土，造成 160% 伤害，杀意 +1' },
+      { id: 'shadowkill', n: '影杀',     lv: 20, cd: 4, wx: 'jin', fin: 1, d: '终结技：对一个目标连刺，次数等于杀意，每下 90% 伤害，必定暴击' },
+      { id: 'yandun',     n: '烟遁',     lv: 25, cd: 6, wx: 'mu', ki: 3, d: '2 回合内敌人打不中你，杀意 +3' },
+      { id: 'twin',       n: '双刺',     lv: 1,  cd: 0, wx: 'jin', ki: 1, d: '快速出刺两次，每次 60% 伤害，杀意 +1' },
+    ],
+    tree: { n: '暗器', t: [
+      { id: 'venomUp',  n: '淬毒',   d: '淬毒镖伤害和中毒伤害 +15%', max: 5, st: { sk_venom: 15, poisonPct: 15 } },
+      { id: 'shadowUp', n: '身法',   d: '闪避 +2%', max: 5, st: { dodge: 2 } },
+      { id: 'kiUp',     n: '杀心',   d: '终结技每点杀意的加成 +5%', max: 5, st: { kiPct: 5 } },
+      { id: 'reap',     n: '夺魂',   d: '被夺命印标记的敌人额外受到 +50% 伤害；杀意上限 +1', max: 1, fx: 'deathMarkPlus' } ] } },
+  paladin: {
+    n: '金刚武僧', d: '少林外家功夫，最耐打，输出最低。挨打时有 15% 几率格挡并反击（佛光伤害），身上有护体真气时再 +15%；还会给自己回血。', spr: 'monk',
+    base: { hp: 130, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 10 }, per: { hp: 12.5, atk: 2.9, armor: 1.7 },
+    res: { n: '反击' },
+    skills: [
+      { id: 'aegis',     n: '金钟罩',   lv: 1,  cd: 6, wx: 'jin', d: '获得 20% 最大气血的护体真气' },
+      { id: 'hammer',    n: '降魔杵',   lv: 3,  cd: 3, wx: 'jin', d: '造成 190% 佛光伤害' },
+      { id: 'ganlu',     n: '甘露',     lv: 6,  cd: 4, wx: 'shui', k: 'healaoe', m: 0.7, heal: 0.06, d: '甘露洒落，恢复 6% 气血，并对所有敌人造成 70% 伤害' },
+      { id: 'fuhu',      n: '伏虎拳',   lv: 9,  cd: 3, wx: 'mu',   k: 'single', m: 1.7, d: '一拳伏虎，造成 170% 伤害' },
+      { id: 'prayer',    n: '般若心经', lv: 12, cd: 5, wx: 'mu', d: '气血低于 70% 时恢复 16% 最大气血' },
+      { id: 'budong',    n: '不动明王', lv: 16, cd: 5, wx: 'tu',   k: 'aoe', m: 0.9, shield: 0.11, d: '对所有敌人造成 90% 伤害，并获得 11% 气血的护体' },
+      { id: 'judgement', n: '万佛朝宗', lv: 20, cd: 6, wx: 'huo', d: '对所有敌人造成 200% 佛光伤害' },
+      { id: 'chanhou',   n: '狮子吼·禅', lv: 25, cd: 6, wx: 'tu', d: '3 回合内反击几率 +40%，反击必定让敌人眩晕' },
+      { id: 'holy',      n: '罗汉拳',   lv: 1,  cd: 0, wx: 'tu', d: '造成 115% 佛光伤害' },
+    ],
+    tree: { n: '禅心', t: [
+      { id: 'counterUp', n: '铁壁',   d: '反击几率 +3%', max: 5, st: { counter: 3 } },
+      { id: 'hammerUp',  n: '降魔',   d: '降魔杵伤害 +15%', max: 5, st: { sk_hammer: 15 } },
+      { id: 'healUp',    n: '慈悲',   d: '治疗效果 +10%', max: 5, st: { healPct: 10 } },
+      { id: 'divine',    n: '佛法无边', d: '般若心经同时对所有敌人造成 100% 佛光伤害；护体真气上限 +30%', max: 1, fx: 'divine' } ] } },
+};
+const CLASS_IDS = Object.keys(CLASSES);
+
+const TALENT_SHARED = [
+  { id: 'survive', n: '内功', t: [
+    { id: 'vit',   n: '易筋经',   d: '最大气血 +4%', max: 5, st: { hpPct: 4 } },
+    { id: 'iron',  n: '铁布衫',   d: '护甲 +6%，全抗 +2%', max: 5, st: { armorPct: 6, res: 2 } },
+    { id: 'drain', n: '吸星大法', d: '吸血 +1%', max: 5, st: { leech: 1 } },
+    { id: 'last',  n: '置之死地', d: '气血低于 30% 时受到的伤害 -40%', max: 1, fx: 'lastStand' } ] },
+  { id: 'slay', n: '杀伐', t: [
+    { id: 'precise', n: '眼疾',   d: '暴击率 +2%', max: 5, st: { crit: 2 } },
+    { id: 'brutal',  n: '心狠',   d: '暴击伤害 +10%', max: 5, st: { critDmg: 10 } },
+    { id: 'swift',   n: '手快',   d: '速度 +4', max: 5, st: { spd: 4 } },
+    { id: 'exec',    n: '斩草除根', d: '对气血低于 30% 的敌人伤害 +60%', max: 1, fx: 'execute' } ] },
+];
+const TALENT_TIER_REQ = 3;
+
+const GEM_TYPES = {
+  ruby:     { n: '赤玉', c: '#e04040', st: 'atk',     v: [2, 4, 7, 11, 16] },
+  sapphire: { n: '青玉', c: '#4a9aff', st: 'res',     v: [3, 5, 8, 11, 15] },
+  topaz:    { n: '黄玉', c: '#f1c94a', st: 'crit',    v: [1, 2, 3, 4, 6] },
+  emerald:  { n: '翠玉', c: '#3cc870', st: 'hpPct',   v: [2, 4, 6, 8, 11] },
+  amethyst: { n: '墨玉', c: '#8a6aaa', st: 'armor',   v: [5, 10, 18, 28, 40] },
+  diamond:  { n: '白玉', c: '#f0f4f8', st: 'critDmg', v: [5, 9, 14, 20, 28] },
+};
+const GEM_TIERS = ['碎', '粗', '良', '精', '极品'];
+const ENHANCE_RATE = [1, 1, 1, 1, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35];
+const ENHANCE_MAX = 10;
+
+// 难度：base 是在章节等级之上额外加的怪物等级
+const DIFFS = {
+  normal:    { n: '凡尘', base: 0,  res: 0,  hpMul: 1,   atkMul: 1,   loot: 0 },
+  nightmare: { n: '修罗', base: 22, res: 20, hpMul: 2.7, atkMul: 2.1, loot: 1 },
+  hell:      { n: '炼狱', base: 40, res: 40, hpMul: 4.4, atkMul: 3.3, loot: 2 },
+};
+const DIFF_IDS = Object.keys(DIFFS);
+
+const ELITE_AFFIXES = [
+  { id: 'fiery',    n: '烈焰', d: '攻击额外造成火焰伤害' },
+  { id: 'cold',     n: '寒霜', d: '攻击有几率定身目标' },
+  { id: 'vamp',     n: '吸血', d: '攻击吸取气血' },
+  { id: 'split',    n: '分身', d: '死后分成两只' },
+  { id: 'thorny',   n: '反震', d: '反弹受到的部分伤害' },
+  { id: 'enraged',  n: '狂暴', d: '半血后伤害和速度大增' },
+  { id: 'tough',    n: '铜皮', d: '气血大幅提高' },
+  { id: 'fast',     n: '神行', d: '行动速度大幅提高' },
+  { id: 'shielded', n: '护体', d: '战斗开始时获得护体真气' },
+  { id: 'venom',    n: '剧毒', d: '攻击使目标中毒' },
+];
+const ELITE_TITLES = ['凶煞', '怨毒', '嗜血', '百年', '千年', '狂怒', '阴'];
+
+const ROOM_TYPES = {
+  start: { n: '入口' }, empty: { n: '空房间' }, battle: { n: '妖物' }, elite: { n: '精英' },
+  keeper: { n: '守门妖将' }, event: { n: '奇遇' }, chest: { n: '宝箱' }, gold: { n: '银两' },
+  shop: { n: '货郎' }, rest: { n: '篝火' }, boss: { n: '首领' }, goblin: { n: '招财金蟾' },
+  story: { n: '剧情' }, page: { n: '残卷' },
+};
+
+// 奇遇（随机事件）。go() 返回 { msg, fight? }；E 是引擎提供的工具函数。
+const EVENTS = [
+  { id: 'shrine', t: '土地庙', d: '路边一座破土地庙，香炉里居然还插着三炷没烧完的香。',
+    c: [
+      { l: '上香许愿', go: (r, E) => {
+          const x = Math.random();
+          if (x < 0.4) { E.buff(r, 'dmgPct', 15); return { msg: '土地公显灵，拍了拍你的肩。本局伤害 +15%。' }; }
+          if (x < 0.7) { E.buff(r, 'armorPct', 30); return { msg: '一股暖流护住全身。本局护甲 +30%。' }; }
+          E.hurt(r, 0.2); return { msg: '香炉里跳出一只黄鼠狼咬了你一口，原来这庙早被占了。失去 20% 气血。' };
+        } },
+      { l: '离开', go: () => ({ msg: '敬鬼神而远之。' }) },
+    ] },
+  { id: 'adventurer', t: '落难书生', d: '一个书生被吊在树上，嘴里还在背《论语》。他说只要一颗丹药就能缓过来。',
+    c: [
+      { l: '给他一颗丹药', req: r => r.potions > 0, go: (r, E) => { r.potions--; const it = E.loot(r, 'elite'); return { msg: '书生感激涕零，把祖传的宝贝塞给你：' + it }; } },
+      { l: '翻他的书箱', go: (r, E) => { const g = E.gold(r, 6); E.hurt(r, 0.1); return { msg: `书生用砚台砸了你的头。你拿走了 ${g} 两银子，失去 10% 气血。` }; } },
+      { l: '离开', go: () => ({ msg: '身后传来「朽木不可雕也」的骂声。' }) },
+    ] },
+  { id: 'cursedChest', t: '贴满符的棺材', d: '一口黑漆棺材，上面贴满了黄符，里面隐约有东西在敲。',
+    c: [
+      { l: '撕符开棺', go: (r, E) => {
+          if (Math.random() < 0.5) { const it = E.loot(r, 'boss'); return { msg: '棺材里是一具早已化灰的老员外，手里还攥着宝贝：' + it }; }
+          return { msg: '棺盖「砰」地飞了出去——一只精怪扑了出来！', fight: 'elite' };
+        } },
+      { l: '离开', go: () => ({ msg: '有些东西最好别碰。' }) },
+    ] },
+  { id: 'bloodAltar', t: '邪神祭坛', d: '祭坛上的血槽干涸已久，似乎在等待新的祭品。',
+    c: [
+      { l: '献上 20% 气血', go: (r, E) => { E.hurt(r, 0.2); E.buff(r, 'dmgPct', 20); return { msg: '祭坛饮下你的血。本局伤害 +20%。' }; } },
+      { l: '离开', go: () => ({ msg: '你收起了兵器。' }) },
+    ] },
+  { id: 'gambler', t: '鬼赌坊', d: '一只穿长衫的骷髅坐在骰盅后面：「客官，押大押小？」',
+    c: [
+      { l: '下注', dyn: (r, E) => `押 ${E.bet(r)} 两`, req: (r, E) => E.save().gold >= E.bet(r), go: (r, E) => {
+          const b = E.bet(r);
+          if (Math.random() < 0.5) { E.save().gold += b; return { msg: `开！四五六，大！你赢了 ${b} 两。骷髅的下巴掉到了地上。` }; }
+          E.save().gold -= b; return { msg: `开！一二三，小！骷髅咯咯笑着收走了你的 ${b} 两。` };
+        } },
+      { l: '离开', go: () => ({ msg: '「客官下次再来呀～」' }) },
+    ] },
+  { id: 'library', t: '藏经阁残页', d: '一堆被老鼠啃过的经书，书页上的字还在发光。',
+    c: [
+      { l: '翻阅', go: (r, E) => {
+          if (Math.random() < 0.25) return { msg: '书里窜出一群书虫成精了！', fight: 'battle' };
+          const x = E.xp(r, 0.25); return { msg: `你读懂了一页武功心法。获得 ${x} 经验。` };
+        } },
+      { l: '离开', go: () => ({ msg: '读书人的事，回头再说。' }) },
+    ] },
+  { id: 'fountain', t: '两口古井', d: '左边的井水清澈见底，右边的井水红得像血。',
+    c: [
+      { l: '喝清井的水', go: (r, E) => { E.heal(r, 0.5); return { msg: '井水甘甜。恢复 50% 气血。' }; } },
+      { l: '喝血井的水', go: (r, E) => {
+          if (Math.random() < 0.6) { E.buff(r, 'hpPct', 15); E.heal(r, 0.15); return { msg: '血气翻涌，力大无穷。本局最大气血 +15%。' }; }
+          E.hurt(r, 0.25); return { msg: '有毒！你吐了半天。失去 25% 气血。' };
+        } },
+    ] },
+  { id: 'bones', t: '乱坟堆', d: '几座没有墓碑的新坟，其中一座的土还在动。',
+    c: [
+      { l: '挖开看看', go: (r, E) => {
+          if (Math.random() < 0.6) { const it = E.loot(r, 'normal'); return { msg: '原来是只土拨鼠。坟里埋着：' + it }; }
+          return { msg: '坟里伸出一只手抓住了你的脚！', fight: 'battle' };
+        } },
+      { l: '离开', go: () => ({ msg: '让死者安息吧。' }) },
+    ] },
+  { id: 'pact', t: '心魔', d: '你脑中响起一个声音：「我可以给你力量……只要一点点代价。」',
+    c: [
+      { l: '接受心魔', go: (r, E) => { E.buff(r, 'crit', 15); E.buff(r, 'critDmg', 40); E.buff(r, 'hpPct', -15);
+          return { msg: '心魔入体。本局暴击率 +15%、暴击伤害 +40%，最大气血 -15%。' }; } },
+      { l: '默念清心咒', go: () => ({ msg: '心魔不甘地散去了。' }) },
+    ] },
+  { id: 'lostSoul', t: '迷途孤魂', d: '一个老婆婆的魂魄在路口打转，说找不到回家的路。',
+    c: [
+      { l: '给她指路', go: r => { r.potions++; return { msg: '婆婆道谢后消散，原地留下一颗丹药。丹药 +1。' }; } },
+      { l: '吸收魂魄', go: (r, E) => { E.buff(r, 'leech', 4); return { msg: '冰冷的力量流入体内……你感觉自己有点不是人。本局吸血 +4%。' }; } },
+    ] },
+  { id: 'rack', t: '遗落的兵器', d: '一具骸骨靠墙坐着，手里还握着一把好兵器。',
+    c: [
+      { l: '借来一用', go: (r, E) => { const it = E.loot(r, 'elite', 'weapon'); return { msg: '骸骨的手指松开了：' + it }; } },
+      { l: '离开', go: () => ({ msg: '君子不夺人所好，死人也一样。' }) },
+    ] },
+  { id: 'trap', t: '机关暗道', d: '地砖上刻着八卦图，墙上密密麻麻全是小孔。',
+    c: [
+      { l: '按八卦步法走', go: (r, E) => { if (Math.random() < 0.7) return { msg: '乾三连、坤六断……你安全通过了。' }; E.hurt(r, 0.15); return { msg: '踩错一步，毒箭齐发！失去 15% 气血。' }; } },
+      { l: '冲过去，顺手撬墙里的银子', go: (r, E) => { E.hurt(r, 0.12); const g = E.gold(r, 8); return { msg: `你挨了几箭，失去 12% 气血，但撬出了 ${g} 两银子。` }; } },
+    ] },
+  { id: 'gemVein', t: '玉石矿脉', d: '岩壁上嵌着几块发光的玉石，但周围的石头看起来很不稳。',
+    c: [
+      { l: '徒手开采', go: (r, E) => { E.hurt(r, 0.1); const g = E.gem(r); return { msg: `碎石划伤了你（失去 10% 气血），但你挖出了一块${g}。` }; } },
+      { l: '离开', go: () => ({ msg: '小心驶得万年船。' }) },
+    ] },
+  { id: 'anvil', t: '铸剑炉', d: '一座废弃的铸剑炉，炉火居然还没熄灭。',
+    c: [
+      { l: '淬炼你的兵器', req: r => !!E_weapon(r), go: (r, E) => E.forge(r) },
+      { l: '离开', go: () => ({ msg: '你没有时间打铁。' }) },
+    ] },
+  { id: 'prisoner', t: '被困的狐仙', d: '一只小白狐被铁笼困住，看守它的妖怪就在附近打盹。',
+    c: [
+      { l: '砸开铁笼', go: () => ({ msg: '一声巨响惊醒了看守！', fight: 'elite', reward: 'mats' }) },
+      { l: '离开', go: () => ({ msg: '小白狐失望地看着你离开。' }) },
+    ] },
+  { id: 'soulWell', t: '聚魂井', d: '一口深井里翻涌着幽蓝的光。',
+    c: [
+      { l: '汲取魂晶', go: (r, E) => { const n = E.mats(r, 6); return { msg: `你收集到了 ${n} 颗魂晶（铸剑坊用的材料）。` }; } },
+      { l: '倒入一颗丹药', req: r => r.potions > 0, go: (r, E) => { r.potions--; E.buff(r, 'res', 20); return { msg: '井水平静下来，护佑着你。本局全抗 +20%。' }; } },
+    ] },
+];
+function E_weapon(r) { return SAVE.chars[r.cls].eq.weapon; }
+
+// ---------------- 五行 ----------------
+const WX = { jin: { n: '金', c: '#f1d34e' }, mu: { n: '木', c: '#5fd07a' }, shui: { n: '水', c: '#5fb0ff' }, huo: { n: '火', c: '#ff6a2a' }, tu: { n: '土', c: '#c8935a' } };
+const WX_IDS = ['mu', 'huo', 'tu', 'jin', 'shui'];
+const WX_SHENG = { mu: 'huo', huo: 'tu', tu: 'jin', jin: 'shui', shui: 'mu' };   // 甲生乙
+const WX_KE = { mu: 'tu', tu: 'shui', shui: 'huo', huo: 'jin', jin: 'mu' };      // 甲克乙
+// 反应：相克以「打上去的五行」命名，相生以「原来的印」命名
+const REACTS = {
+  ke_shui: { n: '蒸腾', d: '水克火：这一击伤害翻倍' },
+  ke_huo:  { n: '熔甲', d: '火克金：护甲减半、抗性 -20，持续 3 回合' },
+  ke_jin:  { n: '伐',   d: '金克木：斩断护体，这一击必定暴击' },
+  ke_mu:   { n: '裂',   d: '木克土：击晕 1 回合' },
+  ke_tu:   { n: '封',   d: '土克水：冻住 1 回合' },
+  sh_mu:   { n: '燎原', d: '木生火：所有敌人都烧起来' },
+  sh_huo:  { n: '余烬', d: '火生土：其他敌人也受到 40% 伤害' },
+  sh_tu:   { n: '淬锋', d: '土生金：伤害 +20%，你的下一击必定暴击' },
+  sh_jin:  { n: '寒锋', d: '金生水：目标变慢 3 回合' },
+  sh_shui: { n: '滋养', d: '水生木：你恢复 8% 气血' },
+};
+// 妖物的五行与特性（按像素图大致归类）
+const MON_WX = {yayi:'jin', yong:'tu', headless:'shui', xianling:'tu',  jiangshi: 'tu', skeleton: 'jin', imp: 'mu', bat: 'mu', wisp: 'huo', hound: 'mu', spider: 'mu', golem: 'tu', snake: 'shui', toad: 'shui',
+  ghost: 'shui', fox: 'huo', femghost: 'shui', bull: 'tu', crow: 'huo', paper: 'mu', knight: 'jin', caster: 'huo', demon: 'huo', zombie: 'tu', skelking: 'jin' };
+const MON_TRAIT = {yayi:'shield', yong:'shield', headless:'fly',  skeleton: 'shield', knight: 'shield', golem: 'shield', jiangshi: 'regen', zombie: 'regen', snake: 'regen', bat: 'fly', wisp: 'fly', crow: 'fly', ghost: 'fly' };
+const TRAITS = { shield: { n: '骨甲', d: '开场带一层护体；被「破甲」就碎' }, regen: { n: '回春', d: '每回合回血；被「灼烧」时回不了' }, fly: { n: '飞行', d: '近战攻击有 25% 落空；被「冰冻」后掉下来，不会再落空' } };
+// 同伴
+const COMPANIONS = {
+  ngoc: { n: 'Ngoc', spr: 'ngoc', wx: 'huo', ap: 'burn', hp: 0.5, atk: 0.5, spd: 95, d: '给你回血；扔的药瓶会让敌人灼烧' },
+  zhen: { n: '珍姑娘', spr: 'constable', wx: 'jin', ap: 'armor', hp: 0.65, atk: 0.6, spd: 105, d: '捕快刀会让敌人破甲，每三招甩一次锁链让敌人眩晕' },
+  long: { n: '龙道长', spr: 'scholar', wx: 'mu', ap: 'chill', hp: 0.45, atk: 0.55, spd: 98, d: '正气诀会让敌人冰冻，时不时念一段给你加攻击' },
+};
+
+// ---------------- 状态配合 ----------------
+// 起手技能给敌人挂状态（ap），收招技能打带状态的敌人有额外效果（pay）
+const STATES = { burn: { n: '灼烧', c: '#ff6a2a', d: '每回合掉血；回春的妖物烧着时不能回血' },
+  chill: { n: '冰冻', c: '#5fb0ff', d: '出手变慢；飞行的妖物会掉下来' },
+  armor: { n: '破甲', c: '#d8a05a', d: '护甲减半、抗性 -20；骨甲直接碎掉' },
+  stun: { n: '眩晕', c: '#f1d34e', d: '跳过下一次出手' },
+  poison: { n: '中毒', c: '#7fe05a', d: '每回合掉血，持续 3 回合' } };
+const SKILL_COMBO = {
+  liedi: { ap: 'armor' }, lieyan: { ap: 'burn' }, warcry: { ap: 'stun', apc: 0.3 }, hanren: { ap: 'chill', pay: { s: 'stun', x: 'crit', n: '断骨' } },
+  bloodlust: { pay: { s: 'burn', x: 'dmg', v: 1.8, n: '饮火' } }, whirl: { pay: { s: 'armor', x: 'dmg', v: 1.7, n: '破军' } }, bawang: { pay: { s: 'armor', x: 'crit', n: '卸甲' } },
+  fireball: { ap: 'burn' }, frostnova: { ap: 'chill' }, chain: { pay: { s: 'burn', x: 'dmg', v: 1.8, n: '雷火' } }, luoshi: { ap: 'armor' },
+  jinguang: { pay: { s: 'chill', x: 'shatter', v: 2.8, n: '碎冰' } }, lunzhuan: { pay: { s: 'any', x: 'detonate', n: '引爆' } },
+  meteor: { pay: { s: 'armor', x: 'dmg', v: 1.5, n: '焚城' } }, wulei: { pay: { s: 'stun', x: 'crit', n: '天雷' } },
+  bonespear: {}, jihuo: { pay: { s: 'poison', x: 'dmg', v: 1.8, n: '尸毒攻心' } }, shidu: { ap: 'poison' }, corpse: { pay: { s: 'burn', x: 'spread', n: '尸火' } },
+  curse: { ap: 'armor' }, bonestorm: { pay: { s: 'armor', x: 'dmg', v: 1.5, n: '百鬼噬甲' } }, tudun: { pay: { s: 'chill', x: 'shatter', v: 2.2, n: '冰葬' } },
+  venom: { ap: 'poison' }, bingpo: { ap: 'chill' }, deathmark: { pay: { s: 'stun', x: 'dmg', v: 2, n: '趁虚' } }, fan: { pay: { s: 'poison', x: 'dmg', v: 1.6, n: '毒雨' } },
+  dici: { ap: 'stun', apc: 0.4, pay: { s: 'chill', x: 'crit', n: '冰刺' } }, shadowkill: { pay: { s: 'poison', x: 'dmg', v: 1.4, n: '毒刃' } },
+  hammer: { ap: 'stun', apc: 0.3 }, ganlu: { ap: 'chill' }, fuhu: { ap: 'armor', pay: { s: 'stun', x: 'dmg', v: 1.8, n: '伏虎' } },
+  budong: { pay: { s: 'stun', x: 'heal', v: 0.06, n: '明王' } }, judgement: { pay: { s: 'armor', x: 'dmg', v: 1.6, n: '伏魔' } },
+};
+for (const c in CLASSES) for (const k of CLASSES[c].skills) Object.assign(k, SKILL_COMBO[k.id] || {});
+const payText = p => !p ? '' : p.x === 'dmg' ? `伤害 ×${p.v}` : p.x === 'crit' ? '必定暴击' : p.x === 'shatter' ? `伤害 ×${p.v}，打碎状态` : p.x === 'spread' ? '传给所有敌人' : p.x === 'heal' ? `你回 ${Math.round(p.v * 100)}% 气血` : p.x === 'detonate' ? '每种状态 +80%' : '';

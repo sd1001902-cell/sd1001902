@@ -1,0 +1,1943 @@
+// ============ 深渊回廊 · 游戏引擎（不碰界面） ============
+'use strict';
+
+const RNG = {
+  f: (a, b) => a + Math.random() * (b - a),
+  i: (a, b) => a + Math.floor(Math.random() * (b - a + 1)),
+  pick: a => a[Math.floor(Math.random() * a.length)],
+  ch: p => Math.random() < p,
+  w(map) {
+    let t = 0; for (const k in map) t += Math.max(0, map[k]);
+    let x = Math.random() * t;
+    for (const k in map) { x -= Math.max(0, map[k]); if (x < 0) return k; }
+    return Object.keys(map)[0];
+  },
+  shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; },
+};
+let _uid = 0;
+const uid = () => (++_uid).toString(36) + Math.random().toString(36).slice(2, 7);
+
+// ---------------- 存档 ----------------
+const SAVE_KEY = 'jiuyou-save-v1';
+let SAVE = null;
+let storageOK = true;
+let onPersist = null;
+
+function newChar() { return { level: 1, xp: 0, tal: {}, runes: {}, order: null, off: {}, yi: [], cube: [null, null, null],
+  eq: { weapon: makeItem({ slot: 'weapon', ilvl: 1, rarity: 'normal', noSocket: true }) } }; }
+function newSave() {
+  const s = { v: 4, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
+              mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
+              stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
+              para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
+              riftMax: 0, rift: {}, riftCap: 3, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true,
+              story: { cleared: { normal: 0, nightmare: 0, hell: 0 }, pages: {}, ended: false, seen: {} } };
+  for (const c of CLASS_IDS) s.chars[c] = newChar();
+  return s;
+}
+function migrate(s) {
+  const d = newSave();
+  for (const k in d) if (s[k] === undefined) s[k] = d[k];
+  for (const k in d.stats) if (s.stats[k] === undefined) s.stats[k] = 0;
+  for (const c of CLASS_IDS) {
+    if (!s.chars[c]) s.chars[c] = newChar();
+    const ch = s.chars[c], nc = newChar();
+    for (const k of ['tal', 'runes', 'off', 'cube', 'yi']) if (!ch[k]) ch[k] = nc[k];
+    if (ch.order === undefined) ch.order = null;
+    if (ch.level > MAX_LEVEL) { ch.level = MAX_LEVEL; ch.xp = 0; }
+  }
+  s.disp = {};
+  if (s.riftCap == null || s.riftCap < s.riftMax + 1) s.riftCap = Math.max(3, s.riftMax + 3);   // 老存档：保持原来「最高纪录 +3」的上限
+  if (!s.comps) s.comps = { ngoc: 1 };
+  if (!s.comp) s.comp = 'ngoc';
+  if (s.run && !s.run.world && (!s.run.maze || s.run.maze.v !== 2)) s.run = null;
+  if (!(s.story && s.story.ended)) s.mods = [];
+  if (!s.story.cleared) s.story = d.story;
+  if (s.run && (!s.run.maze || !s.run.mode)) s.run = null;
+  // 传奇图鉴：把已经拿到的都记上；找不到定义的旧神兵降为稀有
+  if (!s.codex) s.codex = {};
+  s.newLeg = [];
+  const allIt = [...(s.stash || [])]; for (const c in s.chars) for (const k in (s.chars[c].eq || {})) if (s.chars[c].eq[k]) allIt.push(s.chars[c].eq[k]);
+  for (const it of allIt) if (it && it.rarity === 'legend') { if (it.legend && LEGENDS.some(l => l.id === it.legend)) s.codex[it.legend] = 1; else { it.rarity = 'rare'; delete it.legend; } }
+  // 职业重做（v4）：心法点全部退回、技能装配重来、旧变招清掉
+  if ((s.v || 0) < 4) { for (const c of CLASS_IDS) { const ch = s.chars[c]; ch.tal = {}; ch.loadout = null; ch.loadoutManual = 0; ch.unequipped = {}; ch.runes = {}; } s.respec4 = 1; }
+  // 速度改成数值：旧鞋子的主属性速度（固定 3）按阶数补上
+  for (const it of allIt) if (it && it.slot === 'boots' && it.imp) { const L = it.legend && LEGENDS.find(l => l.id === it.legend), li = (L && L.imp.spd) || 0; if (it.imp.spd === 3 + li) it.imp.spd = bootSpd(it.ilvl) + li; }
+  s.v = 4;
+  return s;
+}
+function loadSave() {
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { SAVE = migrate(JSON.parse(raw)); return SAVE; } }
+  catch (e) { storageOK = false; }
+  SAVE = newSave(); return SAVE;
+}
+function persist(quiet) {
+  if (!quiet) SAVE.t = Date.now();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); storageOK = true; } catch (e) { storageOK = false; }
+  if (onPersist && !quiet) onPersist();
+}
+function exportSave() { return btoa(unescape(encodeURIComponent(JSON.stringify(SAVE)))); }
+function parseSave(obj) { if (!obj || !obj.chars || !Array.isArray(obj.stash)) throw new Error('bad'); return migrate(obj); }
+function importSave(str) { SAVE = parseSave(JSON.parse(decodeURIComponent(escape(atob(str.trim()))))); persist(); }
+
+// ---------------- 剧情进度与解锁 ----------------
+const storyCleared = diff => (SAVE && SAVE.story && SAVE.story.cleared[diff || 'normal']) || 0;
+const POSTGAME = new Set(['rift', 'para', 'lgem', 'bounty', 'mods', 'nightmare', 'enhance', 'sockets', 'gems', 'reroll']);   // 装备养成（强化、打孔镶玉、淬炼洗炼、传承升阶）通关后才开：剧情里装备每章都换，专心看故事
+const featureOn = key => POSTGAME.has(key) ? !!(SAVE && SAVE.story && SAVE.story.ended) : storyCleared('normal') >= (FEATURE_CH[key] || 0) || (key === 'runes' && typeof wPast === 'function' && wPast(7, 'runes7'));   // 变招：第七章龙道长教过就开
+const bldOpen = B => storyCleared('normal') >= (B.ch || 0);
+
+// ---------------- 营地建筑 ----------------
+const bLv = id => { const B = BUILDINGS.find(x => x.id === id); return B && SAVE && SAVE.story ? Math.min(B.max, Math.floor(storyCleared('normal') * (B.max + 1) / 11)) : 0; };
+const stashMax = () => 120 + bLv('warehouse') * 40;
+const smithMax = () => Math.min(ENHANCE_MAX, 5 + bLv('smith'));
+const gemCap = () => Math.min(4, 2 + bLv('jewel'));
+function bldCost(B, lv) { return { gold: Math.round(B.gold * Math.pow(lv + 1, 2)), mats: B.mats * (lv + 1) }; }
+function upgradeBuilding(id) {
+  const B = BUILDINGS.find(x => x.id === id), lv = bLv(id);
+  if (!bldOpen(B)) return { err: "Chưa khai trương" };
+  if (lv >= B.max) return { err: "Đã tối đa cấp" };
+  const c = bldCost(B, lv);
+  if (SAVE.gold < c.gold) return { err: "Không đủ tiền vàng" };
+  if (SAVE.mats < c.mats) return { err: "Không đủ mảnh linh hồn" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats; SAVE.bld[id] = lv + 1; return { ok: true };
+}
+
+// ---------------- 装备 ----------------
+// ---------------- 装备分阶：每章一段等级，掉落的装备按所在章节定阶 ----------------
+const CH_BAND = [null, [1, 7], [8, 12], [12, 15], [15, 18], [18, 21], [21, 24], [24, 27], [27, 30], [30, 33], [33, 36]];
+const TIER_N = ['', "Giai 1", "Giai 2", "Giai 3", "Giai 4", "Giai 5", "Giai 6", "Giai 7", "Giai 8", "Giai 9", "Giai 10", "Giai 11"];
+function tierOf(ilvl) { for (let c = 1; c <= 10; c++) if (ilvl <= CH_BAND[c][1] + 1) return c; return 11; }
+const curChapter = () => (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world) ? SAVE.run.chapter : Math.min(10, (typeof SAVE !== 'undefined' && SAVE && SAVE.story ? storyCleared('normal') : 0) + 1);
+// 本章装备的等级上限（任务奖励、宝箱不会超过本章）
+function chIlvl(ch, lv) { const B = CH_BAND[Math.min(10, Math.max(1, ch))]; return Math.max(B[0], Math.min(B[1], lv)) + 1; }
+function implicitFor(slot, L) {
+  switch (slot) {
+    case 'weapon': return { atk: Math.round(2 + L * 2.0) };
+    case 'helm':   return { armor: Math.round(2 + L * 2.0) };
+    case 'chest':  return { armor: Math.round(5 + L * 3.2), hp: Math.round(4 + L * 4.5) };
+    case 'gloves': return { armor: Math.round(1 + L * 1.5), atk: Math.round(L * 0.55) };
+    case 'boots':  return { armor: Math.round(1 + L * 1.5), spd: bootSpd(L) };   // 鞋子的主属性：速度，随阶数涨
+    default: return {};
+  }
+}
+const bootSpd = L => Math.round(4 + tierOf(L) * 1.2);
+const SPD_CAP = 90;   // 速度最多 100 + 90
+function scaleObj(o, m) { const r = {}; for (const k in o) r[k] = k === 'spd' ? o[k] : Math.round(o[k] * m); return r; }
+const affSc = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 0.68 + ilvl / 22;
+function affixValue(a, ilvl, mult, max) {
+  const sc = affSc(a, ilvl);
+  return Math.max(1, Math.round((max ? a.r[1] : RNG.f(a.r[0], a.r[1])) * sc * mult));
+}
+function rollAffixes(n, ilvl, mult, exclude = [], max, slot) {
+  const out = [], used = new Set(exclude);
+  while (out.length < n) {
+    const pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && (!a.slots || !slot || a.slots.includes(slot))); if (!pool.length) break;
+    let x = Math.random() * pool.reduce((s, a) => s + a.w, 0), pick = pool[0];
+    for (const a of pool) { x -= a.w; if (x < 0) { pick = a; break; } }
+    used.add(pick.k); out.push([pick.k, affixValue(pick, ilvl, mult, max)]);
+  }
+  return out;
+}
+function pickBase(slot, ilvl) { const ok = BASES[slot].filter(b => b[1] <= (ilvl || 1)); return (RNG.pick(ok.slice(-2)) || BASES[slot][0])[0]; }
+// 大地图掉率：普通怪基本只掉凡品/灵品；稀有主要靠精英、首领、宝箱
+const W_RARITY = {
+  normal: { normal: 50, magic: 45, rare: 5, set: 0.2, legend: 0.05 },
+  elite:  { normal: 0, magic: 52, rare: 40, set: 5, legend: 3 },
+  boss:   { normal: 0, magic: 0, rare: 85, set: 15, legend: 0 },
+  chest:  { normal: 0, magic: 60, rare: 35, set: 4, legend: 1 },
+  quest:  { normal: 0, magic: 100, rare: 0, set: 0, legend: 0 },
+};
+function rollRarity(quality, mf, diffLoot) {
+  if (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world && W_RARITY[quality === 'cache' ? 'chest' : quality]) {
+    const w = { ...W_RARITY[quality === 'cache' ? 'chest' : quality] }, m = 1 + (mf || 0) / 200, m2 = Math.pow(1.3, diffLoot || 0);
+    w.rare *= m * m2; w.set *= (1 + (mf || 0) / 300) * m2; w.legend *= (1 + (mf || 0) / 300) * m2;
+    return RNG.w(w);
+  }
+  const w = { normal: 40, magic: 36, rare: 18, set: 2.5, legend: 0.12 };
+  if (quality === 'elite') { w.normal = 6; w.magic = 40; w.rare *= 2.2; w.set *= 3; w.legend *= 3; }
+  if (quality === 'boss')  { w.normal = 0; w.magic = 18; w.rare *= 3; w.set *= 6; w.legend *= 6; }
+  if (quality === 'gamble'){ w.normal = 0; w.magic = 50; w.rare = 36; w.set = 7; w.legend = 0.8; }
+  if (quality === 'cache') { w.normal = 0; w.magic = 0; w.rare = 60; w.set = 20; w.legend = 3; }
+  const m2 = (1 + (mf || 0) / 180) * Math.pow(1.3, diffLoot || 0);
+  w.rare *= 1 + (mf || 0) / 100; w.set *= m2; w.legend *= m2;
+  return RNG.w(w);
+}
+function rollSockets(slot, rarity) {
+  const max = MAX_SOCKETS[slot], p = { normal: 0.35, magic: 0.2, rare: 0.25, set: 0.15, legend: 0.15 }[rarity];
+  let n = 0; while (n < max && RNG.ch(n === 0 ? p : p * 0.5)) n++;
+  return n;
+}
+const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
+const primalOK = () => SAVE && (SAVE.unlocked.hell || SAVE.riftMax >= 10);
+function finishItem(it, noSocket) {
+  it.tier = tierOf(it.ilvl);
+  it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
+  if (it.rarity === 'legend' || it.rarity === 'set') {
+    it.anc = primalOK() && RNG.ch(0.006) ? 2 : RNG.ch(0.1) ? 1 : 0;
+    if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]);
+  }
+  return it;
+}
+function makeItem({ slot, ilvl, rarity, cls, setId, noSocket }) {
+  ilvl = Math.max(1, Math.min(70, Math.round(ilvl)));
+  if (rarity === 'legend') {
+    const cc = Math.max(tierOf(ilvl), 1);
+    const ok = l => (!slot || l.slot === slot) && (!l.cls || l.cls === cls) && (l.ch || 1) <= cc;
+    const mine = LEGENDS.filter(l => ok(l) && l.cls), gen = LEGENDS.filter(l => ok(l) && !l.cls);
+    const pool = mine.length && (RNG.ch(0.6) || !gen.length) ? mine : gen;
+    if (pool.length) {
+      const wsum = pool.map(l => (l.ch || 1) >= cc ? 3 : (l.ch || 1) >= cc - 1 ? 1.6 : 1);   // 本章的传奇更常见
+      let r0 = Math.random() * wsum.reduce((a, b) => a + b, 0), L = pool[0];
+      for (let i = 0; i < pool.length; i++) { r0 -= wsum[i]; if (r0 <= 0) { L = pool[i]; break; } }
+      slot = L.slot;
+      const imp = scaleObj(implicitFor(slot, ilvl), 1.05), lsc = 0.45 + ilvl / 20;
+      for (const k in L.imp) imp[k] = (imp[k] || 0) + (k === 'spd' ? L.imp[k] : Math.max(1, Math.round(L.imp[k] * lsc)));
+      return finishItem({ id: uid(), slot, ilvl, rarity, name: L.n, base: pickBase(slot, ilvl), legend: L.id, imp,
+                          aff: rollAffixes(RNG.i(2, 3), ilvl, 1.05, Object.keys(L.imp), false, slot) }, noSocket);
+    }
+    rarity = 'rare';
+  }
+  if (rarity === 'set') {
+    let pool = [];
+    for (const S of SETS) if (!S.rift || setId) for (const [sl, n] of S.pieces) if (!slot || sl === slot) pool.push({ S, sl, n });
+    if (setId) pool = pool.filter(p => p.S.id === setId);
+    else if (cls && RNG.ch(0.65)) { const p2 = pool.filter(p => p.S.cls === cls); if (p2.length) pool = p2; }
+    if (pool.length) {
+      const p = RNG.pick(pool); slot = p.sl;
+      const rs = p.S.rift;   // 幻境套装：底子更厚，多一条词条
+      return finishItem({ id: uid(), slot, ilvl, rarity, name: p.n, base: pickBase(slot, ilvl), set: p.S.id, cls: p.S.cls,
+                          imp: scaleObj(implicitFor(slot, ilvl), rs ? 1.4 : 1.25), aff: rollAffixes(rs ? 3 : 2, ilvl, rs ? 1.3 : 1.2, [], false, slot) }, noSocket);
+    }
+    rarity = 'rare';
+  }
+  slot = slot || RNG.pick(SLOT_IDS);
+  if (rarity === 'normal' && (slot === 'ring' || slot === 'amulet')) rarity = 'magic';
+  const base = pickBase(slot, ilvl);
+  const R = RARITY[rarity];
+  const aff = rollAffixes(RNG.i(R.aff[0], R.aff[1]), ilvl, rarity === 'rare' ? 1.1 : 1, [], false, slot);
+  let name = base;
+  if (rarity === 'magic') name = joinName(AFFIXES.find(x => x.k === aff[0][0]).p, base);
+  if (rarity === 'rare') name = RNG.pick(RARE_NAME_A) + (isVi() ? ' ' : '') + RNG.pick(RARE_NAME_B[slot]);
+  return finishItem({ id: uid(), slot, ilvl, rarity, name, base, imp: implicitFor(slot, ilvl), aff }, noSocket);
+}
+const ancName = it => it.anc === 2 ? "Thái Cổ ·" : it.anc === 1 ? "Thượng Cổ ·" : '';
+function itemMult(it) { return (1 + (it.plus || 0) * 0.08) * (it.anc ? 1.3 : 1); }
+function itemStats(it) {
+  const m = itemMult(it), s = {};
+  const add = (k, v) => { s[k] = (s[k] || 0) + v; };
+  for (const k in it.imp) add(k, k === 'spd' ? it.imp[k] : Math.round(it.imp[k] * m));
+  for (const [k, v] of it.aff) add(k, Math.round(v * m));
+  for (const g of it.gems || []) {
+    if (g.startsWith('L:')) { const L = SAVE && SAVE.lgems.find(x => x.id === g.slice(2)); if (L) { const st = LGEMS[L.t].st(L.lv); for (const k in st) add(k, st[k]); } continue; }
+    const [t, tier] = g.split('_'); const G = GEM_TYPES[t]; if (G) add(G.st, G.v[+tier]);
+  }
+  return s;
+}
+function sellPrice(it) { return Math.round((3 + it.ilvl * 1.5) * { normal: 1, magic: 2, rare: 5, set: 12, legend: 15 }[it.rarity] * (1 + (it.plus || 0) * 0.15) * (it.anc ? 2 : 1) * (1 + bLv('merchant') * 0.1)); }
+function canEquip(it, cls) { return !it.cls || it.cls === cls; }
+const legendOf = it => it.legend && LEGENDS.find(l => l.id === it.legend);
+const setOf = it => it.set && SETS.find(s => s.id === it.set);
+
+// ---------------- 天赋 ----------------
+function talentBranches(cls) { return [{ ...CLASSES[cls].tree, id: 'class' }, ...TALENT_SHARED]; }
+function talentInfo(cls) {
+  const ch = SAVE.chars[cls], tal = ch.tal || {};
+  let spent = 0; for (const k in tal) spent += tal[k];
+  return { total: ch.level - 1, spent, free: ch.level - 1 - spent };
+}
+function branchSpent(cls, br) { const tal = SAVE.chars[cls].tal; let n = 0; for (const k in tal) if (k.startsWith(br + '.')) n += tal[k]; return n; }
+function canLearn(cls, br, idx) {
+  const Bq = talentBranches(cls).find(b => b.id === br), T = Bq.t[idx], key = br + '.' + T.id;
+  return talentInfo(cls).free > 0 && (SAVE.chars[cls].tal[key] || 0) < T.max && branchSpent(cls, br) >= idx * TALENT_TIER_REQ;
+}
+function learnTalent(cls, br, idx) {
+  if (!canLearn(cls, br, idx)) return false;
+  const before = runMaxHpIf(cls);
+  const T = talentBranches(cls).find(b => b.id === br).t[idx], key = br + '.' + T.id;
+  SAVE.chars[cls].tal[key] = (SAVE.chars[cls].tal[key] || 0) + 1;
+  fixRunHp(cls, before); return true;
+}
+const respecCost = cls => SAVE.chars[cls].level < 10 ? 0 : SAVE.chars[cls].level * 25;
+function resetTalents(cls) {
+  const c = respecCost(cls); if (SAVE.gold < c) return false;
+  const before = runMaxHpIf(cls);
+  SAVE.gold -= c; SAVE.chars[cls].tal = {}; fixRunHp(cls, before); return true;
+}
+
+// ---------------- 巅峰等级 ----------------
+const paraNeed = p => 30000 + p * 1500;
+function paraFree() { let n = 0; for (const k in SAVE.para.pts) n += SAVE.para.pts[k]; return SAVE.para.lv - n; }
+function paraCanAdd(k) { const P = PARAGON_STATS.find(x => x.k === k); const cur = SAVE.para.pts[k] || 0; return paraFree() > 0 && (!P.cap || (cur + 1) * P.v <= P.cap); }
+function addPara(k, n = 1) { let done = 0; while (done < n && paraCanAdd(k)) { SAVE.para.pts[k] = (SAVE.para.pts[k] || 0) + 1; done++; } return done; }
+function resetPara() { SAVE.para.pts = {}; }
+
+// ---------------- 镇妖录与役使 ----------------
+function zyEntries(i) { const C = CHAPTERS[i], out = [], seen = new Set();
+  const add = (n, boss) => { if (!seen.has(n)) { seen.add(n); out.push({ n, boss }); } };
+  add(C.boss.n, true); if (C.boss.twin) add(C.boss.twin.n, true); C.mons.forEach(m => add(m.n, false)); return out; }
+// 存档里镇妖录、图鉴按中文名记；越南语版用 ZHN（越→中）换回中文名，两个语言共用一份存档
+const MK = n => (typeof ZHN !== 'undefined' && ZHN[n]) || n;
+// 越南语：形容词放在名词后面（「锋锐的铁剑」→「Kiếm sắt sắc bén」）
+const isVi = () => typeof window !== 'undefined' && window.LANG === 'vi';
+const joinName = (adj, noun) => isVi() ? noun + ' ' + adj : adj + noun;
+const zyOf = n => (SAVE.zy || {})[MK(n)] || 0;
+function zyPagePts(i) { return zyEntries(i).reduce((a, e) => a + zyOf(e.n), 0); }
+function zyPageDone(i) { const E = zyEntries(i); return E.some(e => e.boss && zyOf(e.n)) && E.filter(e => !e.boss && zyOf(e.n)).length >= ZY_NEED; }
+function yiGrade(id) { const Y = YISHI[id]; if (!Y) return 0; return Math.max(...zyEntries(Y.pg).filter(e => e.boss).map(e => zyOf(e.n))); }
+function yiOf(ch) { const o = {}; if (!ch || !ch.yi || !SAVE || !featureOn('rift')) return o; for (const id of ch.yi) { const g = yiGrade(id); if (g) o[id] = g; } return o; }
+function setYi(cls, id) {
+  const ch = SAVE.chars[cls], yi = ch.yi || (ch.yi = []), before = runMaxHpIf(cls);
+  const i = yi.indexOf(id);
+  if (i >= 0) yi.splice(i, 1); else { if (!yiGrade(id)) return { err: "Chưa thu phục thủ lĩnh chương này" }; if (yi.length >= 2) yi.shift(); yi.push(id); }
+  fixRunHp(cls, before); return { ok: true };
+}
+// 收一颗精魄：品级比现在高才算数，否则化成魂晶
+function zyTake(res, name, g) {
+  const cur = zyOf(name);
+  if (g > cur) { SAVE.zy[MK(name)] = g; res.zy.push([name, g, cur]); }
+  else res.mats += 2;
+}
+
+// ---------------- 图鉴与成就 ----------------
+function bestiaryTier(name) { const k = (SAVE.kills || {})[MK(name)] || 0; let t = 0; for (const x of BESTIARY_TIERS) if (k >= x) t++; return t; }
+function bestiaryTiers() { let n = 0; for (const name in SAVE.kills) n += bestiaryTier(name); return n; }
+const bestiaryBonus = name => 0;
+function allMonsterDefs() {
+  const out = [], seen = new Set();
+  const add = (d, kind) => { if (!seen.has(d.n)) { seen.add(d.n); out.push({ ...d, kind }); } };
+  RIFT_THEMES.forEach(T => { T.mons.forEach(m => add(m, 'mon')); add(T.boss, 'boss'); if (T.boss.twin) add({ ...T.boss.twin }, 'boss'); });
+  add(GOBLIN, 'goblin');
+  return out;
+}
+function checkAch() {
+  const got = [];
+  for (const A of ACHIEVEMENTS) if (!SAVE.ach[A.id]) { let ok = false; try { ok = A.chk(SAVE); } catch (e) {} if (ok) { SAVE.ach[A.id] = Date.now(); got.push(A); } }
+  return got;
+}
+function globalStats() {
+  const s = {};
+  const add = (k, v) => { s[k] = (s[k] || 0) + v; };
+  if (featureOn('para')) for (const P of PARAGON_STATS) { const n = SAVE.para.pts[P.k] || 0; if (n) add(P.k, n * P.v); }
+  if (featureOn('rift')) ZY_PAGES.forEach((Pg, i) => { const n = zyPagePts(i); if (n) for (const k in Pg.st) add(k, +(n * Pg.st[k]).toFixed(2)); });
+  return s;
+}
+
+// ---------------- 属性 ----------------
+const STAT_KEYS = Object.keys(STAT_NAMES);
+function calcStats(clsId, eq, level, buffs, ch) {
+  const C = CLASSES[clsId], s = { sk: {} };
+  for (const k of STAT_KEYS) s[k] = 0;
+  s.hp = C.base.hp + C.per.hp * (level - 1);
+  s.atk = C.base.atk + C.per.atk * (level - 1);
+  s.armor = C.base.armor + C.per.armor * (level - 1);
+  s.crit = C.base.crit; s.critDmg = C.base.critDmg; s.spd = C.base.spd || 0; s.res = C.base.res || 0;
+  const fx = new Set(), setCount = {};
+  const add = (k, v) => { if (k.startsWith('sk_')) s.sk[k.slice(3)] = (s.sk[k.slice(3)] || 0) + v; else s[k] = (s[k] || 0) + v; };
+  for (const sl of SLOT_IDS) {
+    const it = eq[sl]; if (!it) continue;
+    const st = itemStats(it); for (const k in st) add(k, st[k]);
+    if (it.set) setCount[it.set] = (setCount[it.set] || 0) + 1;
+    const L = legendOf(it); if (L) fx.add(L.fx);
+  }
+  for (const id in setCount) {
+    const S = SETS.find(x => x.id === id); if (!S) continue;
+    if (setCount[id] >= 2) for (const k in S.b2) add(k, S.b2[k]);
+    if (setCount[id] >= 4) fx.add(S.b4);
+    if (setCount[id] >= 6 && S.b6) fx.add(S.b6);
+  }
+  if (ch) {
+    const tal = ch.tal || {};
+    for (const Bq of talentBranches(clsId)) Bq.t.forEach(T => {
+      const r = tal[Bq.id + '.' + T.id] || 0; if (!r) return;
+      if (T.st) for (const k in T.st) add(k, T.st[k] * r);
+      if (T.fx) fx.add(T.fx);
+    });
+    for (const lid of ch.cube || []) { const L = lid && LEGENDS.find(l => l.id === lid); if (L && SAVE.cube[lid]) fx.add(L.fx); }
+    const yi = yiOf(ch);
+    if (yi.guiwang) { add('mf', 12 + yi.guiwang * 8); add('gf', 20 + yi.guiwang * 10); }
+    if (yi.mozun) add('dmgPct', 8 + yi.mozun * 4);
+  }
+  if (SAVE) { const g = globalStats(); for (const k in g) add(k, g[k]); }
+  if (buffs) for (const k in buffs) add(k, buffs[k]);
+  s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100)));
+  s.armorT = Math.round(s.armor * (1 + s.armorPct / 100));
+  s.atk = Math.round(s.atk);
+  s.crit = Math.min(75, Math.round(s.crit * 10) / 10); s.res = Math.min(75, Math.round(s.res * 10) / 10);
+  s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10;
+  s.dodge = Math.min(45, s.dodge + (fx.has('dodge') ? 15 : 0));
+  if (fx.has('boneArmy')) s.minion += 1;
+  s.fx = fx; s.setCount = setCount; s.level = level; s.cls = clsId;
+  return s;
+}
+function charStats(clsId, buffs) { const ch = SAVE.chars[clsId]; return calcStats(clsId, ch.eq, ch.level, buffs, ch); }
+function power(s) {
+  const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100);
+  const ehp = s.maxHp * (1 + s.armorT / 120) / (1 - s.res / 100 * 0.6) * (1 + s.dodge / 100) + s.regen * 25 + s.thorns * 8;
+  let skb = 0; for (const k in s.sk) skb += s.sk[k];
+  let rs = 0; for (const f of s.fx) if (RSET_FX.has(f)) rs++;   // 幻境套装的 4 件、6 件效果很值钱，「一键换上最强」不能把它拆散
+  return Math.round(Math.sqrt(off * ehp) * (1 + s.leech / 40) * (1 + s.fx.size * 0.08 + s.minion * 0.1 + s.freeze / 200 + s.poison / 200 + skb / 600) * (1 + rs * 0.3));
+}
+const RSET_FX = new Set(SETS.filter(S => S.rift).flatMap(S => [S.b4, S.b6]));
+function powerWith(cls, item) { const ch = SAVE.chars[cls]; return power(calcStats(cls, { ...ch.eq, [item.slot]: item }, ch.level, null, ch)); }
+
+// ---------------- 等级 ----------------
+const MAX_LV = MAX_LEVEL;
+const xpNeed = L => Math.round(40 * Math.pow(L, 1.75));
+function gainXp(cls, x) {
+  const ch = SAVE.chars[cls]; let ups = 0, pups = 0;
+  if (ch.level < MAX_LV) {
+    ch.xp += x; x = 0;
+    while (ch.level < MAX_LV && ch.xp >= xpNeed(ch.level)) { ch.xp -= xpNeed(ch.level); ch.level++; ups++; }
+    if (ch.level >= MAX_LV) { x = ch.xp; ch.xp = 0; }
+  }
+  if (x > 0) {
+    SAVE.para.xp += x;
+    while (SAVE.para.xp >= paraNeed(SAVE.para.lv)) { SAVE.para.xp -= paraNeed(SAVE.para.lv); SAVE.para.lv++; pups++; }
+  }
+  return ups + pups;
+}
+
+// ---------------- 装备操作 ----------------
+function runMaxHpIf(cls) { return SAVE.run && SAVE.run.cls === cls ? runStats(SAVE.run).maxHp : 0; }
+function fixRunHp(cls, before) {
+  const r = SAVE.run; if (!r || r.cls !== cls || !before) return;
+  const after = runStats(r).maxHp;
+  r.hp = Math.max(1, Math.min(after, Math.round(r.hp * after / before)));
+}
+function checkSet4(cls) { const s = charStats(cls); if (Object.values(s.setCount).some(n => n >= 4)) SAVE.flags.set4 = true; }
+function equipItem(cls, id) {
+  const ch = SAVE.chars[cls], i = SAVE.stash.findIndex(x => x.id === id);
+  if (i < 0) return false;
+  const it = SAVE.stash[i]; if (!canEquip(it, cls)) return false;
+  const before = runMaxHpIf(cls);
+  SAVE.stash.splice(i, 1);
+  if (ch.eq[it.slot]) SAVE.stash.push(ch.eq[it.slot]);
+  ch.eq[it.slot] = it;
+  fixRunHp(cls, before); checkSet4(cls); return true;
+}
+function unequip(cls, slot) {
+  const ch = SAVE.chars[cls]; if (!ch.eq[slot]) return;
+  const before = runMaxHpIf(cls);
+  SAVE.stash.push(ch.eq[slot]); delete ch.eq[slot];
+  fixRunHp(cls, before);
+}
+function returnGems(it) { for (const g of it.gems || []) if (!g.startsWith('L:')) SAVE.gems[g] = (SAVE.gems[g] || 0) + 1; it.gems = []; }
+function sellItem(id) {
+  const i = SAVE.stash.findIndex(x => x.id === id); if (i < 0) return 0;
+  const it = SAVE.stash[i], p = sellPrice(it); returnGems(it);
+  SAVE.gold += p; SAVE.stash.splice(i, 1); return p;
+}
+const isJunk = it => (it.rarity === 'normal' || it.rarity === 'magic') && !(it.plus > 0) && !(it.gems && it.gems.length);
+function sellJunk() {
+  let g = 0, n = 0;
+  SAVE.stash = SAVE.stash.filter(it => { if (isJunk(it)) { g += sellPrice(it); n++; return false; } return true; });
+  SAVE.gold += g; return { g, n };
+}
+function bestGear(cls) {
+  const ch = SAVE.chars[cls]; const before = runMaxHpIf(cls); let changed = 0;
+  for (let pass = 0; pass < 2; pass++) for (const sl of SLOT_IDS) {
+    let bestP = power(calcStats(cls, ch.eq, ch.level, null, ch)), best = null;
+    for (const it of SAVE.stash) {
+      if (it.slot !== sl || !canEquip(it, cls)) continue;
+      const p = power(calcStats(cls, { ...ch.eq, [sl]: it }, ch.level, null, ch));
+      if (p > bestP) { bestP = p; best = it; }
+    }
+    if (best) { SAVE.stash.splice(SAVE.stash.indexOf(best), 1); if (ch.eq[sl]) { SAVE.stash.push(ch.eq[sl]); if ((ch.eq[sl].plus || 0) > 0 || (ch.eq[sl].gems && ch.eq[sl].gems.length)) bestGear.left = (bestGear.left || []).concat([ch.eq[sl]]); } ch.eq[sl] = best; changed++; }
+  }
+  fixRunHp(cls, before); checkSet4(cls); return changed;
+}
+function storeItem(run, it) {
+  if (it.rarity === 'legend') { SAVE.flags.legend = true; SAVE.codex = SAVE.codex || {}; if (it.legend) SAVE.codex[it.legend] = 1; (SAVE.newLeg = SAVE.newLeg || []).push(it.name); }
+  if (it.anc === 1) SAVE.flags.ancient = true;
+  if (it.anc === 2) SAVE.flags.primal = true;
+  if (SAVE.stash.length >= stashMax()) {
+    const junk = SAVE.stash.filter(isJunk).sort((a, b) => sellPrice(a) - sellPrice(b))[0];
+    if (junk) sellItem(junk.id);
+  }
+  SAVE.stash.push(it);
+  if (run) { run.loot.push(it); if (!SAVE.chars[run.cls].eq[it.slot] && canEquip(it, run.cls)) { equipItem(run.cls, it.id); it.auto = true; } }
+  return it;
+}
+const topLevel = () => Math.max(...CLASS_IDS.map(c => SAVE.chars[c].level));
+function gamblePrice(cls) { return Math.round((40 + SAVE.chars[cls].level * 18) * (1 - bLv('merchant') * 0.08)); }
+function gamble(cls, slot) {
+  const p = gamblePrice(cls); if (SAVE.gold < p) return null;
+  SAVE.gold -= p;
+  return storeItem(null, makeItem({ slot, ilvl: SAVE.chars[cls].level + 2, rarity: rollRarity('gamble', 0, 0), cls }));
+}
+
+// ---------------- 铁匠：强化 / 打孔 / 镶嵌 / 分解 / 重铸 / 魔盒 ----------------
+function findOwned(id) {
+  const s = SAVE.stash.find(x => x.id === id); if (s) return s;
+  for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] && SAVE.chars[c].eq[sl].id === id) return SAVE.chars[c].eq[sl];
+  return null;
+}
+function ownerOf(it) { for (const c of CLASS_IDS) if (SAVE.chars[c].eq[it.slot] === it) return c; return null; }
+function withOwnerHp(it, fn) { const o = ownerOf(it), b = o ? runMaxHpIf(o) : 0; const r = fn(); if (o) fixRunHp(o, b); return r; }
+function enhanceCost(it) { const p = it.plus || 0; return { gold: Math.round((20 + it.ilvl * 4) * (p + 1)), mats: p + 1, rate: Math.min(1, ENHANCE_RATE[p] + bLv('smith') * 0.03) }; }
+function enhance(it) {
+  if ((it.plus || 0) >= smithMax()) return { err: (it.plus || 0) >= ENHANCE_MAX ? "Đã cường hóa tối đa" : `Tiệm rèn chưa đủ cấp, giờ chỉ cường hóa được tối đa +${smithMax()}` };
+  const c = enhanceCost(it);
+  if (SAVE.gold < c.gold) return { err: "Không đủ tiền vàng" };
+  if (SAVE.mats < c.mats) return { err: "Không đủ mảnh linh hồn" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats; track('forge');
+  const ok = RNG.ch(c.rate);
+  if (ok) withOwnerHp(it, () => { it.plus = (it.plus || 0) + 1; });
+  if (it.plus >= 10) SAVE.flags.plus10 = true;
+  return { ok };
+}
+function socketCost(it) { const n = it.sockets || 0; return { gold: Math.round((60 + it.ilvl * 8) * (n + 1)), mats: 4 * (n + 1) }; }
+function addSocket(it) {
+  if ((it.sockets || 0) >= MAX_SOCKETS[it.slot]) return { err: "Vị trí này đã đục đủ lỗ" };
+  const c = socketCost(it);
+  if (SAVE.gold < c.gold) return { err: "Không đủ tiền vàng" };
+  if (SAVE.mats < c.mats) return { err: "Không đủ mảnh linh hồn" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats; it.sockets = (it.sockets || 0) + 1; return { ok: true };
+}
+const salvageValue = it => ({ normal: 1, magic: 2, rare: 4, set: 8, legend: 10 }[it.rarity] + (it.plus || 0) * 2 + (it.anc ? 10 : 0));
+function salvage(id) {
+  const i = SAVE.stash.findIndex(x => x.id === id); if (i < 0) return 0;
+  const it = SAVE.stash[i], v = salvageValue(it); returnGems(it);
+  SAVE.stash.splice(i, 1); SAVE.mats += v; return v;
+}
+function salvageJunk() {
+  let m = 0, n = 0;
+  SAVE.stash = SAVE.stash.filter(it => { if (isJunk(it)) { m += salvageValue(it); n++; return false; } return true; });
+  SAVE.mats += m; return { m, n };
+}
+// ---------------- 装备养成：成色、淬炼、洗炼、传承、升阶、特殊词条 ----------------
+const genMult = it => ({ rare: 1.1, set: 1.2, legend: 1.05 }[it.rarity] || 1);
+function affRange(k, ilvl, mult) { const a = AFFIXES.find(x => x.k === k); if (!a) return null; const sc = affSc(a, ilvl); return [Math.max(1, Math.round(a.r[0] * sc * mult)), Math.max(1, Math.round(a.r[1] * sc * mult))]; }
+// 成色：这条词条在它能出的范围里排第几（0~1）
+function affQ(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r || r[1] <= r[0]) return 1; return Math.max(0, Math.min(1, (v - r[0]) / (r[1] - r[0]))); }
+const affStars = q => 1 + Math.min(4, Math.floor(q * 5));
+function itemQ(it) { if (!it.aff || !it.aff.length) return null; return it.aff.reduce((s, [k, v]) => s + affQ(it, k, v), 0) / it.aff.length; }
+const busyRoll = it => !!(it.rfPending || it.wsPending || it.rrPending);
+// 淬炼：一条词条的数值重新摇一次，新旧二选一
+function refineCost(it) { const n = it.rfn || 0; return { gold: Math.round((30 + it.ilvl * 5) * (1 + n * 0.25)), mats: 2 + Math.floor(n / 2) }; }
+function refineStart(it, idx) {
+  if (busyRoll(it)) return { err: "Kết quả lần trước còn chưa chọn" };
+  const a = it.aff[idx], A = a && AFFIXES.find(x => x.k === a[0]); if (!A) return { err: "Thuộc tính này không tôi luyện được" };
+  const c = refineCost(it); if (SAVE.gold < c.gold) return { err: "Không đủ bạc" }; if (SAVE.mats < c.mats) return { err: "Không đủ hồn tinh" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats; it.rfn = (it.rfn || 0) + 1;
+  it.rfPending = { idx, opts: [[...a], [a[0], affixValue(A, it.ilvl, genMult(it), it.anc === 2)]] }; return { ok: true };
+}
+function refinePick(it, c) { const P = it.rfPending; if (!P) return; withOwnerHp(it, () => { it.aff[P.idx] = P.opts[c]; }); delete it.rfPending; }
+// 洗炼：锁住想留的词条，其余全部换新；洗完新旧整套二选一
+function washCost(it, nLock) { const n = it.wsn || 0; return { gold: Math.round((60 + it.ilvl * 8) * (1 + n * 0.2) * (1 + nLock * 0.8)), mats: 4 + nLock * 3 + Math.floor(n / 2) }; }
+function washStart(it, locks) {
+  if (busyRoll(it)) return { err: "Kết quả lần trước còn chưa chọn" };
+  if (!it.aff.length) return { err: "Món trang bị này không có thuộc tính" };
+  locks = [...new Set(locks)].filter(i => it.aff[i]); if (locks.length >= it.aff.length) return { err: "Phải chừa ít nhất một dòng không khóa" };
+  const c = washCost(it, locks.length); if (SAVE.gold < c.gold) return { err: "Không đủ bạc" }; if (SAVE.mats < c.mats) return { err: "Không đủ hồn tinh" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats; it.wsn = (it.wsn || 0) + 1;
+  const L = legendOf(it), keep = locks.map(i => it.aff[i][0]).concat(L ? Object.keys(L.imp) : []);
+  const fresh = rollAffixes(it.aff.length - locks.length, it.ilvl, genMult(it), keep, it.anc === 2, it.slot);
+  let j = 0; const neo = it.aff.map((a, i) => locks.includes(i) ? [...a] : (fresh[j++] || [...a]));
+  it.wsPending = { opts: [it.aff.map(a => [...a]), neo] }; return { ok: true };
+}
+function washPick(it, c) { const P = it.wsPending; if (!P) return; withOwnerHp(it, () => { it.aff = P.opts[c]; }); delete it.wsPending; }
+// 传承：把旧装备的强化（降一级）、孔和宝石转到同部位的新装备上
+function inheritCost(dst, src) { const p = Math.max(1, src.plus || 0); return { gold: Math.round((40 + dst.ilvl * 6) * p), mats: p }; }
+const canInherit = (dst, src) => src && dst && src !== dst && src.slot === dst.slot && ((src.plus || 0) > 0 || (src.gems && src.gems.length));
+function inheritFrom(dst, src) {
+  if (!canInherit(dst, src)) return { err: "Không truyền thừa được" };
+  const c = inheritCost(dst, src); if (SAVE.gold < c.gold) return { err: "Không đủ bạc" }; if (SAVE.mats < c.mats) return { err: "Không đủ hồn tinh" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats;
+  const plus = Math.max(0, (src.plus || 0) - 1), gems = [...(src.gems || [])], socks = src.sockets || 0;
+  withOwnerHp(src, () => { src.plus = 0; src.gems = []; });
+  const over = [];
+  withOwnerHp(dst, () => {
+    dst.plus = Math.min(ENHANCE_MAX, Math.max(dst.plus || 0, plus));
+    dst.gems = dst.gems || []; dst.sockets = Math.max(dst.sockets || 0, Math.min(MAX_SOCKETS[dst.slot], socks));
+    for (const g of gems) { if (dst.gems.length < dst.sockets) dst.gems.push(g); else over.push(g); }
+  });
+  if (over.length) returnGems({ gems: over });
+  return { ok: true, plus: dst.plus, gems: gems.length - over.length };
+}
+// 升阶：稀有、套装、神兵可以升到当前章节的阶数，词条按比例一起涨
+const upTierOK = it => ['rare', 'set', 'legend'].includes(it.rarity);
+function upTierTarget(cls) { return chIlvl(curChapter(), SAVE.chars[cls || SAVE.cls].level); }
+function upTierCost(it, L) { const d = Math.max(1, tierOf(L) - tierOf(it.ilvl)); return { gold: Math.round((150 + L * 15) * d), mats: 5 * d }; }
+function upTier(it, L) {
+  if (!upTierOK(it) || L <= it.ilvl) return { err: "Không thăng giai được" };
+  const c = upTierCost(it, L); if (SAVE.gold < c.gold) return { err: "Không đủ bạc" }; if (SAVE.mats < c.mats) return { err: "Không đủ hồn tinh" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats;
+  const old = it.ilvl, b0 = implicitFor(it.slot, old), b1 = implicitFor(it.slot, L);
+  withOwnerHp(it, () => {
+    const imp = {};
+    for (const k in it.imp) {
+      if (k === 'spd') imp[k] = it.imp[k] + (it.slot === 'boots' ? (b1.spd || 0) - (b0.spd || 0) : 0);
+      else if (b0[k]) imp[k] = Math.round(it.imp[k] * b1[k] / b0[k]);
+      else imp[k] = Math.max(1, Math.round(it.imp[k] * (0.45 + L / 20) / (0.45 + old / 20)));
+    }
+    it.imp = imp;
+    it.aff = it.aff.map(([k, v]) => { const a = AFFIXES.find(x => x.k === k); return a ? [k, Math.max(1, Math.round(v * affSc(a, L) / affSc(a, old)))] : [k, v]; });
+    it.ilvl = L; it.tier = tierOf(L);
+  });
+  return { ok: true };
+}
+// 给装备加一条特殊词条（悬赏、鬼市的货）：顶掉最后一条普通词条
+function addSpecial(it, k) {
+  const keys = SP_AFFIXES.filter(x => !it.aff.some(a => a[0] === x)); if (!keys.length) return it;
+  k = k && keys.includes(k) ? k : RNG.pick(keys); const A = AFFIXES.find(a => a.k === k);
+  const v = affixValue(A, it.ilvl, 1, it.anc === 2);
+  if (it.aff.length >= 3 || (it.rarity !== 'magic' && it.aff.length >= 2)) it.aff[it.aff.length - 1] = [k, v]; else it.aff.push([k, v]);
+  it.sp = 1; return it;
+}
+function rerollCost(it) { const n = it.rrn || 0; return { gold: Math.round((50 + it.ilvl * 6) * (1 + n * 0.3)), mats: 4 + n }; }
+function rerollStart(it, idx) {
+  if (it.rr != null && it.rr !== idx) return { err: "Món này đã đúc lại một thuộc tính khác, chỉ có thể tiếp tục đúc lại dòng đó" };
+  if (!it.aff[idx]) return { err: "Không có thuộc tính này" };
+  const c = rerollCost(it);
+  if (SAVE.gold < c.gold) return { err: "Không đủ tiền vàng" };
+  if (SAVE.mats < c.mats) return { err: "Không đủ mảnh linh hồn" };
+  SAVE.gold -= c.gold; SAVE.mats -= c.mats;
+  const L = legendOf(it), excl = [...it.aff.filter((_, i) => i !== idx).map(a => a[0]), ...(L ? Object.keys(L.imp) : [])];
+  it.rr = idx; it.rrn = (it.rrn || 0) + 1;
+  it.rrPending = { idx, opts: [it.aff[idx], ...rollAffixes(2, it.ilvl, affMult(it), excl, it.anc === 2, it.slot)] };
+  return { ok: true };
+}
+function rerollPick(it, c) {
+  if (!it.rrPending) return;
+  withOwnerHp(it, () => { it.aff[it.rrPending.idx] = it.rrPending.opts[c]; });
+  delete it.rrPending;
+}
+function extractLegend(id) {
+  const i = SAVE.stash.findIndex(x => x.id === id); if (i < 0) return { err: "Chỉ trích xuất được truyền kỳ trong kho" };
+  const it = SAVE.stash[i]; if (!it.legend) return { err: "Chỉ trang bị truyền kỳ mới có hiệu ứng để trích xuất" };
+  if (SAVE.cube[it.legend]) return { err: "Trong hộp ma thuật đã có hiệu ứng này" };
+  if (SAVE.mats < 10) return { err: "Cần 10 mảnh linh hồn" };
+  SAVE.mats -= 10; returnGems(it); SAVE.stash.splice(i, 1); SAVE.cube[it.legend] = true; return { ok: true, lid: it.legend };
+}
+function setCube(cls, slot, lid) {
+  const ch = SAVE.chars[cls], before = runMaxHpIf(cls);
+  if (lid && !SAVE.cube[lid]) return;
+  ch.cube = ch.cube.map((x, i) => i === slot ? (lid || null) : (x === lid ? null : x));
+  fixRunHp(cls, before);
+}
+const gemKey = (t, tier) => t + '_' + tier;
+function gemName(key) {
+  if (key.startsWith('L:')) { const g = SAVE.lgems.find(x => x.id === key.slice(2)); return g ? `${LGEMS[g.t].n} (cấp ${g.lv})` : "Ngọc truyền kỳ"; }
+  const [t, tier] = key.split('_'); return joinName(GEM_TIERS[+tier], GEM_TYPES[t].n);
+}
+function gemDesc(key) {
+  if (key.startsWith('L:')) { const g = SAVE.lgems.find(x => x.id === key.slice(2)); return g ? LGEMS[g.t].d(g.lv) : ''; }
+  const [t, tier] = key.split('_'); const G = GEM_TYPES[t]; return `+${G.v[+tier]}${PCT_STATS.has(G.st) ? '%' : ''} ${STAT_NAMES[G.st]}`;
+}
+const gemColor = key => key.startsWith('L:') ? (LGEMS[(SAVE.lgems.find(x => x.id === key.slice(2)) || {}).t] || { c: '#fff' }).c : GEM_TYPES[key.split('_')[0]].c;
+function addGem(key, n = 1) { SAVE.gems[key] = (SAVE.gems[key] || 0) + n; }
+// 剧情里玉石还没开放：捡到的先悄悄攒着，不在战利品里显示，通关后一起拿出来
+function dropGem(res, key) { if (featureOn('gems')) res.gems.push(key); else addGem(key); }
+function socketGem(it, key) {
+  if (!SAVE.gems[key]) return { err: "Không có viên ngọc này" };
+  if ((it.gems || []).length >= (it.sockets || 0)) return { err: "Không có lỗ trống" };
+  withOwnerHp(it, () => { it.gems.push(key); });
+  if (--SAVE.gems[key] <= 0) delete SAVE.gems[key];
+  return { ok: true };
+}
+const lgemHost = gid => { for (const it of allItems()) if ((it.gems || []).includes('L:' + gid)) return it; return null; };
+function allItems() { const a = [...SAVE.stash]; for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl]) a.push(SAVE.chars[c].eq[sl]); return a; }
+function socketLgem(it, gid) {
+  if (it.slot !== 'ring' && it.slot !== 'amulet') return { err: "Ngọc truyền kỳ chỉ khảm được vào nhẫn hoặc bùa hộ mệnh" };
+  if ((it.gems || []).length >= (it.sockets || 0)) return { err: "Không có lỗ trống" };
+  if (lgemHost(gid)) return { err: "Viên ngọc này đã khảm vào trang bị khác" };
+  withOwnerHp(it, () => { it.gems.push('L:' + gid); }); return { ok: true };
+}
+const unsocketCost = key => key.startsWith('L:') || bLv('jewel') >= 3 ? 0 : 30 * (+key.split('_')[1] + 1);
+function unsocket(it, idx) {
+  const key = it.gems[idx]; if (!key) return { err: "Chỗ này không có ngọc" };
+  const c = unsocketCost(key); if (SAVE.gold < c) return { err: "Không đủ tiền vàng" };
+  SAVE.gold -= c; withOwnerHp(it, () => { it.gems.splice(idx, 1); });
+  if (!key.startsWith('L:')) addGem(key);
+  return { ok: true };
+}
+const combineCost = key => Math.round(20 * Math.pow(+key.split('_')[1] + 1, 2) * (1 - bLv('jewel') * 0.2));
+function combineGem(key) {
+  const [t, tier] = key.split('_');
+  if (+tier >= 4) return { err: "Đã đạt cấp cao nhất" };
+  if (+tier + 1 > gemCap()) return { err: `Xưởng ngọc chưa đủ cấp, giờ chỉ ghép tối đa đến “${GEM_TIERS[gemCap()]}”` };
+  if ((SAVE.gems[key] || 0) < 3) return { err: "Cần 3 viên ngọc giống nhau" };
+  const c = combineCost(key); if (SAVE.gold < c) return { err: "Không đủ tiền vàng" };
+  SAVE.gold -= c; SAVE.gems[key] -= 3; if (!SAVE.gems[key]) delete SAVE.gems[key];
+  const nk = gemKey(t, +tier + 1); addGem(nk); return { ok: true, key: nk };
+}
+function rollGem(run) {
+  const d = diffIdx(run);
+  const tier = Math.max(0, Math.min(4, d + (run.floor >= 3 ? 1 : 0) + (RNG.ch(0.2) ? 1 : 0)));
+  return gemKey(RNG.pick(Object.keys(GEM_TYPES)), tier);
+}
+
+// ---------------- 技能顺序与符文 ----------------
+const LOADOUT_MAX = 4;
+const SKILL_PRIO = { berserker: ['liedi', 'lieyan', 'whirl', 'bloodlust', 'bawang', 'hanren', 'warcry', 'butui'],
+  mage: ['fireball', 'luoshi', 'jinguang', 'frostnova', 'chain', 'lunzhuan', 'meteor', 'wulei'],
+  necro: ['summon', 'shidu', 'jihuo', 'corpse', 'bonestorm', 'yangshi', 'curse', 'tudun'],
+  assassin: ['venom', 'deathmark', 'bingpo', 'shadowkill', 'dici', 'fan', 'shadowstep', 'yandun'],
+  paladin: ['hammer', 'fuhu', 'aegis', 'ganlu', 'budong', 'judgement', 'prayer', 'chanhou'] };
+// 已学会的主动技能里，按装配顺序取前 4 个；空位自动补上新学会的
+function syncLoadout(cls) {
+  const ch = SAVE.chars[cls], C = CLASSES[cls];
+  const ok = id => C.skills.some(k => k.id === id && k.cd && k.lv <= ch.level);
+  // 没手动换过技能的话，按推荐顺序自动带上最搭的四招
+  if (!ch.loadoutManual && SKILL_PRIO[cls]) { const L0 = SKILL_PRIO[cls].filter(ok).slice(0, LOADOUT_MAX); for (const k of C.skills) if (L0.length < LOADOUT_MAX && k.cd && ok(k.id) && !L0.includes(k.id)) L0.push(k.id); ch.loadout = L0; return L0; }
+  let L = (ch.loadout || []).filter(ok);
+  for (const k of C.skills) if (L.length < LOADOUT_MAX && k.cd && k.lv <= ch.level && !L.includes(k.id) && !(ch.unequipped || {})[k.id]) L.push(k.id);
+  ch.loadout = L; return L;
+}
+function skillList(cls) {
+  const C = CLASSES[cls], L = syncLoadout(cls);
+  return { act: L.map(id => C.skills.find(k => k.id === id)), basic: C.skills.find(k => !k.cd), all: C.skills.filter(k => k.cd) };
+}
+function equipSkill(cls, id) {
+  const ch = SAVE.chars[cls], L = syncLoadout(cls); ch.unequipped = ch.unequipped || {}; ch.loadoutManual = 1;
+  if (L.includes(id)) { ch.loadout = L.filter(x => x !== id); ch.unequipped[id] = 1; return 'off'; }
+  if (L.length >= LOADOUT_MAX) return 'full';
+  delete ch.unequipped[id]; ch.loadout = L.concat(id); return 'on';
+}
+function moveSkill(cls, id, dir) {
+  const ch = SAVE.chars[cls], L = syncLoadout(cls).slice(), i = L.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= L.length) return;
+  [L[i], L[j]] = [L[j], L[i]]; ch.loadout = L; ch.loadoutManual = 1;
+}
+function setRune(cls, id, r) { const rs = SAVE.chars[cls].runes; if (rs[id] === r) delete rs[id]; else rs[id] = r; }
+
+// ---------------- 一局地下城（迷宫） ----------------
+const MW = 5, MH = 6;
+function riftD(N) { return { n: "Bí cảnh · tầng " + N + " ", base: 6 + Math.round(N * 1.4), res: Math.min(60, Math.round(N * 1.2)), hpMul: Math.pow(1.075, N), atkMul: Math.pow(1.055, N), loot: Math.min(4, 0.5 + N / 15) }; }
+const dOf = run => run.mode === 'rift' ? riftD(run.riftLv) : DIFFS[run.diff];
+const themeOf = run => run.mode === 'rift' ? RIFT_THEMES[run.theme] : CHAPTERS[run.chapter - 1];
+const diffIdx = run => run.mode === 'rift' ? Math.min(2, Math.floor(run.riftLv / 15)) : DIFF_IDS.indexOf(run.diff);
+const hasMod = (run, id) => (run.mods || []).includes(id);
+const riftUnlocked = () => featureOn('rift');
+function runStats(run) {
+  const F = run.food && typeof FOODS !== 'undefined' && FOODS.find(f => f.id === run.food);
+  if (F && F.st) { const b = { ...run.buffs }; for (const k in F.st) b[k] = (b[k] || 0) + F.st[k]; return charStats(run.cls, b); }
+  return charStats(run.cls, run.buffs);
+}
+function cellLv(run, c) {
+  if (c && c.lv != null) return c.lv;
+  const M = run.maze, frac = (c ? c.dist : 0) / Math.max(1, M.maxDist);
+  if (run.mode === 'rift') return dOf(run).base + Math.floor(frac * 3);
+  return dOf(run).base + CHAPTERS[run.chapter - 1].base + (run.floor - 1) + Math.floor(frac * 2);
+}
+function curCell(run) { return run.world ? (run.encCell || (run.encCell = {})) : run.maze.cells[run.pos]; }
+function isAway(cls) { return false; }
+
+function newRun(cls, opts = {}) {
+  const mode = opts.mode || 'story', mods = opts.mods || [];
+  const run = { cls, mode, diff: opts.diff || 'normal', riftLv: opts.riftLv || 1, chapter: opts.chapter || 1, mods, floor: 1,
+                potions: mods.includes('scarce') ? 0 : 3 + bLv('alchemist'), buffs: {}, loot: [], goldGot: 0, xpGot: 0, gemsGot: 0, matsGot: 0,
+                kills: 0, t0: Date.now(), lvStart: SAVE.chars[cls].level, paraStart: SAVE.para.lv, hp: 0, ended: null, rooms: 0, xpMul: 1.5, prog: 0 };
+  for (const id of mods) { const M = DUNGEON_MODS.find(x => x.id === id); if (!M) continue;
+    if (M.mf) run.buffs.mf = (run.buffs.mf || 0) + M.mf; if (M.gf) run.buffs.gf = (run.buffs.gf || 0) + M.gf; if (M.xp) run.xpMul += M.xp / 100; }
+  if (mode === 'rift') { run.theme = RNG.i(0, RIFT_THEMES.length - 1); run.xpMul += 0.25; run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; }
+  else { const C = CHAPTERS[run.chapter - 1]; run.ngoc = C.ngoc === 'normal' ? 'normal' : C.ngoc === 'fox' ? 'fox' : null; }
+  if (!run.ngoc) run.comp = (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
+  genMaze(run);
+  run.hp = runStats(run).maxHp;
+  return run;
+}
+function genMaze(run) {
+  const N = MW * MH, cells = [], rift = run.mode === 'rift';
+  for (let i = 0; i < N; i++) cells.push({ i, x: i % MW, y: Math.floor(i / MW), links: [], type: 'empty', room: false, seen: false, visited: false, cleared: false, dist: -1 });
+  const nb = c => [[0, -1], [1, 0], [0, 1], [-1, 0]].map(([dx, dy]) => [c.x + dx, c.y + dy])
+    .filter(([x, y]) => x >= 0 && y >= 0 && x < MW && y < MH).map(([x, y]) => cells[y * MW + x]);
+  const link = (a, b) => { if (!a.links.includes(b.i)) { a.links.push(b.i); b.links.push(a.i); } };
+  const target = rift ? 18 : RNG.i(16, 18);
+  let rooms, start;
+  for (let tries = 0; tries < 30; tries++) {
+    cells.forEach(c => { c.links = []; c.room = false; });
+    start = cells[(MH - 1) * MW + RNG.i(1, MW - 2)]; start.room = true;
+    rooms = [start];
+    // 生长树：多数时候从最新的房间往外长（形成长走廊），偶尔从旧房间分叉（形成岔路和死胡同）
+    while (rooms.length < target) {
+      const from = RNG.ch(0.62) ? rooms[rooms.length - 1] : RNG.pick(rooms);
+      const opts = nb(from).filter(n => !n.room); if (!opts.length) { if (rooms.every(r => !nb(r).some(n => !n.room))) break; continue; }
+      const up = opts.filter(n => n.y < from.y), n = up.length && RNG.ch(0.35) ? RNG.pick(up) : RNG.pick(opts);
+      n.room = true; link(from, n); rooms.push(n);
+    }
+    if (rooms.length >= target && Math.min(...rooms.map(r => r.y)) <= 1) break;
+  }
+  // 少量环路
+  for (let k = 0; k < 2; k++) { const c = RNG.pick(rooms), n = nb(c).find(n => n.room && !c.links.includes(n.i)); if (n && RNG.ch(0.6)) link(c, n); }
+  const d = Array(N).fill(-1), par = Array(N).fill(-1), q = [start.i]; d[start.i] = 0;
+  while (q.length) { const i = q.shift(); for (const j of cells[i].links) if (d[j] < 0) { d[j] = d[i] + 1; par[j] = i; q.push(j); } }
+  rooms.forEach(c => { c.dist = d[c.i]; });
+  const maxDist = Math.max(...rooms.map(c => c.dist));
+  // 首领：最远处的死胡同优先
+  const far = rooms.filter(c => c !== start && c.dist >= maxDist - 1).sort((a, b) => (a.links.length - b.links.length) || b.dist - a.dist || a.y - b.y);
+  const boss = far[0];
+  // 首领房间只留一个入口，避免绕路
+  if (boss.links.length > 1) { const keep = boss.links.reduce((a, b) => d[a] <= d[b] ? a : b); for (const j of boss.links.slice()) if (j !== keep) { boss.links = boss.links.filter(x => x !== j); cells[j].links = cells[j].links.filter(x => x !== boss.i); } }
+  // 删掉入口后，确认其他房间都还连得上（不经过首领）
+  const ok = new Set([start.i]), q2 = [start.i];
+  while (q2.length) { const i = q2.shift(); for (const j of cells[i].links) if (j !== boss.i && !ok.has(j)) { ok.add(j); q2.push(j); } }
+  for (const c of rooms) if (c !== boss && !ok.has(c.i)) { const n = nb(c).find(n => n.room && n !== boss && ok.has(n.i)); if (n) { link(c, n); ok.add(c.i); } }
+  start.type = 'start'; boss.type = 'boss';
+  let keyC = null;
+  const free = () => rooms.filter(c => c.type === 'empty');
+  if (!rift) {
+    const onPath = new Set(); for (let i = boss.i; i >= 0; i = par[i]) onPath.add(i);
+    let pool = free().filter(c => !onPath.has(c.i) && c.dist >= maxDist * 0.4);
+    if (!pool.length) pool = free().filter(c => c.dist >= maxDist * 0.35);
+    if (!pool.length) pool = free();
+    const ends = pool.filter(c => c.links.length === 1);
+    keyC = RNG.pick(ends.length ? ends : pool); keyC.type = 'keeper';
+  }
+  const take = (type, n, pref) => { for (let k = 0; k < n; k++) { const pool = RNG.shuffle((pref ? free().filter(pref) : []).concat()); const c = pool[0] || RNG.pick(free()); if (c) c.type = type; } };
+  if (!rift) {
+    const C = CHAPTERS[run.chapter - 1];
+    if (run.floor === 2 && C.story) take('story', 1, c => c.dist >= maxDist * 0.3);
+  }
+  take('chest', 1, c => c.links.length === 1); take('rest', 1, c => c.dist >= maxDist * 0.4); take('event', 2);
+  if (run.floor === 2 || rift) take('shop', 1);
+  take('elite', 1 + (hasMod(run, 'elites') ? 2 : 0));
+  if (RNG.ch(rift ? 0.4 : 0.3)) take('goblin', 1);
+  take('gold', 1, c => c.links.length === 1);
+  take('battle', rift ? 7 : 5);
+  // 剩下的空房间：一半变成小战斗，一半留作通道
+  for (const c of free()) if (RNG.ch(0.5)) c.type = 'battle';
+  const F = themeOf(run);
+  for (const c of rooms) if (c.type === 'battle' || c.type === 'elite' || c.type === 'keeper') c.mon = RNG.i(0, F.mons.length - 1);
+  run.maze = { v: 2, cells, maxDist, start: start.i, boss: boss.i, key: keyC ? keyC.i : -1 };
+  run.pos = start.i; run.hasKey = false;
+  visit(run, start); start.cleared = true;
+}
+function visit(run, c) {
+  if (!c.visited) { run.rooms++; track('room'); }
+  c.visited = true; c.seen = true;
+  for (const j of c.links) run.maze.cells[j].seen = true;
+}
+function pathTo(run, target) {
+  const cells = run.maze.cells, t = cells[target]; if (!t || !t.seen) return null;
+  const prev = { [run.pos]: -1 }, q = [run.pos];
+  while (q.length) {
+    const i = q.shift(); if (i === target) break;
+    for (const j of cells[i].links) {
+      if (j in prev) continue;
+      if (!cells[j].visited && j !== target) continue;
+      prev[j] = i; q.push(j);
+    }
+  }
+  if (!(target in prev)) return null;
+  const path = []; for (let i = target; i !== -1; i = prev[i]) path.unshift(i);
+  return path;
+}
+function bossLocked(run) {
+  if (run.mode !== 'rift') return !run.hasKey;
+  if (run.prog >= 100) return false;
+  // 所有能打的房间都清空了就直接放行，避免差一点点卡住
+  return run.maze.cells.some(c => !c.cleared && ['battle', 'elite', 'goblin'].includes(c.type));
+}
+function moveTo(run, target) {
+  const c = run.maze.cells[target];
+  if (c.type === 'boss' && !c.cleared && bossLocked(run))
+    return { err: run.mode === 'rift' ? `Thủ hộ bí cảnh chưa xuất hiện: tiếp tục diệt quái để lấp đầy tiến độ (hiện tại ${Math.floor(run.prog)}%)` : "Cửa thủ lĩnh bị phong ấn. Hãy tìm hộ vệ chìa khóa, cướp lấy chìa khóa trước." };
+  const path = pathTo(run, target); if (!path) return { err: "Không qua được" };
+  run.pos = target; const fresh = !c.visited; visit(run, c);
+  if (run.mode === 'rift' && !run.riftDone) run.clock = (run.clock || 0) + RIFT_CLOCK.room * Math.max(1, path.length - 1);
+  return { cell: c, fresh, steps: path.length - 1 };
+}
+function clearCell(run) { const c = curCell(run); c.cleared = true; }
+function nextFloor(run) { run.floor++; genMaze(run); run.floorNew = true; EV.heal(run, 0.5); run.potions += hasMod(run, 'scarce') ? 0 : 1; }
+function endRun(run, outcome) {
+  run.ended = outcome; run.t1 = Date.now();
+  SAVE.stats.runs++;
+  if (outcome === 'win') {
+    SAVE.stats.wins++;
+    if (run.mode === 'story') {
+      const secs = Math.round((run.t1 - run.t0) / 1000), key = run.diff + '-' + run.chapter;
+      const b = SAVE.best[key];
+      if (!b || secs < b.t) { SAVE.best[key] = { t: secs, cls: run.cls, lv: SAVE.chars[run.cls].level }; run.record = !!b; }
+    }
+  }
+  run.ach = checkAch();
+  SAVE.run = null;
+}
+function openChest(run, q) {
+  run.evItems = []; if (run.world) EV.loot(run, q || 'chest'); else { EV.loot(run, 'elite'); if (RNG.ch(0.5)) EV.loot(run, 'normal'); }
+  const gems = RNG.ch(0.4) && featureOn('gems') ? [EV.gem(run)] : [];
+  track('chest');
+  return { items: run.evItems, gold: EV.gold(run, 5), gems };
+}
+function enterShop(run) {
+  const c = curCell(run);
+  if (!c.shop) {
+    const lv = cellLv(run, c) + 1, s = runStats(run);
+    c.shop = { items: Array.from({ length: 4 + bLv('merchant') }, () => { const it = makeItem({ ilvl: lv, rarity: rollRarity('elite', s.mf, dOf(run).loot), cls: run.cls }); return { it, price: Math.round(sellPrice(it) * 4 / (1 + bLv('merchant') * 0.1)), sold: false }; }),
+               potion: hasMod(run, 'scarce') ? 0 : 15 + lv * 3, gem: { key: rollGem(run), price: 60 + lv * 6, sold: false } };
+  }
+  return c.shop;
+}
+// ---------------- 剧情 ----------------
+function storyRoomData(run) { return CHAPTERS[run.chapter - 1].story; }
+function applyStoryReward(run, rw) {
+  const got = [];
+  if (!rw) return got;
+  if (rw.gold) got.push(`Bạc +${EV.gold(run, rw.gold * 3)}`);
+  if (rw.potion) { run.potions += rw.potion; got.push(`Đan dược +${rw.potion}`); }
+  if (rw.gem) { if (featureOn('gems')) got.push(`Nhận ${EV.gem(run)}`); else { addGem(rollGem(run)); got.push(`Nhận ${EV.gold(run, 3)} lượng`); } }
+  if (rw.mats) got.push(`Hồn tinh +${EV.mats(run, rw.mats)}`);
+  if (rw.heal) { EV.heal(run, rw.heal); got.push(rw.heal >= 1 ? "Khí huyết đầy" : `Hồi ${Math.round(rw.heal * 100)}% khí huyết`); }
+  if (rw.ngoc) { run.ngoc = rw.ngoc; got.push("Ngoc gia nhập trận đấu"); }
+  return got;
+}
+function collectPage(run) { SAVE.story.pages[run.chapter] = true; return CHAPTERS[run.chapter - 1].page; }
+function chapterUnlocked(diff, ch) { if (diff !== 'normal' && !SAVE.unlocked[diff]) return false; return ch <= storyCleared(diff) + 1; }
+function storyComplete(run) {
+  const ch = run.chapter, di = DIFF_IDS.indexOf(run.diff), first = storyCleared(run.diff) < ch;
+  const res = { first, chapter: ch, items: [], gold: 0, mats: 0, unlock: '' };
+  if (first) {
+    SAVE.story.cleared[run.diff] = ch;
+    res.gold = Math.round(150 * ch * (1 + di)); res.mats = 5 * ch;
+    SAVE.gold += res.gold; SAVE.mats += res.mats; run.goldGot += res.gold; run.matsGot += res.mats;
+    res.items.push(storeItem(run, makeItem({ ilvl: run.world ? chIlvl(run.chapter, 99) : cellLv(run, curCell(run)) + 2, rarity: rollRarity('cache', 50, di), cls: run.cls })));
+    if (run.diff === 'normal') {
+      res.unlock = CHAPTERS[ch - 1].unlock || '';
+      if (ch === 10) { SAVE.story.ended = true; SAVE.unlocked.nightmare = true; res.ending = true; }
+    }
+    if (run.diff === 'nightmare' && ch === 10) SAVE.unlocked.hell = true;
+  }
+  track('clear');
+  run.storyDone = res;
+  return res;
+}
+// ---------------- 试玩角色：直接从某一章开始（测试用） ----------------
+// 等级、装备、心法、同伴、前几章的道具和美食，都按「正常玩到这一章」准备
+const TEST_BACKUP_KEY = 'jiuyou-save-backup';
+const testLevel = (ch, inter) => inter ? CH_BAND[Math.min(10, ch)][1] + 1 : ch <= 1 ? 1 : ch === 2 ? 8 : CH_BAND[Math.min(10, ch)][0] + 1;
+// inter：直接从这一章结尾的幕间开始（前面的主线当作已经做完）
+function makeTestSave(cls, ch, inter) {
+  const prev = SAVE, s = newSave(); SAVE = s;
+  try {
+    s.test = { ch, cls, inter: !!inter }; s.cls = cls; s.chapter = ch; s.diff = 'normal';
+    s.story.cleared.normal = ch - 1; s.story.seen.prologue = 1;
+    for (let i = 1; i < ch; i++) s.story.seen['i' + i] = 1;
+    const C = s.chars[cls], L = testLevel(ch, inter); C.level = L; C.xp = 0;
+    if (ch > 1) {
+      SLOT_IDS.forEach((sl, i) => { const it = makeItem({ ilvl: L, rarity: i < 2 ? 'rare' : 'magic', slot: sl, cls }); s.stash.push(it); equipItem(cls, it.id); });
+      s.stash = s.stash.filter(it => it.rarity !== 'normal');
+    }
+    for (let g = 0; g < 60; g++) { let ok = false;
+      for (const B of talentBranches(cls)) for (let ti = 0; ti < B.t.length; ti++) if (!ok && canLearn(cls, B.id, ti)) { learnTalent(cls, B.id, ti); ok = true; }
+      if (!ok) break; }
+    syncLoadout(cls);
+    s.gold = 220 * (ch - 1); s.mats = 6 * (ch - 1);
+    s.comps = ch >= 3 ? { ngoc: 1, zhen: 1, long: 1 } : { ngoc: 1 }; s.comp = 'ngoc';
+    s.wflags = {}; for (let i = 1; i < ch; i++) s.wflags['dish' + i] = 1; if (ch >= 4) s.wflags.foodbook = 1;
+    s.keys = {};
+    if (typeof WQ !== 'undefined') for (let c = 2; c < ch; c++) { const Q = WQ[c]; if (!Q) continue;
+      for (const m of Q.main) if (m.rw && m.rw.key) s.keys[m.rw.key] = 1;
+      for (const q of Q.side) if (q.rw && q.rw.key) s.keys[q.rw.key] = 1; }
+    if (ch >= 3) s.keys.wolftooth = 1;
+    s.aff = { ngoc: Math.min(10, ch + 1), zhen: Math.min(10, ch - 1), kang: Math.min(10, ch - 1), long: Math.max(0, ch - 2), liu: Math.max(0, ch - 2) };
+    if (inter && typeof WQ !== 'undefined' && WQ[ch]) {
+      const M = WQ[ch].main, idx = M.findIndex(m => /^i/.test(m.id));
+      if (idx > 0) {
+        s.run = newWorldRun(cls, ch); const S = wstate(ch); let tele = null;
+        for (let i = 0; i < idx; i++) { const m = M[i]; if (m.set) Object.assign(S.flags, m.set); if (m.tele) tele = m.tele;
+          if (m.rw && m.rw.flag) s.wflags[m.rw.flag] = 1; if (m.rw && m.rw.key) s.keys[m.rw.key] = 1; if (m.comp) s.comps[m.comp] = 1; }
+        for (const q of WQ[ch].side) if (q.rw && q.rw.key) s.keys[q.rw.key] = 1;
+        S.main = idx; S.kc = 0;
+        if (tele) { wEnter(ch, tele[0], tele[1]); if (tele[2]) { S.camp = tele[2]; S.camps = [tele[2]]; } }
+        else wEnter(ch, WMAPS[ch].start, WMAPS[ch].startPt);
+        s.run = null;
+      }
+    }
+  } finally { SAVE = prev; }
+  return s;
+}
+// 秘境完成
+function riftGrade(run) { const tl = Math.max(0, 1 - (run.clock || 0) / riftLimit(run.riftLv)); return { tl, G: tl > 0 ? RIFT_GRADES.find(g => g.min >= 0 && tl >= g.min) : RIFT_GRADES[RIFT_GRADES.length - 1] }; }
+function riftComplete(run) {
+  const N = run.riftLv, { tl, G } = riftGrade(run);
+  run.timeLeft = tl; run.grade = G.n; run.jump = G.jump;
+  run.capBefore = SAVE.riftCap;
+  if (tl > 0) {
+    SAVE.riftMax = Math.max(SAVE.riftMax, N); SAVE.rift[run.cls] = Math.max(SAVE.rift[run.cls] || 0, N);
+    SAVE.riftCap = Math.max(SAVE.riftCap || 3, N + G.jump);
+    const R = SAVE.riftRec[run.cls], used = Math.round((run.clock || 0) / 100);
+    if (!R || N > R.lv || (N === R.lv && used < R.t)) { SAVE.riftRec[run.cls] = { lv: N, t: used, d: today() }; run.record = true; }
+  }
+  SAVE.stats.rifts++; track('rift');
+  const owned = new Set(SAVE.lgems.map(g => g.t)), un = Object.keys(LGEMS).filter(t => !owned.has(t));
+  let newGem = null;
+  if (un.length && (SAVE.lgems.length === 0 || RNG.ch(0.55))) { newGem = { id: uid(), t: RNG.pick(un), lv: 0 }; SAVE.lgems.push(newGem); }
+  run.upg = G.upg; run.riftDone = true; run.newGem = newGem;
+}
+// 幻境里倒下不算输：被吐回入口，香烧掉一截（倒得越多烧得越多）
+function riftRevive(run) {
+  run.deaths = (run.deaths || 0) + 1;
+  const pen = Math.round(riftLimit(run.riftLv) * Math.min(0.15, 0.05 + 0.03 * (run.deaths - 1)));
+  run.clock = (run.clock || 0) + pen; run.hp = runStats(run).maxHp; run.pos = run.maze.start;
+  return pen;
+}
+function lgemChance(g, N) { const d = N - g.lv; return d >= 10 ? 1 : d >= 0 ? 0.6 + d * 0.04 : Math.max(0.05, 0.6 + d * 0.1); }
+function upgradeLgem(run, gid) {
+  if (!run || !run.upg) return null;
+  const g = SAVE.lgems.find(x => x.id === gid); if (!g) return null;
+  run.upg--; const ok = RNG.ch(lgemChance(g, run.riftLv)); if (ok) withOwnerHpGem(gid, () => { g.lv++; });
+  return ok;
+}
+function withOwnerHpGem(gid, fn) { const host = lgemHost(gid); if (host) withOwnerHp(host, fn); else fn(); }
+
+// ---------------- 每日悬赏 ----------------
+function today() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
+function ensureBounties() {
+  if (!SAVE) return;
+  if (SAVE.bounty && SAVE.bounty.day === today()) return;
+  const pool = RNG.shuffle(BOUNTY_POOL.filter(b => !b.rift || riftUnlocked())).slice(0, 3);
+  SAVE.bounty = { day: today(), bonus: false, list: pool.map(b => { const need = RNG.i(b.n[0], b.n[1]); return { id: b.id, ev: b.ev, t: b.t(need), need, prog: 0, claimed: false }; }) };
+}
+function track(ev, n = 1) {
+  if (!SAVE) return; ensureBounties();
+  for (const b of SAVE.bounty.list) if (b.ev === ev && b.prog < b.need) b.prog = Math.min(b.need, b.prog + n);
+}
+function bountyReward(quality) {
+  const lv = topLevel(), it = storeItem(null, makeItem({ ilvl: lv + 2, rarity: rollRarity(quality, 50, 0), cls: SAVE.cls }));
+  const gold = 100 + lv * 25, mats = 6 + Math.floor(lv / 5);
+  SAVE.gold += gold; SAVE.mats += mats;
+  const gem = RNG.ch(0.5) ? gemKey(RNG.pick(Object.keys(GEM_TYPES)), Math.min(gemCap(), Math.floor(lv / 15))) : null;
+  if (gem) addGem(gem);
+  return { gold, mats, items: [it], gem };
+}
+function claimBounty(i) {
+  const b = SAVE.bounty.list[i]; if (!b || b.claimed || b.prog < b.need) return null;
+  b.claimed = true; SAVE.stats.bounties++; return bountyReward('boss');
+}
+function claimBountyBonus() {
+  const B = SAVE.bounty; if (!B || B.bonus || !B.list.every(b => b.claimed)) return null;
+  B.bonus = true; return bountyReward('cache');
+}
+
+// ---------------- 离线派遣 ----------------
+const dispSlots = () => 1 + bLv('barracks');
+const dispUsed = () => Object.keys(SAVE.disp).length;
+function canDispatch(cls) { return !SAVE.disp[cls] && !(SAVE.run && SAVE.run.cls === cls) && dispUsed() < dispSlots(); }
+function startDispatch(cls, h) { if (!canDispatch(cls)) return false; const now = Date.now(); SAVE.disp[cls] = { start: now, end: now + h * 3600e3, h }; return true; }
+function cancelDispatch(cls) { delete SAVE.disp[cls]; }
+function claimDispatch(cls) {
+  const D = SAVE.disp[cls]; if (!D || Date.now() < D.end) return null;
+  delete SAVE.disp[cls];
+  const lv = SAVE.chars[cls].level, h = D.h, mult = 1 + bLv('barracks') * 0.2;
+  const xp = Math.round(xpNeed(Math.min(lv, MAX_LV - 1)) * 0.07 * h * mult);
+  const gold = Math.round((15 + lv * 4) * h * 8 * mult), mats = Math.round(h * 2 * mult);
+  const ups = gainXp(cls, xp); SAVE.gold += gold; SAVE.mats += mats;
+  const items = []; for (let i = 0; i < Math.floor(h * 1.2 * mult) + 1; i++) items.push(storeItem(null, makeItem({ ilvl: lv, rarity: rollRarity(h >= 4 ? 'elite' : 'normal', 30, 0), cls })));
+  const gems = []; for (let i = 0; i < h; i++) if (RNG.ch(0.15)) { const k = gemKey(RNG.pick(Object.keys(GEM_TYPES)), Math.min(gemCap(), Math.floor(lv / 15))); addGem(k); gems.push(k); }
+  return { xp, gold, mats, items, gems, ups };
+}
+
+// 事件用的工具
+const EV = {
+  buff(r, k, v) { r.buffs[k] = (r.buffs[k] || 0) + v; const m = runStats(r).maxHp; if (r.hp > m) r.hp = m; },
+  hurt(r, p) { r.hp = Math.max(1, Math.round(r.hp - runStats(r).maxHp * p)); },
+  heal(r, p) { const m = runStats(r).maxHp; r.hp = Math.min(m, Math.round(r.hp + m * p)); },
+  gold(r, mult) { const g = Math.round((10 + cellLv(r, curCell(r)) * mult) * RNG.f(0.8, 1.3) * (1 + (r.buffs.gf || 0) / 100)); SAVE.gold += g; r.goldGot += g; return g; },
+  loot(r, q, slot) {
+    const s = runStats(r), lv = cellLv(r, curCell(r)) + 1;
+    const it = makeItem({ slot, ilvl: lv, rarity: rollRarity(q, s.mf, dOf(r).loot), cls: r.cls });
+    storeItem(r, it); (r.evItems = r.evItems || []).push(it);
+    return `“${ancName(it)}${it.name}”`;
+  },
+  xp(r, frac) { const x = Math.round(xpNeed(Math.min(SAVE.chars[r.cls].level, MAX_LV - 1)) * frac); gainXp(r.cls, x); r.xpGot += x; return x; },
+  bet(r) { return 30 * r.floor * (1 + diffIdx(r) * 2); },
+  save() { return SAVE; },
+  gem(r) { const k = rollGem(r); addGem(k); r.gemsGot++; return gemName(k); },
+  mats(r, n) { n = n + RNG.i(0, 2); SAVE.mats += n; r.matsGot += n; return n; },
+  forge(r) {
+    const w = SAVE.chars[r.cls].eq.weapon;
+    if ((w.plus || 0) >= ENHANCE_MAX) return { msg: "Vũ khí của bạn đã cường hóa đến giới hạn." };
+    if (RNG.ch(0.5)) { withOwnerHp(w, () => { w.plus = (w.plus || 0) + 1; }); if (w.plus >= 10) SAVE.flags.plus10 = true; return { msg: `Tia lửa văng tung tóe! ${w.name} cường hóa lên +${w.plus}.` }; }
+    return { msg: "Cái đe nứt ra, chẳng có chuyện gì xảy ra." };
+  },
+};
+function resolveEvent(run, evId, ci) {
+  run.evItems = [];
+  const ev = EVENTS.find(e => e.id === evId), c = ev.c[ci];
+  if (c.req && !c.req(run, EV)) return { msg: "Không đủ điều kiện." };
+  const res = c.go(run, EV) || {};
+  if (res.reward) run.pendingReward = res.reward;
+  track('event');
+  res.items = run.evItems; return res;
+}
+
+// ---------------- 怪物 ----------------
+function makeMonster(def, lv, run, kind, affs) {
+  const D = dOf(run);
+  let hp = (25 + lv * 11.5) * (def.hp || 1) * D.hpMul * 1.25;
+  let atk = (4 + lv * 1.85) * (def.atk || 1) * D.atkMul;
+  let armor = 4 + lv * 3.5;
+  if (kind === 'elite') { hp *= 2.4; atk *= 1.3; }
+  if (kind === 'boss') { hp *= 6.5; atk *= 1.45; }
+  if (kind === 'mini') { hp *= 0.35; atk *= 0.6; }
+  if (run.mode === 'story') { const k = run.chapter - 1; if (run.world) { hp *= 1 + Math.min(k, 1) * 0.35 + k * 0.04; atk *= 1 + Math.min(k, 1) * 0.22 + k * 0.025; } else { hp *= 1 + k * 0.38; atk *= 1 + k * 0.27; } }   // 大地图的等级已经按章节涨了，不再重复乘
+  if (hasMod(run, 'hardy')) hp *= 1.5;
+  if (hasMod(run, 'brutal')) atk *= 1.3;
+  if (hasMod(run, 'armored')) armor *= 1.6;
+  affs = affs || [];
+  if (affs.includes('tough')) hp *= 1.8;
+  const u = { id: uid(), side: 'e', kind, name: def.n, lv, atk, armor, res: Math.min(75, D.res + (def.res || 0)),
+              spd: 90 * (def.spd || 1) * (affs.includes('fast') ? 1.5 : 1), crit: 5, critDmg: 150, ae: def.elem || 'phys',
+              aff: affs, abs: def.abs, halfDef: def.half, dieSay: def.die, g: RNG.f(0, 40), st: {}, def, spr: def.spr, pal: def.pal };
+  u.maxHp = u.hp = Math.round(hp);
+  if (affs.includes('shielded')) u.shield = Math.round(u.maxHp * 0.3);
+  u.wx = def.wx || MON_WX[def.spr] || null;
+  u.trait = def.trait !== undefined ? def.trait : (kind === 'boss' ? null : MON_TRAIT[def.spr] || null);
+  if (u.trait === 'shield') u.shield = Math.max(u.shield || 0, Math.round(u.maxHp * 0.25));
+  return u;
+}
+function makeEncounter(run, kind, cell) {
+  const lv = cellLv(run, cell), F = themeOf(run), out = [];
+  const mainDef = cell && cell.mon != null ? F.mons[cell.mon] : RNG.pick(F.mons);
+  const nAffBase = run.mode === 'rift' ? 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= 45 ? 1 : 0) : 1 + diffIdx(run) + (run.world ? W_EAFF : 0);   // 大地图可以多给词缀（W_EAFF，默认 0）。幻境：精英词缀最多 3 条（稀有精英 +1），推层看的是本事，不是运气
+  if (kind === 'goblin') {
+    const g = makeMonster(GOBLIN, lv, run, 'goblin'); g.atk = 0; out.push(g);
+  } else if (kind === 'boss' && run.mode === 'story' && run.floor < 3) {
+    const g = F.guards[run.floor - 1], gd = { ...F.mons[g.m], n: g.n };
+    const u = makeMonster(gd, lv + 2, run, 'boss'); u.guard = true;
+    u.maxHp = u.hp = Math.round(u.hp * 0.55); u.atk *= 0.9;
+    if (run.chapter === 1) { u.maxHp = u.hp = Math.round(u.hp * 0.7); u.atk *= 0.85; }
+    out.push(u);
+  } else if (kind === 'boss') {
+    const twin = F.boss.twin;
+    const boss = makeMonster(F.boss, lv + 2, run, 'boss');
+    if (run.mode === 'rift') { boss.name = "Giữ Ải Ảo Cảnh ·" + F.boss.n; boss.maxHp = boss.hp = Math.round(boss.hp * 1.15); }
+    else { boss.maxHp = boss.hp = Math.round(boss.hp * BOSS_HP); boss.atk *= BOSS_ATK; }
+    if (run.mode === 'story' && run.chapter === 1 && run.diff === 'normal' && !run.world) { boss.maxHp = boss.hp = Math.round(boss.hp * 0.7); boss.atk *= 0.85; }
+    out.push(boss);
+    if (twin) {
+      const t = makeMonster({ ...twin, hp: F.boss.hp, atk: F.boss.atk, abs: F.boss.twinAbs, half: F.boss.twinHalf, die: F.boss.die }, lv + 2, run, 'boss');
+      if (run.mode === 'rift') t.name = "Giữ Ải Ảo Cảnh ·" + twin.n;
+      t.maxHp = t.hp = boss.maxHp; out.push(t);
+    }
+  } else if (kind === 'elite' || kind === 'keeper') {
+    const rare = kind === 'elite' && RNG.ch(0.15);
+    const affs = RNG.shuffle(ELITE_AFFIXES.map(a => a.id)).slice(0, nAffBase + (kind === 'keeper' || rare ? 1 : 0));
+    const e = makeMonster(mainDef, lv + 1, run, 'elite', affs);
+    e.name = kind === 'keeper' ? "Hộ vệ chìa khóa ·" + mainDef.n : rare ? RNG.pick(RARE_ELITE_NAMES) : joinName(RNG.pick(ELITE_TITLES), mainDef.n);
+    if (rare) { e.rare = true; e.maxHp = e.hp = Math.round(e.hp * 1.3); }
+    out.push(e);
+    for (let i = RNG.i(0, 2); i > 0; i--) out.push(makeMonster(mainDef, lv, run, 'normal'));
+  } else {
+    let n = +RNG.w({ 1: 30, 2: 45, 3: 25 }); if (mainDef.pack) n = Math.min(4, n + 1);
+    for (let i = 0; i < n; i++) out.push(makeMonster(i === 0 || RNG.ch(0.6) ? mainDef : RNG.pick(F.mons), lv, run, 'normal'));
+  }
+  return out;
+}
+
+// ---------------- 自动战斗 ----------------
+let BOSS_HP = 2.9, BOSS_ATK = 1.3;
+var W_EAFF = 1;   // 大地图精英额外词缀条数（2026-11：精英 2 条词缀，稀有 3 条）
+var W_LVUP = [0.02, 0.02, 4];   // 比妖物高时：每级打出 +2%、挨打 -2%，最多 4 级（原来 +7% / -6%，最多 6 级）
+function startBattle(run, kind) {
+  const s = runStats(run), C = CLASSES[run.cls], ch = SAVE.chars[run.cls], lv = ch.level, cell = curCell(run);
+  const { act, basic } = skillList(run.cls);
+  const skills = [...act.filter(k => k.lv <= lv), basic].map(k => ({ ...k, left: 0 }));
+  const P = { id: 'P', side: 'p', kind: 'hero', name: C.n, lv, cls: run.cls, spr: C.spr, hp: Math.min(run.hp, s.maxHp), maxHp: s.maxHp, atk: s.atk,
+              armor: s.armorT, res: s.res, spd: 100 + s.spd, crit: s.crit, critDmg: s.critDmg, leech: s.leech, regen: s.regen,
+              thorns: s.thorns, dodge: s.dodge, dmgPct: s.dmgPct, elem: s.elem, freeze: s.freeze, poison: s.poison, frozenDmg: s.frozenDmg,
+              minionCap: 3 + s.minion + (s.fx && s.fx.has('minionArmor') ? 1 : 0), minionPct: s.minionPct, healPct: s.healPct, sk: s.sk, runes: featureOn('runes') ? { ...ch.runes } : {},
+              xBoss: s.xBoss, xExec: s.xExec, xBreak: s.xBreak,
+              fury: 0, furyGain: s.furyGain || 0, lian: 0, lastWx: null, lianPct: s.lianPct || 0, ki: 0, kiMax: 5 + (s.fx.has('deathMarkPlus') ? 1 : 0) + (s.fx.has('qiSha4') ? 2 : 0), kiPct: s.kiPct || 0,
+              counter: run.cls === 'paladin' ? 15 + (s.counter || 0) + (s.fx.has('luoHan6') ? 15 : 0) : 0, yi: yiOf(ch), fonu: 0, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
+              fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: 25 };
+  const encU = run.encUnits; delete run.encUnits;
+  const b = { kind, P, units: [P, ...(encU || makeEncounter(run, kind, cell))], corpses: 0, turn: 0, over: false, win: false,
+              dead: [], extraLoot: 0, cheated: false, phoenix: false, run, goblinEscaped: false, ultAuto: true, castAuto: true, castReq: null, ultReq: false, ults: 0, reacts: 0 };
+  if (s.fx.has('startShield')) P.shield = Math.round(P.maxHp * 0.25);
+  if (run.cls === 'mage') P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * 0.35));   // 五行道士：护身符箓
+  if (run.cls === 'assassin') P.g = Math.max(P.g, 30);   // 夜行刺客：先手
+  if (s.fx.has('undeadAlly')) summonSkel(b, P);
+  if (P.yi.qingxu) P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * (8 + P.yi.qingxu * 4) / 100));
+  if (run.encWard) {   // 守护战：一个不能打的人在念，念完就赢；他倒了就输
+    const W = run.encWard; delete run.encWard;
+    b.ward = { need: W.need, n: 0, lines: W.lines || [], say: W.say || {}, end: W.end || '', mons: W.mons, lv: W.lv, keep: W.keep || 3, name: W.name };
+    b.units.push({ id: 'WD', side: 'p', kind: 'ward', name: W.name, lv, spr: W.spr, pal: W.pal, maxHp: Math.round(P.maxHp * (W.hp || 1)), hp: Math.round(P.maxHp * (W.hp || 1)),
+      atk: 0, armor: P.armor * (W.arm || 1), res: P.res, spd: W.spd || 80, crit: 0, critDmg: 100, g: 10, st: {} });
+  }
+  const comp = run.comp && run.comp !== 'ngoc' ? COMPANIONS[run.comp] : null;
+  const afB = 1 + 0.04 * ((SAVE.aff || {})[run.comp || 'ngoc'] || 0);
+  if (comp) b.units.push({ id: 'NG', side: 'p', kind: 'ally', comp: run.comp, name: comp.n, lv, spr: comp.spr, wx: comp.wx,
+      maxHp: Math.round(P.maxHp * comp.hp * afB), hp: Math.round(P.maxHp * comp.hp * afB), atk: P.atk * comp.atk * afB, armor: P.armor * 0.8, res: P.res, spd: comp.spd, crit: 10, critDmg: 160, g: 30, st: {}, rage: 0, n: 0 });
+  else if (run.ngoc || run.comp === 'ngoc') {
+    const fox = run.ngoc === 'fox';
+    b.units.push({ id: 'NG', side: 'p', kind: 'ally', name: fox ? "Ngoc (Cửu Vĩ)" : 'Ngoc', lv, spr: fox ? 'ngocfox' : 'ngoc', fox,
+      maxHp: Math.round(P.maxHp * (fox ? 0.7 : 0.5) * afB), hp: Math.round(P.maxHp * (fox ? 0.7 : 0.5) * afB), atk: P.atk * (fox ? 0.85 : 0.5) * afB,
+      armor: P.armor * 0.8, res: P.res, spd: fox ? 108 : 95, crit: 10, critDmg: 160, g: 30, st: {}, healCd: 0, rage: 0 });
+  }
+  if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
+    if (P.yi.zhizhu) f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2);
+    if (P.yi.xianling && RNG.ch((16 + P.yi.xianling * 6) / 100 * (f.kind === 'boss' ? 0.5 : 1))) f.st.frozen = true;
+  }
+  return b;
+}
+const aliveOf = (b, side) => b.units.filter(u => u.side === side && u.hp > 0);
+function spdOf(u) {
+  let s = u.spd / 100;
+  if (u.st && u.st.slow) s *= 0.65;
+  if (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5) s *= 1.3;
+  if (u.fx && u.fx.has('bloodrage') && u.hp / u.maxHp < 0.5) s *= 1.3;
+  if (u.enraged) s *= 1.3;
+  if (u.frenzy) s *= 1 + 0.04 * u.frenzy;
+  if (u.mom) s *= 1 + 0.15 * u.mom;
+  return Math.max(0.2, s);
+}
+function addRage(u, n) { if (u.rage == null) return; u.rage = Math.min(100, u.rage + n); }
+function heal(u, amt, out, quiet) {
+  if (u.hp <= 0) return 0;
+  const a = Math.min(u.maxHp - u.hp, Math.round(amt));
+  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + a, 'heal']); }
+  return Math.max(0, a);
+}
+function freezeU(u, out, label) {
+  if (u.hp <= 0 || (u.kind === 'boss' && RNG.ch(0.5))) return;
+  u.st.frozen = true; out.pops.push([u.id, label || "Choáng", 'cold', 1]);
+  if (u.ghostForm) { u.ghostForm = false; out.pops.push([u.id, "Hiện hình", 'react']); out.lines.push(`${u.name} bị đánh choáng, quỷ thân hiện hình!`); }
+}
+function applyPoison(src, tgt, pct, bonus) {
+  const m = src.fx && src.fx.has('plague') ? 2.5 : 1;
+  tgt.st.poison = { d: src.atk * pct / 100 * m * (1 + (bonus || 0) / 100), t: 3 };
+}
+// ---------------- 赶尸人的僵尸 ----------------
+const ZOMBIES = {
+  tiaoshi: { n: "Khiêu Thi",   lv: 1,  spr: 'jiangshi', pal: null, hp: 0.34, atk: 0.8, spd: 112, arm: 1, ae: 'phys', d: "Hàng trước · đánh nhanh, vồ cắn" },
+  tiejia:  { n: "Thiết Giáp Thi", lv: 6,  spr: 'yong', pal: { B: '#4a4a5a' }, hp: 0.7, atk: 0.4, spd: 85, arm: 2.2, ae: 'phys', taunt: 0.6, thornsP: 0.15, d: "Hàng trước · khiêu khích: sáu phần đòn của địch đánh vào nó, bị đánh thì phản chấn" },
+  dushi:   { n: "Độc Thi",   lv: 12, spr: 'swampcorpse', pal: null, hp: 0.32, atk: 0.5, spd: 98, arm: 0.8, ae: 'poison', ap: 'poison', apc: 0.7, d: "Hàng sau · phun độc, gây trúng độc" },
+  yinhuo:  { n: "Âm Hỏa Thi", lv: 20, spr: 'jiangshi', pal: { B: '#2a3a6a', S: '#9ad0ff' }, hp: 0.3, atk: 0.42, spd: 82, arm: 0.8, ae: 'fire', aoe: 0.8, ap: 'burn', apc: 0.4, d: "Hàng sau · phun thi hỏa, đánh mọi kẻ địch, gây thiêu đốt" },
+  shiwang: { n: "Thi Vương",   lv: 25, spr: 'jiangshi', pal: { B: '#6a4a10', S: '#e8c13a' }, hp: 1.2, atk: 0.9, spd: 100, arm: 2, ae: 'phys', aoe: 1, life: 4, ult: true, d: "Gọi ra bằng tuyệt kỹ, càn quét cả trận 4 lượt; khi có mặt thì mọi cương thi công +30%" },
+};
+const ZOMBIE_ORDER = ['tiaoshi', 'tiejia', 'dushi', 'yinhuo'];
+// 尸阵：赶尸人在武学页排的位置；没排过就按解锁情况给一个顺手的
+function necroForm(lv, form) {
+  const ok = z => ZOMBIES[z] && !ZOMBIES[z].ult && ZOMBIES[z].lv <= lv;
+  const def = [ok('tiejia') ? 'tiejia' : 'tiaoshi', 'tiaoshi', ok('dushi') ? 'dushi' : 'tiaoshi', ok('yinhuo') ? 'yinhuo' : 'tiaoshi', 'tiaoshi'];
+  return def.map((d, i) => form && ok(form[i]) ? form[i] : d);
+}
+function makeZombie(b, P, zt, slot, rune) {
+  const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + (P.minionPct || 0) / 100);
+  const hpM = (rune === 'b' ? 1.6 : 1) * (zt === 'tiejia' ? 1 + (P.ironPct || 0) / 100 : 1);
+  const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
+              maxHp: Math.round(P.maxHp * Z.hp * m * hpM), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? 4 : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd, crit: 5, critDmg: 150, g: 40, st: {},
+              ae: Z.ae, wx: 'tu', taunt: Z.taunt, thornsP: Z.thornsP ? Z.thornsP + (P.ironPct || 0) / 150 : 0, poisonPct: P.poisonPct || 0, life: Z.life };
+  if (b.run && b.run.mode === 'rift') { u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg; }   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
+  u.hp = u.maxHp; b.units.push(u); return u;
+}
+const zombiesOf = b => b.units.filter(u => u.kind === 'minion' && u.hp > 0);
+// 摇铃唤尸：按尸阵把空着的位置补上
+function summonSkel(b, P, rune, n) {
+  const cap = P.minionCap || 3, form = P.cls === 'necro' ? necroForm(P.lv, SAVE.chars.necro && SAVE.chars.necro.form) : ['tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi'];
+  let made = 0;
+  for (let k = 0; k < (n || 1); k++) {
+    const alive = zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult); if (alive.length >= cap) break;
+    let slot = 0; while (slot < cap && alive.some(z => z.slot === slot)) slot++;
+    makeZombie(b, P, form[slot] || 'tiaoshi', slot, rune); made++;
+  }
+  return made;
+}
+function minionAct(b, u, out) {
+  if (u.life != null && --u.life < 0) { u.hp = 0; out.lines.push(`${u.name} hóa thành một nắm đất, trở về lòng đất`); out.pops.push([u.id, "Về đất", 'miss']); return; }
+  const foes = aliveOf(b, 'e'); if (!foes.length) return;
+  const Z = ZOMBIES[u.zt] || ZOMBIES.tiaoshi, king = b.units.some(x => x.zt === 'shiwang' && x.hp > 0 && x !== u);
+  const am = (u.st.yang ? 1.3 : 1) * (king ? 1.3 : 1), sk = Z.ap ? { ap: Z.ap, apc: Z.apc || 1 } : null;
+  if (Z.aoe) { out.cast = { id: 'minion', elem: u.ae, target: foes[0].id, aoe: true }; foes.forEach(f => hit(b, u, f, Z.aoe * am, u.ae, out, { aoe: 1, sk })); return; }
+  const t = (b.focus && foes.find(f => f.id === b.focus)) || (Z.taunt ? foes[0] : foes.reduce((a, c) => c.hp < a.hp ? c : a));
+  out.cast = { id: 'minion', elem: u.ae, target: t.id }; hit(b, u, t, am, u.ae, out, { sk });
+}
+
+// 出手顺序预览：照着读条往后推 n 次（不改战斗状态）
+function turnOrder(b, n) {
+  const live = b.units.filter(u => u.hp > 0 && !u.dead), g = new Map(live.map(u => [u, u.g])), out = [];
+  for (let k = 0; k < n && live.length; k++) {
+    let actor = null, bt = Infinity;
+    for (const u of live) { const t = (100 - g.get(u)) / spdOf(u); if (t < bt) { bt = t; actor = u; } }
+    for (const u of live) g.set(u, g.get(u) + bt * spdOf(u));
+    g.set(actor, 0); out.push(actor);
+  }
+  return out;
+}
+function battleStep(b) {
+  const out = { lines: [], pops: [], actor: null, cast: null };
+  if (b.over) return out;
+  const live = b.units.filter(u => u.hp > 0);
+  let actor = null, bt = Infinity;
+  for (const u of live) { const t = (100 - u.g) / spdOf(u); if (t < bt) { bt = t; actor = u; } }
+  for (const u of live) u.g += bt * spdOf(u);
+  actor.g = 0; out.actor = actor.id; out.dt = bt;
+  if (b.run && b.run.mode === 'rift' && !b.run.riftDone) b.run.clock = (b.run.clock || 0) + bt;
+  act(b, actor, out);
+  resolveDeaths(b, out);
+  if (++b.turn > 700 && !b.over) { b.over = true; b.win = false; out.lines.push("Trận đánh kéo dài quá lâu, bạn kiệt sức ngã xuống."); }
+  return out;
+}
+function act(b, u, out) {
+  for (const k of ['burn', 'poison']) {
+    const d = u.st[k]; if (!d) continue;
+    const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg;
+    out.pops.push([u.id, '-' + dmg, k]);
+    if (--d.t <= 0) delete u.st[k];
+    if (u.hp <= 0) { out.lines.push(`${u.name} ${k === 'burn' ? "bị thiêu" : "trúng độc"} chết`); return; }
+  }
+  if (u.st.frozen) { delete u.st.frozen; if (u.charging) { delete u.charging; out.pops.push([u.id, "Ngắt", 'buff']); out.lines.push(`${u.name} bị đánh choáng, tụ lực bị ngắt!`); } else out.lines.push(`${u.name} bị choáng`); out.actor = null; return; }
+  if (u.trait === 'regen' && u.hp > 0 && !u.st.burn) heal(u, u.maxHp * 0.05, out);
+  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'yang']) if (u.st[k] && --u.st[k] <= 0) {
+    delete u.st[k];
+    if (k === 'curse') { delete u.st.curseW; delete u.st.curseB; }
+    if (k === 'mark') delete u.st.markB;
+  }
+  if (u.regen) heal(u, u.regen, out, true);
+  if (u.st.renew) { heal(u, u.maxHp * 0.06, out); if (--u.st.renew <= 0) delete u.st.renew; }
+  if (u.kind === 'hero') return heroAct(b, u, out);
+  if (u.kind === 'ally') return ngocAct(b, u, out);
+  if (u.kind === 'ward') return wardAct(b, u, out);
+  if (u.kind === 'minion') return minionAct(b, u, out);
+  enemyAct(b, u, out);
+}
+// 守护战里念诵的人：每轮念一句，正气护住众人；念完，小怪全退
+function wardAct(b, u, out) {
+  const W = b.ward; if (!W) return; W.n++;
+  const L = W.lines[(W.n - 1) % Math.max(1, W.lines.length)];
+  out.cast = { id: 'zhengqi', elem: 'holy', target: u.id }; out.pops.push([u.id, `${W.n}/${W.need}`, 'buff']);
+  if (W.say[W.n]) { out.say = [u.id, W.say[W.n]]; out.lines.push(`${u.name}: “${W.say[W.n]}”`); }
+  else if (L) { out.say = [u.id, L]; out.lines.push(`${u.name} niệm: “${L}”`); }
+  aliveOf(b, 'p').forEach(a => { if (a !== u) heal(a, a.maxHp * 0.04, out, true); });
+  if (W.n >= W.need) {
+    aliveOf(b, 'e').forEach(f => { f.hp = 0; out.pops.push([f.id, "Tan biến", 'holy']); });
+    out.lines.push(W.end || "Chính khí xông thẳng lên trời, quỷ triều rút lui."); out.cast = { id: 'zhengqi', elem: 'holy', aoe: true, target: u.id };
+  }
+}
+function compAct(b, u, out) {
+  const P = b.P, foes = aliveOf(b, 'e'); if (!foes.length) return;
+  addRage(u, 9); u.n = (u.n || 0) + 1;
+  if (u.comp === 'zhen') {
+    const t = foes.reduce((a, c) => c.hp < a.hp ? c : a);
+    if (u.n % 3 === 0) { out.cast = { id: 'chain2', elem: 'phys', target: t.id, wx: 'jin' }; if (hit(b, u, t, 0.7, 'phys', out, { sk: { ap: 'stun', apc: 0.5 } })) {} if (RNG.ch(0.25)) out.say = [u.id, RNG.pick(["Ngoan ngoãn chút!", "Theo ta về nha môn!", "Hừ, chỉ có chút bản lĩnh này?"])]; }
+    else { out.cast = { id: 'blade2', elem: 'phys', target: t.id, wx: 'jin' }; hit(b, u, t, 1, 'phys', out, { sk: { ap: 'armor', apc: 0.4 } }); }
+  } else if (u.comp === 'long') {
+    if (u.n % 4 === 0 && P.hp > 0) { P.st.warcry = Math.max(P.st.warcry || 0, 2); out.pops.push(['P', "Chính khí", 'buff']); out.cast = { id: 'zhengqi', elem: 'holy', target: 'P' }; out.say = [u.id, RNG.pick(["Trời đất có chính khí!", "Hạo nhiên chi khí, chí đại chí cương!", "Huynh đài, tại hạ trợ uy cho huynh!"])]; }
+    else { const t = RNG.pick(foes); out.cast = { id: 'zhengjue', elem: 'poison', target: t.id, wx: 'mu' }; hit(b, u, t, 0.95, 'poison', out, { sk: { ap: 'chill', apc: 0.45 } }); }
+  }
+}
+function ngocAct(b, u, out) {
+  if (u.comp) return compAct(b, u, out);
+  const P = b.P, foes = aliveOf(b, 'e'); if (!foes.length) return;
+  if (u.healCd > 0) u.healCd--;
+  addRage(u, 9);
+  if (RNG.ch(0.16)) { out.say = [u.id, RNG.pick(NGOC_QUIPS[u.fox ? 'fox' : 'normal'])]; }
+  if (P.hp > 0 && P.hp / P.maxHp < 0.6 && u.healCd <= 0) {
+    heal(P, P.maxHp * (u.fox ? 0.15 : 0.1), out); u.healCd = 3;
+    out.lines.push(u.fox ? "Hồ quang của Ngoc bao trùm lấy bạn" : "Ngoc ném tới một gói thuốc");
+    out.cast = { id: u.fox ? 'foxHeal' : 'ngocHeal', elem: 'heal', target: 'P' }; return;
+  }
+  if (u.fox) {
+    if (RNG.ch(0.3)) { out.cast = { id: 'foxfireAll', elem: 'fire', aoe: true }; foes.forEach(f => hit(b, u, f, 0.55, 'fire', out, { aoe: 1, sk: { ap: 'burn', apc: 0.4 } })); }
+    else { const t = RNG.pick(foes); out.cast = { id: 'foxfire', elem: 'fire', target: t.id }; hit(b, u, t, 1, 'fire', out, { sk: { ap: 'burn' } }); }
+  } else { const t = foes[0]; out.cast = { id: 'potionThrow', elem: 'poison', target: t.id }; hit(b, u, t, 0.8, 'magic', out, { sk: { ap: 'burn', apc: 0.5 } }); }
+}
+
+// ---------------- 必杀技 ----------------
+const ULTS = {
+  berserker: { n: "Bá Đao Trảm", g: "Trảm", elem: 'phys', wx: 'jin' },
+  mage:      { n: "Thiên Lôi Dẫn", g: "LÔI", elem: 'light', wx: 'mu' },
+  necro:     { n: "Vạn Quỷ Phệ Hồn", g: "QUỶ", elem: 'magic', wx: 'shui' },
+  assassin:  { n: "Thiên Nhận Sát", g: "SÁT", elem: 'phys', wx: 'jin' },
+  paladin:   { n: "Như Lai Thần Chưởng", g: "PHẬT", elem: 'holy', wx: 'tu' },
+};
+function ultimate(b, P, foes, out) {
+  P.rage = 0; b.ultReq = false; b.ults++;
+  const NG = b.units.find(u => u.kind === 'ally' && u.hp > 0);
+  const combo = !!(NG && NG.rage >= 100);
+  if (combo) NG.rage = 0;
+  const U = ULTS[P.cls], m = combo ? 1.3 : 1;
+  out.ult = { cls: P.cls, n: combo ? "Song nhân hợp kích · " + U.n : U.n, g: U.g, combo, comp: NG && NG.comp };
+  out.cast = { id: 'ult', elem: U.elem, aoe: true, cls: P.cls, combo };
+  out.lines.push(combo ? `Bạn và Ngoc cùng ra tay — “${U.n}”!` : `Tuyệt kỹ “${U.n}”!`);
+  // 打断首领蓄力
+  for (const f of foes) if (f.charging) { delete f.charging; out.pops.push([f.id, "Ngắt", 'buff']); out.lines.push(`Tụ lực của ${f.name} bị ngắt!`); }
+  const o = { ult: 1, aoe: 1, wx: U.wx };
+  switch (P.cls) {
+    case 'berserker': { let tot = 0; foes.forEach(f => { tot += hit(b, P, f, 3.2 * m, 'phys', out, o); }); heal(P, tot * 0.3, out); break; }
+    case 'mage': for (let i = 0; i < 6; i++) { const al = aliveOf(b, 'e'); if (!al.length) break; hit(b, P, RNG.pick(al), 1.3 * m, 'light', out, o); } break;
+    case 'necro': foes.forEach(f => { hit(b, P, f, (P.lv >= 25 ? 1.6 : 2.6) * m, 'magic', out, o); if (f.hp > 0) { f.st.curse = 3; f.st.curseB = true; } });
+      if (P.lv >= 25 && !zombiesOf(b).some(z => z.zt === 'shiwang')) { makeZombie(b, P, 'shiwang', 9); out.lines.push("Mặt đất nứt ra — Thi Vương bò lên!"); } break;
+    case 'assassin': for (let i = 0; i < 7; i++) { const al = aliveOf(b, 'e'); if (!al.length) break; const t = al.reduce((a, c) => c.hp / c.maxHp < a.hp / a.maxHp ? c : a); hit(b, P, t, 0.75 * m, 'phys', out, o); } break;
+    case 'paladin': foes.forEach(f => hit(b, P, f, 2.6 * m, 'holy', out, o)); heal(P, P.maxHp * 0.2, out); P.shield = Math.max(P.shield, Math.round(P.maxHp * 0.15)); break;
+  }
+  if (combo) { const cw = NG.wx || 'huo'; aliveOf(b, 'e').forEach(f => hit(b, NG, f, 1.2, WX_ELEM[cw], out, { ...o, wx: cw })); heal(P, P.maxHp * 0.1, out); }
+}
+function skillReady(b, P, sk, foes) {
+  switch (sk.id) {
+    case 'whirl': case 'fan': return foes.length >= 2;
+    case 'warcry': return !P.st.warcry;
+    case 'summon': return zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length < P.minionCap;
+    case 'jihuo': case 'bonestorm': return zombiesOf(b).length > 0;
+    case 'yangshi': return zombiesOf(b).some(z => z.hp < z.maxHp * 0.8 || !z.st.yang);
+    case 'bawang': return P.fury >= 40;
+    case 'deathmark': case 'shadowkill': return P.ki >= Math.min(3, P.kiMax);
+    case 'butui': return P.hp / P.maxHp < 0.75 && !P.st.butui;
+    case 'yandun': return !P.st.smoke;
+    case 'chanhou': return !P.st.chan;
+    case 'curse': return !foes.some(f => f.st.curse);
+    case 'corpse': return zombiesOf(b).some(z => !ZOMBIES[z.zt].ult);
+    case 'shadowstep': return !P.st.shadow;
+    case 'prayer': return P.hp / P.maxHp < 0.7;
+    case 'aegis': return !(P.shield > P.maxHp * 0.05);
+    default: return true;
+  }
+}
+function skillCd(P, sk) {
+  let cd = sk.cd; const fx = P.fx, R = P.runes[sk.id];
+  if (sk.id === 'fireball' && fx.has('ignite')) cd--;
+  if (sk.id === 'frostnova' && fx.has('shatter')) cd--;
+  if (sk.id === 'whirl' && fx.has('rampage')) cd--;
+  if (sk.id === 'whirl' && R === 'b') cd++;
+  if (sk.id === 'meteor' && fx.has('archmage')) cd -= 2;
+  if (sk.id === 'meteor' && R === 'b') cd += 2;
+  if (sk.id === 'venom' && fx.has('venomFang')) cd--;
+  if (sk.id === 'prayer' && fx.has('holyLight')) cd -= 2;
+  if (sk.id === 'bloodlust' && fx.has('bloodPlus')) cd -= 2;
+  if (sk.id === 'lunzhuan' && fx.has('detPlus')) cd -= 1;
+  if (sk.id === 'shadowstep' && fx.has('shadow3')) cd -= 2;
+  if (fx.has('cdr')) cd--;
+  return Math.max(1, cd);
+}
+function heroAct(b, P, out) {
+  const run = b.run;
+  if (P.hp / P.maxHp < 0.35 && run.potions > 0) {
+    run.potions--; heal(P, P.maxHp * 0.45 * (P.fx.has('potionPlus') ? 1.6 : 1) * (1 + bLv('alchemist') * 0.1), out);
+    out.lines.push(`Bạn uống một bình thuốc (còn ${run.potions} bình)`);
+  }
+  for (const sk of P.skills) if (sk.left > 0) sk.left--;
+  let foes = aliveOf(b, 'e'); if (!foes.length) return;
+  if (P.rage >= 100 && (b.ultAuto || b.ultReq)) return ultimate(b, P, foes, out);
+  let sk;
+  if (b.castAuto) sk = autoPick(b, P, foes);
+  else { sk = b.castReq && P.skills.find(k => k.id === b.castReq && k.left <= 0); b.castReq = null; if (!sk) sk = P.skills.find(k => !k.cd); }
+  if (b.target && foes.some(f => f.id === b.target)) foes = [foes.find(f => f.id === b.target), ...foes.filter(f => f.id !== b.target)];   // 手动点了目标
+  else if (sk.pay) foes = foes.slice().sort((x, y) => stHas(y, sk.pay.s) - stHas(x, sk.pay.s));   // 收招打带状态的那个
+  // 五行道士：按相生顺序出招叠「连」
+  if (P.cls === 'mage' && sk.wx) { const cap = P.fx.has('tianshi') ? 7 : 5;
+    P.lian = P.lastWx && WX_SHENG[P.lastWx] === sk.wx ? Math.min(cap, P.lian + 1) : P.fx.has('guiYuan4') ? Math.max(0, P.lian - 2) : 0; P.lastWx = sk.wx;
+    if (P.fx.has('guiYuan6') && P.lian >= 5) { b.guiYuan = true; out.pops.push(['P', "Quy Nguyên", 'crit']); }
+    if (P.lian) out.pops.push(['P', `Liên ${P.lian}`, 'buff']);
+    if (P.fx.has('tianshi') && P.lian >= cap) { b.castCrit = true; b.lianReset = true; } }
+  const nFoe0 = aliveOf(b, 'e').length;
+  cast(b, P, sk, foes, out); b.castCrit = false; b.guiYuan = false; if (b.lianReset) { b.lianReset = false; P.lian = 0; out.pops.push(['P', "Thiên Sư", 'crit']); }
+  if (P.cls === 'berserker') P.fury = Math.min(100, (P.fury || 0) + 5 * (1 + (P.furyGain || 0) / 100) + (sk.id === 'warcry' ? 30 : 0));
+  if (P.cls === 'assassin' && sk.ki) P.ki = Math.min(P.kiMax, P.ki + sk.ki);
+  if (sk.cd) {
+    sk.left = skillCd(P, sk);
+    foes = aliveOf(b, 'e');
+    if (P.fx.has('doubleCast') && foes.length && RNG.ch(0.2) && skillReady(b, P, sk, foes)) {
+      out.lines.push("Song Sinh Giới: kỹ năng tung lại lần nữa!"); cast(b, P, sk, foes, out);
+    }
+    if (sk.fin && P.fx.has('qiSha6') && aliveOf(b, 'e').length < nFoe0) { sk.left = 0; out.pops.push(['P', "Thất Sát", 'crit']); }
+  }
+  if (sk.fin && P.fx.has('qiSha4')) P.ki = Math.min(P.kiMax, P.ki + 2);
+  if (P.yi.langwang && RNG.ch((18 + P.yi.langwang * 5) / 100)) { const t2 = aliveOf(b, 'e')[0];
+    if (t2) { out.pops.push([t2.id, "Bóng sói", 'crit']); hit(b, P, t2, 0.6 + P.yi.langwang * 0.2, 'phys', out, { proc: 1 }); } }
+}
+// 自动出招：有状态先收招，没状态先起手；职业各有讲究
+function autoPick(b, P, foes) {
+  const ready = P.skills.filter(k => k.cd && k.left <= 0 && skillReady(b, P, k, foes)), basic = P.skills.find(k => !k.cd);
+  const has = s => foes.some(f => stHas(f, s)), pick = id => ready.find(k => k.id === id);
+  if (P.cls === 'necro' && pick('summon') && zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length < Math.min(2, P.minionCap)) return pick('summon');
+  if (P.cls === 'paladin' && P.hp / P.maxHp < 0.5 && (pick('prayer') || pick('aegis'))) return pick('prayer') || pick('aegis');
+  if (P.cls === 'berserker' && P.fury >= 80 && pick('bawang')) return pick('bawang');
+  if (P.cls === 'assassin' && P.ki >= P.kiMax - 1) { const f = ready.find(k => k.fin && k.pay && has(k.pay.s)) || ready.find(k => k.fin); if (f) return f; }
+  if (P.cls === 'mage') {   // 五行道士：先顾着相生不断（灵符是木，可以接水）
+    const nx = P.lastWx ? WX_SHENG[P.lastWx] : null, cont = ready.filter(k => !nx || k.wx === nx);
+    const c = cont.find(k => k.pay && has(k.pay.s)) || cont.find(k => k.ap && !has(k.ap)) || cont[0];
+    if (c && nx) return c; if (nx && basic.wx === nx) return basic; }
+  const pay = ready.find(k => k.pay && !k.fin && has(k.pay.s)); if (pay) return pay;
+  const start = ready.find(k => k.ap && !has(k.ap)); if (start) return start;
+  if (P.cls === 'mage' && P.lastWx) { const nx = WX_SHENG[P.lastWx]; const c = ready.find(k => k.wx === nx) || (basic.wx === nx ? basic : null); if (c) return c; }
+  return ready.find(k => !k.fin && k.id !== 'bawang') || basic;
+}
+function cast(b, P, sk, foes, out) {
+  b.castWx = sk.wx; b.castSk = sk;
+  try { castInner(b, P, sk, foes, out); } finally { b.castWx = null; b.castSk = null; }
+}
+function castInner(b, P, sk, foes, out) {
+  const t = foes[0], R = P.runes[sk.id] || null;
+  let m = 1 + ((P.sk && P.sk[sk.id]) || 0) / 100;
+  const hp = (pct) => P.maxHp * pct * (1 + (P.healPct || 0) / 100);
+  if (sk.cd) out.lines.push(`Bạn thi triển “${sk.n}”${R ? '·' + RUNES[sk.id][R === 'a' ? 0 : 1].n : ''}`);
+  const elemOf = { slash: 'phys', whirl: 'phys', bloodlust: 'phys', missile: 'magic', fireball: 'fire', frostnova: 'cold', chain: 'light',
+    meteor: R === 'a' ? 'cold' : 'fire', bonespear: 'magic', corpse: 'magic', bonestorm: 'magic', twin: 'phys', venom: 'poison', fan: 'phys',
+    deathmark: 'phys', holy: 'holy', hammer: 'holy', judgement: 'holy', jihuo: 'phys', shadowkill: 'phys', bawang: 'phys', wulei: 'light' }[sk.id];
+  const aoe = ['whirl', 'frostnova', 'meteor', 'corpse', 'bonestorm', 'fan', 'judgement', 'chain'].includes(sk.id) || (sk.id === 'hammer' && P.fx.has('wrath')) || (sk.id === 'venom' && R === 'b') || (sk.id === 'fireball' && R);
+  out.cast = { id: sk.id, elem: elemOf || 'buff', aoe, target: t && t.id, wx: b.castWx };
+  if (sk.k) return castGen(b, P, sk, foes, out, m);
+  const all = (mult, elem, after) => foes.forEach(f => { const d = hit(b, P, f, mult, elem, out, { aoe: 1 }); if (after) after(f, d); });
+  switch (sk.id) {
+    case 'slash': hit(b, P, t, m, 'phys', out); break;
+    case 'missile': case 'bonespear': case 'holy': hit(b, P, t, m * (sk.id === 'bonespear' ? 0.6 : sk.id === 'missile' ? 1.1 : 1.15), elemOf, out); if (sk.id === 'bonespear' && t.hp > 0) { b.focus = t.id; out.pops.push([t.id, "Trấn hồn", 'curse']); } break;
+    case 'whirl': {
+      for (let r = 0; r < (P.fx.has('whirl2') ? 2 : 1); r++) {
+        let n = 0; aliveOf(b, 'e').forEach(f => { if (hit(b, P, f, 0.7 * m * (R === 'b' ? 1.5 : 1), 'phys', out, { aoe: 1 })) n++; });
+        if (P.fx.has('rampage')) heal(P, P.maxHp * 0.05, out);
+        if ((R === 'a' || P.fx.has('whirl2')) && n) heal(P, P.maxHp * 0.02 * n, out);
+      }
+      break;
+    }
+    case 'warcry': P.st.warcry = 4; out.pops.push(['P', "Chiến hống", 'buff']); if (R === 'a') foes.forEach(f => { f.st.curse = 4; out.pops.push([f.id, "Chấn Nhiếp", 'curse', 1]); }); break;
+    case 'bloodlust': { const mm = 1.8 * m * (R === 'a' && t.hp / t.maxHp < 0.4 ? 2 : 1); const d = hit(b, P, t, mm, 'phys', out); if (d) heal(P, d * (R === 'b' ? 1 : 0.5) * (P.fx.has('bloodPlus') ? 2 : 1), out); break; }
+    case 'fireball': {
+      const ign = f => { if (f.hp > 0 && P.fx.has('ignite')) { f.st.burn = { d: P.atk * 0.5 * (1 + P.elem / 100), t: 3 }; out.pops.push([f.id, "Bốc cháy", 'fire', 1]); } };
+      if (R === 'a') RNG.shuffle(foes).slice(0, 3).forEach(f => { if (hit(b, P, f, 0.8 * m, 'fire', out, { aoe: 1 })) ign(f); });
+      else { const d = hit(b, P, t, 1.8 * m, 'fire', out); if (d) { ign(t); if (R === 'b') foes.filter(f => f !== t).forEach(f => hit(b, P, f, m, 'fire', out, { proc: 1 })); } }
+      break;
+    }
+    case 'frostnova': all(0.45 * m * (R === 'a' ? 0.5 : R === 'b' ? 2 : 1), 'cold', f => { if (R === 'a' && RNG.ch(0.6)) freezeU(f, out); }); break;
+    case 'chain': RNG.shuffle(foes).slice(0, P.fx.has('chainAll') ? 99 : R === 'a' ? 5 : R === 'b' ? 2 : 3).forEach(f => hit(b, P, f, 1.2 * m * (R === 'b' ? 1.6 : 1), 'light', out, { aoe: 1 })); break;
+    case 'meteor': all(2.0 * m * (R === 'b' ? 1.5 : 1), R === 'a' ? 'cold' : 'fire', f => { if (R === 'a') freezeU(f, out); }); break;
+    case 'summon': if (!summonSkel(b, P, R, R === 'a' ? 2 : 1)) out.lines.push("Thi vị đã đầy"); break;
+    case 'jihuo': { const Z = zombiesOf(b); out.cast.aoe = false; Z.forEach(z => { const tt = t.hp > 0 ? t : aliveOf(b, 'e')[0]; if (tt) hit(b, z, tt, (z.st.yang ? 1.3 : 1), z.ae || 'phys', out, { sk }); }); break; }
+    case 'yangshi': zombiesOf(b).forEach(z => { heal(z, z.maxHp * 0.3, out); z.st.yang = 3; }); out.pops.push(['P', "Dưỡng thi", 'buff']); break;
+    case 'curse': foes.forEach(f => { f.st.curse = 4; if (R === 'a') f.st.curseW = true; if (R === 'b') f.st.curseB = true; out.pops.push([f.id, "Nguyền rủa", 'curse', 1]); }); break;
+    case 'corpse': {   // 尸爆：炸掉血最少的一具僵尸
+      for (let i = 0; i < (R === 'a' ? 2 : 1); i++) {
+        const Z = zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).sort((x, y) => x.hp - y.hp)[0]; if (!Z) break;
+        const dmg = Math.round(Z.hp * 0.8 * m * (1 + (P.elem || 0) / 200)); Z.hp = 0; out.pops.push([Z.id, "Thi Bạo", 'fire']);
+        aliveOf(b, 'e').forEach(f => { hit(b, P, f, 0, 'magic', out, { aoe: 1, flat: dmg }); if (f.hp > 0 && P.fx.has('plague')) applyPoison(P, f, P.poison || 30); if (P.fx.has('corpsePlague') && f.hp > 0) { stSet(P, f, 'burn', out); applyPoison(P, f, 35); } });
+        if (R === 'b') heal(P, P.maxHp * 0.08, out);
+        if (!aliveOf(b, 'e').length) break;
+      }
+      break;
+    }
+    case 'bonestorm': all(0.45 * Math.max(1, zombiesOf(b).length) * m * (R === 'b' ? 1.4 : 1), 'magic', f => { if (R === 'a' && RNG.ch(0.4)) freezeU(f, out); else if (P.fx.has('stormStun') && f.hp > 0 && RNG.ch(0.35)) freezeU(f, out, "Choáng"); }); break;
+    case 'shadowkill': { const n = Math.max(1, P.ki); P.ki = 0; for (let i = 0; i < n; i++) { const tt = t.hp > 0 ? t : aliveOf(b, 'e')[0]; if (!tt) break; hit(b, P, tt, 0.9 * m * (1 + (P.kiPct || 0) / 100), 'phys', out, { crit: 1 }); } break; }
+    case 'yandun': P.st.smoke = 3; out.pops.push(['P', "Yên Độn", 'buff']); break;
+    case 'bawang': { const f = P.fury || 0; P.fury = P.fx.has('xueHai4') ? Math.floor(f / 2) : 0; hit(b, P, t, (1.5 + f * 0.02) * m * (P.fx.has('xueHai6') ? 2 : 1), 'phys', out); break; }
+    case 'butui': P.st.butui = 3; out.pops.push(['P', "Bất Thoái", 'buff']); break;
+    case 'chanhou': P.st.chan = 4; out.pops.push(['P', "Thiền hống", 'buff']); break;
+    case 'wulei': { const all5 = P.lian >= 5; (all5 ? foes : [t]).forEach(f => hit(b, P, f, 1.9 * m, 'light', out, { aoe: all5 ? 1 : 0 })); out.cast.aoe = all5; break; }
+    case 'twin': { hit(b, P, t, 0.6 * m, 'phys', out); const t2 = aliveOf(b, 'e')[0]; if (t2) hit(b, P, t2, 0.6 * m, 'phys', out); break; }
+    case 'venom': {
+      const pois = f => { if (f.hp > 0) { applyPoison(P, f, 40 * (R === 'a' ? 2 : 1), P.sk.venom); out.pops.push([f.id, "Trúng độc", 'poison', 1]); } };
+      if (R === 'b') all(0.72 * m, 'phys', (f, d) => { if (d) pois(f); });
+      else { const d = hit(b, P, t, 1.2 * m, 'phys', out); if (d) pois(t); }
+      break;
+    }
+    case 'shadowstep': P.st.shadow = R === 'b' ? 6 : 4; P.st.shadowCrit = P.fx.has('shadow3') ? 3 : 1; out.pops.push(['P', "Ảnh bộ", 'buff']); if (R === 'a') hit(b, P, t, 1.5 * m, 'phys', out); break;
+    case 'fan':
+      if (R === 'b') foes.forEach(f => { hit(b, P, f, 0.5 * m, 'phys', out, { aoe: 1 }); hit(b, P, f, 0.5 * m, 'phys', out, { aoe: 1 }); });
+      else all(0.6 * m * (R === 'a' ? 1.4 : 1), 'phys');
+      if (P.fx.has('fanBurn')) aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out));
+      break;
+    case 'deathmark': { hit(b, P, t, 2.5 * m * (1 + P.ki * (0.25 + (P.kiPct || 0) / 100)), 'phys', out); P.ki = 0; if (t.hp > 0) { t.st.mark = 4; if (R === 'b') t.st.markB = true; out.pops.push([t.id, "Đánh dấu", 'curse']); } break; }
+    case 'aegis': P.shield = Math.max(P.shield || 0, Math.round(hp(R === 'b' ? 0.35 : 0.2) * (P.fx.has('divine') ? 1.3 : 1))); out.pops.push(['P', "Khiên", 'buff']); break;
+    case 'prayer': {
+      const want = hp(0.16), got = heal(P, want, out);
+      if (P.fx.has('holyLight') && want - got > 1) P.shield = (P.shield || 0) + Math.round(want - got);
+      if (P.fx.has('divine')) all(1, 'holy');
+      if (R === 'a') P.st.renew = 3;
+      if (R === 'b') all(0.8, 'holy');
+      break;
+    }
+    case 'hammer': {
+      const tg = P.fx.has('wrath') || P.fx.has('hammerAll') ? foes : [t];
+      tg.forEach(f => { hit(b, P, f, 1.9 * m * (R === 'b' ? 1.5 : 1), 'holy', out, { aoe: tg.length > 1 ? 1 : 0 }); if ((R === 'a' && RNG.ch(0.3)) || (P.fx.has('hammerAll') && f.hp > 0 && RNG.ch(0.2))) freezeU(f, out, "Choáng"); });
+      break;
+    }
+    case 'judgement': { let n = 0; all(2.0 * m * (R === 'a' ? 1.4 : 1), 'holy', (f, d) => { if (d) n++; }); if (R === 'b' && n) heal(P, P.maxHp * 0.03 * n, out); break; }
+  }
+}
+const WX_ELEM = { jin: 'phys', mu: 'poison', shui: 'cold', huo: 'fire', tu: 'holy' };
+function castGen(b, P, sk, foes, out, m) {
+  const t = foes[0], el = WX_ELEM[b.castWx] || 'phys', aoe = ['aoe', 'aoeburn', 'dotall', 'healaoe'].includes(sk.k);
+  out.cast = { id: 'gen', sk: sk.id, elem: el, wx: b.castWx, aoe, target: t && t.id };
+  const stun = f => { if (sk.stun && f.hp > 0 && RNG.ch(sk.stun)) freezeU(f, out, "Choáng"); };
+  const burn = f => { if (f.hp > 0) { f.st.burn = { d: P.atk * 0.45 * (1 + (P.elem || 0) / 100), t: 3 }; out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); } };
+  const FX = P.fx;
+  if (sk.id === 'lieyan' && FX.has('lieyanAll')) { foes.forEach(f => { if (hit(b, P, f, sk.m * m * 0.8, el, out, { aoe: 1 })) stSet(P, f, 'burn', out); }); out.cast.aoe = true; return; }
+  if (sk.id === 'fuhu' && FX.has('fuhu2')) { if (hit(b, P, t, sk.m * m, el, out)) { stSet(P, t, 'armor', out); if (RNG.ch(0.3)) stSet(P, t, 'stun', out); } return; }
+  if (sk.id === 'bingpo' && FX.has('needle6')) sk = { ...sk, hits: 6 };
+  if (sk.id === 'ganlu' && FX.has('ganlu2')) { heal(P, P.maxHp * 0.12 * (1 + (P.healPct || 0) / 100), out); delete P.st.poison; delete P.st.frozen; out.pops.push(['P', "Thanh tẩy", 'buff']); }
+  switch (sk.k) {
+    case 'single': if (hit(b, P, t, sk.m * m, el, out)) stun(t); break;
+    case 'aoe': foes.forEach(f => { if (hit(b, P, f, sk.m * m, el, out, { aoe: 1 })) stun(f); });
+      if (sk.heal === 'minion') aliveOf(b, 'p').filter(u => u.kind === 'minion').forEach(u => heal(u, u.maxHp * 0.3, out));
+      if (sk.shield) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * sk.shield * (FX.has('budong2') ? 2 : 1))); out.pops.push(['P', "Hộ Thể", 'buff']); }
+      break;
+    case 'burn': if (hit(b, P, t, sk.m * m, el, out)) burn(t); break;
+    case 'aoeburn': foes.forEach(f => { if (hit(b, P, f, sk.m * m, el, out, { aoe: 1 })) burn(f); }); break;
+    case 'slow': if (hit(b, P, t, sk.m * m, el, out) && t.hp > 0) { t.st.slow = 3; out.pops.push([t.id, "Đóng băng", 'cold', 1]); } break;
+    case 'multi': for (let i = 0; i < (sk.hits || 3); i++) { const al = aliveOf(b, 'e'); if (!al.length) break; hit(b, P, RNG.pick(al), sk.m * m, el, out, { aoe: 1 }); } break;
+    case 'dotall': foes.forEach(f => { if (hit(b, P, f, sk.m * m, el, out, { aoe: 1 }) && f.hp > 0) { applyPoison(P, f, 35); out.pops.push([f.id, "Trúng độc", 'poison', 1]); } }); break;
+    case 'healaoe': heal(P, P.maxHp * (sk.heal || 0.1) * (1 + (P.healPct || 0) / 100), out); foes.forEach(f => hit(b, P, f, sk.m * m, el, out, { aoe: 1 })); break;
+  }
+}
+// 状态：灼烧、冰冻、破甲、眩晕
+const ST_KEY = { burn: 'burn', chill: 'slow', armor: 'melt', stun: 'frozen', poison: 'poison' };
+const stHas = (f, s) => s === 'any' ? ['burn', 'slow', 'melt', 'frozen', 'poison'].filter(k => f.st[k]).length : (f.st[ST_KEY[s]] ? 1 : 0);
+function stClear(f, s) { for (const k of s === 'any' ? ['burn', 'slow', 'melt', 'frozen', 'poison'] : [ST_KEY[s]]) delete f.st[k]; }
+function stSet(src, f, s, out) {
+  if (f.hp <= 0) return;
+  if (s === 'burn' && f.cocoon && f.shield > 0) { f.shield = 0; f.cocoon = false; out.pops.push([f.id, "Kén tơ cháy thủng", 'react']); out.lines.push(`Kén tơ của ${f.name} bắt lửa rồi!`); }
+  if (s === 'burn') { f.st.burn = { d: src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1), t: 3 }; out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); }
+  else if (s === 'chill') { f.st.slow = 3; out.pops.push([f.id, "Đóng băng", 'cold', 1]); if (f.lavaShell && f.shield > 0) { f.shield = 0; f.lavaShell = false; out.pops.push([f.id, "Vỏ nứt", 'react']); out.lines.push(`Lớp vỏ dung nham của ${f.name} bị đông nứt!`); } }
+  else if (s === 'armor') { f.st.melt = 3; out.pops.push([f.id, "Phá giáp", 'crit', 1]); if (f.shield > 0 && (f.trait === 'shield' || f.silver)) { f.shield = 0; out.pops.push([f.id, f.silver ? "Giáp bạc vỡ rồi" : "Vỡ giáp", 'react']); if (f.silver) out.lines.push(`Giáp bạc của ${f.name} bị đánh vỡ!`); } }
+  else if (s === 'stun') freezeU(f, out, "Choáng");
+  else if (s === 'poison') { applyPoison(src, f, 35, src.poisonPct || 0); out.pops.push([f.id, "Trúng độc", 'poison', 1]); }
+}
+function enemyAct(b, u, out) {
+  if (u.def && u.def.goblin) {
+    u.flee = (u.flee || 0) + 1;
+    if (u.flee >= GOBLIN_FLEE) { u.escaped = true; u.hp = 0; out.lines.push("Kim Thiềm chui vào cổng dịch chuyển, chạy mất rồi!"); out.pops.push([u.id, "Chạy mất", 'miss']); return; }
+    out.lines.push(GOBLIN_FLEE - u.flee <= 2 ? "Kim Thiềm đang mở cổng dịch chuyển!" : "Kim Thiềm ôm túi tiền chạy loạn khắp nơi");
+    return;
+  }
+  if (u.fleeDef && u.hp / u.maxHp < u.fleeDef.at) {   // 悬赏的家伙：打残了要跑，几回合内不打死就跑掉
+    u.flee = (u.flee || 0) + 1; const left = (u.fleeDef.n || 3) - u.flee;
+    if (left < 0) { u.escaped = true; u.hp = 0; u.dead = true; if (b.run) b.run.btyEsc = u.bty; out.lines.push(`${u.name} chui vào bóng tối, chạy mất rồi!`); out.pops.push([u.id, "Chạy mất", 'miss']); return; }
+    out.lines.push(`${u.name} muốn chạy! ${left ? `${left} lượt nữa là chạy mất` : "Lượt sau là chạy mất!"}`); out.pops.push([u.id, "Muốn chạy", 'crit']); bossSay(u, out, u.fleeDef.say); return;
+  }
+  if ((u.kind === 'boss' || u.abs) && bossAct(b, u, out)) return;
+  const allies = aliveOf(b, 'p'), P = b.P;
+  const others = allies.filter(a => a !== P), tank = others.find(a => a.taunt), wd = others.find(a => a.kind === 'ward');
+  if (wd && !(tank && RNG.ch(tank.taunt)) && RNG.ch(0.4)) { out.cast = { id: 'atk', elem: u.ae, target: wd.id, enemy: true }; hit(b, u, wd, 1, u.ae, out); return; }
+  const t = tank && RNG.ch(tank.taunt * (u.kind === 'boss' ? 0.5 : 1)) ? tank : P.hp > 0 && (!others.length || RNG.ch(0.55)) ? P : RNG.pick(others);
+  if (t) { out.cast = { id: 'atk', elem: u.ae, target: t.id, enemy: true }; hit(b, u, t, 1, u.ae, out); }
+}
+function bossSay(u, out, text) { if (!text) return; out.say = [u.id, text]; out.lines.push(`${u.name}: “${text}”`); }
+function bossAct(b, u, out) {
+  u.cnt = (u.cnt || 0) + 1;
+  if (u.charging) { const A = u.charging; delete u.charging; return doAbility(b, u, A, out, true); }
+  const H = u.halfDef;
+  if (H && !u.halfDone && u.hp / u.maxHp < 0.5) {
+    u.halfDone = true; bossSay(u, out, H.say);
+    if (H.enrage) u.enraged = true;
+    if (H.ghost) { u.ghostForm = true; out.pops.push([u.id, "Quỷ thân", 'buff']); out.lines.push(`${u.name} hóa thành một đám bóng ma, rất khó đánh trúng — dùng “Choáng” để nó hiện hình`); }
+    if (H.cocoon) { u.shield = Math.round(u.maxHp * H.cocoon); u.cocoon = true; out.pops.push([u.id, "Kén tơ hộ thể", 'buff']); out.lines.push(`${u.name} nhả tơ cuộn mình lại — dùng “Thiêu đốt” để đốt thủng kén tơ`); }
+    if (H.silver) { u.shield = Math.round(u.maxHp * H.silver); u.silver = true; out.pops.push([u.id, "Giáp bạc hộ thể", 'buff']); out.lines.push(`${u.name} phủ lên người một lớp giáp bạc — dùng “Phá giáp” để đập vỡ`); }
+    if (H.phase) { u.phased = true; if (u.def.pal2) u.pal = u.def.pal2; if (H.name) u.name = H.name; u.atk *= 1.25; u.spd *= 1.15; heal(u, u.maxHp * 0.1, out); }
+    out.cast = { id: H.phase ? 'phase' : 'enrage', elem: 'magic', aoe: true, enemy: true, target: u.id };
+    return true;
+  }
+  for (const A of u.abs || []) if (u.cnt % A.every === 0 && doAbility(b, u, A, out)) return true;
+  return false;
+}
+function doAbility(b, u, A, out, now) {
+  const allies = aliveOf(b, 'p');
+  if ((A.t === 'aoe' || A.t === 'poison') && !now) { u.charging = A; out.cast = { id: 'charge', elem: A.t === 'poison' ? 'poison' : A.elem, enemy: true, target: u.id }; out.pops.push([u.id, "Tụ lực", 'crit']); out.lines.push(`${u.name} đang tụ lực, chuẩn bị tung đại chiêu…`); return true; }
+  const hasKey = k => typeof SAVE !== 'undefined' && SAVE.keys && SAVE.keys[k];
+  if (A.key && hasKey(A.key)) { out.lines.push(A.foil); out.pops.push([u.id, "Bị khắc chế", 'miss']); out.cast = { id: 'roar', elem: 'phys', target: u.id, enemy: true }; (out.foil = out.foil || []).push(A.foil); (out.foilKey = out.foilKey || []).push(A.key); return true; }
+  if (A.t === 'devour' && !now) { u.charging = A; out.cast = { id: 'charge', elem: 'poison', enemy: true, target: u.id }; out.pops.push([u.id, "Tụ lực", 'crit']); bossSay(u, out, A.say); out.lines.push(`${u.name} há to miệng — đánh choáng nó là ngắt được!`); return true; }
+  if (A.t === 'gavel' && !now) { u.charging = A; out.cast = { id: 'charge', elem: 'holy', enemy: true, target: u.id }; out.pops.push([u.id, "Tụ lực", 'crit']); bossSay(u, out, A.say); out.lines.push(`${u.name} giơ cao kinh đường mộc…`); return true; }
+  switch (A.t) {
+    case 'shell':
+      bossSay(u, out, A.say); u.shield = Math.max(u.shield || 0, Math.round(u.maxHp * (A.pct || 0.15) * (u.kind === 'elite' && !u.bty ? Math.pow(0.7, u.shellN = (u.shellN || 0) + 1) / 0.7 : 1))); u.lavaShell = true;
+      out.pops.push([u.id, "Vỏ dung nham", 'buff']); out.lines.push(`${u.name} kết một lớp vỏ dung nham — “Đóng băng” làm nó nứt ra`); out.cast = { id: 'roar', elem: 'fire', target: u.id, enemy: true }; return true;
+    case 'devour':
+      if (b.P.hp <= 0) return false;
+      bossSay(u, out, A.bite || "Nuốt —!"); out.cast = { id: 'bossAoe', elem: 'poison', target: 'P', enemy: true };
+      hit(b, u, b.P, A.mult || 2.4, 'phys', out, { proc: 1, noBlock: 1 }); return true;
+    case 'court': {
+      if (aliveOf(b, 'e').length >= 5) return false;
+      const def = themeOf(b.run).mons[A.m || 0];
+      for (let i = 0; i < (A.n || 2) && aliveOf(b, 'e').length < 5; i++) { const m = makeMonster(def, Math.max(1, u.lv - 2), b.run, 'normal'); m.g = 0; m.protect = true; m.name = "Hộ giá" + m.name; b.units.push(m); }
+      bossSay(u, out, A.say); out.lines.push(A.note || "Khi yêu vật hộ giá còn sống, thủ lĩnh nhận ít đi hơn ba phần sát thương"); out.cast = { id: 'summon', elem: 'magic', enemy: true }; return true;
+    }
+    case 'gavel':
+      bossSay(u, out, "Bốp!!"); out.cast = { id: 'bossAoe', elem: 'holy', aoe: true, enemy: true };
+      allies.forEach(t => { hit(b, u, t, A.mult || 0.8, 'holy', out, { proc: 1 }); if (t.hp > 0) { t.st.frozen = true; out.pops.push([t.id, "Choáng", 'cold']); } });
+      return true;
+    case 'brush':
+      if (b.P.hp <= 0) return false;
+      bossSay(u, out, A.say); out.cast = { id: 'web', elem: 'magic', target: 'P', enemy: true };
+      hit(b, u, b.P, 0.6, 'magic', out, { proc: 1 }); if (b.P.hp > 0) { b.P.st.poison = { d: b.P.maxHp * (A.pct || 0.03), t: 3 }; out.pops.push(['P', "Câu Hồn", 'poison']); }
+      return true;
+    case 'summon': {
+      if (aliveOf(b, 'e').length >= 5) return false;
+      const def = themeOf(b.run).mons[A.m || 0];
+      for (let i = 0; i < (A.n || 2) && aliveOf(b, 'e').length < 5; i++) { const m = makeMonster(def, Math.max(1, u.lv + (A.lvd != null ? A.lvd : -2)), b.run, 'normal'); m.g = 0; b.units.push(m); }
+      bossSay(u, out, A.say); out.cast = { id: 'summon', elem: 'magic', enemy: true }; return true;
+    }
+    case 'aoe':
+      bossSay(u, out, A.say); out.cast = { id: 'bossAoe', elem: A.elem, aoe: true, enemy: true };
+      allies.forEach(t => { hit(b, u, t, A.mult * 1.3, A.elem, out, { proc: 1 }); if (A.freeze && RNG.ch(A.freeze)) freezeU(t, out); });
+      return true;
+    case 'web':
+      if (b.P.hp <= 0) return false;
+      bossSay(u, out, A.say); out.cast = { id: 'web', elem: 'magic', target: 'P', enemy: true };
+      hit(b, u, b.P, A.mult || 0.6, 'phys', out, { proc: 1 }); if (b.P.hp > 0) { b.P.st.frozen = true; out.pops.push(['P', "Bất động", 'cold']); }
+      return true;
+    case 'poison':
+      bossSay(u, out, A.say); out.cast = { id: 'bossAoe', elem: 'poison', aoe: true, enemy: true };
+      allies.forEach(t => { hit(b, u, t, A.mult || 0.65, 'poison', out, { proc: 1 }); if (t.hp > 0) { t.st.poison = { d: u.atk * (A.dot || 0.35), t: 3 }; out.pops.push([t.id, "Trúng độc", 'poison', 1]); } });
+      return true;
+    case 'heal':
+      if (u.hp / u.maxHp > 0.85) return false;
+      if (u.st.burn && !A.pierce) { out.lines.push(`${u.name} đang bốc cháy, không hút được thi khí`); out.pops.push([u.id, "Áp chế bằng lửa", 'fire']); return true; }
+      bossSay(u, out, A.say); heal(u, u.maxHp * A.pct * (u.kind === 'elite' && !u.bty ? Math.pow(0.7, u.healN = (u.healN || 0) + 1) / 0.7 : 1), out); out.cast = { id: 'bossHeal', elem: 'poison', target: u.id, enemy: true }; return true;   // 精英血厚了，回血一次比一次少，免得打成拉锯
+    case 'roar':
+      bossSay(u, out, A.say); u.roarN = (u.roarN || 0) + 1; if (u.roarN <= (A.cap || 3)) u.atk *= (A.mult || 1.12); else if (u.kind !== 'elite' || u.bty || u.roarN <= (A.cap || 3) + 3) heal(u, u.maxHp * 0.03, out); out.pops.push([u.id, "Gầm thét", 'crit']); out.cast = { id: 'roar', elem: 'phys', target: u.id, enemy: true }; return true;
+  }
+  return false;
+}
+function hit(b, src, tgt, mult, elem, out, opt = {}) {
+  if (!tgt || tgt.hp <= 0 || src.hp <= 0) return 0;
+  if (tgt.trait === 'fly' && !tgt.st.slow && src.kind === 'hero' && !opt.aoe && !opt.ult && ['berserker', 'assassin', 'paladin'].includes(src.cls) && RNG.ch(0.25)) { out.pops.push([tgt.id, "Hụt", 'miss']); return 0; }
+  if (tgt.st.smoke && src.side === 'e') { out.pops.push([tgt.id, "Yên Độn", 'miss']); return 0; }
+  const dodge = (tgt.dodge || 0) + (tgt.st.shadow ? 40 : 0) + (tgt.ghostForm ? 25 : 0);
+  if (dodge && RNG.ch(Math.min(70, dodge) / 100)) { out.pops.push([tgt.id, "Né tránh", 'miss']); return 0; }
+  const fx = src.fx, tfx = tgt.fx;
+  let d = opt.flat != null ? opt.flat : src.atk * mult * (1 + (src.dmgPct || 0) / 100 + (elem !== 'phys' ? (src.elem || 0) / 100 : 0));
+  if (src.st.warcry) d *= 1.4;
+  if (src.kind === 'hero') {   // 职业的看家本事
+    if (src.cls === 'berserker') { d *= (src.fury >= 50 ? 1.15 : 1) * (1 + 0.03 * Math.floor((1 - src.hp / src.maxHp) * 10)); }
+    if (src.cls === 'mage' && src.lian) d *= 1 + src.lian * (0.08 + (src.lianPct || 0) / 100);
+  }
+  if (tgt.kind === 'hero' && tgt.st.butui) d *= 0.5;
+  if (src.st.curse) d *= src.st.curseW ? 0.55 : 0.7;
+  if (tgt.st.curse && tgt.st.curseB) d *= 1.25;
+  if (fx) {
+    if (fx.has('execute') && tgt.hp / tgt.maxHp < 0.3) d *= 1.6;
+    if (fx.has('bloodrage') && src.hp / src.maxHp < 0.5) d *= 1.6;
+    if (fx.has('lowHpDmg')) d *= 1 + 0.5 * (1 - src.hp / src.maxHp);
+    if (fx.has('critStack')) d *= 1 + 0.05 * src.stacks;
+    if (fx.has('shatter') && tgt.st.frozen) d *= 2;
+    if (fx.has('bossDmg') && (tgt.kind === 'boss' || tgt.kind === 'elite')) d *= 1.35;
+    if (fx.has('venomFang') && tgt.st.poison) d *= 1.3;
+    if (fx.has('archmage')) d *= 1.15;
+    if (fx.has('elemSurge') && elem !== 'phys' && RNG.ch(0.2)) d *= 2;
+    if (fx.has('armorHunter') && tgt.st.melt) d *= 1.4;
+    if (fx.has('xueHai6') && src.fury) d *= 1 + src.fury * 0.015;
+    if (fx.has('qiSha6') && src === b.P && b.castSk && b.castSk.fin) d *= 4;
+    if (fx.has('luoHan6') && src.fonu) d *= 1 + src.fonu * 0.3;
+  }
+  if (src === b.P && b.guiYuan && !opt.proc) d *= 3;
+  if (src.side === 'p' && b.P && b.P.yi && b.P.yi.xuanbing && (tgt.st.frozen || tgt.st.slow)) d *= 1 + (12 + b.P.yi.xuanbing * 6) / 100;
+  if (src.xBoss && (tgt.kind === 'boss' || tgt.kind === 'elite')) d *= 1 + src.xBoss / 100;
+  if (src.xExec && tgt.hp / tgt.maxHp < 0.3) d *= 1 + src.xExec / 100;
+  if (src.xBreak && tgt.charging) d *= 1 + src.xBreak / 100;
+  if (src.frozenDmg && tgt.st.frozen) d *= 1 + src.frozenDmg / 100;
+  if (src.side === 'p' && tgt.def) d *= 1 + bestiaryBonus(tgt.def.n) / 100;
+  if (tgt.st.mark) d *= 1.5 + (tgt.st.markB ? 0.25 : 0) + (fx && fx.has('deathMarkPlus') ? 0.5 : 0);
+  if (src.aff && src.aff.includes('enraged') && src.hp / src.maxHp < 0.5) d *= 1.6;
+  if (src.enraged) d *= 1.3;
+  let crit = false;
+  if (opt.crit || (src === b.P && b.castCrit)) crit = true;
+  else if (src.st.shadowCrit) { crit = true; src.st.shadowCrit = (src.st.shadowCrit === true ? 1 : src.st.shadowCrit) - 1; if (src.st.shadowCrit <= 0) delete src.st.shadowCrit; }
+  else if (RNG.ch((src.crit || 0) / 100)) crit = true;
+  if (crit) { d *= (src.critDmg || 150) / 100; if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; }
+  if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1)); }
+  else d *= 1 - Math.max(0, Math.min(75, tgt.res || 0) - (tgt.st.melt ? 20 : 0)) / 100;
+  // 收招：打带状态的敌人
+  let pay = null;
+  const SK = opt.sk || (src === b.P && !opt.ult ? b.castSk : null);
+  if (SK && SK.pay && src.side === 'p' && tgt.side === 'e' && !opt.proc) {
+    const P2 = SK.pay, has = stHas(tgt, P2.s);
+    if (has) {
+      pay = P2;
+      if (P2.x === 'dmg') d *= P2.v;
+      else if (P2.x === 'shatter') { d *= P2.v; stClear(tgt, P2.s); }
+      else if (P2.x === 'crit' && !crit) { crit = true; d *= (src.critDmg || 150) / 100; }
+      else if (P2.x === 'detonate') { d *= 1 + (fx && fx.has('detPlus') ? 2.3 : 0.8) * has; stClear(tgt, 'any'); }
+    }
+  }
+  if (tfx) {
+    if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 0.75;
+    if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
+    if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
+    if (tgt.yi && tgt.yi.mozun) d *= 1.08;
+    if (tfx.has('stoneSkin')) d *= 0.88;
+    if (tfx.has('budong2') && tgt.shield > 0) d *= 0.8;
+    if (tfx.has('lastStand') && tgt.hp / tgt.maxHp < 0.3) d *= 0.6;
+  }
+  // 大地图第二章起：等级差直接影响伤害。比妖物低 1 级：打出 -7%、挨打 +6%（最多按 6 级算）；
+  // 比妖物高：收益压低（W_LVUP），高 1 级只 +2% / -2%，最多按 4 级算——要变强得靠刷装备，不是靠练级碾压
+  if (b.run && b.run.world && b.run.chapter >= 2 && b.P) {
+    const heroLv = b.P.lv || 1;
+    const lvMul = (gp, dn, up) => gp > 0 ? 1 + Math.min(W_LVUP[2], gp) * up : 1 + Math.max(-6, gp) * dn;
+    if (src.side === 'p' && tgt.side === 'e') d *= lvMul(heroLv - (tgt.lv || heroLv), 0.07, W_LVUP[0]);
+    else if (src.side === 'e' && tgt.side === 'p') d *= lvMul(heroLv - (src.lv || heroLv), -0.06, -W_LVUP[1]);
+  }
+  d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
+  if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, "Hộ giá", 'miss']); }
+  const dPre = d, shieldThorns = tgt.shield > 0 && tgt.runes && tgt.runes.aegis === 'a';
+  if (tgt.shield > 0) {
+    const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a;
+    if (d <= 0) {
+      out.pops.push([tgt.id, "Khiên", 'miss']);
+      if (shieldThorns && src.hp > 0) { const r = Math.round(dPre * 0.3); src.hp -= r; out.pops.push([src.id, "Phản thương" + r, 'thorn']); }
+      if (tfx && tfx.has('luoHan4')) counterHit(b, tgt, src, out, opt);   // 罗汉金身：护体挡下的攻击也反击
+      return 0;
+    }
+  }
+  if (tgt.kind === 'hero' && src.side === 'e' && !opt.noBlock && RNG.ch(0.12)) { d = Math.max(1, Math.round(d * 0.5)); out.pops.push([tgt.id, "Đỡ đòn", 'block']); }
+  tgt.hp -= d;
+  out.pops.push([tgt.id, String(d), crit ? 'crit' : elem]);
+  if (tgt.kind === 'hero' && src.side === 'e' && tgt.cls === 'berserker') tgt.fury = Math.min(100, (tgt.fury || 0) + 8 * (tgt.st.butui ? 2 : 1) * (1 + (tgt.furyGain || 0) / 100));
+  if (tgt.thornsP && src.side === 'e' && src.hp > 0) { const r = Math.max(1, Math.round(d * tgt.thornsP)); src.hp -= r; out.pops.push([src.id, "Phản chấn" + r, 'thorn']); }
+  counterHit(b, tgt, src, out, opt);
+  if (tgt.kind === 'hero' && tgt.yi && src.side === 'e' && !opt.proc) {
+    if (tgt.yi.shimo && src.hp > 0 && tgt.hp > 0 && RNG.ch((15 + tgt.yi.shimo * 5) / 100)) { out.pops.push([tgt.id, "Dung Tâm", 'fire']); hit(b, tgt, src, 0.8 + tgt.yi.shimo * 0.3, 'fire', out, { proc: 1 }); stSet(tgt, src, 'burn', out); }
+    if (tgt.yi.shemu && !b.shed && tgt.hp > 0 && tgt.hp / tgt.maxHp < 0.35) { b.shed = true; heal(tgt, tgt.maxHp * (14 + tgt.yi.shemu * 5) / 100, out);
+      for (const k of ['poison', 'burn', 'frozen', 'slow']) delete tgt.st[k]; out.pops.push([tgt.id, "Lột Da", 'buff']); out.lines.push("Dịch Sứ · Xà Mẫu: bạn lột đi một lớp da, vết thương khép lại"); }
+  }
+  if (src.side === 'p' && tgt.side === 'e' && tgt.hp > 0 && b.P && b.P.yi && b.P.yi.niuma && (tgt.kind === 'normal' || tgt.kind === 'mini') && tgt.hp / tgt.maxHp < (8 + b.P.yi.niuma * 3) / 100) {
+    tgt.hp = 0; out.pops.push([tgt.id, "Câu Hồn", 'curse']); }
+  if (pay) {
+    b.reacts = (b.reacts || 0) + 1;
+    out.pops.push([tgt.id, pay.n, 'react']); (out.react = out.react || []).push({ id: tgt.id, n: pay.n, s: pay.s });
+    if (pay.x === 'heal' && src.hp > 0) heal(src, src.maxHp * pay.v, out);
+    if (pay.x === 'spread') aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => stSet(src, f, pay.s, out));
+    if (pay.x === 'shatter' && src.fx && src.fx.has('shatterBlast')) aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => hit(b, src, f, 0, 'cold', out, { flat: Math.round(d * 0.6), proc: 1, aoe: 1 }));
+  }
+  if (SK && SK.ap && tgt.side === 'e' && tgt.hp > 0 && !opt.proc && RNG.ch(SK.apc || 1)) stSet(src, tgt, SK.ap, out);
+  if (src.kind === 'minion' && tgt.side === 'e' && tgt.hp > 0 && b.P.fx.has('minionArmor') && !tgt.st.melt) stSet(src, tgt, 'armor', out);
+  if (src.kind === 'hero' && !opt.ult) addRage(src, crit ? 9 : 5);
+  if (tgt.kind === 'hero' || tgt.kind === 'ally') addRage(tgt, 6);
+  if (tgt.kind === 'hero') {
+    if (tgt.hp <= 0 && tfx.has('cheatDeath') && !b.cheated) {
+      b.cheated = true; tgt.hp = Math.round(tgt.maxHp * 0.3);
+      out.lines.push("Giáp Bất Hủ tỏa sáng, bạn trở về từ bờ vực cái chết!"); out.pops.push([tgt.id, "Bất hủ", 'buff']);
+    }
+    if (tgt.hp > 0 && tgt.hp / tgt.maxHp < 0.3 && tfx.has('phoenix') && !b.phoenix) {
+      b.phoenix = true; out.lines.push("Lông phượng hoàng bùng cháy!"); out.cast = { id: 'phoenix', elem: 'fire', aoe: true };
+      aliveOf(b, 'e').forEach(f => hit(b, tgt, f, 3, 'fire', out, { proc: 1 }));
+    }
+  }
+  let lee = (src.leech || 0) / 100 * (fx && fx.has('vampire') ? 2 : 1);
+  if (src.aff && src.aff.includes('vamp')) lee += 0.3;
+  if (src.st.warcry && src.runes && src.runes.warcry === 'b') lee += 0.1;
+  if (lee) heal(src, d * lee, out, true);
+  if (opt.proc) return d;
+  if (src.side === 'p') {
+    if (src.kind === 'hero' && fx.has('frenzy') && src.frenzy < 10) src.frenzy++;
+    if (src.freeze && RNG.ch(src.freeze / 100)) freezeU(tgt, out);
+    if (fx && fx.has('frostbite') && RNG.ch(0.15)) freezeU(tgt, out);
+    if (src.poison && tgt.hp > 0) applyPoison(src, tgt, src.poison);
+    if (fx && fx.has('chain') && !opt.aoe && RNG.ch(0.2)) {
+      out.lines.push("Phong bạo nộ: sét bùng nổ!");
+      aliveOf(b, 'e').forEach(f => hit(b, src, f, 0.5, 'light', out, { proc: 1 }));
+    }
+    if (fx && fx.has('cleave') && !opt.aoe) aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => hit(b, src, f, mult * 0.35, elem, out, { proc: 1 }));
+    if (src === b.P && b.guiYuan && !opt.aoe) aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => hit(b, src, f, mult * 0.6, elem, out, { proc: 1, aoe: 1 }));
+    if (crit && fx && fx.has('shadowDance') && RNG.ch(0.35)) { const t2 = tgt.hp > 0 ? tgt : aliveOf(b, 'e')[0]; if (t2) hit(b, src, t2, 1, 'phys', out, { proc: 1 }); }
+  } else {
+    if (src.aff.includes('cold') && RNG.ch(0.2)) freezeU(tgt, out);
+    if (src.aff.includes('venom') && tgt.hp > 0) tgt.st.poison = { d: src.atk * 0.25, t: 3 };
+    if (src.aff.includes('fiery')) hit(b, src, tgt, 0.4, 'fire', out, { proc: 1 });
+  }
+  if (tgt.hp > 0 && src.hp > 0) {
+    let refl = tgt.thorns || 0;
+    if (tfx && tfx.has('thornsPct')) refl += tgt.armor * 0.25;
+    if (tfx && tfx.has('bulwark')) {
+      refl += d * 0.4;
+      const w = tgt.skills.find(s => s.id === 'whirl'); if (w && w.left > 0) w.left--;
+    }
+    if (shieldThorns) refl += dPre * 0.3;
+    if (tgt.aff && tgt.aff.includes('thorny')) refl += d * 0.25;
+    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, "Phản thương" + refl, 'thorn']); }
+    if (tfx && tfx.has('revenge') && src.hp > 0 && RNG.ch(0.3)) hit(b, tgt, src, 1, 'phys', out, { proc: 1 });
+  }
+  return d;
+}
+// 金刚武僧：挨打时有几率格挡反击
+function counterHit(b, tgt, src, out, opt) {
+  if (!(tgt.kind === 'hero' && tgt.counter && src.side === 'e' && src.hp > 0 && tgt.hp > 0 && !opt.proc && !b.inCounter)) return;
+  const tfx = tgt.fx, ch = (tgt.counter + (tgt.shield > 0 ? 15 : 0) + (tgt.st.chan ? 40 : 0)) / 100;
+  if (!RNG.ch(Math.min(0.85, ch))) return;
+  b.inCounter = true; out.pops.push([tgt.id, "Phản kích", 'buff']);
+  const lh = tfx && tfx.has('luoHan4');
+  (lh ? aliveOf(b, 'e') : [src]).forEach(f => hit(b, tgt, f, lh ? 2 : 0.8, 'holy', out, { proc: 1, aoe: lh ? 1 : 0 }));
+  if (tgt.st.chan && src.hp > 0) freezeU(src, out, "Choáng");
+  if (tfx && tfx.has('luoHan6') && tgt.fonu < 10) { tgt.fonu++; out.pops.push([tgt.id, "Phật nộ " + tgt.fonu, 'buff']); }
+  b.inCounter = false;
+}
+function resolveDeaths(b, out) {
+  const run = b.run, P = b.P;
+  for (const u of b.units) {
+    if (u.hp > 0 || u.dead) continue;
+    if (u.kind === 'hero' && u.fx && u.fx.has('lastBreath') && !b.lastBreath) { b.lastBreath = true; u.hp = 1; u.st.butui = 2; out.pops.push([u.id, "Bất Tử", 'buff']); out.lines.push("Còn một hơi thở — bạn vẫn đứng vững!"); continue; }
+    if (u.kind === 'hero' && run && run.tishen > 0) { run.tishen--; u.hp = Math.round(u.maxHp * 0.3); out.pops.push([u.id, "Hình nhân thế mạng", 'buff']); out.lines.push(`Một hình nhân giấy “phụt” một cái đỡ thay bạn đòn này, cháy thành tro (còn ${run.tishen} cái)`); continue; }
+    u.dead = true; u.hp = 0;
+    if (u.kind === 'ally') { out.say = [u.id, "Tôi, tôi rút lui chút đã! Ngươi chống đỡ cho ta!"]; out.lines.push("Ngoc lui về phía sau"); continue; }
+    if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name} ngã xuống rồi…`); continue; }
+    if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * 0.5); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1 })); out.pops.push([u.id, "Âm binh nổ", 'fire']); }
+    if (u.kind === 'minion' && P.fx.has('corpseBurst')) { aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out)); out.lines.push("Cương thi nổ tung, thi hỏa văng tứ tung"); }
+    if (u.side !== 'e') continue;
+    if (u.kind === 'boss' && u.dieSay && !u.guard) { out.say = [u.id, u.dieSay]; }
+    if (u.escaped) { b.goblinEscaped = true; continue; }
+    b.corpses++; b.dead.push(u);
+    out.lines.push(`${u.name} ngã xuống`);
+    const nm = MK(u.def.n); SAVE.kills[nm] = (SAVE.kills[nm] || 0) + 1;
+    track('kill');
+    if (u.kind === 'elite') track('elite');
+    if (u.kind === 'boss') track('boss');
+    if (u.kind === 'goblin') { SAVE.stats.goblins++; track('goblin'); }
+    if (run.mode === 'rift' && u.kind !== 'boss') run.prog = Math.min(100, run.prog + 1.7 * (u.kind === 'elite' ? (u.rare ? 18 : 12) : u.kind === 'mini' ? 1.5 : u.kind === 'goblin' ? 5 : 4));
+    if (P.fx.has('killHeal')) heal(P, P.maxHp * 0.1, out);
+    if (P.fx.has('lootKill') && RNG.ch(0.12)) b.extraLoot++;
+    if (P.fx.has('momentum') && P.mom < 6) P.mom++;
+    if (u.st.mark && P.runes.deathmark === 'a') { const s = P.skills.find(k => k.id === 'deathmark'); if (s) s.left = 0; }
+    if (u.st.mark && P.fx.has('markSpread')) { const nx = b.units.find(x => x.side === 'e' && x.hp > 0 && !x.st.mark); if (nx) { nx.st.mark = 4; out.pops.push([nx.id, "Ấn chuyển sang", 'curse']); } }
+    if (u.aff.includes('split') && u.kind !== 'mini') {
+      for (let i = 0; i < 2; i++) { const c = makeMonster(u.def, u.lv, run, 'mini'); c.name = "Phân liệt ·" + u.def.n; c.g = 30; b.units.push(c); }
+      out.lines.push(`${u.name} tách thành hai con!`);
+    }
+  }
+  if (b.ward && !b.wardDown && b.ward.n < b.ward.need && run && run.world) {   // 鬼潮：打掉一个，又涌上来一个
+    const W = b.ward, F = CHAPTERS[run.chapter - 1];
+    while (aliveOf(b, 'e').length < W.keep) { const m = makeMonster(F.mons[RNG.pick(W.mons)], W.lv, run, 'normal'); m.maxHp = m.hp = Math.round(m.hp * W_NORM[0]); m.atk *= W_NORM[1]; m.g = RNG.i(0, 40); b.units.push(m); }
+  }
+  if (P.hp <= 0 || b.wardDown) { b.over = true; b.win = false; }
+  else if (!aliveOf(b, 'e').length) { b.over = true; b.win = true; }
+}
+function dropItem(run, q, ilvl, mf) { return makeItem({ ilvl, rarity: rollRarity(q, mf, dOf(run).loot), cls: run.cls }); }
+function finishBattle(b) {
+  const run = b.run, s = runStats(run);
+  run.hp = Math.max(0, Math.min(b.P.hp, s.maxHp));
+  const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null };
+  if (!b.win) return res;
+  const lv = SAVE.chars[run.cls].level, di = diffIdx(run);
+  for (const u of b.dead) {
+    const mult = u.guard ? 5 : u.kind === 'boss' ? 12 : u.kind === 'elite' ? (u.rare ? 5 : 3) : u.kind === 'mini' ? 0.3 : u.kind === 'goblin' ? 2 : 1;
+    let x = (6 + u.lv * 3) * (run.world && u.kind === 'elite' ? 5 : mult) * run.xpMul; const gap = lv - u.lv;
+    if (run.world) { if (gap >= 3) x *= Math.max(0.08, 1 - (gap - 2) * 0.3); }   // 大地图：比你低 3 级以上的妖物，经验大减
+    else if (gap > 5) x *= Math.max(0.1, 1 - (gap - 5) * 0.12);
+    res.xp += Math.round(x);
+    res.gold += Math.round((2 + u.lv * 1.2) * (u.kind === 'goblin' ? 25 : mult) * RNG.f(0.7, 1.3) * (1 + s.gf / 100));
+    if (u.kind === 'goblin') {
+      res.goblin = 'killed';
+      for (let i = 0; i < 4 + di; i++) res.items.push(dropItem(run, 'elite', u.lv + 1, s.mf + 50));
+      dropGem(res, rollGem(run)); res.mats += RNG.i(4, 8);
+      continue;
+    }
+    const q = u.guard ? 'elite' : u.kind === 'boss' ? 'boss' : u.kind === 'elite' ? 'elite' : 'normal';
+    let n = run.world ? (q === 'boss' ? 2 : q === 'elite' ? 1 : (RNG.ch(u.kind === 'mini' ? 0.05 : 0.12) ? 1 : 0))
+      : u.guard ? 2 : q === 'boss' ? 2 + di : q === 'elite' ? 1 + (RNG.ch(0.5) ? 1 : 0) : (RNG.ch(u.kind === 'mini' ? 0.08 : 0.2) ? 1 : 0);
+    if (q !== 'normal' && s.fx.has('lucky')) n++;
+    for (let i = 0; i < n; i++) res.items.push(dropItem(run, q, u.lv + (q === 'boss' ? 1 : 0), s.mf));
+    if (u.rare) res.items.push(dropItem(run, 'boss', u.lv + 1, s.mf));
+    if (run.mode === 'rift') {
+      const g = zyGrade(run.riftLv), nm = u.def.n;
+      if (q === 'boss' || (q === 'elite' && RNG.ch(u.rare ? 1 : 0.6))) zyTake(res, nm, g);
+      else if (u.kind === 'normal' && RNG.ch(zyOf(nm) < g ? 0.05 : 0.01)) zyTake(res, nm, g);
+      if (run.riftLv >= RSET_LV && RNG.ch(q === 'boss' ? 0.7 : u.rare ? 0.15 : q === 'elite' ? 0.06 : 0)) {
+        const mine = SETS.find(S => S.rift && S.cls === run.cls), other = RNG.pick(SETS.filter(S => S.rift));
+        res.items.push(makeItem({ ilvl: u.lv + 1, rarity: 'set', setId: (RNG.ch(0.85) ? mine : other).id, cls: run.cls }));
+      }
+    }
+    if (RNG.ch(q === 'boss' ? 1 : q === 'elite' ? 0.35 : 0.05)) dropGem(res, rollGem(run));
+    res.mats += q === 'boss' ? RNG.i(4, 7) : q === 'elite' ? RNG.i(1, 3) + (u.rare ? 3 : 0) : (RNG.ch(0.12) ? 1 : 0);
+  }
+  for (let i = 0; i < b.extraLoot; i++) res.items.push(dropItem(run, 'normal', cellLv(run, curCell(run)), s.mf));
+  if (b.kind === 'keeper') { run.hasKey = true; res.key = true; }
+  if (run.pendingReward === 'mats') { res.mats += 8; run.pendingReward = null; }
+  run.kills += b.dead.length; SAVE.stats.kills += b.dead.length;
+  SAVE.gold += res.gold; run.goldGot += res.gold;
+  SAVE.mats += res.mats; run.matsGot += res.mats;
+  res.gems.forEach(k => addGem(k)); run.gemsGot += res.gems.length;
+  res.levels = gainXp(run.cls, res.xp); run.xpGot += res.xp;
+  res.items.forEach(it => storeItem(run, it));
+  const s2 = runStats(run);
+  run.hp = Math.min(s2.maxHp, run.hp + (s2.maxHp - s.maxHp) + Math.round(s2.maxHp * 0.12));
+  res.ach = checkAch();
+  return res;
+}
