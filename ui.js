@@ -25,23 +25,30 @@ function legBeam() {
 }
 setInterval(() => { if (!document.querySelector('.legbeam')) legBeam(); }, 500);
 let BTOAST = [];
-function toast(msg) { if (VIEW === 'battle' && B && !B.over) { if (!BTOAST.includes(msg)) BTOAST.push(msg); return; } const t = $('#toast'); t.innerHTML = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
+function toast(msg) { if (VIEW === 'battle' && B && !B.over) { if (!BTOAST.includes(msg)) BTOAST.push(msg); return; } const t = $('#toast'); t.innerHTML = msg;
+  { const mp = VIEW === 'world' && innerWidth <= 700 && document.querySelector('.wmapbox, #wmap, .wmap'); t.style.top = mp ? Math.round(mp.getBoundingClientRect().top + 30) + 'px' : ''; }   // 手机上地图界面的提示落在地图上沿，不盖住气血条和任务栏
+  t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
 function achToast(list) { if (list && list.length) { SFX.play('legend'); setTimeout(() => toast('成就达成：' + list.map(a => `<b>${a.n}</b>`).join('、')), 600); } }
 const ctxCls = () => SAVE.run ? SAVE.run.cls : SAVE.cls;
 const fmtTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const fmtLeft = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} 小时 ${m} 分` : m ? `${m} 分 ${s % 60} 秒` : `${s} 秒`; };
 const num = v => Number.isInteger(v) ? v : (Math.round(v * 10) / 10);
 const heroSpr = (cls, size, extra) => typeof HERO !== 'undefined' && HERO.has(cls) ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(cls, size >= 100 ? 'full' : 'head')}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(CLASSES[cls].spr, size, CLASSES[cls].pal, extra);
+// 同伴和常见人物：有侧身新造型的用新造型（头像 / 站姿 / 全身），没有的还用原来的小人图
+const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== 'undefined' && HERO.lookOf(spr);
+  return lk ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(lk, mode || (size >= 100 ? 'full' : size >= 50 ? 'stand' : 'head'), HERO.mapPal(lk, pal))}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(spr, size, pal, extra); };
+// 顶栏的大数字缩写：十万以上写成「12.3万」，省地方
+const fmtBig = n => n >= 100000 ? `${(n / 10000).toFixed(n >= 1000000 ? 0 : 1)}万` : String(n);
 const chTitle = ch => `第${CN[ch]}章 · ${CHAPTERS[ch - 1].n}`;
 
 // ---------- 对话 ----------
 let DLG = null;
 function dlgSpeaker(who) {
   if (who === 'me') return { n: '你', img: heroSpr(ctxCls(), 72) };
-  if (who === 'boss') { const Bo = DLG.boss; return { n: Bo ? Bo.n : '？？？', img: Bo ? SPR.img(Bo.spr, 72, Bo.pal) : '' }; }
+  if (who === 'boss') { const Bo = DLG.boss; return { n: Bo ? Bo.n : '？？？', img: Bo ? unitIcon(Bo.spr, 72, Bo.pal, '', 'head') : '' }; }
   const S = SPEAKERS[who] || { n: '' }, por = S.por || POR_EXTRA[who];
   if (por) return { n: S.n, img: SPR.img(por, 84, null, 'por') };
-  return { n: S.n, img: S.spr ? SPR.img(S.spr, 72, S.pal) : '' };
+  return { n: S.n, img: S.spr ? unitIcon(S.spr, 72, S.pal, '', 'head') : '' };
 }
 // 没写立绘的主要角色，补一张
 const POR_EXTRA = { ngoc: 'p_ngoc', lei: 'p_lei', tiedan: 'p_tiedan', smith: 'p_smith', qingxu: 'p_qingxu' };
@@ -251,7 +258,7 @@ function townHTML() {
   const tabs = CLASS_IDS.map(id => `<button class="tab ${id === cls ? 'on' : ''}" data-act="tab" data-arg="${id}">${heroSpr(id, 34)}<b>${CLASSES[id].n}</b><span>Lv ${SAVE.chars[id].level}</span></button>`).join('');
   const body = ({ go: goTab, gear: gearTab, hero: heroTab, col: colTab, set: setTab }[TT] || goTab)();
   return `<div class="top"><button class="btn sm ghost homeb" data-act="home">‹ 主页</button><h1>九幽回廊</h1><span class="sub">中式暗黑 · 自动战斗 · 迷宫探索</span>
-      <div class="row rescur"><span class="pill gold">${SPR.img('ingot', 18)}银两 ${SAVE.gold}</span><span class="pill">${SPR.img('shard', 18)}魂晶 ${SAVE.mats}</span>${featureOn('para') && SAVE.para.lv ? `<span class="pill para">修为 · ${realmName(SAVE.para.lv)}</span>` : ''}</div></div>
+      <div class="row rescur"><span class="pill gold">${SPR.img('ingot', 18)}银两 ${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 18)}魂晶 ${fmtBig(SAVE.mats)}</span>${featureOn('para') && SAVE.para.lv ? `<span class="pill para">修为 · ${realmName(SAVE.para.lv)}</span>` : ''}</div></div>
   ${storageOK ? '' : '<p class="warn">当前浏览器不允许保存进度，关闭页面后进度会丢失。</p>'}
   <div class="tabs">${tabs}</div>
   <section class="panel hero-strip"><div class="pedestal">${heroSpr(cls, 72, 'idle')}</div>
@@ -270,7 +277,7 @@ function npcList() {
 function campStrip() {
   return `<section class="camp" style="--bg:#0e0a0c"><div class="lanterns"><i></i><i></i><i></i></div>
     <div class="npcs">${npcList().map(([id]) => { const S = SPEAKERS[id], qc = townCh(), mk = qc ? wNpcMark(qc, id) : '';
-      return `<button class="npc ${id}" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${SPR.img(S.spr, id === 'ngoc' ? 76 : 60, S.pal, id === 'ngoc' ? 'idle' : '')}<b>${S.n}</b></button>`; }).join('')}</div>
+      return `<button class="npc ${id}" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${unitIcon(S.spr, id === 'ngoc' ? 76 : 60, S.pal, id === 'ngoc' ? 'idle' : '', 'stand')}<b>${S.n}</b></button>`; }).join('')}</div>
     <p class="camp-hint">青石镇 · 点击镇上的人聊两句</p></section>`;
 }
 function goTab() {
@@ -314,7 +321,7 @@ function goTab() {
   const mods = featureOn('mods') ? `<button class="modsbtn" data-act="modsopen">加难度${SAVE.mods.length ? ` · 已选 ${SAVE.mods.length} 项` : ''} ${MODSOPEN ? '▲' : '▼'}</button>
     ${MODSOPEN ? `<div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}` : '';
   const comps = Object.keys(COMPANIONS).filter(c => (SAVE.comps || {})[c]);
-  const compSel = comps.length > 1 ? `<div class="compsel"><span class="sub">同伴</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${SPR.img(C2.spr, 34)}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
+  const compSel = comps.length > 1 ? `<div class="compsel"><span class="sub">同伴</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${unitIcon(C2.spr, 34, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
   return `${campStrip()}<section class="panel gopanel">${modeSel}${body}${compSel}${mods}
     <button class="btn big" data-act="start">${mode === 'rift' ? `进入九幽幻境 ${SAVE.riftLv} 层` : `出发：${chTitle(SAVE.chapter)}`}</button></section>`;
 }
@@ -345,7 +352,7 @@ function heroTab() {
     body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>
       <h4 class="sub-h">门派套装</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
         return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>幻境 ${RSET_LV} 层以上掉落</em>` : ''}（已穿 ${n}/${S.pieces.length}）<div class="${n >= 2 ? 'on' : 'off'}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 件：${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
-      ${fxList ? `<h4 class="sub-h">生效中的特效</h4><ul class="setlist fxl">${fxList}</ul>` : ''}`;
+      ${fxList ? `<h4 class="sub-h">生效中的特效</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
   } else if (HTAB === 'tal') {
     body = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="sub">每升一级得 1 点 · 可用 <b style="color:var(--gold2)">${ti.free}</b> 点</span>
       <button class="btn sm ghost" ${SAVE.gold >= respecCost(cls) && ti.spent ? '' : 'disabled'} data-act="respec">散功重修${respecCost(cls) ? `（${respecCost(cls)} 两）` : '（免费）'}</button></div>${talentGrid(cls)}`;
@@ -476,7 +483,7 @@ function titleHTML() {
     </div>
     <p class="tl-sign">涂与豪作品</p>
     <p class="tl-lang">${[['zh', '中文'], ['vi', 'Tiếng Việt']].map(([k, n]) => `<a data-act="lang" data-arg="${k}" class="${(window.LANG || 'zh') === k ? 'on' : ''}">${n}</a>`).join(' · ')}</p>
-    <p class="tl-foot">${storageOK ? '进度自动保存在这台设备上' : '当前浏览器不允许保存进度'}</p>
+    <p class="tl-foot">${storageOK ? `进度自动保存在这台设备上${bkDue() ? ' · <a data-act="tsave">建议备份一下</a>' : ''}` : '当前浏览器不允许保存进度'}</p>
   </div>`;
 }
 // 每章开头的「上回说到」
@@ -541,11 +548,31 @@ const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${l
       <button class="btn ghost" data-act="cine">大招演出：${SAVE.cineOff ? '关' : '开'}</button>
       <button class="btn ghost" data-act="hdpx">像素：${SAVE.hdOff ? '经典' : '高清'}</button></div>
       <p class="help-p">手机发烫或卡顿时把特效调到「低」：粒子减少，不再顿帧、慢镜。</p></section>`;
-const setSave = () => `<section class="panel"><h3>存档</h3>
-      <p class="help-p" id="cloudline">${cloudLine()}</p>
-      <div class="row" style="margin-bottom:8px"><button class="btn sm ghost" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="reset">删除存档重新开始</button></div>
-      <textarea id="imp" placeholder="把存档码粘贴到这里，可以在设备之间转移进度"></textarea>
-      <button class="btn sm" style="margin-top:8px" data-act="import">导入存档</button></section>`;
+// ---------- 存档备份 ----------
+const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} ${b.lv} 级 · ${b.ended ? '已通关全部十章' : `已通关 ${b.cleared} 章`} · 银两 ${b.gold}`;
+const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
+function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
+const setSave = () => `<section class="panel bkp"><h3>存档备份</h3>
+      <p class="help-p">进度只存在这台设备的这个浏览器里：清理缓存、换手机、换浏览器打开，进度都会丢。建议每打完一章备份一次。</p>
+      <p class="bk-now"><b>现在的进度</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `上次备份：${fmtDay(SAVE.bk.t)}` : '还没有备份过'}</small></p>
+      <div class="row"><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bkfile">保存成文件</button></div>
+      <p class="help-p bk-tip">存档码是一长串字符。复制后发给自己（比如微信「文件传输助手」、Zalo 自己的聊天）存起来；太长发不出去时，用「保存成文件」。</p>
+      <h3 style="margin-top:14px">恢复进度</h3>
+      <textarea id="imp" placeholder="把存档码粘贴到这里"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn sm" data-act="import">读取存档码</button><button class="btn sm ghost" data-act="bkpick">从文件恢复</button><input type="file" id="bkf" accept=".txt,text/plain" hidden></div>
+      <div class="row" style="margin-top:14px"><button class="btn sm ghost" data-act="reset">删除存档重新开始</button></div></section>`;
+let IMPORTING = null;
+const importModal = () => () => { const a = saveBrief(IMPORTING), b = saveBrief(SAVE), older = hasProgress() && (a.cleared < b.cleared || (a.cleared === b.cleared && a.lv < b.lv));
+  return `<h2 class="mh">恢复这份存档？</h2>
+    <div class="bk-cmp"><div class="in"><small>存档码里的进度</small><b>${briefLine(a)}</b>${a.t ? `<small>保存于 ${fmtDay(a.t)}</small>` : ''}</div>
+    ${hasProgress() ? `<div><small>这台设备上现在的进度（会被覆盖）</small><b>${briefLine(b)}</b>${b.t ? `<small>保存于 ${fmtDay(b.t)}</small>` : ''}</div>` : ''}</div>
+    ${older ? '<p class="bk-warn">注意：存档码里的进度比现在的还少。确认要用旧的覆盖新的吗？</p>' : ''}
+    <div class="row"><button class="btn" data-act="doimport">恢复这份存档</button><button class="btn ghost" data-act="imcancel">取消</button></div>`; };
+function tryImport(str) {
+  try { IMPORTING = decodeSave(str); } catch (e) { IMPORTING = null; return toast(e.message === 'cut' ? '存档码不完整：可能复制时被截断了，请重新完整复制一次' : '这不是存档码，请检查一下'); }
+  BACK = MODALFN; openModal(importModal());
+}
 // 选章试玩：测试用，平时折起来，不打扰正常游玩
 const testFold = () => `<details class="testfold" ${SAVE.test || testBackup() || TEST_BAK ? 'open' : ''}><summary>选章试玩 <small>测试用</small></summary>${testPanel()}</details>`;
 function setTab() {
@@ -852,7 +879,7 @@ function showCutin(kind, data) {
   let h;
   if (kind === 'ult') {
     const run = SAVE.run;
-    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? SPR.img(run.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 104) : ''}</div>
+    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? unitIcon(run.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 104, null, '', 'full') : ''}</div>
       <div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
     el.className = 'cutin on' + (data.combo ? ' combo' : '');
     SFX.play('gong'); if (typeof GFX !== 'undefined') GFX.ult(data.combo ? '#ff9ac0' : '#ffb04a');
@@ -897,7 +924,7 @@ function resChip(P) {
 }
 // 出手顺序条：接下来 6 次谁出手；头像下面是速度
 const TB_SZ = 26;
-function tbIcon(u) { if (!u._tbi) u._tbi = u.kind === 'hero' ? heroSpr(u.cls, TB_SZ) : SPR.img(u.spr || 'skeleton', TB_SZ, u.pal); return u._tbi; }
+function tbIcon(u) { if (!u._tbi) u._tbi = u.kind === 'hero' ? heroSpr(u.cls, TB_SZ) : unitIcon(u.spr || 'skeleton', TB_SZ, u.pal, '', 'head'); return u._tbi; }
 function drawTurnBar() {
   const el = $('#turnbar'); if (!el || !B) return;
   if (B.over) { el.innerHTML = ''; return; }
@@ -1473,7 +1500,10 @@ function wStepLoop() {
   if (S.sc === sc0 && !r.blocked) { WTRAIL.unshift(from); WTRAIL.length = Math.min(WTRAIL.length, 4); }
   if (WALK) { const T2 = SCENE_THEMES[(wmap(ch).def || {}).theme] || {}, th = (wmap(ch).def || {}).theme; SFX.play(th === 'snow' || th === 'icecave' ? 'crunch' : th === 'swamp' ? 'squelch' : T2.kind === 'room' || T2.kind === 'hall' ? 'wood' : WALK.i % 2 ? 'step' : 'step2'); }
   updWorldHud();
-  if (r.blocked) { WALK = null; return; }
+  if (r.blocked) { WALK = null; for (const a of r.acts || []) { if (a.toast) qtoast(a.toast); if (a.sfx) SFX.play(a.sfx); }   // 被挡住要说一声为什么；自动探索时被挡住：换条路再试，连着三次都不通才停（原来会卡在「探索中…」不动）
+    if (WAUTO) { if (++AUTOBLK >= 3) { AUTOBLK = 0; wStopAuto(); qtoast('这边走不通，自动探索先停下'); } else { clearTimeout(AUTOT); AUTOT = setTimeout(wAutoStep, 250); } }
+    return; }
+  AUTOBLK = 0;
   if (r.cont) { for (const a of r.acts) { if (a.toast) qtoast(a.toast); if (a.sfx) SFX.play(a.sfx); } }
   else if (r.acts.length) { WALK = null; save(); return wRun(r.acts); }
   // 自动探索时：有醒着的妖物靠近、或者找到了要找的东西，就停下
@@ -1484,12 +1514,18 @@ function wStepLoop() {
   }
   WALK.h = setTimeout(wStepLoop, dur);
 }
+let AUTOT = null, AUTOBLK = 0;
 function wAutoStep() {
-  if (!WAUTO || VIEW !== 'world' || WALK || DLG || MODALFN) return;
+  clearTimeout(AUTOT);
+  if (!WAUTO || VIEW !== 'world' || WALK) return;
+  if (DLG || MODALFN) { AUTOT = setTimeout(wAutoStep, 400); return; }   // 正在说话或开着窗口：等它关了接着探索
   const ch = wch(), run = SAVE.run;
   if (run.hp < runStats(run).maxHp * 0.35 && run.potions === 0) { wStopAuto(); return qtoast('气血太低了，先回篝火歇一歇'); }
   const path = wExploreTarget(ch, WAUTOZ);
-  if (!path || !path.length) { const z = WAUTOZ; wStopAuto(); return qtoast(z ? '这一带都找遍了，换个地方看看' : '附近都探索过了'); }
+  if (!path || !path.length) { const z = WAUTOZ; wStopAuto();
+    // 路都走过了，但地上还有发光的线索没捡：提醒去点一下（原来只会说「找遍了」，其实东西就在眼前）
+    let loose = 0; { const m = wmap(ch); for (const c in m.pts) { const P = m.def.pts[c]; if (!P || !['qitem', 'clue', 'relic'].includes(P.t)) continue; for (const p of m.pts[c]) if (wSeen(ch, p.x, p.y) && wPtVisible(ch, p.x, p.y)) loose++; } }
+    return qtoast(loose ? '路都走过了——地上发光的地方还没看，点一下试试' : z ? '这一带都找遍了，换个地方看看' : '附近都探索过了'); }
   WALK = { path: path.slice(0, 10), i: 0 }; wStepLoop();
 }
 function wStopAuto() { WAUTOZ = null; if (!WAUTO) return; WAUTO = false; const b = document.querySelector('.wauto'); if (b) { b.classList.add('ghost'); b.textContent = '自动探索'; } }
@@ -1591,7 +1627,7 @@ function worldBattleContinue() {
   B = null; VIEW = 'world'; save(); render();
   wRun(wFightWon(ch, k.key || {}, run).concat(k.rest || []));
 }
-function wBack() { const k = WKEY; WKEY = null; VIEW = 'world'; render(); if (k && k.rest && k.rest.length) wRun(k.rest); }
+function wBack() { const k = WKEY; WKEY = null; VIEW = 'world'; wRun((k && k.rest) || []); }   // 开完宝箱、遇完奇遇：接着自动探索 / 接着前往（原来会停在「探索中…」不动）
 function wFinishChapter() {
   const run = SAVE.run; WGOAL = null; wStopAuto();
   const res = storyComplete(run); endRun(run, 'win'); LASTRUN = run; VIEW = res.ending || (run.chapter === 10 && run.diff === 'normal' && SAVE.story.ended && !seen('credW')) ? 'credits' : 'end'; if (VIEW === 'credits') markSeen('credW');
@@ -1629,24 +1665,34 @@ function playMini(id, done) {
   if (id === 'snowball') return miniSnowball(done);
   done && done();
 }
+// 计时小游戏的画面：只在状态变了才重建按钮，平时只挪指针。
+// （原来每一帧都重建整块，鼠标按下和抬起落在两个不同的按钮上，电脑上经常点不中。）
+function miniPaint(box, key, html, pos) {
+  if (box._mk !== key || !box.querySelector('.mz-pt')) { box.innerHTML = html(); box._mk = key; }
+  const pt = box.querySelector('.mz-pt'); if (pt) pt.style.left = pos * 100 + '%';
+  box._pos = pos;
+  if (!box.onpointerdown) box.onpointerdown = e => { if (e.target.closest('[data-mz]')) { box._pd = box._pos; box._pdt = performance.now(); } };
+}
+// 判定用「手指按下去那一刻」的位置，而不是松手那一刻——按得久一点也不吃亏
+function miniPos(box) { const p = box._pd != null && performance.now() - box._pdt < 700 ? box._pd : box._pos; box._pd = null; return p; }
 function miniBellows(done, tries = 0, O = {}) {
   const box = $('#quiz'); let beat = 0, hits = 0, t0 = performance.now(), raf = 0, zone = null;
   const BEATS = O.beats || ['长', '长', '长', '短', '短'], NEED = O.need || 4, WHO = O.who || 'tiedan';
   const newZone = () => { const w = BEATS[beat] === '长' ? 0.2 : 0.13; const c = 0.3 + Math.random() * 0.45; zone = [c - w / 2, c + w / 2]; t0 = performance.now(); };
   const draw = () => {
     const per = BEATS[beat] === '长' ? 1700 : 1150, k = ((performance.now() - t0) % (per * 2)) / per, pos = k <= 1 ? k : 2 - k;
-    box.innerHTML = O.title ? `<div class="qz-box mini"><div class="qz-q"><b>${esc(O.title)}</b>${esc(O.hint(beat, hits))}（中 ${hits} / ${beat}）</div>
+    miniPaint(box, 'b' + beat + '|' + hits + '|' + zone[0], () => O.title ? `<div class="qz-box mini"><div class="qz-q"><b>${esc(O.title)}</b>${esc(O.hint(beat, hits))}（中 ${hits} / ${beat}）</div>
       <div class="mz-bar"><i class="mz-zone" style="left:${zone[0] * 100}%;width:${(zone[1] - zone[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
       <button class="qz-opt mz-go" data-mz="1">${esc(O.btn(beat))}</button></div>`
       : `<div class="qz-box mini"><div class="qz-q"><b>${O.who ? '父子拉风箱' : '拉风箱'}</b>${WHO === 'smith' ? '张大锤' : '铁蛋'}：「${esc(BEATS.map((b, i) => i < beat ? '✓' : b).join(' '))}」——火候走到<span class="mz-or">橘黄</span>那一段时，点「拉」！（中 ${hits} / ${beat}）</div>
       <div class="mz-bar"><i class="mz-zone" style="left:${zone[0] * 100}%;width:${(zone[1] - zone[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
-      <button class="qz-opt mz-go" data-mz="1">拉！（${BEATS[beat]}）</button></div>`;
-    box._pos = pos; raf = requestAnimationFrame(draw);
+      <button class="qz-opt mz-go" data-mz="1">拉！（${BEATS[beat]}）</button></div>`, pos);
+    raf = requestAnimationFrame(draw);
   };
   box.hidden = false; newZone(); draw();
   box.onclick = e => {
     if (!e.target.closest('[data-mz]')) return; e.stopPropagation();
-    const ok = box._pos >= zone[0] && box._pos <= zone[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); beat++;
+    const mp = miniPos(box), ok = mp >= zone[0] && mp <= zone[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); beat++;
     if (beat < BEATS.length) { newZone(); return; }
     cancelAnimationFrame(raf); box.hidden = true; box.onclick = null;
     if (hits >= NEED) { SFX.play('legend'); playDialog(O.win || [['tiedan', hits === 5 ? '五下全中！我爹都没你拉得好！' : '成了！火候刚好！'], ['narr', '铁块烧得通红透亮。']], null, done); }
@@ -1660,12 +1706,12 @@ function miniTaoquan(done, tries = 0) {
   const box = $('#quiz'); let n = 0, hits = 0, raf = 0, t0 = performance.now();
   const zone = () => { const w = 0.16 - n * 0.025, c = [0.62, 0.38, 0.7][n]; return [c - w / 2, c + w / 2]; };
   const draw = () => { const per = 1050 - n * 150, k = ((performance.now() - t0) % (per * 2)) / per, pos = k <= 1 ? k : 2 - k, z = zone();
-    box.innerHTML = `<div class="qz-box mini"><div class="qz-q"><b>套圈 · 第 ${n + 1} 个圈（中 ${hits}）</b>小虎：「那只木头老虎！就那只！」——手晃到<span class="mz-or">老虎</span>上面时，点「扔」！</div>
+    miniPaint(box, 't' + n + '|' + hits, () => `<div class="qz-box mini"><div class="qz-q"><b>套圈 · 第 ${n + 1} 个圈（中 ${hits}）</b>小虎：「那只木头老虎！就那只！」——手晃到<span class="mz-or">老虎</span>上面时，点「扔」！</div>
       <div class="mz-bar"><i class="mz-zone" style="left:${z[0] * 100}%;width:${(z[1] - z[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
-      <button class="qz-opt mz-go" data-mz="1">扔！</button></div>`; box._pos = pos; raf = requestAnimationFrame(draw); };
+      <button class="qz-opt mz-go" data-mz="1">扔！</button></div>`, pos); raf = requestAnimationFrame(draw); };
   box.hidden = false; draw();
   box.onclick = e => { if (!e.target.closest('[data-mz]')) return; e.stopPropagation();
-    const z = zone(), ok = box._pos >= z[0] && box._pos <= z[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); n++; t0 = performance.now();
+    const z = zone(), mp = miniPos(box), ok = mp >= z[0] && mp <= z[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); n++; t0 = performance.now();
     if (n < 3) return;
     cancelAnimationFrame(raf); box.hidden = true; box.onclick = null;
     const S = wstate(qch()); S.flags.taoquanWin = hits >= 2 ? 1 : 0;
@@ -1743,14 +1789,14 @@ function miniFish(done) {
   const box = $('#quiz'); let tries = 0, hits = 0, raf = 0, t0 = performance.now(), zone = null, spd = 1;
   const newZone = () => { const w = 0.16 - hits * 0.02, c = 0.25 + Math.random() * 0.5; zone = [c - w / 2, c + w / 2]; spd = 0.9 + Math.random() * 0.7 + hits * 0.2; t0 = performance.now(); };
   const draw = () => { const t = (performance.now() - t0) / 1000, pos = 0.5 + 0.45 * Math.sin(t * 2.4 * spd) * Math.cos(t * 1.3 * spd + 0.7);
-    box.innerHTML = `<div class="qz-box mini"><div class="qz-q"><b>冰钓（第 ${tries + 1} 竿 · 提中 ${hits}/3）</b>浮漂一沉到<span class="mz-bl">蓝色</span>那段，就提竿！</div>
+    miniPaint(box, 'f' + tries + '|' + hits + '|' + zone[0], () => `<div class="qz-box mini"><div class="qz-q"><b>冰钓（第 ${tries + 1} 竿 · 提中 ${hits}/3）</b>浮漂一沉到<span class="mz-bl">蓝色</span>那段，就提竿！</div>
       <div class="mz-bar"><i class="mz-zone bl" style="left:${zone[0] * 100}%;width:${(zone[1] - zone[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
-      <button class="qz-opt mz-go" data-mz="1">提竿！</button></div>`; box._pos = pos; raf = requestAnimationFrame(draw); };
+      <button class="qz-opt mz-go" data-mz="1">提竿！</button></div>`, pos); raf = requestAnimationFrame(draw); };
   const fin = () => { cancelAnimationFrame(raf); box.hidden = true; box.onclick = null; const msg = (W_MINI_RW.fish || (() => ''))(wch(), hits >= 3 ? 1 : 0);
     playDialog(hits >= 3 ? [['narr', '竿子一沉——一条冰鱼甩着尾巴被你拽出了冰窟窿！'], ...(msg ? [['narr', msg]] : [])] : [['narr', '鱼线一松，鱼跑了。'], ['narr', '冰窟窿里冒了个泡，像在笑你。']], null, done); };
   box.hidden = false; newZone(); draw();
   box.onclick = e => { if (!e.target.closest('[data-mz]')) return; e.stopPropagation();
-    const ok = box._pos >= zone[0] && box._pos <= zone[1]; if (ok) hits++; tries++; SFX.play(ok ? 'hit' : 'fail');
+    const mp = miniPos(box), ok = mp >= zone[0] && mp <= zone[1]; if (ok) hits++; tries++; SFX.play(ok ? 'hit' : 'fail');
     if (hits >= 3 || tries >= 5) return fin(); newZone(); };
 }
 // 打雪仗：小孩从三道雪墙后面探头，看准了砸；十次里砸中六次就赢
@@ -1827,7 +1873,7 @@ const shopModal = () => {
     body = L.length ? L.map(it => `<div class="irow ${ancCls(it)}">${SPR.item(it, 28)}<button class="linkish nm" data-act="item" data-arg="${it.id}"><span class="r-${it.rarity}">${esc(itemTitle(it))}</span> <small>${SLOT_NAME[it.slot]}</small></button><button class="btn sm ghost" data-act="shopsell" data-arg="${it.id}">当 ${wShopSellPrice(SH, it)} ${cur}</button></div>`).join('') : '<p class="sub">储物箱是空的。身上穿着的东西当不了。</p>'; }
   else { const own = [...Object.values(SAVE.chars[cls].eq).filter(Boolean), ...SAVE.stash].filter(it => it.aff && it.aff.length);
     body = `<p class="help-p">开光：随手洗掉一条词条，换成一条新的——好坏全看缘分。每次 ${SH.reroll} ${cur}。</p>` + own.map(it => `<div class="irow ${ancCls(it)}">${SPR.item(it, 28)}<button class="linkish nm" data-act="item" data-arg="${it.id}"><span class="r-${it.rarity}">${esc(itemTitle(it))}</span><small class="sd">${it.aff.map(([k, v]) => fmtStat(k, Math.round(v * itemMult(it)))).join('，')}</small></button><button class="btn sm" ${wCurN(SH.cur) >= SH.reroll ? '' : 'disabled'} data-act="shoproll" data-arg="${it.id}">开光</button></div>`).join(''); }
-  return `<div class="shoph">${SPR.img(Sp.spr, 56, Sp.pal)}<div><h2 class="mh">${esc(SH.n)}</h2><p class="sub">${esc(SH.blurb || '')}</p></div></div>
+  return `<div class="shoph">${unitIcon(Sp.spr, 56, Sp.pal, '', 'stand')}<div><h2 class="mh">${esc(SH.n)}</h2><p class="sub">${esc(SH.blurb || '')}</p></div></div>
     <div class="row wallet"><span class="pill gold">银两 ${SAVE.gold}</span>${SH.cur === 'shang' ? `<span class="pill gold">赏银 ${SAVE.shang || 0}</span>` : ''}${SH.cur === 'mb' || SAVE.mb ? `<span class="pill mb">冥币 ${wMb()}</span>` : ''}${run && run.tishen ? `<span class="pill">纸人 ${run.tishen}</span>` : ''}</div>
     ${tabs.length > 1 ? `<div class="row tabs">${tabs.map(([k, n]) => `<button class="btn sm ${SHOPTAB === k ? '' : 'ghost'}" data-act="shoptab" data-arg="${k}">${n}</button>`).join('')}</div>` : ''}
     ${SHOPMSG ? `<p class="evres shopmsg">${SHOPMSG}</p>` : ''}
@@ -1899,7 +1945,7 @@ const campModal = P => () => {
   return `<h2 class="mh">${SPR.img('fire', 34, null, 'flicker')} ${esc(P.n)}</h2>
     <p class="help-p">火光驱散了阴气。在这里存档；打输了会回到最近的篝火。</p>
     <div class="campb"><button class="btn" data-act="wrest">休息 <small>回满气血和丹药，小妖会重新出现${talk ? ' · <b class="talkdot">有人想和你说说话</b>' : ''}</small></button>
-      ${comps.length > 1 && !forced ? `<div class="compsel camp"><span class="sub">带谁同行</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="wcomp" data-arg="${c}">${SPR.img(C2.spr, 30)}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : ''}
+      ${comps.length > 1 && !forced ? `<div class="compsel camp"><span class="sub">带谁同行</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="wcomp" data-arg="${c}">${unitIcon(C2.spr, 30, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : ''}
       ${others.map(id => `<button class="btn ghost" data-act="wtele" data-arg="${id}">传送到「${esc(wCampName(ch, id))}」 <small>${esc(WMAPS[ch].scenes[wCampPos(ch, id).sc].n)}</small></button>`).join('')}
       <button class="btn ghost" data-act="wmenu">暂离 <small>回到出征菜单（换角色、看图鉴），之后从这里继续</small></button>
       <button class="btn ghost" data-act="close">离开</button></div>`;
@@ -2079,7 +2125,7 @@ function endHTML() {
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
         <button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button></div>`).join('')}</div>` : ''}</div>`;
   }
-  return `<div class="scene"><div class="panel"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 80, 'float') + (r.ngoc ? SPR.img(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 72, null, 'float') : '') : SPR.img('skeleton', 80)}</div><h2>${title}</h2>
+  return `<div class="scene"><div class="panel"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 80, 'float') + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 72, null, 'float', 'stand') : '') : SPR.img('skeleton', 80)}</div><h2>${title}</h2>
     <p class="d">${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}</p>
     ${r.record && !rift ? '<p class="evres">刷新了本章最快纪录！</p>' : ''}
     ${extra}
@@ -2088,6 +2134,7 @@ function endHTML() {
       <div><small>玉石</small><b>+${r.gemsGot}</b></div><div><small>魂晶</small><b>+${r.matsGot}</b></div>
       ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">这次得到 ${loot.length} 件装备（已放进储物箱）</p>${lootChips(loot)}
+    ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>又打完一章。进度只存在这台设备上，备份一下更保险。</p><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bknudge">更多备份方式</button></div>` : ''}
     <button class="btn big" data-act="town">回青石镇</button></div></div>`;
 }
 function creditsHTML() {
@@ -2406,6 +2453,7 @@ const ACT = {
     const ch = wch(), q = wTracker(ch).find(x => x.id === id); if (!q) { WGOAL = null; return; }
     if (!cont) WGOAL = { id, hops: 0 }; else if (!WGOAL) return;
     wStopAuto(); clearTimeout(WALK && WALK.h); WALK = null;
+    { const p0 = wMarkPos(ch, q); if (p0 && p0.comp) { WGOAL = null; return ACT.wtalkc(); } }   // 要找的人就跟在身边：直接搭话
     if (wWatchBlock(ch)) { WGOAL = null; return qtoast('这里有人巡逻，自动寻路不管用——自己摸过去'); }
     { const MS = WQ[ch].main.find(m => m.id === id), nt = !!wstate(ch).flags.night;   // 昼夜：时辰不对，找不着人
       if (WMAPS[ch].daynight && MS && MS.tod && (MS.tod === 'night') !== nt && !cont) qtoast(MS.tod === 'night' ? '这件事得等天黑——在篝火边歇一歇，天就黑了' : '这件事得等天亮——在篝火边歇一歇，天就亮了'); }
@@ -2415,7 +2463,7 @@ const ACT = {
     if (!R) { WGOAL = null; return qtoast('那边的路现在还走不通'); }
     if (R.puzzle) {   // 被谜题挡住：走到边上停下，剩下的自己来
       WGOAL = null; WTAP = { x: R.x, y: R.y, t: 0 };
-      const msg = R.puzzle === '迷路' ? '林子里的路得自己找——走过一次的门才认得' : R.puzzle === '巡逻' ? '前面有人巡逻，得自己摸过去' : `前面是${R.puzzle}，得自己走`;
+      const msg = R.who ? `${R.who}两眼发直地挡在路口——走过去点他一下` : R.puzzle === '迷路' ? '林子里的路得自己找——走过一次的门才认得' : R.puzzle === '巡逻' ? '前面有人巡逻，得自己摸过去' : `前面是${R.puzzle}，得自己走`;
       if (!R.path.length) return qtoast(msg);
       WALK = { path: R.path, i: 0, onArrive: () => qtoast(msg) }; return wStepLoop();
     }
@@ -2426,8 +2474,8 @@ const ACT = {
       else { const act = wInteract(ch, p.x, p.y); done = () => { WGOAL = null; if (act) act(); }; }
     }
     if (R.near) {
-      if (!R.path.length) { if (p.area && !R.door) return done(); WGOAL = null; return qtoast('这条路还没探出来，试试「自动探索」'); }
-      qtoast(R.plate ? '路被栅栏挡住了——去踩那块机关试试' : '前面的路还没探过，先往那个方向走');
+      if (!R.path.length) { if (p.area && !R.door) return done(); WGOAL = null; return qtoast(R.fence ? '路被栅栏挡住了——附近有机关，踩上去试试' : '这条路还没探出来，试试「自动探索」'); }
+      qtoast(R.plate ? '路被栅栏挡住了——去踩那块机关试试' : R.fence ? '路被栅栏挡住了——附近有机关，踩上去试试' : '前面的路还没探过，先往那个方向走');
       WALK = { path: R.path, i: 0, onArrive: p.area && !R.door ? done : () => { if (WGOAL) setTimeout(() => ACT.wgo(id, null, true), 200); } }; return wStepLoop();
     }
     if (!R.path.length) { if (done) return done(); WGOAL = null; return; }
@@ -2488,11 +2536,27 @@ const ACT = {
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   export: async () => {
-    const code = exportSave();
-    try { await navigator.clipboard.writeText(code); toast('存档码已复制'); }
-    catch (e) { const t = $('#imp'); t.value = code; t.select(); toast('没法自动复制，存档码已放进下面的输入框，请手动复制'); }
+    markBackup(); persist(true); const code = exportSave();
+    const done = () => { toast(`存档码已复制（${code.length} 个字符），找个地方粘贴存好`); const m = document.querySelector('.bk-now small'); if (m) m.textContent = `上次备份：${fmtDay(SAVE.bk.t)}`; document.querySelectorAll('.bk-nudge').forEach(x => x.remove()); };
+    try { await navigator.clipboard.writeText(code); done(); }
+    catch (e) { const t = $('#imp'); if (!t) return ACT.tsave(), setTimeout(ACT.export, 50);
+      t.value = code; t.focus(); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e2) {}
+      if (ok) done(); else toast('没法自动复制：存档码已放进下面的输入框，请长按全选后手动复制'); }
   },
-  import: () => { try { importSave($('#imp').value); VIEW = SAVE.run ? 'map' : 'town'; toast('导入成功'); render(); } catch (e) { toast('存档码不对，请检查是否完整'); } },
+  bkfile: async () => {
+    markBackup(); persist(true); const code = exportSave(), b = saveBrief(SAVE), d = new Date(), z = n => String(n).padStart(2, '0');
+    const name = `jiuyou-save-${b.cls}-lv${b.lv}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}.txt`;
+    try { const file = new File([code], name, { type: 'text/plain' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: '九幽回廊存档' }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      toast('存档文件已生成。要是没有弹出保存或分享，请改用「复制存档码」');
+    } catch (e) { toast('这个浏览器没法保存文件，请改用「复制存档码」'); }
+  },
+  bkpick: () => { const f = $('#bkf'); if (!f) return; f.onchange = () => { const file = f.files && f.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => tryImport(String(rd.result || '')); rd.onerror = () => toast('文件读不出来'); rd.readAsText(file); f.value = ''; }; f.click(); },
+  import: () => { const v = ($('#imp') || {}).value || ''; if (!v.trim()) return toast('先把存档码粘贴到输入框里'); tryImport(v); },
+  imcancel: () => { IMPORTING = null; closeModal(); },
+  doimport: () => { if (!IMPORTING) return; clearOverlays(); SAVE = IMPORTING; IMPORTING = null; persist(true); toast('已恢复，正在重新载入……'); setTimeout(() => location.reload(), 500); },
+  bknudge: () => { ACT.tsave(); },
   tcls: c => { TCLS = c; refresh(); },
   home: () => { stopAuto(); closeModal(); VIEW = 'title'; render(); window.scrollTo(0, 0); },
   tcont: () => { closeModal(); if (SAVE.run) return ACT.resume(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); },
@@ -2566,6 +2630,7 @@ function render() {
 VIEW = 'title';
 render();
 initCloud();
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.respec4) { delete SAVE.respec4; persist(); setTimeout(() => toast('五个职业重做了：心法点已经全部退回，招式也重新装配。去「修炼」看看新的心法和招式，赶尸人记得排一下「尸阵」'), 1200); }
 window.__abyss = { get SAVE() { return SAVE; }, get B() { return B; }, pause: () => clearTimeout(timer), mini: (id, f) => playMini(id, f), get WHERO() { return WHERO; }, get WGOAL() { return WGOAL; }, get WAUTO() { return WAUTO; }, ACT, fightw: e => beginWorldBattle(e), wbusy: () => !!WALK, maxhp: () => runStats(SAVE.run).maxHp, wtr: () => { const ch = SAVE.run && SAVE.run.world && SAVE.run.chapter; if (!ch) return []; return wTracker(ch).map(q => ({ t: q.t, town: wMarkPos(ch, q.mark) === 'town' })); }, fight: k => beginBattle(k), get WALKING() { return WALKING; }, get B() { return B; }, get VIEW() { return VIEW; }, get DLG() { return DLG; }, endDlg, wRun: a => wRun(a), dbg: { dlg: l => playDialog(l, null, null), render: () => render(), save: () => save(), view: v => { VIEW = v; }, finish: (r, o) => finishRunView(r, o) } };
 }

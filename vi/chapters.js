@@ -2313,7 +2313,7 @@ WQ[4] = {
       ], aff: { zhen: 1 }, rw: { xp: 0.3 } },
     { id: 'm14', t: "Đốc công", d: "Hạ Quỷ đốc công mỏ, đập gãy xích sắt", hint: "Gã to xác bên cạnh lão Tôn.", area: 'kuangdong2', goal: { fight: 'jiangong' }, mark: 'jiangong',
       lines: [['jiangong', "Dừng lại làm gì! Đào! Đào hết cho ta!"], ['narr', "Một con quỷ mỏ to xác cháy đen toàn thân, kéo một cây roi sắt đi tới."]],
-      after: [['narr', "Đốc công ngã xuống. Bạn đập gãy xích sắt, một, hai, ba…"], ['narr', "Mấy chục thợ mỏ đứng ngây ra, như không biết mình đã có thể đi."], ['laosun', "…Đi được rồi à?"], ['laosun', "Về nhà được rồi à?"], ['zhen', "Được. Tôi đưa mọi người ra ngoài."], ['laosun', "Chân ta nhũn ra, đi không nhanh… cậu, cậu đưa ta lên đi. Họ đi theo ta."]], rw: { xp: 0.5, item: 'magic' } },
+      after: [['narr', "Đốc công ngã xuống. Bạn đập gãy xích sắt, một, hai, ba…"], ['narr', "Mấy chục thợ mỏ đứng ngây ra, như không biết mình đã có thể đi."], ['laosun', "…Đi được rồi à?"], ['laosun', "Về nhà được rồi à?"], ['zhen', "Được. Tôi đưa mọi người ra ngoài."], ['laosun', "Chân ta nhũn ra, đi không nhanh… cậu, cậu đưa ta lên đi. Họ đi theo ta."]], set: { escort: 'laosun' }, rw: { xp: 0.5, item: 'magic' } },
     { id: 'm15', t: "Hộ tống lão Tôn", d: "Đưa lão Tôn và các thợ mỏ về bên lửa trại làng mỏ", hint: "Theo đường cũ về làng mỏ. Lão Tôn đi không nhanh, chó dung nham ngửi thấy mùi người sẽ đuổi theo.", goal: { reach: 'hsfire' }, mark: 'hsfire', escort: 'laosun',
       escortLines: [['laosun', "Ta đi theo cậu… canh một, canh hai… ta đếm đây."]],
       escortMiss: "Lão Tôn không theo kịp — quay lại tìm lão", escortLost: "Lão Tôn sợ quá đứng chôn chân bên dung nham… phải quay lại đưa lão đi lần nữa.",

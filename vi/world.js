@@ -274,6 +274,15 @@ function wEnsureDropMons(ch) {
   }
 }
 const wMonAt = (ch, x, y) => wScene(ch).mons.find(mn => mn.x === x && mn.y === y);
+// 妖物和主角叠在同一格（进门、醒来、刷新时可能发生）：把妖物挪到旁边空着的一格，不然点不到它、也打不起来
+function wUnstackMons(ch) {
+  const S = wstate(ch), D = wScene(ch);
+  for (const mn of D.mons) { if (mn.x !== S.pos.x || mn.y !== S.pos.y) continue;
+    let done = false;
+    for (let r = 1; r <= 3 && !done; r++) for (let dy = -r; dy <= r && !done; dy++) for (let dx = -r; dx <= r && !done; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = mn.x + dx, y = mn.y + dy;
+      if (wPassMon(ch, x, y) && !D.mons.some(o => o !== mn && o.x === x && o.y === y)) { mn.x = x; mn.y = y; done = true; } } }
+}
 function wMoveMons(ch) {
   const S = SAVE.world[wk(ch)], hp = S.pos, D = wScene(ch);
   for (const mn of D.mons) {
@@ -636,7 +645,7 @@ function wEnter(ch, sc, code) {
   S.sc = sc; S.pos = wArrive(ch, sc, code); S.pz.ent = { ...S.pos }; S.pz.entCode = code;
   if (S.pz.box && S.pz.box[sc] && !wBoxSolved(ch, sc)) delete S.pz.box[sc];   // 冰块没推好就离开，回来重新摆
   { const B = wmap(ch, sc).def.pts[code]; if (B && B.t === 'door') { S.pz.ud = S.pz.ud || {}; S.pz.ud[sc + '>' + B.to + '@' + B.at] = 1; } }   // 来时的门，认得回去
-  wScene(ch); wReveal(ch);
+  wScene(ch); wReveal(ch); wUnstackMons(ch);
   const acts = [{ enter: sc }];
   const D = WMAPS[ch].scenes[sc];
   if (D.onEnter) { const a = D.onEnter(S); if (a) acts.push(...a); }
@@ -772,6 +781,7 @@ function wUse(ch, x, y, run) {
 }
 // 走一步
 function wStep(ch, x, y, run) {
+  wUnstackMons(ch);
   const S = wstate(ch), m0 = wmap(ch), c0 = wTile(m0, x, y), TR = wTerr(ch), pre = [];
   if (c0 === '%' && !S.got[wgk(S.sc, x, y)]) {
     if (!wHasKey(ch, TR.web || 'torch')) return { blocked: true, acts: [{ toast: "Mạng nhện vừa dính vừa dai, đao chém không đứt — phải dùng lửa đốt" }] };
@@ -800,7 +810,7 @@ function wStep(ch, x, y, run) {
   // 每章自己的地形规矩（暴风雪、塌方、扒手……）
   if (run && WMAPS[ch].onStep) { const r = WMAPS[ch].onStep(ch, S, run, x, y); if (r) { if (r.stop) return { acts: [...pre, ...r.acts] }; pre.push(...(r.acts || [])); } }
   // 巡逻的眼睛：被看见就被赶回门口
-  const seenBy = wWatchSee(ch, x, y);
+  const seenBy = W_AUTOSOLVE ? null : wWatchSee(ch, x, y);
   if (seenBy && seenBy.alarm && (S.pz.alarmT || 0) > S.pz.bc) { /* 刚打完增援，喘口气 */ }
   else if (seenBy && seenBy.alarm) { S.pz.alarmT = S.pz.bc + 8; return { acts: [...pre, { toast: seenBy.caught || "Báo động vang lên!" }, { sfx: 'fail' }, { fight: { ...seenBy.alarm, first: 'e' }, key: {} }] }; }
   if (seenBy && !seenBy.alarm) { S.pos = { ...(S.pz.ent || from) }; wReveal(ch); return { acts: [...pre, { toast: seenBy.caught || `Bị ${seenBy.n || "lính tuần đêm"} phát hiện! Bạn bị đuổi ra ngoài` }, { sfx: 'fail' }] }; }
@@ -1044,14 +1054,28 @@ function wRoute(ch, t) {
   const R = wRoute0(ch, t);
   if (W_AUTOSOLVE || (R && !R.near)) return R;
   let R2; W_AUTOSOLVE = true; try { R2 = wRoute0(ch, t); } finally { W_AUTOSOLVE = false; }
-  if (!R2 || R2.near) return R;
+  if (!R2) return R;
   const S = wstate(ch);
-  if (!R) return { path: [], near: true, puzzle: wWatchActive(ch) && !(S.pz.sneak || {})[S.sc] ? "Tuần tra" : "Lạc đường", x: R2.x, y: R2.y, door: R2.door };
-  const p0 = R2.path.find(p => wPuzzle(ch, p.x, p.y));
+  // 机关后面还没探过（比如岩浆对岸）：照样要说清楚是机关挡路，而不是「路还没探出来」
+  const isXt = p => { const P = wPt(ch, p.x, p.y); return !!P && P.t === 'xintu' && !S.got[wgk(S.sc, p.x, p.y)]; };   // 被迷住的信徒站在路口
+  const isYY = p => { const c = wTile(wmap(ch), p.x, p.y); return (c === '(' && !!S.flags.yin) || (c === ')' && !S.flags.yin); };   // 阴阳两面：这一面是断的
+  let p0 = (R2.path || []).find(p => wPuzzle(ch, p.x, p.y) || isXt(p) || isYY(p));
+  if (!p0 && R && R.near && !R.path.length && !R.fence) {   // 一步也近不了了：看看是不是哪个机关就挡在走得到的地方旁边（对岸还在雾里时，路线里找不到它）
+    const m = wmap(ch), L = [], reach = new Set([wkey(S.pos.x, S.pos.y)]), q = [S.pos];
+    while (q.length) { const c = q.shift();
+      for (const [dx, dy] of W_DIRS8) { const n = { x: c.x + dx, y: c.y + dy }, k = wkey(n.x, n.y);
+        if (reach.has(k) || !wSeen(ch, n.x, n.y) || !wPassHero(ch, n.x, n.y) || wPuzzle(ch, n.x, n.y) || wIsDoor(ch, n.x, n.y) || wEliteAt(ch, n.x, n.y) || !wDiagOk(ch, c, dx, dy)) continue; reach.add(k); q.push(n); } }
+    for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) { const p = { x, y };
+      if (!wSeen(ch, x, y) || !(wPuzzle(ch, x, y) || isXt(p) || isYY(p))) continue;
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => reach.has(wkey(x + dx, y + dy)))) L.push({ x, y, d: Math.abs(x - R.x) + Math.abs(y - R.y) }); }
+    L.sort((a, b) => a.d - b.d); p0 = L[0] || null;
+  }
+  if (R2.near && !p0) return R;
+  if (!R && !R2.near) return { path: [], near: true, puzzle: wWatchActive(ch) && !(S.pz.sneak || {})[S.sc] ? "Tuần tra" : "Lạc đường", x: R2.x, y: R2.y, door: R2.door };
   if (!p0) return R;
   const n = wPathNear(ch, p0.x, p0.y);
   const c0 = wTile(wmap(ch), p0.x, p0.y), P0 = wmap(ch).def.pts[c0];
-  return { path: n.path, near: true, puzzle: P0 && P0.box ? "Cửa băng (đẩy khối băng lên mắt băng)" : W_PUZ_N[c0] || "Cơ quan", x: p0.x, y: p0.y, door: R2.door };
+  return { path: n.path, near: true, puzzle: P0 && P0.box ? "Cửa băng (đẩy khối băng lên mắt băng)" : c0 === '(' || c0 === ')' ? "Đường đứt (mặt này không qua được — dùng Gương Âm Dương soi sang mặt kia rồi hãy qua)" : W_PUZ_N[c0] || "Cơ quan", who: P0 && P0.t === 'xintu' ? (P0.n || "một tín đồ") : null, x: p0.x, y: p0.y, door: R2.door };
 }
 function wRoute0(ch, t) {
   const S = wstate(ch);
@@ -1066,7 +1090,10 @@ function wRoute0(ch, t) {
     L.sort((a, b) => (a.k === S.pz.lastPlate) - (b.k === S.pz.lastPlate) || a.pa.length - b.pa.length);
     if (L[0]) return { path: L[0].pa, near: true, plate: true, door, x: L[0].pa[L[0].pa.length - 1].x, y: L[0].pa[L[0].pa.length - 1].y };
   }
-  const n = wPathNear(ch, x, y); return { path: n.path, near: true, door, x, y };
+  const n = wPathNear(ch, x, y);
+  // 线索模式：不替玩家走到机关上，但要说清楚是栅栏挡路（原来只会说「路还没探出来」，其实是机关没踩）
+  let fence = false; { const m = wmap(ch); for (const c in m.pts) if (m.def.pts[c].t === 'plate' && !S.flags.barsJammed && m.pts[c].length) fence = true; }
+  return { path: n.path, near: true, door, x, y, fence };
 }
 // 任务标记的位置：{sc,x,y}（线索模式下可能只给一个区域）
 function wNearestMon(ch, f) {
@@ -1096,6 +1123,8 @@ function wMarkPos(ch, q) {
   const mark = q.mark; if (!mark) return null;
   const S = wstate(ch), I = wIndex(ch), full = SAVE.guide === 'full';
   let t = null;
+  // 护送任务：人还没跟上，先指向要带的那个人，而不是终点
+  if (q.escort && S.flags.escort !== q.escort) { const n = wFindNpc(ch, q.escort); if (n) return n; }
   if (mark.startsWith('mon:')) { const tag = mark.slice(4); t = wNearestMon(ch, mn => mn.tag === tag); }
   else if (mark.startsWith('monm:')) { const ids = mark.slice(5).split('/').map(Number); t = wNearestMon(ch, mn => ids.includes(mn.m)); }
   else if (mark.startsWith('zone:')) { const zid = mark.slice(5); t = wNearestMon(ch, mn => mn.z === zid) || wZoneCenter(ch, zid); }
@@ -1120,7 +1149,7 @@ function wNextLamp(ch, grp) {
 function wTracker(ch) {
   const S = wstate(ch), out = [], m = wMain(ch), full = SAVE.guide === 'full';
   const ent = (main, id, t, st, n, giver) => { const g = st.goal;
-    return { main, id, t, d: ((full || !st.hint) ? st.d : st.hint).replace('{n}', n), mark: st.mark || g.talk || (g.waves ? giver : null), area: st.area, find: !!(g.get || g.clue || g.herb || g.puzzle || g.rub) }; };
+    return { main, id, t, d: ((full || !st.hint) ? st.d : st.hint).replace('{n}', n), mark: st.mark || g.talk || (g.waves ? giver : null), area: st.area, escort: st.escort, find: !!(g.get || g.clue || g.herb || g.puzzle || g.rub) }; };
   if (m) { const e = ent(true, m.id, m.t, m, S.kc); if (m.goal.talks) e.mark = m.goal.talks.find(n => !S.pz['tk_' + m.id + '_' + n]) || e.mark; out.push(e); }
   for (const q of WQ[ch].side) { const s = S.side[q.id]; if (!s || s.st !== 'on') continue; out.push(ent(false, q.id, q.t, q.steps[s.step], s.n, q.giver)); }
   for (const id in (S.bty && S.bty.on) || {}) { const D = wBtyDef(ch, id); if (D) out.push({ main: false, bty: true, id: 'bty_' + id, t: `Truy nã · ${D.n}`, d: `${BTY_TIER[D.tier].n} ${wBtyWhere(ch, D)}`, mark: 'mon:bty_' + id }); }

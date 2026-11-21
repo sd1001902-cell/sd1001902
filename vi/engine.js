@@ -76,9 +76,63 @@ function persist(quiet) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); storageOK = true; } catch (e) { storageOK = false; }
   if (onPersist && !quiet) onPersist();
 }
-function exportSave() { return btoa(unescape(encodeURIComponent(JSON.stringify(SAVE)))); }
+// ---------- 存档码：压缩（LZW）+ 网址安全的 64 进制 + 长度和校验，短得多，被截断能认出来 ----------
+const B64U = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', LZ_MAX = 1 << 16;
+function lzPack(str) {   // str 里每个字符都在 0~255
+  const dict = new Map(); let next = 256, bits = 9, w = '', acc = 0, nacc = 0, out = '';
+  const emit = code => { acc |= code << nacc; nacc += bits; while (nacc >= 6) { out += B64U[acc & 63]; acc >>>= 6; nacc -= 6; } };
+  const codeOf = k => k.length === 1 ? k.charCodeAt(0) : dict.get(k);
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i], wc = w + c;
+    if (wc.length === 1 || dict.has(wc)) { w = wc; continue; }
+    emit(codeOf(w));
+    if (next < LZ_MAX) { dict.set(wc, next++); if (next > (1 << bits)) bits++; }
+    w = c;
+  }
+  if (w) emit(codeOf(w));
+  if (nacc) out += B64U[acc & 63];
+  return out;
+}
+function lzUnpack(txt) {
+  const val = {}; for (let i = 0; i < 64; i++) val[B64U[i]] = i;
+  let pos = 0, acc = 0, nacc = 0, bits = 9, next = 256;
+  const read = () => { while (nacc < bits) { if (pos >= txt.length) return -1; const v = val[txt[pos++]]; if (v === undefined) throw new Error('bad char'); acc |= v << nacc; nacc += 6; } const c = acc & ((1 << bits) - 1); acc >>>= bits; nacc -= bits; return c; };
+  const dict = []; let k = read(); if (k < 0) return ''; if (k > 255) throw new Error('bad head');
+  let w = String.fromCharCode(k); const out = [w];
+  for (;;) {
+    if (next < LZ_MAX && next + 1 > (1 << bits)) bits++;
+    k = read(); if (k < 0) break;
+    let e; if (k < 256) e = String.fromCharCode(k); else if (k < next) e = dict[k - 256]; else if (k === next) e = w + w[0]; else throw new Error('bad code');
+    out.push(e);
+    if (next < LZ_MAX) { dict[next - 256] = w + e[0]; next++; }
+    w = e;
+  }
+  return out.join('');
+}
+function sum32(s) { let a = 1, b = 0; for (let i = 0; i < s.length; i++) { a = (a + s.charCodeAt(i)) % 65521; b = (b + a) % 65521; } return ((b << 16) | a) >>> 0; }
+const SAVE_TAG = 'JY1';
+function packSaveObj(obj) { const raw = unescape(encodeURIComponent(JSON.stringify(obj))); return SAVE_TAG + '.' + raw.length.toString(36) + '.' + sum32(raw).toString(36) + '.' + lzPack(raw); }
+function exportSave() { return packSaveObj(SAVE); }
+// 存档码 → 存档对象（不动当前进度）。出错时抛出 Error，message：'cut' 被截断 / 'bad' 不是存档码
+function decodeSave(str) {
+  str = String(str || '').replace(/\s+/g, '');
+  const m = str.match(/JY1\.([0-9a-z]+)\.([0-9a-z]+)\.([A-Za-z0-9_-]+)/);
+  if (m) {
+    let raw; try { raw = lzUnpack(m[3]); } catch (e) { throw new Error('cut'); }
+    if (raw.length !== parseInt(m[1], 36) || sum32(raw) !== parseInt(m[2], 36)) throw new Error('cut');
+    return parseSave(JSON.parse(decodeURIComponent(escape(raw))));
+  }
+  if (/^JY1\./.test(str)) throw new Error('cut');
+  let obj; try { obj = JSON.parse(decodeURIComponent(escape(atob(str)))); } catch (e) { throw new Error('bad'); }   // 旧版存档码
+  return parseSave(obj);
+}
 function parseSave(obj) { if (!obj || !obj.chars || !Array.isArray(obj.stash)) throw new Error('bad'); return migrate(obj); }
-function importSave(str) { SAVE = parseSave(JSON.parse(decodeURIComponent(escape(atob(str.trim()))))); persist(); }
+function importSave(str) { SAVE = decodeSave(str); persist(); }
+// 一眼看得懂的存档摘要：恢复之前给玩家确认用
+function saveBrief(S) {
+  const cls = S.cls, c = (S.chars || {})[cls] || { level: 1 }, cleared = ((S.story || {}).cleared || {}).normal || 0;
+  return { cls, lv: c.level || 1, cleared, ch: S.run && S.run.chapter ? S.run.chapter : Math.min(10, cleared + 1), gold: S.gold || 0, t: S.t || 0, para: (S.para || {}).lv || 0, ended: !!(S.story || {}).ended };
+}
 
 // ---------------- 剧情进度与解锁 ----------------
 const storyCleared = diff => (SAVE && SAVE.story && SAVE.story.cleared[diff || 'normal']) || 0;

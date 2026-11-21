@@ -612,10 +612,10 @@ const HERO = (() => {
   }
   // 头像：截头和肩膀；大图截全身
   const por = {};
-  function portrait(cls, mode) {
-    const key = cls + mode + HD_ON(); if (por[key]) return por[key];
-    const c0 = cv(cls, mode === 'full' ? 'rd' : 'idle'); if (!c0) return '';
-    const k = c0.width / W, [x, y, s] = mode === 'full' ? [6, 1, 44] : [19, 13, 19];
+  function portrait(cls, mode, over) {
+    const key = cls + mode + JSON.stringify(over || {}) + HD_ON(); if (por[key]) return por[key];
+    const c0 = cv(cls, mode === 'full' ? 'rd' : 'idle', over); if (!c0) return '';
+    const k = c0.width / W, [x, y, s] = mode === 'full' ? [6, 1, 44] : mode === 'stand' ? [10, 5, 36] : [19, 13, 19];
     const c = document.createElement('canvas'); c.width = s * k; c.height = s * k; c.getContext('2d').drawImage(c0, x * k, y * k, s * k, s * k, 0, 0, s * k, s * k);
     return (por[key] = c.toDataURL());
   }

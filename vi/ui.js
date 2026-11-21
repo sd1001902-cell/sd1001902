@@ -25,23 +25,30 @@ function legBeam() {
 }
 setInterval(() => { if (!document.querySelector('.legbeam')) legBeam(); }, 500);
 let BTOAST = [];
-function toast(msg) { if (VIEW === 'battle' && B && !B.over) { if (!BTOAST.includes(msg)) BTOAST.push(msg); return; } const t = $('#toast'); t.innerHTML = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
+function toast(msg) { if (VIEW === 'battle' && B && !B.over) { if (!BTOAST.includes(msg)) BTOAST.push(msg); return; } const t = $('#toast'); t.innerHTML = msg;
+  { const mp = VIEW === 'world' && innerWidth <= 700 && document.querySelector('.wmapbox, #wmap, .wmap'); t.style.top = mp ? Math.round(mp.getBoundingClientRect().top + 30) + 'px' : ''; }   // 手机上地图界面的提示落在地图上沿，不盖住气血条和任务栏
+  t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
 function achToast(list) { if (list && list.length) { SFX.play('legend'); setTimeout(() => toast("Đạt thành tựu:" + list.map(a => `<b>${a.n}</b>`).join(", ")), 600); } }
 const ctxCls = () => SAVE.run ? SAVE.run.cls : SAVE.cls;
 const fmtTime = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const fmtLeft = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? `${h} giờ ${m} phút` : m ? `${m} phút ${s % 60} giây` : `${s} giây`; };
 const num = v => Number.isInteger(v) ? v : (Math.round(v * 10) / 10);
 const heroSpr = (cls, size, extra) => typeof HERO !== 'undefined' && HERO.has(cls) ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(cls, size >= 100 ? 'full' : 'head')}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(CLASSES[cls].spr, size, CLASSES[cls].pal, extra);
+// 同伴和常见人物：有侧身新造型的用新造型（头像 / 站姿 / 全身），没有的还用原来的小人图
+const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== 'undefined' && HERO.lookOf(spr);
+  return lk ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(lk, mode || (size >= 100 ? 'full' : size >= 50 ? 'stand' : 'head'), HERO.mapPal(lk, pal))}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(spr, size, pal, extra); };
+// 顶栏的大数字缩写：十万以上写成「12.3万」，省地方
+const fmtBig = n => n >= 100000 ? `${(n / 10000).toFixed(n >= 1000000 ? 0 : 1)} vạn` : String(n);
 const chTitle = ch => `Chương ${CN[ch]} · ${CHAPTERS[ch - 1].n}`;
 
 // ---------- 对话 ----------
 let DLG = null;
 function dlgSpeaker(who) {
   if (who === 'me') return { n: "Bạn", img: heroSpr(ctxCls(), 72) };
-  if (who === 'boss') { const Bo = DLG.boss; return { n: Bo ? Bo.n : "? ? ? ", img: Bo ? SPR.img(Bo.spr, 72, Bo.pal) : '' }; }
+  if (who === 'boss') { const Bo = DLG.boss; return { n: Bo ? Bo.n : "? ? ? ", img: Bo ? unitIcon(Bo.spr, 72, Bo.pal, '', 'head') : '' }; }
   const S = SPEAKERS[who] || { n: '' }, por = S.por || POR_EXTRA[who];
   if (por) return { n: S.n, img: SPR.img(por, 84, null, 'por') };
-  return { n: S.n, img: S.spr ? SPR.img(S.spr, 72, S.pal) : '' };
+  return { n: S.n, img: S.spr ? unitIcon(S.spr, 72, S.pal, '', 'head') : '' };
 }
 // 没写立绘的主要角色，补一张
 const POR_EXTRA = { ngoc: 'p_ngoc', lei: 'p_lei', tiedan: 'p_tiedan', smith: 'p_smith', qingxu: 'p_qingxu' };
@@ -251,7 +258,7 @@ function townHTML() {
   const tabs = CLASS_IDS.map(id => `<button class="tab ${id === cls ? 'on' : ''}" data-act="tab" data-arg="${id}">${heroSpr(id, 34)}<b>${CLASSES[id].n}</b><span>Lv ${SAVE.chars[id].level}</span></button>`).join('');
   const body = ({ go: goTab, gear: gearTab, hero: heroTab, col: colTab, set: setTab }[TT] || goTab)();
   return `<div class="top"><button class="btn sm ghost homeb" data-act="home">‹ Trang chủ</button><h1>Cửu U Hồi Lang</h1><span class="sub">Hắc ám phương Đông · Tự động chiến đấu · Khám phá mê cung</span>
-      <div class="row rescur"><span class="pill gold">${SPR.img('ingot', 18)}Bạc ${SAVE.gold}</span><span class="pill">${SPR.img('shard', 18)}Hồn tinh ${SAVE.mats}</span>${featureOn('para') && SAVE.para.lv ? `<span class="pill para">Tu vi · ${realmName(SAVE.para.lv)}</span>` : ''}</div></div>
+      <div class="row rescur"><span class="pill gold">${SPR.img('ingot', 18)}Bạc ${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 18)}Hồn tinh ${fmtBig(SAVE.mats)}</span>${featureOn('para') && SAVE.para.lv ? `<span class="pill para">Tu vi · ${realmName(SAVE.para.lv)}</span>` : ''}</div></div>
   ${storageOK ? '' : "<p class=\"warn\">Trình duyệt này không cho lưu tiến độ, đóng trang là mất hết.</p>"}
   <div class="tabs">${tabs}</div>
   <section class="panel hero-strip"><div class="pedestal">${heroSpr(cls, 72, 'idle')}</div>
@@ -270,7 +277,7 @@ function npcList() {
 function campStrip() {
   return `<section class="camp" style="--bg:#0e0a0c"><div class="lanterns"><i></i><i></i><i></i></div>
     <div class="npcs">${npcList().map(([id]) => { const S = SPEAKERS[id], qc = townCh(), mk = qc ? wNpcMark(qc, id) : '';
-      return `<button class="npc ${id}" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${SPR.img(S.spr, id === 'ngoc' ? 76 : 60, S.pal, id === 'ngoc' ? 'idle' : '')}<b>${S.n}</b></button>`; }).join('')}</div>
+      return `<button class="npc ${id}" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${unitIcon(S.spr, id === 'ngoc' ? 76 : 60, S.pal, id === 'ngoc' ? 'idle' : '', 'stand')}<b>${S.n}</b></button>`; }).join('')}</div>
     <p class="camp-hint">Trấn Thanh Thạch · chạm vào người trong trấn để trò chuyện</p></section>`;
 }
 function goTab() {
@@ -314,7 +321,7 @@ function goTab() {
   const mods = featureOn('mods') ? `<button class="modsbtn" data-act="modsopen">Tăng độ khó${SAVE.mods.length ? ` · đã chọn ${SAVE.mods.length}` : ''} ${MODSOPEN ? '▲' : '▼'}</button>
     ${MODSOPEN ? `<div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}` : '';
   const comps = Object.keys(COMPANIONS).filter(c => (SAVE.comps || {})[c]);
-  const compSel = comps.length > 1 ? `<div class="compsel"><span class="sub">Đồng hành</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${SPR.img(C2.spr, 34)}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
+  const compSel = comps.length > 1 ? `<div class="compsel"><span class="sub">Đồng hành</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${unitIcon(C2.spr, 34, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
   return `${campStrip()}<section class="panel gopanel">${modeSel}${body}${compSel}${mods}
     <button class="btn big" data-act="start">${mode === 'rift' ? `Vào Ảo Cảnh Cửu U tầng ${SAVE.riftLv}` : `Xuất phát: ${chTitle(SAVE.chapter)}`}</button></section>`;
 }
@@ -345,7 +352,7 @@ function heroTab() {
     body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>
       <h4 class="sub-h">Bộ trang bị môn phái</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
         return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>Rơi từ Ảo Cảnh tầng ${RSET_LV} trở lên</em>` : ''} (đã mặc ${n}/${S.pieces.length})<div class="${n >= 2 ? 'on' : 'off'}">2 món: ${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 món: ${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 món: ${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
-      ${fxList ? `<h4 class="sub-h">Hiệu ứng đang có</h4><ul class="setlist fxl">${fxList}</ul>` : ''}`;
+      ${fxList ? `<h4 class="sub-h">Hiệu ứng đang có</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
   } else if (HTAB === 'tal') {
     body = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="sub">Mỗi cấp được 1 điểm · còn <b style="color:var(--gold2)">${ti.free}</b> điểm</span>
       <button class="btn sm ghost" ${SAVE.gold >= respecCost(cls) && ti.spent ? '' : 'disabled'} data-act="respec">Tán công tu lại${respecCost(cls) ? ` (${respecCost(cls)} lượng)` : " (miễn phí)"}</button></div>${talentGrid(cls)}`;
@@ -476,7 +483,7 @@ function titleHTML() {
     </div>
     <p class="tl-sign">Tác phẩm của Đồ Dữ Hào</p>
     <p class="tl-lang">${[['zh', "中文"], ['vi', 'Tiếng Việt']].map(([k, n]) => `<a data-act="lang" data-arg="${k}" class="${(window.LANG || 'zh') === k ? 'on' : ''}">${n}</a>`).join(' · ')}</p>
-    <p class="tl-foot">${storageOK ? "Tiến độ tự động lưu trên thiết bị này" : "Trình duyệt này không cho lưu tiến độ"}</p>
+    <p class="tl-foot">${storageOK ? `Tiến trình tự lưu trên thiết bị này${bkDue() ? " · <a data-act=\"tsave\">nên sao lưu</a>" : ''}` : "Trình duyệt này không cho lưu tiến độ"}</p>
   </div>`;
 }
 // 每章开头的「上回说到」
@@ -541,11 +548,31 @@ const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}<
       <button class="btn ghost" data-act="cine">Cảnh tuyệt kỹ: ${SAVE.cineOff ? "Tắt" : "Bật"}</button>
       <button class="btn ghost" data-act="hdpx">Điểm ảnh: ${SAVE.hdOff ? "Cổ điển" : "Sắc nét"}</button></div>
       <p class="help-p">Nếu điện thoại nóng hoặc giật, chỉnh hiệu ứng xuống “Thấp”: ít hạt hơn, bỏ khựng hình và quay chậm.</p></section>`;
-const setSave = () => `<section class="panel"><h3>Lưu trữ</h3>
-      <p class="help-p" id="cloudline">${cloudLine()}</p>
-      <div class="row" style="margin-bottom:8px"><button class="btn sm ghost" data-act="export">Sao chép mã lưu</button><button class="btn sm ghost" data-act="reset">Xóa bản lưu, chơi lại</button></div>
-      <textarea id="imp" placeholder="Dán mã lưu vào đây để chuyển tiến độ giữa các thiết bị"></textarea>
-      <button class="btn sm" style="margin-top:8px" data-act="import">Nhập bản lưu</button></section>`;
+// ---------- 存档备份 ----------
+const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} cấp ${b.lv} · ${b.ended ? "đã qua cả mười chương" : `đã qua ${b.cleared} chương`} · Bạc ${b.gold}`;
+const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
+function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
+const setSave = () => `<section class="panel bkp"><h3>Sao lưu tiến trình</h3>
+      <p class="help-p">Tiến trình chỉ nằm trong trình duyệt này trên thiết bị này: xóa bộ nhớ đệm, đổi điện thoại hay mở bằng trình duyệt khác là mất. Nên sao lưu sau mỗi chương.</p>
+      <p class="bk-now"><b>Tiến trình hiện tại</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `Sao lưu lần trước: ${fmtDay(SAVE.bk.t)}` : "Chưa sao lưu lần nào"}</small></p>
+      <div class="row"><button class="btn sm" data-act="export">Sao chép mã lưu</button><button class="btn sm ghost" data-act="bkfile">Lưu thành tệp</button></div>
+      <p class="help-p bk-tip">Mã lưu là một chuỗi ký tự dài. Sao chép rồi gửi cho chính mình (ví dụ Zalo “Cloud của tôi”, Messenger) để cất; nếu dài quá không gửi được thì dùng “Lưu thành tệp”.</p>
+      <h3 style="margin-top:14px">Khôi phục tiến trình</h3>
+      <textarea id="imp" placeholder="Dán mã lưu vào đây"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn sm" data-act="import">Đọc mã lưu</button><button class="btn sm ghost" data-act="bkpick">Khôi phục từ tệp</button><input type="file" id="bkf" accept=".txt,text/plain" hidden></div>
+      <div class="row" style="margin-top:14px"><button class="btn sm ghost" data-act="reset">Xóa lưu, chơi lại từ đầu</button></div></section>`;
+let IMPORTING = null;
+const importModal = () => () => { const a = saveBrief(IMPORTING), b = saveBrief(SAVE), older = hasProgress() && (a.cleared < b.cleared || (a.cleared === b.cleared && a.lv < b.lv));
+  return `<h2 class="mh">Khôi phục bản lưu này?</h2>
+    <div class="bk-cmp"><div class="in"><small>Tiến trình trong mã lưu</small><b>${briefLine(a)}</b>${a.t ? `<small>Lưu lúc ${fmtDay(a.t)}</small>` : ''}</div>
+    ${hasProgress() ? `<div><small>Tiến trình hiện có trên thiết bị này (sẽ bị ghi đè)</small><b>${briefLine(b)}</b>${b.t ? `<small>Lưu lúc ${fmtDay(b.t)}</small>` : ''}</div>` : ''}</div>
+    ${older ? "<p class=\"bk-warn\">Chú ý: tiến trình trong mã lưu còn ít hơn hiện tại. Bạn chắc chắn muốn lấy bản cũ ghi đè bản mới?</p>" : ''}
+    <div class="row"><button class="btn" data-act="doimport">Khôi phục bản lưu này</button><button class="btn ghost" data-act="imcancel">Hủy</button></div>`; };
+function tryImport(str) {
+  try { IMPORTING = decodeSave(str); } catch (e) { IMPORTING = null; return toast(e.message === 'cut' ? "Mã lưu không đầy đủ: có thể bị cắt khi sao chép, hãy sao chép lại cho trọn" : "Đây không phải mã lưu, hãy kiểm tra lại"); }
+  BACK = MODALFN; openModal(importModal());
+}
 // 选章试玩：测试用，平时折起来，不打扰正常游玩
 const testFold = () => `<details class="testfold" ${SAVE.test || testBackup() || TEST_BAK ? 'open' : ''}><summary>Chơi thử theo chương <small>để thử nghiệm</small></summary>${testPanel()}</details>`;
 function setTab() {
@@ -852,7 +879,7 @@ function showCutin(kind, data) {
   let h;
   if (kind === 'ult') {
     const run = SAVE.run;
-    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? SPR.img(run.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 104) : ''}</div>
+    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? unitIcon(run.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 104, null, '', 'full') : ''}</div>
       <div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
     el.className = 'cutin on' + (data.combo ? ' combo' : '');
     SFX.play('gong'); if (typeof GFX !== 'undefined') GFX.ult(data.combo ? '#ff9ac0' : '#ffb04a');
@@ -897,7 +924,7 @@ function resChip(P) {
 }
 // 出手顺序条：接下来 6 次谁出手；头像下面是速度
 const TB_SZ = 26;
-function tbIcon(u) { if (!u._tbi) u._tbi = u.kind === 'hero' ? heroSpr(u.cls, TB_SZ) : SPR.img(u.spr || 'skeleton', TB_SZ, u.pal); return u._tbi; }
+function tbIcon(u) { if (!u._tbi) u._tbi = u.kind === 'hero' ? heroSpr(u.cls, TB_SZ) : unitIcon(u.spr || 'skeleton', TB_SZ, u.pal, '', 'head'); return u._tbi; }
 function drawTurnBar() {
   const el = $('#turnbar'); if (!el || !B) return;
   if (B.over) { el.innerHTML = ''; return; }
@@ -1473,7 +1500,10 @@ function wStepLoop() {
   if (S.sc === sc0 && !r.blocked) { WTRAIL.unshift(from); WTRAIL.length = Math.min(WTRAIL.length, 4); }
   if (WALK) { const T2 = SCENE_THEMES[(wmap(ch).def || {}).theme] || {}, th = (wmap(ch).def || {}).theme; SFX.play(th === 'snow' || th === 'icecave' ? 'crunch' : th === 'swamp' ? 'squelch' : T2.kind === 'room' || T2.kind === 'hall' ? 'wood' : WALK.i % 2 ? 'step' : 'step2'); }
   updWorldHud();
-  if (r.blocked) { WALK = null; return; }
+  if (r.blocked) { WALK = null; for (const a of r.acts || []) { if (a.toast) qtoast(a.toast); if (a.sfx) SFX.play(a.sfx); }   // 被挡住要说一声为什么；自动探索时被挡住：换条路再试，连着三次都不通才停（原来会卡在「探索中…」不动）
+    if (WAUTO) { if (++AUTOBLK >= 3) { AUTOBLK = 0; wStopAuto(); qtoast("Bên này không đi được, tạm dừng tự khám phá"); } else { clearTimeout(AUTOT); AUTOT = setTimeout(wAutoStep, 250); } }
+    return; }
+  AUTOBLK = 0;
   if (r.cont) { for (const a of r.acts) { if (a.toast) qtoast(a.toast); if (a.sfx) SFX.play(a.sfx); } }
   else if (r.acts.length) { WALK = null; save(); return wRun(r.acts); }
   // 自动探索时：有醒着的妖物靠近、或者找到了要找的东西，就停下
@@ -1484,12 +1514,18 @@ function wStepLoop() {
   }
   WALK.h = setTimeout(wStepLoop, dur);
 }
+let AUTOT = null, AUTOBLK = 0;
 function wAutoStep() {
-  if (!WAUTO || VIEW !== 'world' || WALK || DLG || MODALFN) return;
+  clearTimeout(AUTOT);
+  if (!WAUTO || VIEW !== 'world' || WALK) return;
+  if (DLG || MODALFN) { AUTOT = setTimeout(wAutoStep, 400); return; }   // 正在说话或开着窗口：等它关了接着探索
   const ch = wch(), run = SAVE.run;
   if (run.hp < runStats(run).maxHp * 0.35 && run.potions === 0) { wStopAuto(); return qtoast("Khí huyết thấp quá, về lửa trại nghỉ chân đã"); }
   const path = wExploreTarget(ch, WAUTOZ);
-  if (!path || !path.length) { const z = WAUTOZ; wStopAuto(); return qtoast(z ? "Vùng này tìm khắp rồi, sang chỗ khác xem" : "Quanh đây đã khám phá hết"); }
+  if (!path || !path.length) { const z = WAUTOZ; wStopAuto();
+    // 路都走过了，但地上还有发光的线索没捡：提醒去点一下（原来只会说「找遍了」，其实东西就在眼前）
+    let loose = 0; { const m = wmap(ch); for (const c in m.pts) { const P = m.def.pts[c]; if (!P || !['qitem', 'clue', 'relic'].includes(P.t)) continue; for (const p of m.pts[c]) if (wSeen(ch, p.x, p.y) && wPtVisible(ch, p.x, p.y)) loose++; } }
+    return qtoast(loose ? "Đường đã đi hết — chỗ phát sáng trên mặt đất chưa xem, chạm vào thử" : z ? "Vùng này tìm khắp rồi, sang chỗ khác xem" : "Quanh đây đã khám phá hết"); }
   WALK = { path: path.slice(0, 10), i: 0 }; wStepLoop();
 }
 function wStopAuto() { WAUTOZ = null; if (!WAUTO) return; WAUTO = false; const b = document.querySelector('.wauto'); if (b) { b.classList.add('ghost'); b.textContent = "Tự khám phá"; } }
@@ -1591,7 +1627,7 @@ function worldBattleContinue() {
   B = null; VIEW = 'world'; save(); render();
   wRun(wFightWon(ch, k.key || {}, run).concat(k.rest || []));
 }
-function wBack() { const k = WKEY; WKEY = null; VIEW = 'world'; render(); if (k && k.rest && k.rest.length) wRun(k.rest); }
+function wBack() { const k = WKEY; WKEY = null; VIEW = 'world'; wRun((k && k.rest) || []); }   // 开完宝箱、遇完奇遇：接着自动探索 / 接着前往（原来会停在「探索中…」不动）
 function wFinishChapter() {
   const run = SAVE.run; WGOAL = null; wStopAuto();
   const res = storyComplete(run); endRun(run, 'win'); LASTRUN = run; VIEW = res.ending || (run.chapter === 10 && run.diff === 'normal' && SAVE.story.ended && !seen('credW')) ? 'credits' : 'end'; if (VIEW === 'credits') markSeen('credW');
@@ -1629,24 +1665,34 @@ function playMini(id, done) {
   if (id === 'snowball') return miniSnowball(done);
   done && done();
 }
+// 计时小游戏的画面：只在状态变了才重建按钮，平时只挪指针。
+// （原来每一帧都重建整块，鼠标按下和抬起落在两个不同的按钮上，电脑上经常点不中。）
+function miniPaint(box, key, html, pos) {
+  if (box._mk !== key || !box.querySelector('.mz-pt')) { box.innerHTML = html(); box._mk = key; }
+  const pt = box.querySelector('.mz-pt'); if (pt) pt.style.left = pos * 100 + '%';
+  box._pos = pos;
+  if (!box.onpointerdown) box.onpointerdown = e => { if (e.target.closest('[data-mz]')) { box._pd = box._pos; box._pdt = performance.now(); } };
+}
+// 判定用「手指按下去那一刻」的位置，而不是松手那一刻——按得久一点也不吃亏
+function miniPos(box) { const p = box._pd != null && performance.now() - box._pdt < 700 ? box._pd : box._pos; box._pd = null; return p; }
 function miniBellows(done, tries = 0, O = {}) {
   const box = $('#quiz'); let beat = 0, hits = 0, t0 = performance.now(), raf = 0, zone = null;
   const BEATS = O.beats || ["Dài", "Dài", "Dài", "Ngắn", "Ngắn"], NEED = O.need || 4, WHO = O.who || 'tiedan';
   const newZone = () => { const w = BEATS[beat] === "Dài" ? 0.2 : 0.13; const c = 0.3 + Math.random() * 0.45; zone = [c - w / 2, c + w / 2]; t0 = performance.now(); };
   const draw = () => {
     const per = BEATS[beat] === "Dài" ? 1700 : 1150, k = ((performance.now() - t0) % (per * 2)) / per, pos = k <= 1 ? k : 2 - k;
-    box.innerHTML = O.title ? `<div class="qz-box mini"><div class="qz-q"><b>${esc(O.title)}</b>${esc(O.hint(beat, hits))} (trúng ${hits} / ${beat})</div>
+    miniPaint(box, 'b' + beat + '|' + hits + '|' + zone[0], () => O.title ? `<div class="qz-box mini"><div class="qz-q"><b>${esc(O.title)}</b>${esc(O.hint(beat, hits))} (trúng ${hits} / ${beat})</div>
       <div class="mz-bar"><i class="mz-zone" style="left:${zone[0] * 100}%;width:${(zone[1] - zone[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
       <button class="qz-opt mz-go" data-mz="1">${esc(O.btn(beat))}</button></div>`
       : `<div class="qz-box mini"><div class="qz-q"><b>${O.who ? "Cha con kéo bễ" : "Kéo bễ"}</b>${WHO === 'smith' ? "Trương Đại Chùy" : "Thiết Đản"}: “${esc(BEATS.map((b, i) => i < beat ? '✓' : b).join(' '))}” — lửa đến đoạn <span class="mz-or">vàng cam</span> thì chạm “Kéo”! (trúng ${hits} / ${beat})</div>
       <div class="mz-bar"><i class="mz-zone" style="left:${zone[0] * 100}%;width:${(zone[1] - zone[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
-      <button class="qz-opt mz-go" data-mz="1">Kéo! (${BEATS[beat]})</button></div>`;
-    box._pos = pos; raf = requestAnimationFrame(draw);
+      <button class="qz-opt mz-go" data-mz="1">Kéo! (${BEATS[beat]})</button></div>`, pos);
+    raf = requestAnimationFrame(draw);
   };
   box.hidden = false; newZone(); draw();
   box.onclick = e => {
     if (!e.target.closest('[data-mz]')) return; e.stopPropagation();
-    const ok = box._pos >= zone[0] && box._pos <= zone[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); beat++;
+    const mp = miniPos(box), ok = mp >= zone[0] && mp <= zone[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); beat++;
     if (beat < BEATS.length) { newZone(); return; }
     cancelAnimationFrame(raf); box.hidden = true; box.onclick = null;
     if (hits >= NEED) { SFX.play('legend'); playDialog(O.win || [['tiedan', hits === 5 ? "Năm lần trúng cả năm! Cha em kéo còn không bằng anh!" : "Xong rồi! Lửa vừa khéo!"], ['narr', "Khối sắt nung đỏ rực, sáng trong."]], null, done); }
@@ -1660,12 +1706,12 @@ function miniTaoquan(done, tries = 0) {
   const box = $('#quiz'); let n = 0, hits = 0, raf = 0, t0 = performance.now();
   const zone = () => { const w = 0.16 - n * 0.025, c = [0.62, 0.38, 0.7][n]; return [c - w / 2, c + w / 2]; };
   const draw = () => { const per = 1050 - n * 150, k = ((performance.now() - t0) % (per * 2)) / per, pos = k <= 1 ? k : 2 - k, z = zone();
-    box.innerHTML = `<div class="qz-box mini"><div class="qz-q"><b>Ném vòng · vòng thứ ${n + 1} (trúng ${hits})</b>Tiểu Hổ: “Con hổ gỗ kia! Đúng con đó!” — tay đung đưa tới ngay trên <span class="mz-or">con hổ</span> thì chạm “Ném”!</div>
+    miniPaint(box, 't' + n + '|' + hits, () => `<div class="qz-box mini"><div class="qz-q"><b>Ném vòng · vòng thứ ${n + 1} (trúng ${hits})</b>Tiểu Hổ: “Con hổ gỗ kia! Đúng con đó!” — tay đung đưa tới ngay trên <span class="mz-or">con hổ</span> thì chạm “Ném”!</div>
       <div class="mz-bar"><i class="mz-zone" style="left:${z[0] * 100}%;width:${(z[1] - z[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
-      <button class="qz-opt mz-go" data-mz="1">Ném!</button></div>`; box._pos = pos; raf = requestAnimationFrame(draw); };
+      <button class="qz-opt mz-go" data-mz="1">Ném!</button></div>`, pos); raf = requestAnimationFrame(draw); };
   box.hidden = false; draw();
   box.onclick = e => { if (!e.target.closest('[data-mz]')) return; e.stopPropagation();
-    const z = zone(), ok = box._pos >= z[0] && box._pos <= z[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); n++; t0 = performance.now();
+    const z = zone(), mp = miniPos(box), ok = mp >= z[0] && mp <= z[1]; if (ok) hits++; SFX.play(ok ? 'hit' : 'fail'); n++; t0 = performance.now();
     if (n < 3) return;
     cancelAnimationFrame(raf); box.hidden = true; box.onclick = null;
     const S = wstate(qch()); S.flags.taoquanWin = hits >= 2 ? 1 : 0;
@@ -1743,14 +1789,14 @@ function miniFish(done) {
   const box = $('#quiz'); let tries = 0, hits = 0, raf = 0, t0 = performance.now(), zone = null, spd = 1;
   const newZone = () => { const w = 0.16 - hits * 0.02, c = 0.25 + Math.random() * 0.5; zone = [c - w / 2, c + w / 2]; spd = 0.9 + Math.random() * 0.7 + hits * 0.2; t0 = performance.now(); };
   const draw = () => { const t = (performance.now() - t0) / 1000, pos = 0.5 + 0.45 * Math.sin(t * 2.4 * spd) * Math.cos(t * 1.3 * spd + 0.7);
-    box.innerHTML = `<div class="qz-box mini"><div class="qz-q"><b>Câu cá băng (cần thứ ${tries + 1} · trúng ${hits}/3)</b>Phao vừa chìm đến đoạn <span class="mz-bl">màu xanh</span> thì giật cần!</div>
+    miniPaint(box, 'f' + tries + '|' + hits + '|' + zone[0], () => `<div class="qz-box mini"><div class="qz-q"><b>Câu cá băng (cần thứ ${tries + 1} · trúng ${hits}/3)</b>Phao vừa chìm đến đoạn <span class="mz-bl">màu xanh</span> thì giật cần!</div>
       <div class="mz-bar"><i class="mz-zone bl" style="left:${zone[0] * 100}%;width:${(zone[1] - zone[0]) * 100}%"></i><i class="mz-pt" style="left:${pos * 100}%"></i></div>
-      <button class="qz-opt mz-go" data-mz="1">Giật cần!</button></div>`; box._pos = pos; raf = requestAnimationFrame(draw); };
+      <button class="qz-opt mz-go" data-mz="1">Giật cần!</button></div>`, pos); raf = requestAnimationFrame(draw); };
   const fin = () => { cancelAnimationFrame(raf); box.hidden = true; box.onclick = null; const msg = (W_MINI_RW.fish || (() => ''))(wch(), hits >= 3 ? 1 : 0);
     playDialog(hits >= 3 ? [['narr', "Cần câu trĩu xuống — một con cá băng quẫy đuôi bị bạn lôi khỏi lỗ băng!"], ...(msg ? [['narr', msg]] : [])] : [['narr', "Dây câu chùng xuống, cá chạy mất."], ['narr', "Lỗ băng sủi lên một cái bong bóng, như đang cười bạn."]], null, done); };
   box.hidden = false; newZone(); draw();
   box.onclick = e => { if (!e.target.closest('[data-mz]')) return; e.stopPropagation();
-    const ok = box._pos >= zone[0] && box._pos <= zone[1]; if (ok) hits++; tries++; SFX.play(ok ? 'hit' : 'fail');
+    const mp = miniPos(box), ok = mp >= zone[0] && mp <= zone[1]; if (ok) hits++; tries++; SFX.play(ok ? 'hit' : 'fail');
     if (hits >= 3 || tries >= 5) return fin(); newZone(); };
 }
 // 打雪仗：小孩从三道雪墙后面探头，看准了砸；十次里砸中六次就赢
@@ -1827,7 +1873,7 @@ const shopModal = () => {
     body = L.length ? L.map(it => `<div class="irow ${ancCls(it)}">${SPR.item(it, 28)}<button class="linkish nm" data-act="item" data-arg="${it.id}"><span class="r-${it.rarity}">${esc(itemTitle(it))}</span> <small>${SLOT_NAME[it.slot]}</small></button><button class="btn sm ghost" data-act="shopsell" data-arg="${it.id}">Cầm ${wShopSellPrice(SH, it)} ${cur}</button></div>`).join('') : "<p class=\"sub\">Kho trống trơn. Đồ đang mặc thì không cầm được.</p>"; }
   else { const own = [...Object.values(SAVE.chars[cls].eq).filter(Boolean), ...SAVE.stash].filter(it => it.aff && it.aff.length);
     body = `<p class="help-p">Khai quang: tẩy ngẫu nhiên một thuộc tính, đổi thành thuộc tính mới — tốt xấu tùy duyên. Mỗi lần ${SH.reroll} ${cur}.</p>` + own.map(it => `<div class="irow ${ancCls(it)}">${SPR.item(it, 28)}<button class="linkish nm" data-act="item" data-arg="${it.id}"><span class="r-${it.rarity}">${esc(itemTitle(it))}</span><small class="sd">${it.aff.map(([k, v]) => fmtStat(k, Math.round(v * itemMult(it)))).join(", ")}</small></button><button class="btn sm" ${wCurN(SH.cur) >= SH.reroll ? '' : 'disabled'} data-act="shoproll" data-arg="${it.id}">Khai quang</button></div>`).join(''); }
-  return `<div class="shoph">${SPR.img(Sp.spr, 56, Sp.pal)}<div><h2 class="mh">${esc(SH.n)}</h2><p class="sub">${esc(SH.blurb || '')}</p></div></div>
+  return `<div class="shoph">${unitIcon(Sp.spr, 56, Sp.pal, '', 'stand')}<div><h2 class="mh">${esc(SH.n)}</h2><p class="sub">${esc(SH.blurb || '')}</p></div></div>
     <div class="row wallet"><span class="pill gold">Bạc ${SAVE.gold}</span>${SH.cur === 'shang' ? `<span class="pill gold">Tiền thưởng ${SAVE.shang || 0}</span>` : ''}${SH.cur === 'mb' || SAVE.mb ? `<span class="pill mb">Minh tệ ${wMb()}</span>` : ''}${run && run.tishen ? `<span class="pill">Hình nhân ${run.tishen}</span>` : ''}</div>
     ${tabs.length > 1 ? `<div class="row tabs">${tabs.map(([k, n]) => `<button class="btn sm ${SHOPTAB === k ? '' : 'ghost'}" data-act="shoptab" data-arg="${k}">${n}</button>`).join('')}</div>` : ''}
     ${SHOPMSG ? `<p class="evres shopmsg">${SHOPMSG}</p>` : ''}
@@ -1899,7 +1945,7 @@ const campModal = P => () => {
   return `<h2 class="mh">${SPR.img('fire', 34, null, 'flicker')} ${esc(P.n)}</h2>
     <p class="help-p">Ánh lửa xua tan âm khí. Lưu tiến độ ở đây; thua trận sẽ về lửa trại gần nhất.</p>
     <div class="campb"><button class="btn" data-act="wrest">Nghỉ ngơi <small>Hồi đầy khí huyết và đan dược, tiểu yêu sẽ xuất hiện lại${talk ? " · <b class=\"talkdot\">Có người muốn nói chuyện với bạn</b>" : ''}</small></button>
-      ${comps.length > 1 && !forced ? `<div class="compsel camp"><span class="sub">Dẫn ai đi cùng</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="wcomp" data-arg="${c}">${SPR.img(C2.spr, 30)}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : ''}
+      ${comps.length > 1 && !forced ? `<div class="compsel camp"><span class="sub">Dẫn ai đi cùng</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="wcomp" data-arg="${c}">${unitIcon(C2.spr, 30, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : ''}
       ${others.map(id => `<button class="btn ghost" data-act="wtele" data-arg="${id}">Dịch chuyển tới “${esc(wCampName(ch, id))}” <small>${esc(WMAPS[ch].scenes[wCampPos(ch, id).sc].n)}</small></button>`).join('')}
       <button class="btn ghost" data-act="wmenu">Tạm rời <small>Về menu xuất chinh (đổi nhân vật, xem đồ giám), sau đó tiếp tục từ đây</small></button>
       <button class="btn ghost" data-act="close">Rời đi</button></div>`;
@@ -2079,7 +2125,7 @@ function endHTML() {
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> cấp ${g.lv}<small>${LGEMS[g.t].d(g.lv)}</small></span>
         <button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">Nâng (${Math.round(lgemChance(g, r.riftLv) * 100)}%)</button></div>`).join('')}</div>` : ''}</div>`;
   }
-  return `<div class="scene"><div class="panel"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 80, 'float') + (r.ngoc ? SPR.img(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 72, null, 'float') : '') : SPR.img('skeleton', 80)}</div><h2>${title}</h2>
+  return `<div class="scene"><div class="panel"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 80, 'float') + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 72, null, 'float', 'stand') : '') : SPR.img('skeleton', 80)}</div><h2>${title}</h2>
     <p class="d">${CLASSES[r.cls].n} · ${rift ? "Ảo Cảnh Cửu U" : DIFFS[r.diff].n}${r.world ? '' : ` · khám phá ${r.rooms} phòng`}</p>
     ${r.record && !rift ? "<p class=\"evres\">Phá kỷ lục nhanh nhất của chương!</p>" : ''}
     ${extra}
@@ -2088,6 +2134,7 @@ function endHTML() {
       <div><small>Ngọc</small><b>+${r.gemsGot}</b></div><div><small>Hồn tinh</small><b>+${r.matsGot}</b></div>
       ${SAVE.para.lv > r.paraStart ? `<div><small>Tu vi</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">Lần này nhận ${loot.length} món trang bị (đã cất vào kho)</p>${lootChips(loot)}
+    ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>Lại xong một chương. Tiến trình chỉ nằm trên thiết bị này, sao lưu lại cho chắc.</p><button class="btn sm" data-act="export">Sao chép mã lưu</button><button class="btn sm ghost" data-act="bknudge">Cách sao lưu khác</button></div>` : ''}
     <button class="btn big" data-act="town">Về trấn Thanh Thạch</button></div></div>`;
 }
 function creditsHTML() {
@@ -2406,6 +2453,7 @@ const ACT = {
     const ch = wch(), q = wTracker(ch).find(x => x.id === id); if (!q) { WGOAL = null; return; }
     if (!cont) WGOAL = { id, hops: 0 }; else if (!WGOAL) return;
     wStopAuto(); clearTimeout(WALK && WALK.h); WALK = null;
+    { const p0 = wMarkPos(ch, q); if (p0 && p0.comp) { WGOAL = null; return ACT.wtalkc(); } }   // 要找的人就跟在身边：直接搭话
     if (wWatchBlock(ch)) { WGOAL = null; return qtoast("Chỗ này có người tuần tra, tự tìm đường vô dụng — tự lần mò qua đi"); }
     { const MS = WQ[ch].main.find(m => m.id === id), nt = !!wstate(ch).flags.night;   // 昼夜：时辰不对，找不着人
       if (WMAPS[ch].daynight && MS && MS.tod && (MS.tod === 'night') !== nt && !cont) qtoast(MS.tod === 'night' ? "Việc này phải đợi trời tối — nghỉ chân bên lửa trại là trời tối" : "Việc này phải đợi trời sáng — nghỉ chân bên lửa trại là trời sáng"); }
@@ -2415,7 +2463,7 @@ const ACT = {
     if (!R) { WGOAL = null; return qtoast("Đường bên đó giờ chưa đi được"); }
     if (R.puzzle) {   // 被谜题挡住：走到边上停下，剩下的自己来
       WGOAL = null; WTAP = { x: R.x, y: R.y, t: 0 };
-      const msg = R.puzzle === "Lạc đường" ? "Đường trong rừng phải tự tìm — cửa nào đi qua một lần mới nhớ" : R.puzzle === "Tuần tra" ? "Phía trước có người tuần tra, phải tự lần qua" : `Phía trước là ${R.puzzle}, phải tự đi`;
+      const msg = R.who ? `${R.who} mắt đờ đẫn chắn ngay lối đi — lại gần chạm vào người đó xem` : R.puzzle === "Lạc đường" ? "Đường trong rừng phải tự tìm — cửa nào đi qua một lần mới nhớ" : R.puzzle === "Tuần tra" ? "Phía trước có người tuần tra, phải tự lần qua" : `Phía trước là ${R.puzzle}, phải tự đi`;
       if (!R.path.length) return qtoast(msg);
       WALK = { path: R.path, i: 0, onArrive: () => qtoast(msg) }; return wStepLoop();
     }
@@ -2426,8 +2474,8 @@ const ACT = {
       else { const act = wInteract(ch, p.x, p.y); done = () => { WGOAL = null; if (act) act(); }; }
     }
     if (R.near) {
-      if (!R.path.length) { if (p.area && !R.door) return done(); WGOAL = null; return qtoast("Con đường này chưa dò ra, thử “Tự khám phá” xem"); }
-      qtoast(R.plate ? "Đường bị hàng rào chặn — thử dẫm lên cái cơ quan kia xem" : "Đường phía trước chưa dò, đi về hướng đó trước");
+      if (!R.path.length) { if (p.area && !R.door) return done(); WGOAL = null; return qtoast(R.fence ? "Đường bị hàng rào chặn — gần đây có cơ quan, thử dẫm lên xem" : "Con đường này chưa dò ra, thử “Tự khám phá” xem"); }
+      qtoast(R.plate ? "Đường bị hàng rào chặn — thử dẫm lên cái cơ quan kia xem" : R.fence ? "Đường bị hàng rào chặn — gần đây có cơ quan, thử dẫm lên xem" : "Đường phía trước chưa dò, đi về hướng đó trước");
       WALK = { path: R.path, i: 0, onArrive: p.area && !R.door ? done : () => { if (WGOAL) setTimeout(() => ACT.wgo(id, null, true), 200); } }; return wStepLoop();
     }
     if (!R.path.length) { if (done) return done(); WGOAL = null; return; }
@@ -2488,11 +2536,27 @@ const ACT = {
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   export: async () => {
-    const code = exportSave();
-    try { await navigator.clipboard.writeText(code); toast("Đã sao chép mã lưu"); }
-    catch (e) { const t = $('#imp'); t.value = code; t.select(); toast("Không tự sao chép được, mã lưu đã đặt vào ô bên dưới, hãy sao chép thủ công"); }
+    markBackup(); persist(true); const code = exportSave();
+    const done = () => { toast(`Đã sao chép mã lưu (${code.length} ký tự), hãy dán vào chỗ nào đó để cất`); const m = document.querySelector('.bk-now small'); if (m) m.textContent = `Sao lưu lần trước: ${fmtDay(SAVE.bk.t)}`; document.querySelectorAll('.bk-nudge').forEach(x => x.remove()); };
+    try { await navigator.clipboard.writeText(code); done(); }
+    catch (e) { const t = $('#imp'); if (!t) return ACT.tsave(), setTimeout(ACT.export, 50);
+      t.value = code; t.focus(); t.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e2) {}
+      if (ok) done(); else toast("Không tự sao chép được: mã lưu đã nằm trong ô bên dưới, hãy nhấn giữ, chọn tất cả rồi sao chép"); }
   },
-  import: () => { try { importSave($('#imp').value); VIEW = SAVE.run ? 'map' : 'town'; toast("Nhập thành công"); render(); } catch (e) { toast("Mã lưu không đúng, hãy kiểm tra xem có đủ không"); } },
+  bkfile: async () => {
+    markBackup(); persist(true); const code = exportSave(), b = saveBrief(SAVE), d = new Date(), z = n => String(n).padStart(2, '0');
+    const name = `jiuyou-save-${b.cls}-lv${b.lv}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}.txt`;
+    try { const file = new File([code], name, { type: 'text/plain' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: "Bản lưu Cửu U Hồi Lang" }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      toast("Đã tạo tệp lưu. Nếu không thấy hiện lưu hoặc chia sẻ, hãy dùng “Sao chép mã lưu”");
+    } catch (e) { toast("Trình duyệt này không lưu tệp được, hãy dùng “Sao chép mã lưu”"); }
+  },
+  bkpick: () => { const f = $('#bkf'); if (!f) return; f.onchange = () => { const file = f.files && f.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => tryImport(String(rd.result || '')); rd.onerror = () => toast("Không đọc được tệp"); rd.readAsText(file); f.value = ''; }; f.click(); },
+  import: () => { const v = ($('#imp') || {}).value || ''; if (!v.trim()) return toast("Hãy dán mã lưu vào ô trước"); tryImport(v); },
+  imcancel: () => { IMPORTING = null; closeModal(); },
+  doimport: () => { if (!IMPORTING) return; clearOverlays(); SAVE = IMPORTING; IMPORTING = null; persist(true); toast("Đã khôi phục, đang tải lại…"); setTimeout(() => location.reload(), 500); },
+  bknudge: () => { ACT.tsave(); },
   tcls: c => { TCLS = c; refresh(); },
   home: () => { stopAuto(); closeModal(); VIEW = 'title'; render(); window.scrollTo(0, 0); },
   tcont: () => { closeModal(); if (SAVE.run) return ACT.resume(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); },
@@ -2566,6 +2630,7 @@ function render() {
 VIEW = 'title';
 render();
 initCloud();
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.respec4) { delete SAVE.respec4; persist(); setTimeout(() => toast("Năm môn phái đã được làm lại: điểm tâm pháp hoàn trả hết, chiêu thức cũng được sắp lại. Vào “Tu luyện” xem tâm pháp và chiêu thức mới, Cản Thi Nhân nhớ xếp “Thi trận”"), 1200); }
 window.__abyss = { get SAVE() { return SAVE; }, get B() { return B; }, pause: () => clearTimeout(timer), mini: (id, f) => playMini(id, f), get WHERO() { return WHERO; }, get WGOAL() { return WGOAL; }, get WAUTO() { return WAUTO; }, ACT, fightw: e => beginWorldBattle(e), wbusy: () => !!WALK, maxhp: () => runStats(SAVE.run).maxHp, wtr: () => { const ch = SAVE.run && SAVE.run.world && SAVE.run.chapter; if (!ch) return []; return wTracker(ch).map(q => ({ t: q.t, town: wMarkPos(ch, q.mark) === 'town' })); }, fight: k => beginBattle(k), get WALKING() { return WALKING; }, get B() { return B; }, get VIEW() { return VIEW; }, get DLG() { return DLG; }, endDlg, wRun: a => wRun(a), dbg: { dlg: l => playDialog(l, null, null), render: () => render(), save: () => save(), view: v => { VIEW = v; }, finish: (r, o) => finishRunView(r, o) } };
 }

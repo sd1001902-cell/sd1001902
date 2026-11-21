@@ -2313,7 +2313,7 @@ WQ[4] = {
       ], aff: { zhen: 1 }, rw: { xp: 0.3 } },
     { id: 'm14', t: '监工', d: '打倒矿鬼监工，砸开铁链', hint: '老孙旁边那个大个子。', area: 'kuangdong2', goal: { fight: 'jiangong' }, mark: 'jiangong',
       lines: [['jiangong', '停下干什么！挖！都给我挖！'], ['narr', '一个浑身焦黑的大个子矿鬼，拖着一根铁鞭走了过来。']],
-      after: [['narr', '监工倒下了。你砸开铁链，一个，两个，三个……'], ['narr', '几十个矿工呆呆地站着，好像不知道自己可以走了。'], ['laosun', '……能走了？'], ['laosun', '能回家了？'], ['zhen', '能。我带你们出去。'], ['laosun', '我腿软，走不快……你、你带我上去吧。他们跟着我。']], rw: { xp: 0.5, item: 'magic' } },
+      after: [['narr', '监工倒下了。你砸开铁链，一个，两个，三个……'], ['narr', '几十个矿工呆呆地站着，好像不知道自己可以走了。'], ['laosun', '……能走了？'], ['laosun', '能回家了？'], ['zhen', '能。我带你们出去。'], ['laosun', '我腿软，走不快……你、你带我上去吧。他们跟着我。']], set: { escort: 'laosun' }, rw: { xp: 0.5, item: 'magic' } },
     { id: 'm15', t: '护送老孙', d: '带老孙和矿工们回到矿村的篝火边', hint: '原路回矿村。老孙走不快，岩浆犬闻着人味会追上来。', goal: { reach: 'hsfire' }, mark: 'hsfire', escort: 'laosun',
       escortLines: [['laosun', '我跟着你……一更天，二更天……我数着呢。']],
       escortMiss: '老孙没跟上来——回去找他', escortLost: '老孙在岩浆边上吓得不敢动了……得回去再把他带上。',
