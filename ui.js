@@ -136,6 +136,7 @@ function itemCard(it, cls, label) {
        + it.aff.map(([k, v]) => `<li class="aff ${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</li>`).join('') + '</ul>'
        + (it.aff.length ? `<div class="iq">词条成色 <b>${Math.round(itemQ(it) * 100)}%</b>${it.sp ? '　<span class="spx">带特殊词条</span>' : ''}</div>` : '');
   if (it.plus) h += `<div class="iplus">强化 +${it.plus}：攻击、气血、护甲这些实数属性 +${it.plus * 8}%</div>`;
+  if (it.lk) h += '<div class="ilock">已锁定：批量分解、出售时会跳过它</div>';
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}：${gemDesc(g)}</span>` : '<span class="gs empty">空孔</span>'; }).join('')}</div>`;
   if (L) h += `<p class="ifx">神兵之魂：${L.d}${SAVE.cube[L.id] ? '<small>（乾坤袋已收藏）</small>' : ''}</p>`;
@@ -206,13 +207,13 @@ function stashBody(cls, D) {
       <button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">看全部</button></div>` : '';
   const chips = [['all', '全部'], ['up', '只看能提升的'], ...(featureOn('cube') ? [['leg', '乾坤袋未收']] : [])];
   return `${curRow}<div class="chips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
-      ${VIEW === 'town' ? '<button class="chip" data-act="junk">卖凡品灵品</button><button class="chip" data-act="salvjunk">分解凡品灵品</button>' : ''}</div>
+      ${VIEW === 'town' ? '<button class="chip bulkc" data-act="bulkopen">筛选分解 / 出售</button>' : ''}</div>
     <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `储物箱里没有可以换的${SLOT_NAME[GSLOT]}。` : '这里没有符合条件的装备。'}</div>`}</div>
     <p class="sub" style="margin:8px 0 0">右边数字是换上后的战力变化。储物箱 ${SAVE.stash.length}/${stashMax()}，各角色共用。</p>`;
 }
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
-  return `<p class="help-p">三块相同的玉石可以合成高一阶，最高合成到「${GEM_TIERS[gemCap()]}」。想镶玉：点身上那件装备，打开「铸剑坊」。</p>
+  return `<p class="help-p">三块相同的玉石可以合成高一阶，最高合成到「${GEM_TIERS[gemCap()]}」。想镶玉：回营地页找玉掌柜。</p>
     <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
       <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">合成（${combineCost(k)} 两）</button></div>`).join('')
       : '<div class="empty-note">还没有玉石。精英、首领和宝箱会掉落玉石。</div>'}</div>
@@ -224,7 +225,7 @@ function gemsBody() {
 function cubeBody(cls) {
   if (!featureOn('cube')) return lockNote('第六章剧情中获得');
   const ch = SAVE.chars[cls], learned = LEGENDS.filter(L => SAVE.cube[L.id]);
-  return `<p class="help-p">已收藏 ${learned.length}/${LEGENDS.length} 种神兵之魂。在神兵的「铸剑坊」里把它收进乾坤袋，就能永久学会特效。每个角色 3 个格子，放进去直接生效。</p>
+  return `<p class="help-p">已收藏 ${learned.length}/${LEGENDS.length} 种神兵之魂。点开一件神兵，把它收进乾坤袋，就能永久学会特效。每个角色 3 个格子，放进去直接生效。</p>
     <div class="cube">${[0, 1, 2].map(i => { const lid = ch.cube[i], L = lid && LEGENDS.find(l => l.id === lid);
       return `<div class="cslot"><small>格子 ${i + 1}</small>${L ? `<b class="r-legend">${L.n}</b><span>${L.d}</span>` : '<span class="sub">空</span>'}
         <button class="btn sm ghost" ${learned.length ? '' : 'disabled'} data-act="cubepick" data-arg="${i}">${L ? '更换' : '放入'}</button></div>`; }).join('')}</div>`;
@@ -301,15 +302,85 @@ function townHTML() {
   ${body}`;
 }
 function npcList() {
-  const c = storyCleared('normal'), L = wTownNpcs().map(id => [id, id]);
+  const c = storyCleared('normal'); let L = wTownNpcs().map(id => [id, id]);
+  if (c >= 9) L = L.filter(([id]) => id !== 'long');   // 第九章，龙道长提着灯走上了坑口
   if (c >= 1 && c < 8) L.push(['taoist', 'taoist']);
+  for (const id of ['tiedan', 'yujiang']) if (svcFns(id).length && !L.some(x => x[0] === id)) L.push([id, id]);   // 有手艺可做了才露面
   return L;
 }
+// ---------- 镇上的人各有手艺：点谁，开谁的铺子（每人一两样）----------
+const SVC = {
+  kang:    { hi: '库房的账我都记着。要清点，还是想碰碰运气？', fns: [['bulk', '清点库房', () => true], ['gamble', '赌石', () => featureOn('enhance')]] },
+  smith:   { hi: '啊？打铁？大声点！强化找我，旧家伙身上的强化和玉也能挪到新家伙上！', fns: [['enh', '强化', () => featureOn('enhance')], ['inh', '传承', () => featureOn('enhance')]] },
+  tiedan:  { hi: '我爹管敲，我管磨。词条不顺眼就拿来；旧刀回一回炉，跟新的一样硬！', fns: [['refine', '淬炼洗炼', () => featureOn('reroll')], ['up', '升阶', () => featureOn('enhance')]] },
+  yujiang: { hi: '孔要打得准，玉要合得稳。慢慢来。', fns: [['sock', '打孔镶玉', () => featureOn('sockets')], ['gems', '玉石合成', () => featureOn('gems')]] },
+  lei:     { hi: '榜上的活儿天天换。攒够赏银，柜上换好东西！', fns: [['bounty', '每日悬赏', () => featureOn('bounty')], ['shang', '赏银柜', () => featureOn('bounty')]] },
+};
+const svcFns = id => (SVC[id] ? SVC[id].fns.filter(f => f[2]()) : []);
+let NPCV = { id: null, fn: null, item: null }, GAMBLE = null, BULKX = new Set(), BULKARM = false;
+// 筛选分解／出售：先挑品级，再挑要留下的，下面列出会被处理的装备，点一件可以单独留下
+function bulkBody() {
+  const f = bulkFilter(), cls = SAVE.cls, sell = f.mode === 'sell', cnt = {};
+  for (const it of SAVE.stash) cnt[it.rarity] = (cnt[it.rarity] || 0) + 1;
+  const all = bulkPick(cls, f), list = all.filter(it => !BULKX.has(it.id));
+  const tot = list.reduce((a, it) => a + (sell ? sellPrice(it) : salvageValue(it)), 0), risky = list.filter(it => it.rarity === 'set' || it.rarity === 'legend').length;
+  const keeps = [['keepUp', `能让${CLASSES[cls].n}变强的`], ['keepSp', '带特殊词条的'], ['keepAnc', '上古、太古'], ['keepQ', '词条成色八成以上的'], ...(featureOn('cube') ? [['keepCube', '乾坤袋还没收的神兵']] : [])];
+  const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 }, shown = all.slice().sort((a, b) => order[a.rarity] - order[b.rarity] || b.ilvl - a.ilvl).slice(0, 80);
+  return `<div class="bulk">
+    <div class="seg sm"><button class="${sell ? '' : 'on'}" data-act="bulkmode" data-arg="salv">分解，换魂晶</button><button class="${sell ? 'on' : ''}" data-act="bulkmode" data-arg="sell">出售，换银两</button></div>
+    <h4 class="sub-h">处理哪些品级</h4>
+    <div class="chips">${RARITY_ORDER.map(r => `<button class="chip ${f.r[r] ? 'on' : ''}" data-act="bulkr" data-arg="${r}"><span class="r-${r}">${RARITY[r].n}</span> ${cnt[r] || 0}</button>`).join('')}</div>
+    <h4 class="sub-h">这些留下</h4>
+    <div class="chips">${keeps.map(([k, n]) => `<button class="chip ${f[k] ? 'on' : ''}" data-act="bulkk" data-arg="${k}">${f[k] ? '✓ ' : ''}${n}</button>`).join('')}</div>
+    <p class="sub">强化过的、镶了玉的、锁定的装备，永远不会被批量处理。</p>
+    <div class="bulk-sum">${list.length ? `会${sell ? '卖掉' : '分解'} <b>${list.length}</b> 件，得到 <b>${tot}</b> ${sell ? '两' : '颗魂晶'}` : '没有符合条件的装备'}${all.length ? '<small>点下面的装备，可以单独把它留下</small>' : ''}</div>
+    <div class="bulk-list">${shown.map(it => `<button class="lchip ${BULKX.has(it.id) ? 'off' : ''} ${ancCls(it)}" data-act="bulkx" data-arg="${it.id}">${SPR.item(it, 22)}<span class="r-${it.rarity}">${itemTitle(it)}</span></button>`).join('')}${all.length > shown.length ? `<span class="sub">……还有 ${all.length - shown.length} 件</span>` : ''}</div>
+    <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? `里面有 ${risky} 件套装或神兵，再点一次确认` : `${sell ? '卖掉' : '分解'}这 ${list.length} 件`}</button></div>`;
+}
+const bulkModal = () => `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">清点库房</h2>${bulkBody()}`;
+function gambleBody() {
+  const cls = SAVE.cls, p = gamblePrice(cls);
+  return `<p class="help-p">花 <b>${p}</b> 两，赌一件${CLASSES[cls].n}能用的装备：部位你挑，品级看运气——多半是灵品、宝品，偶尔出套装，极少出神兵。</p>
+    <div class="row wallet"><span class="pill gold">银两 ${SAVE.gold}</span></div>
+    <div class="svc-slots">${SLOTS.map(sl => `<button class="btn sm" ${SAVE.gold >= p ? '' : 'disabled'} data-act="gamb" data-arg="${sl.id}">${sl.n}</button>`).join('')}</div>
+    ${GAMBLE && SAVE.stash.includes(GAMBLE) ? `<div class="svc-res"><span class="sub">赌到了（已放进储物箱）：</span>${lootChips([GAMBLE])}</div>` : ''}`;
+}
+// 要挑一件装备才能办的事：先列装备（身上的在前），点一件，下面才是这位师傅的那一样手艺
+function svcItems(fn) {
+  const ok = it => fn === 'refine' ? it.aff.length > 0 : fn === 'up' ? upTierOK(it) : true, order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 };
+  return [...Object.values(SAVE.chars[SAVE.cls].eq).filter(it => it && ok(it)).map(it => ({ it, eq: 1 })),
+    ...SAVE.stash.filter(ok).sort((a, b) => order[a.rarity] - order[b.rarity] || b.ilvl - a.ilvl).slice(0, 40).map(it => ({ it }))];
+}
+const svcInfo = (fn, it) => fn === 'enh' ? ((it.plus || 0) >= ENHANCE_MAX ? '已到 +10' : `强化 +${it.plus || 0}`) : fn === 'sock' ? `孔 ${(it.gems || []).length}/${it.sockets || 0}` : fn === 'refine' ? `成色 ${Math.round(itemQ(it) * 100)}%`
+  : fn === 'up' ? TIER_N[it.tier || tierOf(it.ilvl)] : fn === 'inh' ? `+${it.plus || 0}${it.gems && it.gems.length ? ` · ${it.gems.length} 颗玉` : ''}` : '';
+function svcItemBody(fn, title) {
+  const f = NPCV.item && findItem(NPCV.item);
+  if (f) return `<div class="svc-it"><button class="btn sm ghost" data-act="npcitem" data-arg="">‹ 换一件</button>${SPR.item(f.it, 30)}<span class="nm r-${f.it.rarity}">${itemTitle(f.it)}<small>${SLOT_NAME[f.it.slot]} · ${f.where === 'eq' ? '穿在身上' : '储物箱里'}</small></span><button class="btn sm ghost" data-act="item" data-arg="${f.it.id}">看属性</button></div>${smithHTML(f.it, f.where, new Set([fn]), title)}`;
+  const L = svcItems(fn);
+  return `<p class="sub">挑一件装备（${CLASSES[SAVE.cls].n}身上的排在前面）：</p>
+    <div class="svc-list">${L.map(({ it, eq }) => `<button class="svc-row ${ancCls(it)}" data-act="npcitem" data-arg="${it.id}">${SPR.item(it, 28)}<span class="nm r-${it.rarity}">${itemTitle(it)}<small>${eq ? '身上 · ' : ''}${SLOT_NAME[it.slot]} · ${it.ilvl} 阶</small></span><em>${svcInfo(fn, it)}</em></button>`).join('') || '<div class="empty-note">没有合适的装备。</div>'}</div>`;
+}
+const npcModal = () => {
+  const id = NPCV.id, Sp = SPEAKERS[id] || {}, fns = svcFns(id);
+  if (!fns.length) return '<button class="btn sm ghost x" data-act="close">关闭</button><p class="sub">这儿现在没有能办的事。</p>';
+  if (!fns.some(f => f[0] === NPCV.fn)) { NPCV.fn = fns[0][0]; NPCV.item = null; }
+  const fn = NPCV.fn, title = fns.find(f => f[0] === fn)[1];
+  const body = fn === 'bulk' ? bulkBody() : fn === 'gamble' ? gambleBody() : fn === 'gems' ? gemsBody() : fn === 'bounty' ? bountyHTML()
+    : fn === 'shang' ? `<p class="help-p">打悬赏挣的赏银，在柜上换东西：魂晶、玉石、带特殊词条的装备、套装、神兵。货每歇一次换一批。</p><div class="row wallet"><span class="pill gold">赏银 ${SAVE.shang || 0}</span></div><div class="row" style="justify-content:center"><button class="btn" data-act="btyshop">打开赏银柜</button></div>`
+    : svcItemBody(fn, title);
+  return `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button>${fns.length > 1 ? `<div class="stabs">${fns.map(f => `<button class="${f[0] === fn ? 'on' : ''}" data-act="npcfn" data-arg="${f[0]}">${f[1]}</button>`).join('')}</div>` : ''}</div>
+    <div class="svc-head">${unitIcon(Sp.spr, 56, Sp.pal, '', 'stand')}<div><b>${Sp.n}</b><p>${SVC[id].hi}</p></div></div>${body}`;
+};
+const svcNoteModal = () => `<h2 class="mh">铸剑坊拆开了</h2>
+  <p class="help-p">养装备的事不再挤在一件装备的「铸剑坊」页里。回营地页，点镇上的人，各有各的手艺：</p>
+  <p class="help-p"><b>张大锤</b>：强化、传承<br><b>铁蛋</b>：淬炼洗炼、升阶<br><b>玉掌柜</b>：打孔镶玉、玉石合成<br><b>康总管</b>：清点库房（筛选分解、出售）、赌石<br><b>雷老虎</b>：每日悬赏、赏银柜</p>
+  <p class="help-p">点开一件装备，下面也有「拿去找谁」的快捷按钮。</p>
+  <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`;
 function campStrip() {
   return `<section class="camp" style="--bg:#0e0a0c"><div class="lanterns"><i></i><i></i><i></i></div>
     <div class="npcs">${npcList().map(([id]) => { const S = SPEAKERS[id], qc = townCh(), mk = qc ? wNpcMark(qc, id) : '';
-      return `<button class="npc ${id}" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${unitIcon(S.spr, id === 'ngoc' ? 76 : 60, S.pal, id === 'ngoc' ? 'idle' : '', 'stand')}<b>${S.n}</b></button>`; }).join('')}</div>
-    <p class="camp-hint">青石镇 · 点击镇上的人聊两句</p></section>`;
+      return `<button class="npc ${id}" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${unitIcon(S.spr, id === 'ngoc' ? 76 : 60, S.pal, id === 'ngoc' ? 'idle' : '', 'stand')}<b>${S.n}</b>${svcFns(id).length ? `<small class="svc-tag">${svcFns(id).map(f => f[1]).join(' · ')}</small>` : ''}</button>`; }).join('')}</div>
+    <p class="camp-hint">青石镇 · 点镇上的人：各有各的手艺</p></section>`;
 }
 function goTab() {
   const cls = SAVE.cls, run = SAVE.run;
@@ -2120,8 +2191,10 @@ const boardModal = () => {
 const shopEntryName = e => e.k === 'item' ? `<span class="r-${e.it.rarity}">${esc(itemTitle(e.it))}</span> <small>${SLOT_NAME[e.it.slot]}</small>`
   : e.k === 'gem' ? `${gemName(e.key)} <small>${gemDesc(e.key)}</small>` : e.k === 'exchange' ? `${e.gold} 两 → ${e.mb} 枚冥币` : esc(e.n || '');
 const shopEntryIcon = e => e.k === 'item' ? SPR.item(e.it, 28) : e.k === 'gem' ? gemImg(e.key, 28) : SPR.img(e.spr || (e.k === 'food' ? 'cauldron' : e.k === 'gamble' || e.k === 'blind' ? 'chest' : e.k === 'exchange' ? 'gold' : 'scroll'), 28, e.pal);
+// 在哪一章的铺子里：出门在外就是那一章；在营地页（雷老虎的赏银柜）按通关到的章算
+const shopCh = () => SAVE.run && SAVE.run.world && !isRift(SAVE.run) ? SAVE.run.chapter : Math.max(1, Math.min(10, storyCleared('normal') || 1));
 const shopModal = () => {
-  const ch = wch(), SH = W_SHOPS[SHOPID], st = wShopStock(ch, SHOPID), cur = wCurName(SH.cur), run = SAVE.run, cls = run ? run.cls : SAVE.cls, S = wstate(ch);
+  const ch = shopCh(), SH = W_SHOPS[SHOPID], st = wShopStock(ch, SHOPID), cur = wCurName(SH.cur), run = SAVE.run, cls = run ? run.cls : SAVE.cls, S = wstate(ch);
   const Sp = SPEAKERS[SH.who] || { spr: 'merchant' };
   const tabs = [['buy', SH.buyName || '买'], ...(SH.sell ? [['sell', SH.sellName || '当']] : []), ...(SH.reroll ? [['roll', '开光']] : [])];
   let body = '';
@@ -2337,7 +2410,7 @@ function wDirStep(dx, dy) {
   WALK = { path: [{ x: T.x, y: T.y }], i: 0, joy: true, onArrive: P && P.t === 'camp' ? () => openModal(campModal(P)) : null }; wStepLoop();
 }
 // 镇上：带任务的人
-function townCh() { if (SAVE.run && SAVE.run.world) return SAVE.run.chapter; const c = SAVE.chapter || 1; return wHas(c) && WMAPS[c].scenes.town ? c : wHas(1) ? 1 : 0; }
+function townCh() { if (SAVE.run && SAVE.run.world && !isRift(SAVE.run)) return SAVE.run.chapter; const c = SAVE.chapter || 1; return wHas(c) && WMAPS[c].scenes.town ? c : wHas(1) ? 1 : 0; }
 
 // ---------- 奇遇 / 货郎 / 篝火 / 宝箱 / 结算 / 片尾 ----------
 function sceneWrap(art, inner) { return `${runBar(SAVE.run)}<div class="scene"><div class="panel"><div class="art">${art}</div>${inner}</div></div>`; }
@@ -2400,7 +2473,7 @@ function endHTML() {
       ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">这次得到 ${loot.length} 件装备（已放进储物箱）</p>${lootChips(loot)}
     ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>又打完一章。进度只存在这台设备上，备份一下更保险。</p><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bknudge">更多备份方式</button></div>` : ''}
-    <button class="btn big" data-act="town">回青石镇</button></div></div>`;
+    ${r.loot && r.loot.length ? '<button class="btn ghost" style="width:100%;margin-bottom:8px" data-act="bulkopen">清点战利品：筛选分解 / 出售</button>' : ''}<button class="btn big" data-act="town">回青石镇</button></div></div>`;
 }
 function creditsHTML() {
   const E = (SAVE.wflags || {}).ending, EN = { 1: '结局一 · 一人一半', 2: '结局二 · 点灯', 3: '结局三 · 这次换我' }[E];
@@ -2411,7 +2484,7 @@ function creditsHTML() {
   return `<div class="credits"><div class="cr-art">${heroSpr(SAVE.cls, 96, 'float')}${SPR.img('ngoc', 96, null, 'float')}</div>
     <div class="cr-roll">${roll.map(([a, b]) => `<div class="cr-line"><small>${a}</small><b>${b}</b></div>`).join('')}</div>
     <p class="cr-sign">出品 · 制作　涂与豪</p>
-    <div class="cr-unlock"><p>已开启：<b>铸剑坊</b>（强化、打孔镶玉、淬炼洗炼、传承升阶）· <b>赏银柜</b> · <b>九幽幻境</b>（限时一炷香，无尽深渊，可以带 Ngoc）· <b>幻境套装</b> · <b>镇妖录</b>（收服妖物、役使首领）· <b>修罗难度</b> · <b>修为</b> · <b>灵玉</b> · <b>江湖悬赏</b> · <b>加难度</b></p></div>
+    <div class="cr-unlock"><p>已开启：<b>装备养成</b>（营地页点镇上的人：张大锤强化、传承；铁蛋淬炼洗炼、升阶；玉掌柜打孔镶玉）· <b>赏银柜</b> · <b>九幽幻境</b>（限时一炷香，无尽深渊，可以带 Ngoc）· <b>幻境套装</b> · <b>镇妖录</b>（收服妖物、役使首领）· <b>修罗难度</b> · <b>修为</b> · <b>灵玉</b> · <b>江湖悬赏</b> · <b>加难度</b></p></div>
     <button class="btn big" data-act="credend">回青石镇</button></div>`;
 }
 
@@ -2423,17 +2496,17 @@ function findItem(id) {
   for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] && SAVE.chars[c].eq[sl].id === id) return { it: SAVE.chars[c].eq[sl], where: 'eq', cls: c };
   return null;
 }
-function smithHTML(it, where) {
-  if (VIEW !== 'town') return '<p class="sub" style="text-align:center">强化、传承、升阶、打孔、淬炼、洗炼，要回营地页找张大锤。</p>';
+// 装备养成的各个小节：W 里写要哪几节（enh 强化、sock 打孔镶玉、inh 传承、up 升阶、refine 淬炼洗炼、cube 收进乾坤袋）。每个 NPC 只管自己那一两节
+function smithHTML(it, where, W, title) {
+  W = W || new Set(['enh', 'sock', 'inh', 'up', 'refine', 'cube']);
   const ec = enhanceCost(it), sc = socketCost(it), maxS = MAX_SOCKETS[it.slot], cap = smithMax();
-  let h = `<div class="smith"><h4>${SPR.img('smith', 28)}张大锤铸剑坊 <small>你有 ${SAVE.gold} 两 · ${SAVE.mats} 魂晶</small></h4>`;
-  if (!featureOn('enhance')) h += lockNote('通关以后，张大锤的铸剑坊开炉：强化、打孔镶玉、淬炼洗炼、传承升阶');
-  else h += (it.plus || 0) >= ENHANCE_MAX ? '<div class="srow">已经强化到 +10</div>'
+  let h = `<div class="smith"><h4>${title || ''} <small>你有 ${SAVE.gold} 两 · ${SAVE.mats} 魂晶</small></h4>`;
+  if (W.has('enh')) h += (it.plus || 0) >= ENHANCE_MAX ? '<div class="srow">已经强化到 +10</div>'
     : (it.plus || 0) >= cap ? `<div class="srow">张大锤现在最多能强化到 +${cap}，打通后面的章节他的手艺会更好</div>`
     : `<div class="srow"><span>强化 +${it.plus || 0} → +${(it.plus || 0) + 1}<small>成功率 ${Math.round(ec.rate * 100)}% · ${ec.gold} 两 + ${ec.mats} 魂晶（失败只损失材料）· 只加攻击、气血、护甲这些实数属性</small></span><button class="btn sm" ${SAVE.gold >= ec.gold && SAVE.mats >= ec.mats ? '' : 'disabled'} data-act="enh" data-arg="${it.id}">强化</button></div>`;
-  if (featureOn('sockets')) h += (it.sockets || 0) >= maxS ? `<div class="srow">孔已打满（${maxS}/${maxS}）</div>`
+  if (W.has('sock') && featureOn('sockets')) h += (it.sockets || 0) >= maxS ? `<div class="srow">孔已打满（${maxS}/${maxS}）</div>`
     : `<div class="srow"><span>打孔 ${it.sockets || 0}/${maxS}<small>${sc.gold} 两 + ${sc.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= sc.gold && SAVE.mats >= sc.mats ? '' : 'disabled'} data-act="sock" data-arg="${it.id}">打孔</button></div>`;
-  if (it.sockets && featureOn('sockets')) {
+  if (W.has('sock') && it.sockets && featureOn('sockets')) {
     h += '<div class="srow col"><span>玉石</span><div class="gslots">';
     for (let i = 0; i < it.sockets; i++) {
       const g = it.gems[i];
@@ -2445,16 +2518,20 @@ function smithHTML(it, where) {
     if (free > 0) h += keys.length || lg.length ? `<div class="gpick">选择要镶的玉：${lg.map(g => `<button class="chip lgc" data-act="lgem" data-arg="${it.id}|${g.id}">${SPR.img('gem', 16, { G: LGEMS[g.t].c })}${LGEMS[g.t].n} ${g.lv} 级</button>`).join('')}${keys.map(k => `<button class="chip" data-act="gem" data-arg="${it.id}|${k}">${gemImg(k, 16)}${gemName(k)} ×${SAVE.gems[k]}</button>`).join('')}</div>` : '<p class="sub">你还没有玉石。</p>';
     h += '</div>';
   }
-  if (featureOn('enhance')) {
+  if (W.has('inh') && featureOn('enhance')) {
     // 传承：同部位、身上或箱子里带强化/宝石的旧装备
     const pool = [...SAVE.stash, ...CLASS_IDS.flatMap(c => Object.values(SAVE.chars[c].eq).filter(Boolean))].filter(s => canInherit(it, s));
     if (pool.length) h += `<div class="srow col"><span>传承 <small>把旧装备的强化（降一级）、孔和宝石转到这件上。旧装备会变回白板。</small></span><div class="gslots">${pool.slice(0, 6).map(s => { const c = inheritCost(it, s);
       return `<button class="gslot" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="inh" data-arg="${it.id}|${s.id}"><span class="r-${s.rarity}">${esc(s.name)}${s.plus ? ' +' + s.plus : ''}</span>${s.gems && s.gems.length ? `（${s.gems.length} 颗玉）` : ''}<small>→ +${Math.max(it.plus || 0, (s.plus || 0) - 1)} · ${c.gold} 两 ${c.mats} 魂晶</small></button>`; }).join('')}</div></div>`;
+    else h += '<div class="srow">没有可以传过来的旧装备：要同一个部位、带强化或镶了玉的。</div>';
+  }
+  if (W.has('up') && featureOn('enhance')) {
     const L = upTierTarget(ownerOf(it) || SAVE.cls);
     if (upTierOK(it) && L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const c = upTierCost(it, L);
       h += `<div class="srow"><span>升阶 ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>装备等级 ${it.ilvl} → ${L}，攻击、气血、护甲这些实数属性一起涨，百分比词条不变 · ${c.gold} 两 + ${c.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">升阶</button></div>`; }
+    else h += `<div class="srow">${upTierOK(it) ? '这件已经是眼下能到的最高阶了。' : '只有宝品、套装、神兵能升阶。'}</div>`;
   }
-  if (it.aff.length && featureOn('reroll') && !it.rrPending) {
+  if (W.has('refine') && it.aff.length && featureOn('reroll') && !it.rrPending) {
     const m = itemMult(it);
     if (it.rfPending) { const P = it.rfPending;
       h += `<div class="srow col"><span>淬炼结果：选一个留下</span><div class="gslots">${P.opts.map((o, i) => `<button class="gslot" data-act="rfpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * statMult(it, o[0])))}${affTag(it, o[0], o[1])}<small>${i ? '（新的）' : '（原来的）'}</small></button>`).join('')}</div></div>`;
@@ -2468,7 +2545,7 @@ function smithHTML(it, where) {
         <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">洗炼（锁 ${lk.size} 条 · ${wc.gold} 两 + ${wc.mats} 魂晶）</button></div>`;
     }
   }
-  if (it.aff.length && featureOn('reroll') && it.rrPending) {
+  if (W.has('refine') && it.aff.length && featureOn('reroll') && it.rrPending) {
     const rc = rerollCost(it);
     if (it.rrPending) {
       h += `<div class="srow col"><span>洗炼结果：选一条留下</span><div class="gslots">${it.rrPending.opts.map((o, i) => `<button class="gslot" data-act="rrpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * statMult(it, o[0])))}${i === 0 ? '<small>（原来的）</small>' : ''}</button>`).join('')}</div></div>`;
@@ -2477,7 +2554,7 @@ function smithHTML(it, where) {
         ${it.aff.map(([k, v], i) => `<button class="gslot" ${(it.rr == null || it.rr === i) && SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rr" data-arg="${it.id}|${i}">${fmtStat(k, Math.round(v * statMult(it, k)))}</button>`).join('')}</div></div>`;
     }
   }
-  if (where === 'stash' && it.legend && featureOn('cube')) h += `<div class="srow"><span>收进乾坤袋<small>${SAVE.cube[it.legend] ? '乾坤袋里已经有这个特效了' : '销毁这件神兵，永久学会它的特效（需要 10 颗魂晶）'}</small></span><button class="btn sm" ${!SAVE.cube[it.legend] && SAVE.mats >= 10 ? '' : 'disabled'} data-act="extract" data-arg="${it.id}">收进去</button></div>`;
+  if (W.has('cube') && where === 'stash' && it.legend && featureOn('cube')) h += `<div class="srow"><span>收进乾坤袋<small>${SAVE.cube[it.legend] ? '乾坤袋里已经有这个特效了' : '销毁这件神兵，永久学会它的特效（需要 10 颗魂晶）'}</small></span><button class="btn sm" ${!SAVE.cube[it.legend] && SAVE.mats >= 10 ? '' : 'disabled'} data-act="extract" data-arg="${it.id}">收进去</button></div>`;
   return h + '</div>';
 }
 function statMap(it) {
@@ -2502,7 +2579,7 @@ function itemModal(id, shopIdx) {
     const cur = SAVE.chars[cls].eq[it.slot];
     const isMine = where === 'eq' && cur && cur.id === it.id;
     const inFight = VIEW === 'battle' && B && !B.over;
-    const canSmith = where !== 'shop' && !inFight && VIEW === 'town' && (featureOn('enhance') || featureOn('reroll') || (featureOn('cube') && it.legend));   // 剧情里只有神兵能收进乾坤袋，别的装备不显示铸剑坊
+    const canSmith = false, atTown = where !== 'shop' && !inFight && VIEW === 'town';   // 铸剑坊拆给了镇上的人：这里只留「拿去找谁」的快捷按钮
     const tab = canSmith ? ITAB : 'info';
     let h = `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button>${canSmith ? `<div class="stabs"><button class="${tab === 'info' ? 'on' : ''}" data-act="itab" data-arg="info">属性</button><button class="${tab === 'smith' ? 'on' : ''}" data-act="itab" data-arg="smith">铸剑坊</button></div>` : ''}</div>`;
     if (tab === 'info') {
@@ -2514,11 +2591,16 @@ function itemModal(id, shopIdx) {
       }
       h += itemCard(it, cls, isMine ? '当前装备' : where === 'eq' ? '别的角色正在用' : '');
       if (cur && !isMine && where !== 'eq') h += `<details class="curd"><summary>展开身上那件的完整属性</summary>${itemCard(cur, cls, '身上穿的')}</details>`;
+      if (atTown) {
+        const go = [['smith', 'enh', '强化'], ['smith', 'inh', '传承'], ['tiedan', 'refine', '淬炼洗炼'], ['tiedan', 'up', '升阶'], ['yujiang', 'sock', '打孔镶玉']].filter(([n, fn]) => svcFns(n).some(f => f[0] === fn) && (fn !== 'refine' || it.aff.length) && (fn !== 'up' || upTierOK(it)));
+        if (go.length) h += `<div class="svc-go"><span class="sub">拿去找：</span>${go.map(([n, fn, t]) => `<button class="chip" data-act="npcgo" data-arg="${n}|${fn}|${it.id}">${SPEAKERS[n].n} · ${t}</button>`).join('')}</div>`;
+        if (where === 'stash' && it.legend && featureOn('cube')) h += smithHTML(it, where, new Set(['cube']), '乾坤袋');
+      }
     } else h += smithHTML(it, where);
     const acts = [];
     if (where === 'stash') {
       if (canEquip(it, cls)) acts.push(`<button class="btn" data-act="equip" data-arg="${it.id}">穿上</button>`);
-      if (!inFight) acts.push(`<button class="btn ghost" data-act="sell" data-arg="${it.id}">卖 ${sellPrice(it)} 两</button>`, `<button class="btn ghost" data-act="salv" data-arg="${it.id}">分解 ${salvageValue(it)} 魂晶</button>`);
+      if (!inFight) acts.push(`<button class="btn ghost" data-act="sell" data-arg="${it.id}">卖 ${sellPrice(it)} 两</button>`, `<button class="btn ghost" data-act="salv" data-arg="${it.id}">分解 ${salvageValue(it)} 魂晶</button>`, `<button class="btn ghost" data-act="lock" data-arg="${it.id}">${it.lk ? '解锁' : '锁定'}</button>`);
     }
     if (isMine) acts.push(`<button class="btn ghost" data-act="unequip" data-arg="${it.slot}">卸下</button>`);
     if (acts.length) h += `<div class="sheet-act">${acts.join('')}</div>`;
@@ -2618,6 +2700,7 @@ const ACT = {
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast('Ngoc：「早就该带上我了。」'); else toast('Ngoc：「……那你早点回来。」'); },
   npc: id => {
     const qc = townCh();
+    if (!(qc && wNpcMark(qc, id)) && svcFns(id).length) { NPCV = { id, fn: null, item: null }; GAMBLE = null; BULKX = new Set(); BULKARM = false; BACK = null; return openModal(npcModal); }   // 没有任务要说：开他的铺子
     if (qc && (wNpcMark(qc, id) || WNPC[id])) { const acts = wTalk(qc, id, SAVE.run && SAVE.run.world ? SAVE.run : null);
       if (acts.length === 1 && acts[0].dlg && acts[0].dlg.length === 1 && !wNpcMark(qc, id) && NPC_LINES[id] && storyCleared('normal') >= 1) return npcTalk(id);
       if (acts.length === 1 && acts[0].dlg && acts[0].dlg.length === 1) { const el = document.getElementById('npc-' + id); if (el) { document.querySelectorAll('.npc .bubble').forEach(x => x.remove()); const b = document.createElement('div'); b.className = 'bubble'; b.textContent = acts[0].dlg[0][1]; el.appendChild(b); bump(el, 'talk', 400); setTimeout(() => b.remove(), 3200); } return; }
@@ -2659,12 +2742,26 @@ const ACT = {
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
   town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); },
-  credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
+  credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
   replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : C[part]; playDialog(lines, C.boss); },
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
   gsl: sl => { GSLOT = GSLOT === sl ? null : sl; refresh(); },
   gsub: k => { GSUB = k; refresh(); },
   itab: k => { ITAB = k; refresh(); },
+  npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },
+  npcitem: id => { NPCV.item = id || null; refresh(); },
+  npcgo: a => { const [id, fn, item] = split(a); NPCV = { id, fn, item: item || null }; GAMBLE = null; BACK = null; openModal(npcModal); },
+  gamb: slot => { const it = gamble(SAVE.cls, slot); if (!it) return toast('银两不够'); GAMBLE = it; SFX.play(it.rarity === 'legend' || it.rarity === 'set' ? 'legend' : it.rarity === 'rare' ? 'rare' : 'coin'); refresh(); },
+  bulkopen: () => { BULKX = new Set(); BULKARM = false; BACK = null; openModal(bulkModal); },
+  bulkmode: m => { bulkFilter().mode = m; BULKARM = false; refresh(); },
+  bulkr: r => { const f = bulkFilter(); f.r[r] = f.r[r] ? 0 : 1; BULKARM = false; refresh(); },
+  bulkk: k => { const f = bulkFilter(); f[k] = f[k] ? 0 : 1; BULKARM = false; refresh(); },
+  bulkx: id => { if (BULKX.has(id)) BULKX.delete(id); else BULKX.add(id); BULKARM = false; refresh(); },
+  bulkgo: () => { const f = bulkFilter(), list = bulkPick(SAVE.cls, f).filter(it => !BULKX.has(it.id)); if (!list.length) return;
+    if (!BULKARM && list.some(it => it.rarity === 'set' || it.rarity === 'legend')) { BULKARM = true; return refresh(); }
+    const r = bulkDo(f.mode, list.map(it => it.id)); BULKARM = false; SFX.play(f.mode === 'sell' ? 'coin' : 'forge');
+    toast(f.mode === 'sell' ? `卖掉 ${r.n} 件，得到 ${r.v} 两` : `分解 ${r.n} 件，得到 ${r.v} 颗魂晶`); refresh(); },
+  lock: id => { const it = findOwned(id); if (!it) return; if (it.lk) delete it.lk; else it.lk = 1; refresh(); },
   bagtab: k => { BAGTAB = k; refresh(); },
   qeq: id => {
     const cls = ctxCls(), f = findItem(id); if (!f) return;
@@ -2689,7 +2786,7 @@ const ACT = {
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast('洗炼完成'); refresh(); },
   btyacc: id => { const r = wBtyAccept(wch(), id); BTYMSG = r.err || r.ok; SFX.play(r.err ? 'fail' : 'rare'); if (MODALFN) sheet.innerHTML = MODALFN(); },
-  btyshop: () => { SHOPID = 'shangyin'; SHOPTAB = 'buy'; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); },
+  btyshop: () => { const prev = MODALFN; SHOPID = 'shangyin'; SHOPTAB = 'buy'; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); if (prev === npcModal) BACK = prev; },
   form: a => { const [i, z] = split(a); const ch = SAVE.chars.necro; ch.form = necroForm(ch.level, ch.form); ch.form[+i] = z; save(); SFX.play('click'); refresh(); },
   rf: a => { const [id, i] = split(a); const r = refineStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rfpick: a => { const [id, i] = split(a); refinePick(findOwned(id), +i); SFX.play('forge'); toast(+i ? '换上了新的数值' : '留下了原来的'); refresh(); },
@@ -2758,10 +2855,10 @@ const ACT = {
   bhgo: id => { BACK = null; closeModal(); WTRK = true; render(); ACT.wgo(id); },
   shoptab: k => { SHOPTAB = k; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); },
   shopsel: i => { SHOPSEL = SHOPSEL === +i ? -1 : +i; openModal(shopModal); },
-  shopbuy: i => { const r = wShopBuy(wch(), SHOPID, +i, SAVE.run); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : r.item && (r.item.rarity === 'legend' || r.item.rarity === 'set') ? 'legend' : 'coin'); save();
+  shopbuy: i => { const r = wShopBuy(shopCh(), SHOPID, +i, SAVE.run); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : r.item && (r.item.rarity === 'legend' || r.item.rarity === 'set') ? 'legend' : 'coin'); save();
     if (r.acts && r.acts.length) { closeModal(); wRun(r.acts); } else openModal(shopModal); },
-  shopsell: id => { const r = wShopSell(wch(), SHOPID, id); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : 'coin'); save(); openModal(shopModal); },
-  shoproll: id => { const r = wShopReroll(wch(), SHOPID, id); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : 'magic'); save(); openModal(shopModal); },
+  shopsell: id => { const r = wShopSell(shopCh(), SHOPID, id); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : 'coin'); save(); openModal(shopModal); },
+  shoproll: id => { const r = wShopReroll(shopCh(), SHOPID, id); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : 'magic'); save(); openModal(shopModal); },
   eat: id => { const F = wEat(SAVE.run, id); closeModal(); if (F) { SFX.play('buff'); qtoast(`吃了「${esc(F.n)}」：${esc(F.d)}（管到下次休息）`); } save(); refresh(); },
   wtalkc: () => { const ch = wch(), cc = wCompNow(ch); if (!cc) return; wStopAuto(); wRun(wTalk(ch, cc, SAVE.run)); },
   wyin: () => { WALK = null; wStopAuto(); wRun(wYinToggle(wch())); },
@@ -2919,6 +3016,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.story.ended && seen('postg') && !seen('npcsvc')) { markSeen('npcsvc'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(svcNoteModal); }, 1400); }
 if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">装备词条改了规矩</h2>
   <p class="help-p">之前暴击、暴伤、伤害、术法这些百分比词条跟着装备等级越涨越大，七件叠起来，后面的首领几下就没了。现在改成这样：</p>
   <p class="help-p">一、百分比词条的幅度固定，不再随等级涨；后期变强靠攻击、气血、护甲这些实数。</p>

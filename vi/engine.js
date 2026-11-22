@@ -669,6 +669,23 @@ function salvage(id) {
   const it = SAVE.stash[i], v = salvageValue(it); returnGems(it);
   SAVE.stash.splice(i, 1); SAVE.mats += v; return v;
 }
+// 筛选分解／出售：按品级挑，再按几条「保留」规则留下好东西。强化过、镶了玉、锁定的、淬炼洗炼到一半的，永远不动
+const BULK_DEF = { mode: 'salv', r: { normal: 1, magic: 1, rare: 1, set: 0, legend: 0 }, keepUp: 1, keepSp: 1, keepAnc: 1, keepQ: 0, keepCube: 1 };
+function bulkFilter() { const f = SAVE.bulkf || (SAVE.bulkf = JSON.parse(JSON.stringify(BULK_DEF))); for (const k in BULK_DEF) if (f[k] == null) f[k] = JSON.parse(JSON.stringify(BULK_DEF[k])); return f; }
+const bulkSafe = it => !!(it.lk || it.plus > 0 || (it.gems && it.gems.length) || busyRoll(it));
+function bulkPick(cls, f) {
+  const cur = power(charStats(cls));
+  return SAVE.stash.filter(it => {
+    if (!f.r[it.rarity] || bulkSafe(it)) return false;
+    if (f.keepSp && it.aff.some(a => SP_AFFIXES.includes(a[0]))) return false;
+    if (f.keepAnc && it.anc) return false;
+    if (f.keepCube && it.legend && !SAVE.cube[it.legend]) return false;
+    if (f.keepQ && it.aff.length && itemQ(it) >= 0.8) return false;
+    if (f.keepUp && canEquip(it, cls) && powerWith(cls, it) > cur) return false;
+    return true;
+  });
+}
+function bulkDo(mode, ids) { let n = 0, v = 0; for (const id of ids) { const it = SAVE.stash.find(x => x.id === id); if (!it || bulkSafe(it)) continue; v += mode === 'sell' ? sellItem(id) : salvage(id); n++; } return { n, v }; }
 function salvageJunk() {
   let m = 0, n = 0;
   SAVE.stash = SAVE.stash.filter(it => { if (isJunk(it)) { m += salvageValue(it); n++; return false; } return true; });

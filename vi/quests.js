@@ -8,6 +8,7 @@ Object.assign(SPEAKERS, {
   kang:     { n: "Quản gia Khang", spr: 'merchant', por: 'p_kang' },
   long:     { n: "Long đạo trưởng", spr: 'scholar', por: 'p_long' },
   lei:      { n: "Lôi Lão Hổ", spr: 'blade', pal: { H: '#5a3a1a', R: '#e8c13a', B: '#5a2a14' } },
+  yujiang:  { n: "Chưởng quầy Ngọc", spr: 'villager', pal: { B: '#3a6a5a', D: '#22443a', H: '#3a3a3a' } },   // 玉器坊的掌柜：通关后玉器坊开张才露面
   shutong:  { n: "Thư đồng A Phúc", spr: 'ghost', pal: { W: '#c8d8e0', B: '#3a6a8a' } },
   wang:     { n: "Ông lão Vương", spr: 'ghost', pal: { W: '#d0c8b0', B: '#6a5a3a' } },
   mother:   { n: "Mẹ A Phúc", spr: 'ngoc', pal: { H: '#9a9a9a', P: '#6a5a4a', G: '#4a5a4a' } },

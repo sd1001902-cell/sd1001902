@@ -8,6 +8,7 @@ Object.assign(SPEAKERS, {
   kang:     { n: '康总管', spr: 'merchant', por: 'p_kang' },
   long:     { n: '龙道长', spr: 'scholar', por: 'p_long' },
   lei:      { n: '雷老虎', spr: 'blade', pal: { H: '#5a3a1a', R: '#e8c13a', B: '#5a2a14' } },
+  yujiang:  { n: '玉掌柜', spr: 'villager', pal: { B: '#3a6a5a', D: '#22443a', H: '#3a3a3a' } },   // 玉器坊的掌柜：通关后玉器坊开张才露面
   shutong:  { n: '书童阿福', spr: 'ghost', pal: { W: '#c8d8e0', B: '#3a6a8a' } },
   wang:     { n: '王老头', spr: 'ghost', pal: { W: '#d0c8b0', B: '#6a5a3a' } },
   mother:   { n: '阿福娘', spr: 'ngoc', pal: { H: '#9a9a9a', P: '#6a5a4a', G: '#4a5a4a' } },

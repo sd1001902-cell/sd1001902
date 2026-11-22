@@ -501,7 +501,7 @@ const TUTORIALS = {
   6: [['narr', "Túi Càn Khôn Huyền Băng Tử để lại, chứa được “hồn” của thần binh."],
       ['ngoc', "Thần binh không dùng tới đừng vội bán. Cất vào Túi Càn Khôn, hiệu ứng của nó ngươi học được mãi mãi."],
       ['ngoc', "Mỗi nhân vật có ba ô, đặt vào là có hiệu lực, không chiếm chỗ trang bị. …Thứ này còn dễ dùng hơn đầu óc ngươi nhiều."],
-      ['narr', "(Trong “Lò Rèn” của thần binh có “Cất vào Túi Càn Khôn”; trang “Trang bị” thêm thẻ “Túi Càn Khôn”)"]],
+      ['narr', "(Chạm mở một món thần binh sẽ có “Cất vào Túi Càn Khôn”; trang “Trang bị” thêm thẻ “Túi Càn Khôn”)"]],
   7: [['taoist', "Võ học của ngươi đã có chút hỏa hầu. Bần đạo dạy ngươi một mẹo: cùng một chiêu, có thể có những biến hóa khác nhau."],
       ['taoist', "Mỗi võ học chọn một “biến chiêu”, còn chỉnh được thứ tự ra chiêu. Đánh yêu quái nào thì dùng chiêu đó."],
       ['ngoc', "…Lão đạo này hôm nay sao nhiệt tình thế?"],
@@ -510,11 +510,13 @@ const TUTORIALS = {
 // 通关以后：铸剑坊开炉、玉器坊开张、赏银柜开柜（剧情里不打扰，打完了再慢慢养装备）
 const POSTGAME_OPEN = () => { const g = Object.values(SAVE.gems || {}).reduce((a, b) => a + b, 0);
   return [['smith', "…Về rồi đấy à."], ['smith', "Đồ nghề suốt chặng đường này, chương nào cũng thay một cây. Giờ khỏi thay nữa."],
-    ['smith', "Lò Rèn đỏ lửa rồi. Cường hóa, đục lỗ, tôi luyện, tẩy luyện, còn chuyển cường hóa với ngọc của đồ cũ sang đồ mới — cứ tìm ta."],
-    ['tiedan', "Còn thăng giai được nữa! Đao cũ đem đây, ta nung lại cho, cứng như đồ mới!"],
+    ['smith', "Lò Rèn nổi lửa. Cường hóa, rồi chuyển cường hóa và ngọc của đồ cũ sang đồ mới — tới tìm ta."],
+    ['tiedan', "Tôi luyện, tẩy luyện để ta lo! Dòng thuộc tính nào chướng mắt cứ đem tới. Còn thăng giai được nữa: đao cũ nung lại, cứng như đồ mới!"],
+    ['yujiang', "Xưởng Ngọc cũng mở cửa rồi. Đục lỗ, khảm ngọc, ghép ngọc, cứ tới chỗ ta."],
+    ['kang', "Nhà kho để ta kiểm kê cho: thứ không dùng tới, phân giải hay bán đều được. Ngứa tay thì cũng có thể tới đánh cược một ván."],
     ...(g ? [['ngoc', `…Mấy viên đá lấp lánh cậu nhặt dọc đường, ta cất giúp rồi đây. Tổng cộng ${g} viên, ở mục “Ngọc” trong “Trang bị”.`]] : [['ngoc', "Ngọc nhặt dọc đường, sau này đều để ở mục “Ngọc” trong “Trang bị”."]]),
     ['biaotou', "Quầy tiền thưởng cũng mở rồi! Sau này đánh truy nã được tiền thưởng, ra quầy đổi đồ tốt!"],
-    ['narr', "(Mở sau khi phá đảo: Lò Rèn (cường hóa, đục lỗ khảm ngọc, tôi luyện tẩy luyện, truyền thừa thăng giai), ngọc, quầy tiền thưởng, Ảo Cảnh Cửu U, độ khó Tu La, tu vi. Chạm vào một món trang bị là thấy Lò Rèn.)"],
+    ['narr', "(Mở sau khi phá đảo: nuôi trang bị, ngọc, quầy tiền thưởng, Ảo Cảnh Cửu U, độ khó Tu La, tu vi. Muốn nuôi trang bị thì ra trang doanh trại chạm vào người trong trấn: Trương Đại Chùy cường hóa, truyền thừa; Thiết Đản tôi luyện tẩy luyện, thăng giai; Chưởng quầy Ngọc đục lỗ khảm ngọc, ghép ngọc; Quản gia Khang kiểm kê nhà kho, cược đá; Lôi Lão Hổ truy nã, quầy tiền thưởng.)"],
     ['narr', "(Ảo Cảnh Cửu U giới hạn một nén hương, số tầng không có điểm dừng. Từ tầng 20 rơi Bộ Ảo Cảnh; yêu vật thu phục trong Ảo Cảnh được ghi vào Trấn Yêu Lục trong “Giang Hồ Lục”, thu phục thủ lĩnh còn có thể mang theo làm Dịch Sứ.)"]]; };
 const NPC_LINES = {
   ngoc: [
