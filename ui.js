@@ -541,9 +541,9 @@ function testPanel() {
 }
 const langRow = () => `<div class="row lang-row">${[['zh', '中文'], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
 const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>声音</h3><div class="row"><button class="btn ghost" data-act="snd">音效：${SAVE.sound ? '开' : '关'}</button><button class="btn ghost" data-act="mus">古琴背景：${SAVE.music ? '开' : '关'}</button></div>
-  <p class="help-p" style="margin:10px 0 6px">新配乐试听（先做了三段，听听味道对不对）：</p>
-  <div class="row mtest">${[['c1', '坟场'], ['c7', '鬼市'], ['boss', '首领战'], ['battle', '普通打斗']].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">停</button></div>
-  <p class="help-p" style="margin-top:6px">手机外放听不到低音，戴耳机更完整。坟场那段很空，隔十来秒才来一句箫，是故意的。</p></section>
+  <p class="help-p" style="margin:10px 0 6px">配乐试听（点一下就放那个地方的音乐）：</p>
+  <div class="row mtest">${[['town', '青石镇'], ['c1', '坟场'], ['c2', '黑风林'], ['c3', '盘丝洞'], ['c4', '火焰窟'], ['c5', '万毒沼'], ['c6', '昆仑冰窟'], ['c7', '鬼市'], ['c8', '白云观'], ['c9', '九幽上层'], ['c10', '九幽深渊'], ['sad', '篝火夜话'], ['battle', '普通打斗'], ['boss', '首领战']].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">停</button></div>
+  <p class="help-p" style="margin-top:6px">手机外放听不到低音，戴耳机更完整。大多数地方都很空，隔十来秒才来一句，是故意的。</p></section>
     <section class="panel"><h3>操作</h3><p class="help-p">大地图上：点哪走哪；点上方的任务栏自动前往；电脑上可以用方向键或 WASD。</p><div class="row"><button class="btn ghost" data-act="joy">虚拟摇杆：${SAVE.joy ? '开' : '关'}</button>
       <button class="btn ghost" data-act="fs">字号：${({ 0.9: '小', 1: '标准', 1.15: '大', 1.3: '特大' })[SAVE.fs || 1] || '标准'}</button>
       <button class="btn ghost" data-act="guide">任务指引：${SAVE.guide === 'full' ? '详细' : '线索'}</button></div>
@@ -2656,7 +2656,7 @@ const ACT = {
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mtest: k => {
-    const M = { c1: { key: 'c1', kind: 'field' }, c7: { key: 'c7', kind: 'field' }, boss: { key: 'c1', kind: 'field', fight: 'boss' }, battle: { key: 'c1', kind: 'field', fight: 'battle' } }[k];
+    const M = k === 'boss' ? { key: 'c1', kind: 'field', fight: 'boss' } : k === 'battle' ? { key: 'c1', kind: 'field', fight: 'battle' } : k === 'town' || k === 'sad' ? { key: k } : /^c\d+$/.test(k) ? { key: k, kind: 'field' } : null;
     if (!M) { MTEST = null; SFX.audition(curMood()); return refresh(); }
     if (!SAVE.music) { SAVE.music = true; save(); toast('已把背景音乐打开'); }
     SFX.ensure(); SFX.set(SAVE.sound, true); MTEST = { id: k, m: M }; SFX.audition(M); refresh();

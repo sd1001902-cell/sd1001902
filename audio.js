@@ -342,7 +342,7 @@ const SFX = (() => {
     out2(g, 0.7, 0.5); s.start(t); s.stop(t + dur + 0.3);
   }
   // 定时：fn 返回「过多少秒再来一次」；换了氛围（gen 变了）就自己停
-  function every(my, first, fn) { const tick = () => { if (my !== gen || !ctx) return; let d = 1; if (ctx.state === 'running' && !document.hidden) { d = 2; try { d = fn(ctx.currentTime + 0.08); } catch (e) {} }   // 切到后台、声音被系统暂停时不排音，免得回来时一股脑全响
+  function every(my, first, fn) { const tick = () => { if (my !== gen || !ctx) return; let d = 1; if (ctx.state === 'running' && !document.hidden) { d = 2; try { d = fn(ctx.currentTime + 0.08); } catch (e) { if (window.__mdbg) console.error('music: ' + (e && e.stack || e)); } }   // 切到后台、声音被系统暂停时不排音，免得回来时一股脑全响
       if (tm2.length > 200) tm2 = tm2.slice(-50); tm2.push(setTimeout(tick, Math.max(0.03, d) * 1000)); }; tm2.push(setTimeout(tick, first * 1000)); }
   const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
 
@@ -422,7 +422,128 @@ const SFX = (() => {
     });
     return nodes;
   }
-  const V2 = { c1: graveV2, c7: marketV2 };
+  // ---- 其余各处：都是「一层底音 + 一件独奏乐器 + 一种这个地方才有的声音」，没有一直响的噪声 ----
+  function note(inst, f, t, d, vol, last) {
+    if (inst === 'xiao') xiao2(f, t, d * 0.92, vol, { fall: last ? 0.965 : 0, from: 0.975 });
+    else if (inst === 'zheng') pluck(f, t, vol * 1.5, { vib: d > 0.9 ? 1 : 0, bend: Math.random() < 0.18 ? 0.945 : 0, dur: 2.4 });
+    else if (inst === 'pipa') pluck(f, t, vol * 1.4, { bright: 0.8, dur: last ? 2 : 1.2, bend: last ? 1.06 : 0, bendT: 0.3 });
+    else if (inst === 'erhu') erhu(f, t, d * 0.95, vol * 1.5, { gl: 0.2, wet: 0.7 });
+    else if (inst === 'bell') { qing(f, t, vol * 0.7); pluck(f * 2, t, vol * 0.5, { bright: 0.9, dur: 1.2, wet: 0.9 }); }
+  }
+  // 独奏：从几句写好的乐句里挑一句，奏完歇很久
+  function solo(my, sc, inst, PH, vol, first, rest, tempo, onPhrase) {
+    every(my, first, t => { const ph = pick(PH); let x = 0; ph.forEach(([i, d], k) => { note(inst, sc[i], t + x, d * tempo, vol, k === ph.length - 1); x += d * tempo; }); if (onPhrase) onPhrase(t, ph, x); return x + rnd(rest[0], rest[1]); });
+  }
+  const beds = (...fv) => fv.map(([f, v]) => bedTone(f, v).node);
+  function drips(my, first, a, b, vol) { every(my, first, t => { out2(hit('sine', rnd(1100, 1900), 0.14, vol || 0.03, t), 0.6, 1); return rnd(a, b); }); }
+  function heart(t, vol) { tanggu(t, vol); tanggu(t + 0.28, vol * 0.6); }
+  function anvil(t, vol) { [[1180, 1, 0.5], [2960, 0.55, 0.3], [4410, 0.25, 0.18]].forEach(([f, v, d]) => out2(hit('sine', f, d, vol * v, t), 0.5, 0.9)); }
+  // 诵经：低低的一排人声，一个字一顿；slip = 念到最后整排往下滑（不对劲的地方）
+  function chant(t, n, vol, slip) {
+    const o = ctx.createOscillator(), b1 = ctx.createBiquadFilter(), b2 = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain(), sy = 0.62;
+    o.type = 'sawtooth'; b1.type = 'bandpass'; b1.frequency.value = 600; b1.Q.value = 6; b2.type = 'bandpass'; b2.frequency.value = 1000; b2.Q.value = 8; lp.type = 'lowpass'; lp.frequency.value = 1800;
+    g.gain.setValueAtTime(0.0001, t);
+    for (let k = 0; k < n; k++) { const tt = t + k * sy; o.frequency.setValueAtTime(k % 4 === 3 ? 110 : 98, tt); g.gain.setValueAtTime(0.0001, tt); g.gain.linearRampToValueAtTime(vol, tt + 0.08); g.gain.linearRampToValueAtTime(vol * 0.45, tt + 0.45); g.gain.linearRampToValueAtTime(0.0001, tt + 0.6); muyu2(tt, 0.035, 0.9); }
+    const end = t + n * sy;
+    if (slip) { o.frequency.setValueAtTime(98, end); o.frequency.linearRampToValueAtTime(84, end + 2.2); g.gain.setValueAtTime(0.0001, end); g.gain.linearRampToValueAtTime(vol * 0.8, end + 0.1); g.gain.linearRampToValueAtTime(0.0001, end + 2.4); }
+    o.connect(b1); o.connect(b2); b1.connect(lp); b2.connect(lp); lp.connect(g); out2(g, 0.4, 1); o.start(t); o.stop(end + 2.6);
+  }
+  // 青石镇：全游戏唯一暖的地方。筝弹宫调的小曲，笛子偶尔应一句
+  function townV2(my) {
+    const sc = SCALE(293.7, 'gong'), nodes = beds([146.8, 0.006], [220, 0.004]); let n = 0;   // D 宫：D E F# A B；sc[5] = D4
+    const PH = [[[10, .5], [9, .5], [8, 1], [7, .5], [8, .5], [5, 2]], [[5, .5], [7, .5], [8, 1], [9, .5], [10, 1.5], [8, 2]], [[8, .75], [9, .25], [10, 1], [12, 1], [10, .5], [9, .5], [8, 2]], [[7, 1], [8, .5], [7, .5], [6, 1], [5, 2.5]], [[10, 1], [8, .5], [7, .5], [8, 1], [5, .5], [7, .5], [8, 2]]];
+    solo(my, sc, 'zheng', PH, 0.13, 1.5, [1.8, 4], 0.7, (t, ph, x) => { pluck(sc[0], t, 0.1, { dur: 2.6 }); if (++n % 2 === 0) xiao2(sc[ph[ph.length - 1][0]] * 2, t + x + 0.4, 2.2, 0.05, { fall: 0.98, wet: 0.6 }); });
+    return nodes;
+  }
+  // 篝火夜话、结局：一支箫慢慢吹，筝在底下垫一两个音
+  function sadV2(my) {
+    const sc = SCALE(220, 'yu'), nodes = beds([110, 0.014], [165, 0.006]);   // A 羽：A C D E G；sc[5] = A3
+    const PH = [[[10, 2.2], [9, 1.2], [8, 1.2], [7, 3]], [[8, 1.5], [9, 1], [10, 2.5], [9, 1], [8, 3]], [[7, 2], [8, 1], [6, 1], [5, 3.5]], [[11, 2], [10, 1.4], [8, 1], [9, 3]]];
+    solo(my, sc, 'xiao', PH, 0.085, 1.5, [4, 8], 1, t => { pluck(sc[0], t, 0.05, { dur: 2.6 }); pluck(sc[3], t + 0.9, 0.035, { dur: 2.6 }); });
+    return nodes;
+  }
+  // 黑风林：低低的箫，林子深处隔一阵传来一声拖长的狼嚎
+  function forestV2(my, kind) {
+    const sc = SCALE(196, 'jue'), nodes = beds([98, 0.016], [98.5, 0.014]), deep = kind === 'dungeon', room = kind === 'room';   // G 角：G Bb C Eb F；sc[5] = G3
+    const PH = [[[13, 2], [12, 1], [11, 1.5], [10, 3]], [[10, 1.5], [12, 1], [13, 2.5]], [[15, 2.5], [14, 1], [13, 1], [12, 3]], [[11, 3.5]], [[10, 1.2], [11, 1.2], [13, 3]]];
+    solo(my, sc, 'xiao', PH, 0.09, 5, deep ? [14, 24] : [9, 17], 1);
+    if (!room) every(my, 16, t => { const f = sc[pick([15, 16])]; erhu(f, t, rnd(2.8, 3.6), 0.07, { from: f * 0.6, gl: 1.3, wet: 1.3 }); if (Math.random() < 0.4) erhu(f * 0.84, t + rnd(4, 6), 2.6, 0.04, { from: f * 0.5, gl: 1.2, wet: 1.4 }); return rnd(34, 60); });
+    if (!room && !deep) every(my, 11, t => { gust(t, rnd(5, 8), 0.05); return rnd(20, 34); });
+    if (deep) drips(my, 3, 1.5, 5);
+    every(my, 24, t => { qing(sc[pick([5, 8])], t, 0.05); return rnd(28, 44); });
+    return nodes;
+  }
+  // 盘丝洞：琵琶的碎音像蜘蛛在爬，洞顶滴水
+  function caveV2(my, kind) {
+    const sc = SCALE(174.6, 'shang'), nodes = beds([87.3, 0.016], [87.7, 0.014]);   // F 商：F G Bb C Eb；sc[5] = F3
+    const trem = (f, t, n, v) => { for (let k = 0; k < n; k++) pluck(f, t + k * 0.075, v * (0.5 + 0.5 * Math.sin(Math.PI * k / n)), { bright: 0.85, dur: 0.7, wet: 0.5 }); return n * 0.075; };
+    every(my, 3, t => { const r = Math.random(); let x = 0;
+      if (r < 0.4) { x = trem(sc[pick([10, 12])], t, 16, 0.24) + 0.3; [[9, .45], [8, .45], [10, 1.8]].forEach(([i, d], k) => { note('pipa', sc[i], t + x, d, 0.16, k === 2); x += d; }); }
+      else if (r < 0.75) [[12, .32], [11, .32], [10, .32], [8, 1.6]].forEach(([i, d], k) => { note('pipa', sc[i], t + x, d, 0.16, k === 3); x += d; });
+      else { pluck(sc[13], t, 0.18, { bright: 0.9, dur: 2.2, vib: 1 }); x = 2.2; }
+      return x + rnd(3.5, 7.5); });
+    drips(my, 2, 1, 3.8, 0.06);
+    every(my, 20, t => { for (let k = 0; k < 6; k++) pluck(sc[15 + (k % 3)], t + k * 0.05, 0.05, { bright: 0.95, dur: 0.4, wet: 0.8 }); return rnd(24, 40); });   // 很轻很快的一串：有东西从头顶爬过去
+    every(my, 40, t => { ghost(sc[pick([10, 12])], t, rnd(4, 6), 0.012); return rnd(60, 90); });
+    return nodes;
+  }
+  // 火焰窟：远处有人在打铁，「叮——叮叮」；地底下像有心跳
+  function mineV2(my, kind) {
+    const sc = SCALE(130.8, 'zhi'), nodes = beds([65.4, 0.016], [98, 0.01]);   // C 徵：C D F G A；sc[10] = C4
+    every(my, 2, t => { heart(t, 0.09); return 3.8 + rnd(-0.1, 0.1); });
+    every(my, 7, t => { anvil(t, 0.05); anvil(t + 0.9, 0.035); anvil(t + 1.15, 0.045); return rnd(9, 17); });
+    solo(my, sc, 'xiao', [[[12, 2], [11, 1], [10, 3]], [[10, 1.5], [12, 1.5], [13, 3]], [[14, 2], [13, 1], [12, 1], [10, 3]]], 0.08, 12, kind === 'dungeon' ? [22, 34] : [16, 28], 1);
+    if (kind === 'dungeon') drips(my, 4, 2, 6);
+    return nodes;
+  }
+  // 万毒沼：二胡拉得很慢很低，像有人在哭；沼泽里冒泡
+  function swampV2(my, kind) {
+    const sc = SCALE(155.6, 'yu'), nodes = beds([77.8, 0.016], [78.2, 0.014]);   // 降 E 羽；sc[10] = Eb4
+    solo(my, sc, 'erhu', [[[10, 2], [11, 1], [10, 1], [8, 3]], [[12, 2.5], [11, 1.2], [10, 2.8]], [[8, 1.5], [10, 1.5], [9, 3]], [[13, 2], [12, 1], [10, 3.2]]], 0.1, 5, kind === 'dungeon' ? [14, 24] : [10, 18], 1);
+    every(my, 3, t => { const f = rnd(300, 480); out2(hit('sine', f, 0.11, 0.045, t, f * 1.9, 0.1), 0.6, 0.8); if (Math.random() < 0.3) out2(hit('sine', f * 1.2, 0.09, 0.03, t + 0.18, f * 2.2, 0.08), 0.6, 0.8); return rnd(2, 7); });
+    every(my, 18, t => { qing(sc[pick([5, 8])], t, 0.05); return rnd(26, 40); });
+    every(my, 50, t => { ghost(sc[pick([12, 13])], t, rnd(4.5, 6), 0.012); return rnd(70, 100); });
+    return nodes;
+  }
+  // 昆仑冰窟：冰上的磬声，很高很远；隔一阵一声冰裂
+  function iceV2(my, kind) {
+    const sc = SCALE(261.6, 'shang'), nodes = beds([130.8, 0.01]);   // C 商：C D F G Bb；sc[10] = C5
+    solo(my, sc, 'bell', [[[10, 2.5], [12, 2.5], [11, 4]], [[13, 2], [10, 5]], [[12, 1.5], [11, 1.5], [10, 1.5], [8, 5]], [[8, 3], [10, 4]]], 0.12, 3, [7, 13], 1);
+    if (kind !== 'room' && kind !== 'dungeon') every(my, 8, t => { gust(t, rnd(5, 9), 0.06); return rnd(13, 22); });
+    every(my, 22, t => { pluck(sc[15], t, 0.09, { bright: 0.95, dur: 0.5, bend: 1.5, bendT: 0.09, wet: 1 }); return rnd(28, 50); });
+    every(my, 30, t => { xiao2(sc[pick([10, 12])], t, rnd(3, 4), 0.07, { fall: 0.97, wet: 1.2 }); return rnd(40, 60); });
+    if (kind === 'dungeon') drips(my, 4, 2, 6);
+    return nodes;
+  }
+  // 白云观：磬一下一下地敲，殿里有人低声诵经——偶尔念到最后，整排声音一齐往下滑
+  function templeV2(my, kind) {
+    const sc = SCALE(196, 'gong'), nodes = beds([98, 0.012], [147, 0.007]);   // G 宫；sc[5] = G3
+    every(my, 2, t => { qing(sc[pick([5, 5, 8])], t, 0.085); return rnd(7, 9.5); });
+    every(my, 9, t => { const n = Math.floor(rnd(10, 17)); chant(t, n, 0.05, Math.random() < 0.4); return n * 0.62 + rnd(14, 24); });
+    solo(my, sc, 'xiao', [[[10, 2.5], [9, 1.2], [8, 3]], [[8, 2], [10, 3.5]]], 0.06, 30, [34, 55], 1);
+    return nodes;
+  }
+  // 九幽上层：几乎只剩心跳。隔一阵心跳忽然停住，过几秒才接上
+  function netherV2(my, kind) {
+    const sc = SCALE(185, 'yu'), nodes = beds([92.5, 0.016], [93.1, 0.014], [138.6, 0.006]); let n = 0, stop = Math.floor(rnd(18, 28));   // 升 F 羽；sc[10] = F#4
+    every(my, 2, t => { if (++n >= stop) { n = 0; stop = Math.floor(rnd(18, 28)); return rnd(6, 9); } heart(t, 0.16); return 1.5; });
+    every(my, 12, t => { ghost(sc[pick([10, 11, 12])], t, rnd(4, 6.5), 0.022); return rnd(20, 36); });
+    every(my, 22, t => { xiao2(sc[pick([8, 10])], t, rnd(3.5, 5), 0.075, { fall: 0.96, wet: 1.3 }); return rnd(26, 42); });
+    every(my, 38, t => { luo(t, 0.035, true); return rnd(45, 70); });
+    return nodes;
+  }
+  // 九幽深渊：心跳更慢更重，底下像有东西在喘气，二胡低低地哼
+  function abyssV2(my, kind) {
+    const sc = SCALE(138.6, 'jue'), nodes = beds([69.3, 0.018], [69.8, 0.016], [103.8, 0.008]);   // 升 C 角；sc[10] = C#4
+    every(my, 2, t => { heart(t, 0.2); return 2.0; });
+    every(my, 5, t => { const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), d = rnd(3.5, 4.5); s.buffer = noiseBuf(d + 0.5); f.type = 'bandpass'; f.Q.value = 12; f.frequency.setValueAtTime(260, t); f.frequency.linearRampToValueAtTime(330, t + d * 0.4); f.frequency.linearRampToValueAtTime(230, t + d);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.075, t + d * 0.4); g.gain.linearRampToValueAtTime(0.0001, t + d); s.connect(f); f.connect(g); out2(g, 0.7, 0.6); s.start(t); s.stop(t + d + 0.3); return rnd(10, 14); });
+    every(my, 9, t => { const f = sc[pick([8, 9, 10])]; erhu(f, t, rnd(3, 4.2), 0.14, { from: f * 1.06, gl: 0.8, wet: 1 }); return rnd(18, 28); });
+    every(my, 16, t => { ghost(sc[pick([11, 12, 13])], t, rnd(4.5, 7), 0.024); return rnd(25, 40); });
+    every(my, 30, t => { luo(t, 0.04, true); return rnd(35, 52); });
+    return nodes;
+  }
+  const V2 = { town: townV2, sad: sadV2, c1: graveV2, c2: forestV2, c3: caveV2, c4: mineV2, c5: swampV2, c6: iceV2, c7: marketV2, c8: templeV2, c9: netherV2, c10: abyssV2 };
   // 切换氛围：{ key: 'c1'…'c10'|'town'|'sad', kind, fight }
   function mood(m) {
     if (!m) return;
@@ -438,9 +559,8 @@ const SFX = (() => {
     musicGain.gain.linearRampToValueAtTime(0.25, t + 0.4); musicGain.gain.linearRampToValueAtTime(0.85, t + 2);
     setTimeout(() => old.forEach(n => { try { n.stop(); } catch (e) {} }), 600);
     const my = gen; tm2.forEach(clearTimeout); tm2 = [];
-    // 新写法：首领战（所有章节）、坟场和鬼市（含这两章的普通打斗）
-    const v2 = m.fight === 'boss' || (V2[m.key] && !m.old);
-    if (v2) { bus2(); ambNodes = m.fight ? fightV2(my, cur, m.fight === 'boss') : V2[m.key](my, m.kind); droneNodes = []; return; }
+    // 新写法（中式恐怖）：所有场景和打斗都走这里；m.old 只在测试里用来对比旧配乐
+    if (!m.old) { bus2(); ambNodes = m.fight ? fightV2(my, cur, m.fight === 'boss') : (V2[m.key] || graveV2)(my, m.kind); droneNodes = []; return; }
     ambNodes = ambient(cur); droneNodes = m.fight ? [] : drone(cur);
     phraseT = setTimeout(() => phrase(my), 700);
     if (cur.perc) percT = setTimeout(() => perc(my), 300);

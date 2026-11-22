@@ -541,9 +541,9 @@ function testPanel() {
 }
 const langRow = () => `<div class="row lang-row">${[['zh', "中文"], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
 const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>Âm thanh</h3><div class="row"><button class="btn ghost" data-act="snd">Hiệu ứng: ${SAVE.sound ? "Bật" : "Tắt"}</button><button class="btn ghost" data-act="mus">Nhạc cổ cầm: ${SAVE.music ? "Bật" : "Tắt"}</button></div>
-  <p class="help-p" style="margin:10px 0 6px">Nghe thử nhạc mới (mới làm ba đoạn, nghe xem có đúng vị không):</p>
-  <div class="row mtest">${[['c1', "Nghĩa địa"], ['c7', "Chợ Ma"], ['boss', "Đánh thủ lĩnh"], ['battle', "Đánh thường"]].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">Dừng</button></div>
-  <p class="help-p" style="margin-top:6px">Loa ngoài điện thoại không nghe được âm trầm, đeo tai nghe sẽ đầy đủ hơn. Đoạn nghĩa địa rất trống, hơn chục giây mới có một câu tiêu — là cố ý.</p></section>
+  <p class="help-p" style="margin:10px 0 6px">Nghe thử nhạc nền (chạm một cái là phát nhạc của nơi đó):</p>
+  <div class="row mtest">${[['town', "Trấn Thanh Thạch"], ['c1', "Nghĩa địa"], ['c2', "Rừng Hắc Phong"], ['c3', "Động Bàn Tơ"], ['c4', "Hang Hỏa Diệm"], ['c5', "Đầm Vạn Độc"], ['c6', "Hang Băng Côn Lôn"], ['c7', "Chợ Ma"], ['c8', "Bạch Vân Quán"], ['c9', "Tầng Trên Cửu U"], ['c10', "Vực Sâu Cửu U"], ['sad', "Chuyện đêm bên lửa trại"], ['battle', "Đánh thường"], ['boss', "Đánh thủ lĩnh"]].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">Dừng</button></div>
+  <p class="help-p" style="margin-top:6px">Loa ngoài điện thoại không nghe được âm trầm, đeo tai nghe sẽ đầy đủ hơn. Hầu hết các nơi đều rất trống, hơn chục giây mới có một câu — là cố ý.</p></section>
     <section class="panel"><h3>Điều khiển</h3><p class="help-p">Trên bản đồ lớn: chạm đâu đi đó; chạm thanh nhiệm vụ phía trên để tự đi tới; trên máy tính dùng phím mũi tên hoặc WASD.</p><div class="row"><button class="btn ghost" data-act="joy">Cần điều khiển ảo: ${SAVE.joy ? "Bật" : "Tắt"}</button>
       <button class="btn ghost" data-act="fs">Cỡ chữ: ${({ 0.9: "Nhỏ", 1: "Vừa", 1.15: "Lớn", 1.3: "Rất lớn" })[SAVE.fs || 1] || "Vừa"}</button>
       <button class="btn ghost" data-act="guide">Chỉ dẫn nhiệm vụ: ${SAVE.guide === 'full' ? "Chi tiết" : "Manh mối"}</button></div>
@@ -2656,7 +2656,7 @@ const ACT = {
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mtest: k => {
-    const M = { c1: { key: 'c1', kind: 'field' }, c7: { key: 'c7', kind: 'field' }, boss: { key: 'c1', kind: 'field', fight: 'boss' }, battle: { key: 'c1', kind: 'field', fight: 'battle' } }[k];
+    const M = k === 'boss' ? { key: 'c1', kind: 'field', fight: 'boss' } : k === 'battle' ? { key: 'c1', kind: 'field', fight: 'battle' } : k === 'town' || k === 'sad' ? { key: k } : /^c\d+$/.test(k) ? { key: k, kind: 'field' } : null;
     if (!M) { MTEST = null; SFX.audition(curMood()); return refresh(); }
     if (!SAVE.music) { SAVE.music = true; save(); toast("Đã bật nhạc nền"); }
     SFX.ensure(); SFX.set(SAVE.sound, true); MTEST = { id: k, m: M }; SFX.audition(M); refresh();
