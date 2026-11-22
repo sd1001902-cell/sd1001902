@@ -35,14 +35,14 @@ const STAT_NAMES = {
   spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
   hpPct: '最大气血', armorPct: '护甲', regen: '每回合回复气血', thorns: '反震',
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
-  dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果',
+  dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果', eva: '闪避', skd: '某一招伤害',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
   // 稀有词条（只能洗炼出）和灵玉用到的
   xDouble: '连斩（出手后再补一击的几率）', xRage: '必杀怒气获取', xTen: '清神（抵抗眩晕、定身）', xDr: '受到的伤害减少', xLast: '不屈（气血低于 30% 时减伤）',
   xHaste: '疾行（开战前两回合速度）', xKill: '贪狼（每杀一个敌人回复气血）', cdSkip: '招式不进冷却的几率', xLuck: '神兵掉率', xShield: '磐石（开战自带护体，按最大气血）',
   regenPct: '每回合回复气血', xCritNext: '会心（暴击后下一招伤害）', allyPct: '同伴、僵尸的伤害和气血',
 };
-const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -79,6 +79,13 @@ const AFFIXES = [
   { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: '带刺的', no: ['offhand'] },
   { k: 'mf',      r: [8, 20],  w: 4, p: '有福的' },
   { k: 'gf',      r: [10, 30], w: 4, p: '招财的' },
+  // 2026-11 新加：pg＝通关后才会随掉落出（洗炼随时都能洗到）；st：算到哪个属性上
+  { k: 'armorPct', r: [6, 12], w: 5, g: 'd', pg: 1, p: '铁壁的', slots: ['helm', 'chest', 'boots', 'belt'] },
+  { k: 'healPct', r: [8, 15],  w: 4, g: 'd', pg: 1, p: '妙手的', slots: ['helm', 'amulet', 'offhand'] },
+  { k: 'eva',     r: [2, 4],   w: 4, g: 'd', pg: 1, st: 'dodge', p: '灵动的', slots: ['boots', 'gloves', 'helm'] },
+  { k: 'freeze',  r: [2, 4],   w: 4, pg: 1, p: '凝霜的', slots: ['weapon', 'gloves'] },
+  { k: 'poison',  r: [10, 18], w: 4, pg: 1, p: '淬毒的', slots: ['weapon', 'ring'] },
+  { k: 'skd',     r: [8, 15],  w: 5, pg: 1, p: '精专的', slots: ['weapon', 'gloves', 'ring', 'amulet'] },   // 某一招伤害：洗出来时按这件装备的职业随机挑一招，存成 sk_<招式>
   // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
   // 2026-11：也是各部位的稀有词条——洗炼时每条有 WASH_RARE 的几率洗出来（rs：出在哪个部位）
   { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: '先发的', rs: 'gloves' },
@@ -585,6 +592,13 @@ const COMPANIONS = {
     up: ['好感 10：正气诀从每四招一次变成每三招一次', '好感 20：正气诀给全队加攻击'] },
   kang: { n: '康总管', spr: 'merchant', wx: 'tu', ap: 'stun', apc: 0.2, hp: 1.2, atk: 0.35, spd: 85, d: '前排肉盾：会嘲讽；每三招「挡刀」两回合，替你挡下三成伤害', row: 'front', role: '嘲讽 · 挡刀', pg: 1,
     up: ['好感 10：挡刀替你挡四成', '好感 20：嘲讽更凶，多拉一半的攻击'] },
+  // 2026-11 新伙伴：通关后达成条件认识（lock：认识的条件，界面上显示）
+  lei: { n: '雷老虎', spr: 'blade', wx: 'jin', ap: 'armor', hp: 0.9, atk: 0.65, spd: 100, d: '前排老猎户：专砍血最少的；劈刀让敌人破甲，每三招一记「断头刀」，对残血的敌人伤害翻倍', row: 'front', role: '收残血 · 破甲', pg: 1,
+    lock: '完成 10 次悬赏', up: ['好感 10：断头刀对血量低于一半的敌人就翻倍', '好感 20：断头刀砍死了人，再补一刀给下一个'] },
+  liu: { n: '刘师傅', spr: 'oldman', wx: 'shui', ap: 'stun', apc: 0.3, hp: 0.55, atk: 0.45, spd: 92, d: '后排义庄的老师爷：每三招念一段安魂经，全队两回合受到的伤害 -20%；摇铃会让敌人眩晕', row: 'back', role: '全队减伤 · 眩晕', pg: 1,
+    lock: '镇妖录集满 3 页', up: ['好感 10：念经减伤提到 30%', '好感 20：念经时顺手把一个敌人敲晕'] },
+  tie: { n: '铁蛋', spr: 'smith', wx: 'huo', ap: 'burn', hp: 0.6, atk: 0.6, spd: 96, d: '后排铁匠徒弟：火铳让敌人灼烧；每三招给前排「加固」三回合，护甲 +40%', row: 'back', role: '灼烧 · 前排加甲', pg: 1,
+    lock: '在张大锤那里打一把专属兵器', up: ['好感 10：加固也给后排', '好感 20：火铳打所有敌人'] },
 };
 
 // ---------------- 状态配合 ----------------

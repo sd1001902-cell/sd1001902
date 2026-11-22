@@ -167,7 +167,7 @@ function washOddsHTML(it, locks) {
   const pc = p => p >= 0.1 ? Math.round(p * 100) + '%' : (p * 100).toFixed(1) + '%';
   return `<details class="odds" open><summary>这次会洗 ${n} 条 · 每一条可能变成</summary>
     <div class="odds-l">${O.map(o => `<div class="${o.rare ? 'rare' : ''}"><span>${STAT_NAMES[o.k] || o.k}${o.rare ? '<i>稀有</i>' : ''}</span><small>${sh(o.k, o.lo)}–${sh(o.k, o.hi)}${PCT_STATS.has(o.k) ? '%' : ''}</small><b>${pc(o.p)}</b></div>`).join('')}</div>
-    <p class="sub">金色的是${SLOT_NAME[it.slot]}专属的稀有词条，只能洗出来。${n > 1 ? `这次洗 ${n} 条，至少出一条稀有的几率约 ${(100 * (1 - Math.pow(1 - WASH_RARE, n))).toFixed(1)}%。` : ''}洗出来了记得先锁住，再洗别的。</p></details>`;
+    <p class="sub">洗炼不限攻击类条数（掉落的装备最多两条）。「某一招伤害」会在本门招式里随机挑一招。金色的是${SLOT_NAME[it.slot]}专属的稀有词条，只能洗出来。${n > 1 ? `这次洗 ${n} 条，至少出一条稀有的几率约 ${(100 * (1 - Math.pow(1 - WASH_RARE, n))).toFixed(1)}%。` : ''}洗出来了记得先锁住，再洗别的。</p></details>`;
 }
 function bestModal(cls, plan) {
   const ni = plan.filter(e => e.inh), g = ni.reduce((a, e) => a + e.cost.gold, 0), m = ni.reduce((a, e) => a + e.cost.mats, 0), plain = plan.length - ni.length;
@@ -534,7 +534,10 @@ function goTab() {
       <p class="help-p" style="text-align:center">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
       ${cu > 1 ? `<p class="cu-note">追赶中：${CLASSES[cls].n}比你等级最高的角色低 <b>${topLevel() - SAVE.chars[cls].level}</b> 级，战斗经验 <b>×${cuTxt(cu)}</b>（差得越多越快，追平为止）。${SAVE.riftLv <= R_EASY ? `前 ${R_EASY} 层的妖物迁就你的等级（最多高 2 级；10 级以前不比你高，来得也少），放心进。` : `前 ${R_EASY} 层的妖物会迁就你的等级。`}</p>` : ''}
       <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `这一层两套<b class="r-set">幻境套装</b>都会掉` : SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>（${RSET2_LV} 层起多一套）` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
-        <span>精魄：<b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><span>役使：${yi.length ? yi.map(id => `<b>${YISHI[id].n}</b>`).join('、') : '<i>没带</i>'} <button class="linkbtn" data-act="zyopen">镇妖录</button></span></div>
+        <span>精魄：<b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><button class="linkbtn" data-act="zyopen">镇妖录</button></div>
+      <div class="yislots"><span class="sub">役使</span>${[0, 1].map(i => { const id = yi[i], d = id && yiBoss(id), g = id && yiGrade(id);
+        return id ? `<button class="yis on" data-act="zyopen">${d ? SPR.img(d.spr, 30, d.pal) : ''}<span><b>${YISHI[id].n}</b><small>${ZY_CN[g]} · ${YISHI[id].d(g)}</small></span></button>`
+          : `<button class="yis" data-act="zyopen"><i>＋</i><span><b>空位</b><small>${Object.keys(YISHI).some(k => yiGrade(k)) ? '点这里挑一只收服过的首领精魄' : '在幻境里打败首领，收服它的精魄'}</small></span></button>`; }).join('')}</div>
       ${teamRow()}`;
   }
   const mods = featureOn('mods') ? `<button class="modsbtn" data-act="modsopen">加难度${SAVE.mods.length ? ` · 已选 ${SAVE.mods.length} 项` : ''} ${MODSOPEN ? '▲' : '▼'}</button>
@@ -691,6 +694,8 @@ const teamModal = () => () => {
         <p>${C.d}</p>
         <div class="tmaff">好感 <b>${v}</b>/${COMP_AFF_MAX}（气血、攻击 +${v * 4}%）<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `送礼 ${fmtBig(cost)} 两` : '满了'}</button></div>
         ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; }).join('')}</div>
+    ${Object.keys(COMP_LOCK).filter(c => !compOpen(c)).map(c => { const C = COMPANIONS[c], [h, n] = COMP_LOCK[c]();
+      return `<div class="tmc lock"><div class="tmh">${unitIcon(C.spr, 44, null, '', 'head')}<span><b>${C.n}</b>${rowTag(c)}<small>${C.role}</small></span></div><p>${C.d}</p><div class="tmaff">🔒 还没认识：${C.lock}${SAVE.story && SAVE.story.ended ? `（${Math.min(h, n)}/${n}）` : '（通关后）'}</div></div>`; }).join('')}
     <p class="sub">你有 ${fmtBig(SAVE.gold)} 两。</p>
     <button class="btn ghost" data-act="close">好了</button>`;
 };
@@ -786,7 +791,7 @@ function zyHTML() {
         <p class="sub">这一页每有 1 品，${Object.entries(Pg.st).map(([k, v]) => fmtStat(k, v)).join('，')}。${done ? '' : `收服首领和至少 ${ZY_NEED} 种妖物，可以读到这一页的后记（现在 ${E.filter(e => !e.boss && zyOf(e.n)).length}/${ZY_NEED}${E.some(e => e.boss && zyOf(e.n)) ? '' : '，首领还没收'}）。`}</p>
         ${done ? `<div class="hou"><h4>后记</h4>${Pg.hou.split('\n').map(t => `<p>${t}</p>`).join('')}</div>` : ''}</div>` : ''}</div>`; }).join('');
   return `<section class="panel zylu" id="zylu"><h3>镇妖录 <small>${nAll}/${tot} 种 · 幻境里的首领、精英，偶尔还有小妖，会留下精魄</small></h3>
-    <p class="help-p">精魄的品级看幻境层数：1–19 层一品，20 层二品，40 层三品，60 层四品，80 层以上五品。品级越高，这一页给的属性越多；收服一章的首领，就能把它带在身边「役使」。</p>
+    <p class="help-p">精魄的品级看幻境层数：1–19 层一品，20 层二品，40 层三品，60 层四品，80 层五品，往上每 24 层升一品（104 六品、128 七品、152 八品、176 九品），200 层十品。品级越高，这一页给的属性越多；收服一章的首领，就能把它带在身边「役使」。</p>
     <h4 class="sub-h">役使 <small>${CLASSES[cls].n}最多带 2 只，点一下带上或放下</small></h4><div class="yis">${yiList}</div>
     <div class="zyps">${pages}</div></section>`;
 }
@@ -1082,6 +1087,7 @@ const pageModal = (k, txt) => () => `<div class="pagebig">${SPR.img('scroll', 64
 // ---------- 战斗 ----------
 function beginBattle(kind) {
   B = startBattle(SAVE.run, kind); B.logs = []; BRES = null; VIEW = 'battle'; COMBO = { n: 0, t: null }; save(); render();
+  if (B.yiPops && B.yiPops.length) { const yp = B.yiPops; B.yiPops = null; setTimeout(() => { if (!B || B.over) return; [...new Set(yp.map(p => p[3]))].forEach(id => yiFlash(id, YISHI[id].n)); updBattle({ lines: [], pops: yp.map(p => p.slice(0, 3)), actor: null }, true); }, 500); }
   const run = SAVE.run, F = themeOf(run);
   const bossName = kind === 'boss' ? B.units.find(u => u.kind === 'boss').name : '';
   B.logs.push({ boss: run.mode === 'rift' ? `${bossName}现身了！` : run.floor < 3 ? `${bossName}拦住了去路！` : `${F.boss.n}出现了！${F.boss.d}。`, keeper: '守门妖将挡住了去路！', elite: B.units.some(u => u.rare) ? '一只有名号的妖物挡住了去路！' : '一只精英妖物挡住了去路！', goblin: '招财金蟾！快在它溜走之前拿下！' }[kind] || '妖物扑了上来！');
@@ -1141,6 +1147,7 @@ function endBattle() {
     qtoast(`斩 ${n} 只 · 进度 ${Math.floor(run.prog)}%${BRES.items.length ? ` · 装备 ${BRES.items.length} 件` : ''}`);
     for (const it of good) qtoast(`得到 <b class="r-${it.rarity}">${esc(itemTitle(it))}</b>`);
     if (BRES.zy && BRES.zy.length) qtoast(`精魄 +${BRES.zy.length}`);
+    if (BRES.yiNew) qtoast(`解锁役使「<b>${YISHI[BRES.yiNew].n}</b>」${BRES.yiOn ? '，已经带上了' : '（去镇妖录换上）'}`);
     if (BRES.levels) qtoast(SAVE.chars[run.cls].level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}` : `升级！现在 ${SAVE.chars[run.cls].level} 级`);
     achToast(BRES.ach); BRES.items.forEach(i => delete i.auto);
     return setTimeout(() => { if (BRES && VIEW === 'battle') battleContinue(); }, 500);
@@ -1163,11 +1170,13 @@ function showRes() {
     BRES.goblin === 'killed' ? '<b style="color:var(--gold2)">金蟾被你拿下了！</b>' : BRES.goblin === 'fled' ? '金蟾溜走了……' : ''].filter(Boolean).join('　·　');
   const lvText = BRES.levels ? `　<b style="color:var(--gold2)">${ch.level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}！` : `升级！现在 ${ch.level} 级，获得心法点`}</b>` : '';
   const cont = run.world ? '继续' : B.kind === 'boss' ? (run.mode === 'rift' ? '完成幻境' : run.floor < 3 ? '前往下一层' : '本章完结') : '继续探索';
+  if (BRES.yiNew) { const Y = YISHI[BRES.yiNew]; BTOAST.push(`收服了首领的精魄，解锁役使「<b>${Y.n}</b>」${BRES.yiOn ? '，已经带上了' : '（役使已满两只，去镇妖录换）'}：${Y.d(yiGrade(BRES.yiNew))}。下一场起它会跟在你身边。`); flushBattleToasts(); }
   const autoEq = BRES.items.filter(i => i.auto);
   if (autoEq.length) { toast('空着的位置自动穿上了：' + autoEq.map(i => `<b>${esc(i.name)}</b>`).join('、')); autoEq.forEach(i => delete i.auto); }
   el.innerHTML = BRES.win
     ? `<div class="res win"><h3>胜</h3><p>经验 +${BRES.xp}${BRES.cu ? `<small class="cu">（追赶 ×${cuTxt(BRES.cu)}）</small>` : ''}${lvText}　·　银两 +${BRES.gold}${extra ? '　·　' + extra : ''}</p>
        ${lootChips(BRES.items)}${gemChips(BRES.gems)}${zyChips(BRES.zy)}${BRES.items.length || BRES.gems.length || (BRES.zy && BRES.zy.length) ? '' : '<p class="sub">这次没有掉装备</p>'}
+       ${BRES.stat ? `<details class="bstat-d"><summary>本场统计</summary>${statTable(BRES.stat)}</details>` : ''}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>撑不住了</h3><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
       : run.mode === 'rift' ? `<div class="res lose"><h3>倒下了</h3><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
@@ -1185,10 +1194,15 @@ function battleHTML() {
       <button class="ultb" id="ultb" data-act="ult"><i id="ultfill"></i><span><b>必杀·${U.n}</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">${s} 倍速</button>`).join('')}
-      ${SAVE.showSkip ? '<button class="btn sm ghost" data-act="skip">跳过战斗</button>' : ''}
+      ${SAVE.showSkip ? '<button class="btn sm ghost" data-act="skip">跳过战斗</button>' : ''}<button class="btn sm ${STATOPEN ? '' : 'ghost'}" data-act="bstat">统计</button>
       <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>吃丹药 ×${run.potions}</button></div>
+    <div class="bstatp" id="bstatp" ${STATOPEN ? '' : 'hidden'}></div>
     <div class="blog" id="blog" data-act="logt" title="点击展开/收起"></div>`;
 }
+// 役使：跟在你身边的两只首领精魄（小图标）；本事一触发就闪一下
+const yiBoss = id => { const Y = YISHI[id], e = Y && zyEntries(Y.pg).find(x => x.boss); return e ? allMonsterDefs().find(d => d.n === e.n) : null; };
+const yiFolHTML = yi => `<div class="yifol">${Object.keys(yi).map(id => { const d = yiBoss(id); return `<i id="yif-${id}" title="役使·${YISHI[id].n}">${d ? SPR.img(d.spr, 26, d.pal) : ''}</i>`; }).join('')}</div>`;
+function yiFlash(id, txt) { const el = document.getElementById('yif-' + id); if (!el) return; bump(el, 'go', 700); if (txt) { const t = document.createElement('span'); t.className = 'yit'; t.textContent = txt; el.appendChild(t); setTimeout(() => t.remove(), 1000); } }
 function unitEl(u) {
   const el = document.createElement('div');
   el.className = 'unit k-' + u.kind + (u.rare ? ' rare' : '') + ' spawn'; el.id = 'u-' + u.id;
@@ -1202,7 +1216,7 @@ function unitEl(u) {
   el.innerHTML = `<div class="aura"><i class="a-rage"></i><i class="a-fire"></i><i class="a-tox"></i><i class="a-ice"></i><i class="a-shd"></i><i class="a-cur"></i><i class="a-stun"><b>✦</b><b>✦</b><b>✦</b></i></div><div class="sp">${VFX.rigHTML(u, img, size, spr)}</div>
     <div class="un">${esc(u.name)}</div>
     ${(u.aff && u.aff.length) || u.trait ? `<div class="tags">${u.trait ? `<span class="tr" title="${TRAITS[u.trait].d}">${TRAITS[u.trait].n}</span>` : ''}${(u.aff || []).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return `<span title="${A.d}">${A.n}</span>`; }).join('')}</div>` : ''}
-    <div class="hpbar"><i></i><b class="sh"></b><span></span></div><div class="sts"></div>`;
+    <div class="hpbar"><i></i><b class="sh"></b><span></span></div><div class="sts"></div>${u.kind === 'hero' && u.yi && Object.keys(u.yi).length ? yiFolHTML(u.yi) : ''}`;
   setTimeout(() => el.classList.remove('spawn'), u.kind === 'boss' ? 650 : 400);
   if (u.kind === 'boss' && !u.guard) setTimeout(() => VFX.onLand(u.id), 560);
   return el;
@@ -1237,7 +1251,21 @@ function showCutin(kind, data) {
   el.innerHTML = h; el.style.setProperty('--cd', CUT_MS() + 'ms');
   clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, CUT_MS());
 }
+const ALLY_MOVES = { chain2: '锁链', zhengjue: '正气诀', zhengqi: '正气', foxfire: '狐火', foxfireAll: '狐火阵', foxHeal: '狐光', ngocHeal: '药包', potionThrow: '药瓶', kangGuard: '挡刀',
+  leiCut: '劈刀', leiFinish: '断头刀', liuChant: '念经', liuBell: '摇铃', tieGun: '火铳', tieBolt: '加固' };
+const allyMoveName = (u, id) => id === 'blade2' ? ({ zhen: '捕快刀', kang: '算盘', lei: '劈刀' }[u.comp] || '出刀') : ALLY_MOVES[id] || '';
+// 小队统计表（战斗里、结算、幻境一局）
+let STATOPEN = false;
+function statTable(st) {
+  const rows = Object.values(st || {}); if (!rows.length) return '<p class="sub">还没有数据。</p>';
+  const ord = r => r.cid === 'P' ? 0 : r.cid === 'Z' ? 2 : 1; rows.sort((a, b) => ord(a) - ord(b) || b.dmg - a.dmg);
+  const tot = rows.reduce((a, r) => a + r.dmg, 0) || 1, f = v => v ? fmtBig(Math.round(v)) : '—';
+  return `<table class="stbl"><tr><th></th><th>输出</th><th>控制</th><th>治疗</th><th>护体</th><th>承伤</th></tr>${rows.map(r => `<tr><td>${esc(r.cid === 'P' ? '你' : r.n)}</td><td>${f(r.dmg)}<small>${Math.round(r.dmg / tot * 100)}%</small></td><td>${r.ctrl || '—'}</td><td>${f(r.heal)}</td><td>${f(r.shield)}</td><td>${f(r.taken)}${r.guard ? `<small>挡刀 ${fmtBig(Math.round(r.guard))}</small>` : ''}</td></tr>`).join('')}</table>
+    <p class="stbl-n">控制＝让敌人眩晕、冰冻的次数；护体＝护体真气挡下的伤害；承伤＝真正掉的血。</p>`;
+}
+function updStat() { const el = document.getElementById('bstatp'); if (!el) return; el.hidden = !STATOPEN; if (STATOPEN && B) el.innerHTML = `<b class="stt-h">本场统计</b>${statTable(B.stat)}`; }
 function updBattle(o, anim) {
+  if (STATOPEN) updStat();
   if (!B) return;
   if (o && o.say) { const su = B.units.find(u => u.id === o.say[0]); if ((SAVE.speed || 1) < 2 || (su && su.kind === 'boss')) sayBubble(o.say[0], o.say[1]); }
   if (o && anim && o.foilKey) {   // 克制道具生效的特写
@@ -1346,7 +1374,7 @@ function applyStep(o, anim) {
     const actorU = B.units.find(u => u.id === o.actor);
     const basicId = actorU && actorU.kind === 'hero' ? (CLASSES[actorU.cls].skills.find(k => !k.cd) || {}).id : null;
     const isBasic = o.cast && basicId && o.cast.id === basicId;
-    const SP = SAVE.speed || 1, reactN = new Set((o.react || []).map(R => R.n));
+    const SP = SAVE.speed || 1, reactN = new Set((o.react || []).map(R => R.n)), popIdx = {}, byAlly = actorU && (actorU.kind === 'ally' || actorU.kind === 'minion');
     for (const [id, txt0, c, isSt] of o.pops) {
       const el = document.getElementById('u-' + id); if (!el) continue;
       const tu = B.units.find(u => u.id === id);
@@ -1361,9 +1389,9 @@ function applyStep(o, anim) {
       parts.forEach((v, k) => setTimeout(() => {
         const last = k === parts.length - 1, cr = c === 'crit' && last;
         if (quiet) { if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr); return; }
-        if (!pop || !pop.isConnected) { pop = document.createElement('span'); pop.style.left = (28 + Math.random() * 44) + '%'; el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100 + parts.length * 90); }
+        if (!pop || !pop.isConnected) { const ix = popIdx[id] = (popIdx[id] || 0) + 1; pop = document.createElement('span'); pop.style.left = (36 + ((ix * 37) % 28)) + '%'; pop.style.marginTop = -((ix - 1) * 17) + 'px'; el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100 + parts.length * 90); }   // 同一次出手里一个比一个往上错开
         sum += dmgN ? +v : 0;
-        pop.className = 'pop ' + c + tier(dmgN ? sum : 0) + (parts.length > 1 && !last ? ' tick' : '') + (parts.length > 1 && k > 0 ? ' re' : '');
+        pop.className = 'pop ' + c + tier(dmgN ? sum : 0) + (parts.length > 1 && !last ? ' tick' : '') + (parts.length > 1 && k > 0 ? ' re' : '') + (byAlly && dmgN && tu && tu.side === 'e' ? ' ally' : '');
         pop.textContent = dmgN ? fmtBig(sum * uK(tu)) + (cr ? '!' : '') : String(v).replace(/\d+/, n => fmtBig(+n * uK(tu)));
         if (parts.length > 1 && k > 0) { pop.style.animation = 'none'; void pop.offsetWidth; pop.style.animation = ''; }
         if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr);
@@ -1375,6 +1403,11 @@ function applyStep(o, anim) {
       if (anim && /^\d+$/.test(txt) && el._shd) bump(el, 'crack', 320);
       if (/^\d+$/.test(txt) && anim) { bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit') { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
+    }
+    if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
+    if (anim && actorU && actorU.kind === 'ally' && o.cast) {   // 伙伴出手：头顶冒招式名，身上亮一圈
+      const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
+      if (el && mv) { const t = document.createElement('span'); t.className = 'pop move'; t.textContent = mv; el.appendChild(t); setTimeout(() => t.remove(), 1000); bump(el, 'acting', 600); }
     }
     if (anim && o.react) { o.react.forEach(R => VFX.onReact(R.id, R.n, (STATES[R.s] || {}).c || '#e8b0ff')); SFX.play('react'); if (!SAVE.flags.combo1) { SAVE.flags.combo1 = 1; setTimeout(() => toast(`打出连招「${o.react[0].n}」！先用起手技能给敌人挂状态，再用收招技能打，就有额外效果。去「修炼 · 武学」看看搭配`), 600); } }
     if (anim && o.cast) {
@@ -2679,6 +2712,7 @@ function endHTML() {
       <p>${tl > 0 ? `灵玉可以升级 <b>${r.upg}</b> 次 · 现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : '香烧完了：这一层不算过，灵玉只能升 1 次'}</p>
       ${r.bp ? `<p class="newslot">兵魄 <b>+${r.bp}</b>（现在 ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? '，够打一把专属兵器了：去找张大锤' : ''}）</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">新的装备位开了：<b>${r.newSlots.map(p => SLOT_NAME[p]).join('、')}</b>。去「人物」页看看；这一类装备从现在起会在幻境里掉。</p>` : ''}
+      ${r.stat ? `<details class="bstat-d" open><summary>这一局统计</summary>${statTable(r.stat)}</details>` : ''}
       ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${r.world ? '用时 ' + fmtClock(r.clock || 0) : used + ' 回合'}</p>` : ''}</div></div>`;
     extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${SAVE.lgems.length ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级。</p>
@@ -3153,6 +3187,7 @@ const ACT = {
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`这次带 ${COMPANIONS[c].n} 一起去：${COMPANIONS[c].d}`); },
   speed: s => { SAVE.speed = +s; VFX.setSpeed(+s); save(); document.querySelectorAll('#bctl [data-act=speed]').forEach(b => b.classList.toggle('ghost', b.dataset.arg !== s)); schedule(); },
   skip: () => skipBattle(),
+  bstat: () => { STATOPEN = !STATOPEN; const bt = document.querySelector('[data-act=bstat]'); if (bt) bt.classList.toggle('ghost', !STATOPEN); updStat(); },
   bcont: () => battleContinue(),
   choice: i => { EVRES = resolveEvent(SAVE.run, curCell(SAVE.run).ev, +i); if (!EVRES.fight) clearCell(SAVE.run); SFX.play(EVRES.items && EVRES.items.length ? 'loot' : 'magic'); refresh(); },
   evcont: () => { const run = SAVE.run;
@@ -3267,6 +3302,8 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   app.innerHTML = html;
   document.body.dataset.view = VIEW;
+  if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast('你收服过首领的精魄，可以带两只<b>役使</b>上阵（幻境面板里的「役使」空位）。带上以后它们会跟在你身边，本事触发时会闪一下。'), 900); }
+  if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`新伙伴：<b>${COMPANIONS[c].n}</b>（${COMPANIONS[c].role}）愿意跟你进幻境了。去幻境面板的「伙伴」里带上。`), 600 + i * 2800)); } }
   if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SCENE_THEMES[SAVE.run.sth || SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); showRes(); } else VFX.setup(null);
   if (VIEW === 'world') wSetup();
   try { SFX.mood(curMood()); } catch (e) {}

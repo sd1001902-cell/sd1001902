@@ -604,13 +604,22 @@ const VFX = (() => {
       case 'kangGuard':
         if (heroP) { ring(heroP, '#ffd75a', 110, D, 3); glyph(heroP, '挡', '#ffe9a0', 60, G, -40); }
         return 0;
+      case 'liuChant':
+        if (heroP) { ring(heroP, '#ffe7a0', 130, D, 3); glyph(heroP, '佛', '#fff2b0', 60, G, -40); }
+        return 0;
+      case 'tieBolt':
+        if (heroP) { ring(heroP, '#d8a05a', 110, D, 3); glyph(heroP, '固', '#ffd08a', 60, G, -40); }
+        return 0;
+      case 'tieGun':
+        if (ap) { const ts3 = c.aoe ? fps : tp ? [tp] : []; ts3.forEach((p, i) => later(() => proj('foxfire', ap, p, T, '#ff7a3a'), i * 30)); later(() => ts3.forEach(p => { boom(p, '#ff7a3a', 60, D * 0.8); flames(p, 5, '#ffb070', 26, D); }), T); return T; }
+        return 0;
       case 'potionThrow':
         if (ap && tp) { proj('potion', ap, tp, T, '#7fe05a'); later(() => { boom(tp, '#7fe05a', 56, D * 0.8); parts(tp, 8, '#7fe05a', 30, D, { cls: 'bub', rise: -30 }); }, T); return T; }
         return 0;
     }
 
     // ---- 新技能和同伴：按五行出效果 ----
-    if (c.id === 'gen' || ['blade2', 'chain2', 'zhengjue', 'zhengqi'].includes(c.id)) {
+    if (c.id === 'gen' || ['blade2', 'chain2', 'zhengjue', 'zhengqi', 'leiCut', 'leiFinish', 'liuBell'].includes(c.id)) {
       const w = c.wx, wc = w ? WX[w].c : '#fff', ts2 = c.aoe ? fps : tp ? [tp] : [];
       if (c.id === 'zhengqi') { if (heroP) { ring(heroP, '#9aff8a', 120, D, 3); glyph(heroP, '正', '#c8ffb0', 60, G, -40); } return 0; }
       const fx = p => {

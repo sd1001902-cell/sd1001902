@@ -279,9 +279,10 @@ STAT_NAMES.furyGain = STAT_NAMES.furyGain || "Nộ ý nhận được";
 STAT_NAMES.lianPct = STAT_NAMES.lianPct || "Sát thương mỗi tầng “Liên”";
 STAT_NAMES.counter = STAT_NAMES.counter || "Tỉ lệ phản kích";
 
-// 镇妖录：幻境里收服妖物的精魄。一章一页，层数越高精魄品级越高（一品到五品）
-const zyGrade = N => Math.min(5, 1 + Math.floor(N / 20));   // 一品 1–19 层，二品 20–39，三品 40–59，四品 60–79，五品 80 层以上
-const ZY_CN = ['', "Nhất phẩm", "Nhị phẩm", "Tam phẩm", "Tứ phẩm", "Ngũ phẩm"];
+// 镇妖录：幻境里收服妖物的精魄。一章一页，层数越高精魄品级越高（一品到十品）
+// 一品 1–19 层，二品 20–39，三品 40–59，四品 60–79，五品 80–103；往上每 24 层一品：六品 104，七品 128，八品 152，九品 176，十品 200
+const zyGrade = N => N < 80 ? 1 + Math.floor(N / 20) : Math.min(10, 5 + Math.floor((N - 80) / 24));
+const ZY_CN = ['', "Nhất phẩm", "Nhị phẩm", "Tam phẩm", "Tứ phẩm", "Ngũ phẩm", "Lục phẩm", "Thất phẩm", "Bát phẩm", "Cửu phẩm", "Thập phẩm"];
 const ZY_NEED = 5;   // 一页收服首领 + 至少 5 种妖物，就能读到这一页的后记
 const ZY_PAGES = [
   { st: { hpPct: 0.3 }, sd: "Khí huyết tối đa",
@@ -305,9 +306,10 @@ const ZY_PAGES = [
   { st: { dmgPct: 0.25 }, sd: "Sát thương",
     hou: "Vực Sâu Cửu U đã yên tĩnh. Ma Tôn trong Ảo Cảnh chỉ là một cái bóng vực sâu còn nhớ — nó nhớ ba trăm năm bị khóa, cũng nhớ khoảnh khắc cuối cùng: năm cây đinh cùng sáng lên, trên cây đinh thứ năm, đứng một thiếu niên đã quay về đóng lại đinh.\nTrấn Yêu Lục viết đến trang này, là viết kín rồi." },
 ];
-// 役使：收服一章首领的精魄后，可以带着它的本事上阵；每个角色带 2 只。g = 那只首领精魄的品级（1–5）
+// 役使：收服一章首领的精魄后，可以带着它的本事上阵；每个角色带 2 只。g = 那只首领精魄的品级（1–10）
+const YI_STUN = g => Math.min(60, 16 + g * 6), YI_HOOK = g => Math.min(30, 8 + g * 3);
 const YISHI = {
-  xianling: { pg: 0, n: "Kinh Đường Mộc", d: g => `Khai trận đập kinh đường mộc: mỗi kẻ địch có ${16 + g * 6}% tỉ lệ bị chấn choáng (thủ lĩnh giảm nửa)` },
+  xianling: { pg: 0, n: "Kinh Đường Mộc", d: g => `Khai trận đập kinh đường mộc: mỗi kẻ địch có ${YI_STUN(g)}% tỉ lệ bị chấn choáng (thủ lĩnh giảm nửa)` },
   langwang: { pg: 1, n: "Bầy Sói", d: g => `Mỗi lần bạn ra đòn, có ${18 + g * 5}% tỉ lệ dẫn bóng sói vồ cắn mục tiêu, gây ${60 + g * 20}% sát thương` },
   zhizhu:   { pg: 2, n: "Triền Ti", d: g => `Khai trận quấn tơ nhện lên mọi kẻ địch: đóng băng (chậm lại) ${2 + Math.ceil(g / 2)} lượt` },
   shimo:    { pg: 3, n: "Dung Tâm", d: g => `Khi bị đánh có ${15 + g * 5}% tỉ lệ dung nham bắn ngược, gây ${80 + g * 30}% sát thương hỏa lên kẻ ra đòn và thiêu đốt` },
@@ -315,6 +317,6 @@ const YISHI = {
   xuanbing: { pg: 5, n: "Phong Trấn", d: g => `Sát thương lên địch đang choáng hoặc đóng băng (chậm lại) +${12 + g * 6}%` },
   guiwang:  { pg: 6, n: "Chợ Ma", d: g => `Phúc duyên +${12 + g * 8}%, thu hoạch bạc +${20 + g * 10}% (để săn đồ)` },
   qingxu:   { pg: 7, n: "Đan Hỏa Hộ Thể", d: g => `Đầu mỗi trận nhận hộ thể bằng ${8 + g * 4}% khí huyết tối đa` },
-  niuma:    { pg: 8, n: "Câu Hồn", d: g => `Yêu vật thường dưới ${8 + g * 3}% khí huyết thì bị câu đi luôn (tinh anh và thủ lĩnh không tính)` },
+  niuma:    { pg: 8, n: "Câu Hồn", d: g => `Yêu vật thường dưới ${YI_HOOK(g)}% khí huyết thì bị câu đi luôn (tinh anh và thủ lĩnh không tính)` },
   mozun:    { pg: 9, n: "Ma Khí", d: g => `Sát thương +${8 + g * 4}%, nhưng sát thương phải nhận +8%` },
 };

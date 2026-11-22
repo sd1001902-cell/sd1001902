@@ -59,6 +59,8 @@ function migrate(s) {
     if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp = [L0, L]; }
   }
   s.pv = 1;
+  if (s.flags && !s.flags.wpnForged) { const all = [...(s.stash || [])]; for (const c in s.chars || {}) for (const sl in s.chars[c].eq || {}) if (s.chars[c].eq[sl]) all.push(s.chars[c].eq[sl]);
+    if (all.some(it => it && it.legend && (LEGENDS.find(l => l.id === it.legend) || {}).w)) s.flags.wpnForged = 1; }   // 老存档：手里有专属兵器就算打过
   if (!Array.isArray(s.team)) s.team = s.ngocJoin !== false ? ['ngoc'] : s.comp && s.comp !== 'ngoc' ? [s.comp] : [];   // 幻境组队：老存档按原来带的那位
   s.disp = {};
   if (s.riftCap == null || s.riftCap < s.riftMax + 1) s.riftCap = Math.max(3, s.riftMax + 3);   // 老存档：保持原来「最高纪录 +3」的上限
@@ -95,7 +97,7 @@ function regearItem(it) {
   const gm = genMult(it), before = JSON.stringify(it.aff) + JSON.stringify(it.imp), first = it.aff[0] && it.aff[0][0];
   // 每条词条先算出成色 q（在旧范围里排第几），再按新规矩落到新范围里
   const rows = it.aff.map(([k, v]) => {
-    const A = AFFIXES.find(a => a.k === k); if (!A || A.fixed) return { k, v, keep: true };
+    const A = affDef(k); if (!A || A.fixed) return { k, v, keep: true };
     const ro = A.ro || A.r, q = Math.max(0, Math.min(1, (v / (affScOld(A, it.ilvl) * gm) - ro[0]) / (ro[1] - ro[0])));
     return { k, A, q, ok: affOK(A, it.slot) };
   });
@@ -116,7 +118,7 @@ function regearItem(it) {
   const L = legendOf(it); if (L) for (const k in L.imp) if (!FLAT_STATS.has(k) && k !== 'spd' && it.imp[k] != null) it.imp[k] = L.imp[k];
   const changed = JSON.stringify(it.aff) + JSON.stringify(it.imp) !== before;
   if (changed) { delete it.rfPending; delete it.wsPending; delete it.rrPending;
-    if (it.rarity === 'magic' && it.aff[0] && it.aff[0][0] !== first && it.base) { const A = AFFIXES.find(a => a.k === it.aff[0][0]); if (A) it.name = joinName(A.p, it.base); } }
+    if (it.rarity === 'magic' && it.aff[0] && it.aff[0][0] !== first && it.base) { const A = affDef(it.aff[0][0]); if (A) it.name = joinName(A.p, it.base); } }
   return changed;
 }
 function loadSave() {
@@ -297,23 +299,31 @@ const FLAT_STATS = new Set(['atk', 'hp', 'armor', 'regen', 'thorns']);   // 实�
 const affOK = (a, slot) => !slot || ((!a.slots || a.slots.includes(slot)) && !(a.no && a.no.includes(slot)));
 const OFF_SLOTS = new Set(['weapon', 'gloves', 'ring', 'amulet', 'offhand']);
 const AFF_OFF_MAX = 2;   // 一件装备最多两条攻击类词条（攻击、伤害、术法、暴击、暴伤、速度、吸血）
+// 「某一招伤害」词条存成 sk_<招式>；查表、排重时都按 skd 算
+const affBase = k => k && k.startsWith('sk_') ? 'skd' : k;
+const affDef = k => AFFIXES.find(a => a.k === affBase(k));
+const AFF_ST = Object.fromEntries(AFFIXES.filter(a => a.st).map(a => [a.k, a.st]));
+const SKD_EX = new Set(['warcry', 'butui', 'summon', 'jihuo', 'yangshi', 'curse', 'shadowstep', 'yandun', 'aegis', 'prayer', 'chanhou']);
+let AFF_CLS = null;   // 掉落、洗炼时这件装备算哪个职业的（挑「某一招」用）
+function skdKey(cls) { const C = CLASSES[cls || AFF_CLS || (SAVE && SAVE.run && SAVE.run.cls) || (SAVE && SAVE.cls)] || CLASSES.berserker; return 'sk_' + RNG.pick(C.skills.filter(x => !SKD_EX.has(x.id))).id; }
+const affPgOK = a => !a.pg || !!(SAVE && SAVE.story && SAVE.story.ended);
 function affixValue(a, ilvl, mult, max) {
   const sc = affSc(a, ilvl);
   return Math.max(1, Math.round((max ? a.r[1] : RNG.f(a.r[0], a.r[1])) * sc * mult));
 }
-function rollAffixes(n, ilvl, mult, exclude = [], max, slot) {
-  const out = [], used = new Set(exclude);
-  let nOff = 0; for (const k of exclude) { const A = AFFIXES.find(a => a.k === k); if (A && A.g === 'o') nOff++; }
+function rollAffixes(n, ilvl, mult, exclude = [], max, slot, wash) {   // wash：洗炼，不封顶攻击类、所有词条都能洗到
+  const out = [], used = new Set(exclude.map(affBase));
+  let nOff = 0; for (const k of exclude) { const A = affDef(k); if (A && A.g === 'o') nOff++; }
   // 兵器、护腕、扳指、玉佩：三条以上词条的装备，一定带满两条攻击类——掉出来的宝品不会全是防御词条，普通装备和挑过的装备差距也小
-  const needOff = slot && OFF_SLOTS.has(slot) && n + exclude.length >= 3 ? AFF_OFF_MAX : 0;
+  const needOff = !wash && slot && OFF_SLOTS.has(slot) && n + exclude.length >= 3 ? AFF_OFF_MAX : 0, offMax = wash ? 99 : AFF_OFF_MAX;
   while (out.length < n) {
     const left = n - out.length, must = needOff - nOff >= left;
-    let pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && affOK(a, slot) && (a.g !== 'o' || nOff < AFF_OFF_MAX));
+    let pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && affOK(a, slot) && (wash || affPgOK(a)) && (a.g !== 'o' || nOff < offMax));
     if (must) { const p2 = pool.filter(a => a.g === 'o'); if (p2.length) pool = p2; }
     if (!pool.length) break;
     let x = Math.random() * pool.reduce((s, a) => s + a.w, 0), pick = pool[0];
     for (const a of pool) { x -= a.w; if (x < 0) { pick = a; break; } }
-    used.add(pick.k); if (pick.g === 'o') nOff++; out.push([pick.k, affixValue(pick, ilvl, mult, max)]);
+    used.add(pick.k); if (pick.g === 'o') nOff++; out.push([pick.k === 'skd' ? skdKey() : pick.k, affixValue(pick, ilvl, mult, max)]);
   }
   return out;
 }
@@ -371,17 +381,17 @@ function ancientize(it) {
   const c = ancCost(it); if (SAVE.mats < c) return { err: '魂晶不够' };
   SAVE.mats -= c; let add = 0;
   if (!it.anc) { it.anc = 1; SAVE.flags.ancient = true; if (RNG.ch(0.5)) add = addAffixes(it, 1); }
-  else { it.anc = 2; SAVE.flags.primal = true; add = addAffixes(it, 1); it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]); }
+  else { it.anc = 2; SAVE.flags.primal = true; add = addAffixes(it, 1); it.aff = it.aff.map(([k]) => [k, affixValue(affDef(k), it.ilvl, affMult(it), true)]); }
   return { ok: true, add };
 }
 const primalOK = () => !!(SAVE && SAVE.run && SAVE.run.mode === 'rift' && SAVE.run.riftLv >= PRIMAL_FROM);
 // 通关后掉的装备按新的词条数（主线照旧，已有的装备不动）：宝品 2 条；神兵、套装 3 条；上古 3–4 条；太古 4–5 条
 const PG_AFF = () => !!(SAVE && SAVE.story && SAVE.story.ended);
 function addAffixes(it, n) { const L = it.legend && LEGENDS.find(l => l.id === it.legend), ex = [...it.aff.map(a => a[0]), ...(L ? Object.keys(L.imp) : [])];
-  const more = rollAffixes(n, it.ilvl, affMult(it), ex, it.anc === 2, it.slot);
+  AFF_CLS = it.cls || ownerCls(it); const more = rollAffixes(n, it.ilvl, affMult(it), ex, it.anc === 2, it.slot); AFF_CLS = null;
   while (more.length < n) {   // 副手这种格子攻击类词条多、又封顶两条：凑不够就放开封顶，保证上古 3–4、太古 4–5 条
-    const used = new Set([...ex, ...more.map(a => a[0])]), pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && affOK(a, slotType(it.slot) || it.slot)); if (!pool.length) break;
-    const A = RNG.pick(pool); more.push([A.k, affixValue(A, it.ilvl, affMult(it), it.anc === 2)]);
+    const used = new Set([...ex, ...more.map(a => a[0])].map(affBase)), pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && affPgOK(a) && affOK(a, slotType(it.slot) || it.slot)); if (!pool.length) break;
+    const A = RNG.pick(pool); more.push([A.k === 'skd' ? skdKey(it.cls || ownerCls(it)) : A.k, affixValue(A, it.ilvl, affMult(it), it.anc === 2)]);
   }
   it.aff.push(...more); return more.length; }
 function finishItem(it, noSocket) {
@@ -390,11 +400,12 @@ function finishItem(it, noSocket) {
   if (it.rarity === 'legend' || it.rarity === 'set') {
     const ap = ancNow(), ak = mfAnc(DROP_MF); it.anc = primalOK() && RNG.ch(ap[1] * ak) ? 2 : RNG.ch(ap[0] * ak) ? 1 : 0;
     if (PG_AFF() && it.anc) { const want = (it.anc === 2 ? 4 : 3) + (RNG.ch(0.5) ? 1 : 0); if (it.aff.length < want) addAffixes(it, want - it.aff.length); }   // 通关后：上古 3–4 条，太古 4–5 条
-    if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]);
+    if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(affDef(k), it.ilvl, affMult(it), true)]);
   }
   return it;
 }
 function makeItem({ slot, ilvl, rarity, cls, setId, noSocket, legendId }) {
+  AFF_CLS = cls || null;
   ilvl = Math.max(1, Math.min(70, Math.round(ilvl)));
   if (rarity === 'legend') {
     const cc = Math.max(tierOf(ilvl), 1);
@@ -434,7 +445,7 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket, legendId }) {
   const R = RARITY[rarity];
   const aff = rollAffixes(rarity === 'rare' && PG_AFF() ? 2 : RNG.i(R.aff[0], R.aff[1]), ilvl, rarity === 'rare' ? 1.1 : 1, [], false, slot);
   let name = base;
-  if (rarity === 'magic') name = joinName(AFFIXES.find(x => x.k === aff[0][0]).p, base);
+  if (rarity === 'magic') name = joinName(affDef(aff[0][0]).p, base);
   if (rarity === 'rare') name = slot === 'offhand' ? joinName(RNG.pick(RARE_NAME_A), OFFHAND_BASE[ocls]) : RNG.pick(RARE_NAME_A) + (isVi() ? ' ' : '') + RNG.pick(RARE_NAME_B[slot]);
   const it0 = { id: uid(), slot, ilvl, rarity, name, base, imp: implicitFor(slot, ilvl), aff }; if (ocls) it0.cls = ocls;
   return finishItem(it0, noSocket);
@@ -447,7 +458,7 @@ function itemStats(it) {
   const s = {};
   const add = (k, v) => { s[k] = (s[k] || 0) + v; };
   for (const k in it.imp) add(k, Math.round(it.imp[k] * statMult(it, k)));
-  for (const [k, v] of it.aff) add(k, Math.round(v * statMult(it, k)));
+  for (const [k, v] of it.aff) add(AFF_ST[k] || k, Math.round(v * statMult(it, k)));
   for (const g of it.gems || []) {
     if (g.startsWith('L:')) { const L = SAVE && SAVE.lgems.find(x => x.id === g.slice(2)); if (L) { const st = LGEMS[L.t].st(L.lv); for (const k in st) add(k, st[k]); } continue; }
     const [t, tier] = g.split('_'); const G = GEM_TYPES[t]; if (G) add(G.st, G.v[+tier]);
@@ -515,7 +526,10 @@ function setYi(cls, id) {
 // 收一颗精魄：品级比现在高才算数，否则化成魂晶
 function zyTake(res, name, g) {
   const cur = zyOf(name);
-  if (g > cur) { SAVE.zy[MK(name)] = g; res.zy.push([name, g, cur]); }
+  if (g > cur) { const yiBefore = Object.keys(YISHI).filter(id => yiGrade(id)); SAVE.zy[MK(name)] = g; res.zy.push([name, g, cur]);
+    // 头一回收服某章首领：解锁一只役使；身上役使没带满就直接带上
+    const nu = Object.keys(YISHI).find(id => yiGrade(id) && !yiBefore.includes(id)), cls = SAVE.run && SAVE.run.cls;
+    if (nu) { res.yiNew = nu; const ch = cls && SAVE.chars[cls]; if (ch && (ch.yi || []).length < 2) { setYi(cls, nu); res.yiOn = true; } } }
   else res.mats += 2;
 }
 
@@ -776,6 +790,7 @@ function gamble(cls, slot) {
 }
 
 // ---------------- 铁匠：强化 / 打孔 / 镶嵌 / 分解 / 重铸 / 魔盒 ----------------
+function ownerCls(it) { for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] === it) return c; return SAVE.cls; }
 function findOwned(id) {
   const s = SAVE.stash.find(x => x.id === id); if (s) return s;
   for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] && SAVE.chars[c].eq[sl].id === id) return SAVE.chars[c].eq[sl];
@@ -833,7 +848,7 @@ function salvageJunk() {
 }
 // ---------------- 装备养成：成色、淬炼、洗炼、传承、升阶、特殊词条 ----------------
 const genMult = it => ({ rare: 1.1, set: 1.2, legend: 1.05 }[it.rarity] || 1);
-function affRange(k, ilvl, mult) { const a = AFFIXES.find(x => x.k === k); if (!a) return null; const sc = affSc(a, ilvl); return [Math.max(1, Math.round(a.r[0] * sc * mult)), Math.max(1, Math.round(a.r[1] * sc * mult))]; }
+function affRange(k, ilvl, mult) { const a = affDef(k); if (!a) return null; const sc = affSc(a, ilvl); return [Math.max(1, Math.round(a.r[0] * sc * mult)), Math.max(1, Math.round(a.r[1] * sc * mult))]; }
 // 成色：这条词条在它能出的范围里排第几（0~1）
 function affQ(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r || r[1] <= r[0]) return 1; return Math.max(0, Math.min(1, (v - r[0]) / (r[1] - r[0]))); }
 const affStars = q => 1 + Math.min(4, Math.floor(q * 5));
@@ -843,7 +858,7 @@ const busyRoll = it => !!(it.rfPending || it.wsPending || it.rrPending);
 function refineCost(it) { const n = it.rfn || 0; return { gold: Math.round((30 + it.ilvl * 5) * (1 + n * 0.25)), mats: 2 + Math.floor(n / 2) }; }
 function refineStart(it, idx) {
   if (busyRoll(it)) return { err: '上一次的结果还没选' };
-  const a = it.aff[idx], A = a && AFFIXES.find(x => x.k === a[0]); if (!A) return { err: '这条词条淬炼不了' };
+  const a = it.aff[idx], A = a && affDef(a[0]); if (!A) return { err: '这条词条淬炼不了' };
   const c = refineCost(it); if (SAVE.gold < c.gold) return { err: '银两不够' }; if (SAVE.mats < c.mats) return { err: '魂晶不够' };
   SAVE.gold -= c.gold; SAVE.mats -= c.mats; it.rfn = (it.rfn || 0) + 1;
   it.rfPending = { idx, opts: [[...a], [a[0], affixValue(A, it.ilvl, genMult(it), it.anc === 2)]] }; return { ok: true };
@@ -858,9 +873,9 @@ function washStart(it, locks) {
   const c = washCost(it, locks.length); if (SAVE.gold < c.gold) return { err: '银两不够' }; if (SAVE.mats < c.mats) return { err: '魂晶不够' };
   SAVE.gold -= c.gold; SAVE.mats -= c.mats; it.wsn = (it.wsn || 0) + 1;
   const L = legendOf(it), keep = locks.map(i => it.aff[i][0]).concat(L ? Object.keys(L.imp) : []);
-  const fresh = rollAffixes(it.aff.length - locks.length, it.ilvl, genMult(it), keep, it.anc === 2, it.slot);
+  AFF_CLS = it.cls || ownerCls(it); const fresh = rollAffixes(it.aff.length - locks.length, it.ilvl, genMult(it), keep, it.anc === 2, it.slot, true); AFF_CLS = null;
   // 稀有词条：每条新词条有 WASH_RARE 的几率变成这个部位专属的那两条之一（身上已经有的不重复）
-  const have = new Set([...keep, ...fresh.map(a => a[0])]);
+  const have = new Set([...keep, ...fresh.map(a => a[0])].map(affBase));
   for (let q = 0; q < fresh.length; q++) { if (!RNG.ch(WASH_RARE)) continue; const pool = AFFIXES.filter(a => a.rs === it.slot && !have.has(a.k)); if (!pool.length) continue;
     const A = RNG.pick(pool); have.delete(fresh[q][0]); fresh[q] = [A.k, affixValue(A, it.ilvl, genMult(it), it.anc === 2)]; have.add(A.k); it.wsRare = 1; }
   let j = 0; const neo = it.aff.map((a, i) => locks.includes(i) ? [...a] : (fresh[j++] || [...a]));
@@ -869,7 +884,7 @@ function washStart(it, locks) {
 function washPick(it, c) { const P = it.wsPending; if (!P) return; withOwnerHp(it, () => { it.aff = P.opts[c]; }); delete it.wsPending; delete it.wsRare; }
 // 这次洗炼每条新词条可能是什么：[词条, 几率, 数值下限, 上限, 是不是稀有]。几率按权重实算（已经锁住的、神兵自带的不会重复出）
 function washOdds(it, locks) {
-  const L = legendOf(it), keep = new Set((locks || []).map(i => it.aff[i] && it.aff[i][0]).concat(L ? Object.keys(L.imp) : []));
+  const L = legendOf(it), keep = new Set((locks || []).map(i => it.aff[i] && affBase(it.aff[i][0])).concat(L ? Object.keys(L.imp) : []));
   const pool = AFFIXES.filter(a => a.w > 0 && affOK(a, it.slot) && !keep.has(a.k)), W = pool.reduce((x, a) => x + a.w, 0) || 1;
   const rare = AFFIXES.filter(a => a.rs === it.slot && !keep.has(a.k)), pr = rare.length ? WASH_RARE : 0;
   const rng = a => affRange(a.k, it.ilvl, genMult(it));
@@ -911,7 +926,7 @@ function upTier(it, L) {
       else imp[k] = FLAT_STATS.has(k) ? Math.max(1, Math.round(it.imp[k] * (0.45 + L / 20) / (0.45 + old / 20))) : it.imp[k];
     }
     it.imp = imp;
-    it.aff = it.aff.map(([k, v]) => { const a = AFFIXES.find(x => x.k === k); return a ? [k, Math.max(1, Math.round(v * affSc(a, L) / affSc(a, old)))] : [k, v]; });
+    it.aff = it.aff.map(([k, v]) => { const a = affDef(k); return a ? [k, Math.max(1, Math.round(v * affSc(a, L) / affSc(a, old)))] : [k, v]; });
     it.ilvl = L; it.tier = tierOf(L);
   });
   return { ok: true };
@@ -965,7 +980,7 @@ function forgeWeapon(cls, lid) {
   const L = LEGENDS.find(l => l.id === lid && l.w && l.cls === cls); if (!L) return { err: '打不了这把' };
   if ((SAVE.bp || 0) < WPN_COST) return { err: '兵魄不够' };
   if (SAVE.stash.length >= stashMax()) return { err: '储物箱满了，先清一清' };
-  SAVE.bp -= WPN_COST; const it = storeItem(null, makeItem({ ilvl: wpnIlvl(), rarity: 'legend', cls, legendId: lid })); return { ok: true, it };
+  SAVE.bp -= WPN_COST; SAVE.flags.wpnForged = 1; const it = storeItem(null, makeItem({ ilvl: wpnIlvl(), rarity: 'legend', cls, legendId: lid })); return { ok: true, it };
 }
 // 专属兵器每强化 +1，特效再涨 WPN_UP
 const wpnK = ch => { const W = ch && ch.eq && ch.eq.weapon, L = W && legendOf(W); return L && L.w ? 1 + WPN_UP * (W.plus || 0) : 1; };
@@ -1559,7 +1574,7 @@ function startBattle(run, kind) {
   if (run.cls === 'assassin') P.g = Math.max(P.g, 30);   // 夜行刺客：先手
   if (s.fx.has('undeadAlly')) summonSkel(b, P);
   if (run.cls === 'necro' && !s.fx.has('duXing4')) summonSkel(b, P, P.runes.summon || null, P.minionCap || 3);   // 赶尸人：开战时僵尸已经按尸阵列好，不用先花几回合摇铃（五毒独行不带尸）
-  if (P.yi.qingxu) P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * (8 + P.yi.qingxu * 4) / 100));
+  if (P.yi.qingxu) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * (8 + P.yi.qingxu * 4) / 100)); (b.yiPops = b.yiPops || []).push(['P', '丹火护体', 'buff', 'qingxu']); }
   if (run.encWard) {   // 守护战：一个不能打的人在念，念完就赢；他倒了就输
     const W = run.encWard; delete run.encWard;
     b.ward = { need: W.need, n: 0, lines: W.lines || [], say: W.say || {}, end: W.end || '', mons: W.mons, lv: W.lv, keep: W.keep || 3, name: W.name };
@@ -1584,8 +1599,8 @@ function startBattle(run, kind) {
   if (s.fx.has('cShiyu')) for (const u of b.units) if (u.kind === 'ally') { u.maxHp = u.hp = Math.round(u.maxHp * 1.3); u.atk *= 1.3; }   // 尸语冠
   if (P.allyPct) for (const u of b.units) if (u.kind === 'ally') { const k = 1 + P.allyPct / 100; u.maxHp = u.hp = Math.round(u.maxHp * k); u.atk *= k; }   // 同心玉
   if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
-    if (P.yi.zhizhu) f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2);
-    if (P.yi.xianling && RNG.ch((16 + P.yi.xianling * 6) / 100 * (f.kind === 'boss' ? 0.5 : 1))) f.st.frozen = true;
+    if (P.yi.zhizhu) { f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2); (b.yiPops = b.yiPops || []).push([f.id, '缠丝', 'cold', 'zhizhu']); }
+    if (P.yi.xianling && RNG.ch(YI_STUN(P.yi.xianling) / 100 * (f.kind === 'boss' ? 0.5 : 1))) { f.st.frozen = true; (b.yiPops = b.yiPops || []).push([f.id, '惊堂木', 'cold', 'xianling']); }
   }
   return b;
 }
@@ -1603,10 +1618,19 @@ function spdOf(u) {
 }
 // ---------------- 伙伴组队（通关后的幻境） ----------------
 // 伙伴吃你的伤害加成、暴击、暴伤，再乘 COMP_DMG；一个伙伴约占全队一成伤害，好感满（25 点，+100%）约两成
-let COMP_DK = { ngoc: 5, zhen: 14, long: 14, kang: 12 };   // 各伙伴的伤害系数（对着幻境 40 层的配装校出来的）
+let COMP_DK = { ngoc: 5, zhen: 14, long: 14, kang: 12, lei: 9, liu: 14, tie: 12 };   // 各伙伴的伤害系数（对着幻境 40 层的配装校出来的）
 const COMP_AFF_MAX = 25, FRONT_CLS = new Set(['berserker', 'paladin']);
 const teamSlots = () => 1 + ((SAVE.riftMax || 0) >= 120 ? 1 : 0) + ((SAVE.riftMax || 0) >= 150 ? 1 : 0);
-const compOpen = c => !!COMPANIONS[c] && (c === 'kang' ? !!(SAVE.story && SAVE.story.ended) : !!(SAVE.comps || {})[c]);
+const zyPagesDone = () => ZY_PAGES.reduce((a, _, i) => a + (zyPageDone(i) ? 1 : 0), 0);
+const COMP_LOCK = {   // 通关后才认识的伙伴：[现在多少, 要多少]
+  lei: () => [(SAVE.stats && SAVE.stats.bounties) || 0, 10],
+  liu: () => [zyPagesDone(), 3],
+  tie: () => [SAVE.flags && SAVE.flags.wpnForged ? 1 : 0, 1] };
+const compOpen = c => !!COMPANIONS[c] && (COMP_LOCK[c] ? !!(SAVE.story && SAVE.story.ended) && (() => { const [a, n] = COMP_LOCK[c](); return a >= n; })()
+  : c === 'kang' ? !!(SAVE.story && SAVE.story.ended) : !!(SAVE.comps || {})[c]);
+// 新认识了伙伴：回城时提示一次
+function compMeetCheck() { if (!SAVE || !SAVE.story || !SAVE.story.ended) return []; SAVE.flags = SAVE.flags || {}; const got = [];
+  for (const c in COMP_LOCK) if (!SAVE.flags['met_' + c] && compOpen(c)) { SAVE.flags['met_' + c] = 1; got.push(c); } return got; }
 function teamOf() { const T = (SAVE.team || []).filter(compOpen); return [...new Set(T)].slice(0, teamSlots()); }
 const giftCost = c => 5000 + 2000 * wAffOf(c);
 function giftComp(c) {
@@ -1622,7 +1646,7 @@ function makeAlly(b, P, c, idx) {
   const u = { id: idx ? 'NG' + (idx + 1) : 'NG', side: 'p', kind: 'ally', comp: fox ? null : c, cid: c, fox, front: C.row === 'front', afl: aff, name: fox ? 'Ngoc（九尾）' : C.n, lv: P.lv, spr: fox ? 'ngocfox' : C.spr, wx: C.wx,
     maxHp: Math.round(P.maxHp * hp * afB), atk: P.atk * at * afB * (COMP_DK[c] || 1), armor: P.armor * (C.row === 'front' ? 1.2 : 0.8), res: P.res, spd: fox ? 108 : C.spd,
     crit: Math.max(10, P.crit || 0), critDmg: Math.max(160, P.critDmg || 0), dmgPct: P.dmgPct || 0, elem: P.elem || 0, g: 30, st: {}, rage: 0, n: 0, healCd: 0,
-    taunt: c === 'kang' ? (aff >= 20 ? 0.55 : 0.35) : 0 };
+    taunt: c === 'kang' ? (aff >= 20 ? 0.55 : 0.35) : c === 'lei' ? 0.15 : 0 };
   u.hp = u.maxHp; return u;
 }
 function addRage(u, n) { if (u.rage == null) return; u.rage = Math.min(100, u.rage + n * (1 + (u.xRage || 0) / 100)); }
@@ -1632,7 +1656,7 @@ function heal(u, amt, out, quiet) {
   if (u.hp <= 0) return 0;
   if (u.side === 'e' && BNOW && wearyN(BNOW) > 0) return 0;   // 久战破绽：妖物回不了血了
   const a = Math.min(u.maxHp - u.hp, Math.round(amt));
-  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); }
+  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); if (u.side === 'p') stAdd(BNOW, stActor(BNOW), 'heal', a); }
   if (a >= 1 && u.kind === 'hero' && u.fx && u.fx.has('cBodhi') && BNOW) BNOW.units.filter(x => x.kind === 'ally' && x.hp > 0).forEach(x => { x.hp = Math.min(x.maxHp, x.hp + Math.round(x.maxHp * a / u.maxHp)); });   // 菩提子
   if (u.kind === 'hero' && u.fx && u.fx.has('daRi4')) {   // 大日如来：溢出的治疗攒成护体
     const over = Math.round(amt) - Math.max(0, a), cap = Math.round(u.maxHp * dariCap(u));
@@ -1643,14 +1667,14 @@ function heal(u, amt, out, quiet) {
 function freezeU(u, out, label) {
   if (u.hp <= 0 || (u.kind === 'boss' && RNG.ch(0.5))) return;
   if (u.kind === 'hero' && u.xTen && RNG.ch(u.xTen / 100)) { out.pops.push([u.id, '清神', 'buff']); return; }
-  u.st.frozen = true; out.pops.push([u.id, label || '眩晕', 'cold', 1]);
+  u.st.frozen = true; out.pops.push([u.id, label || '眩晕', 'cold', 1]); if (u.side === 'e') stAdd(BNOW, stActor(BNOW), 'ctrl', 1);
   if (u.ghostForm) { u.ghostForm = false; out.pops.push([u.id, '现形', 'react']); out.lines.push(`${u.name}被打晕，鬼身现了形！`); }
 }
 function applyPoison(src, tgt, pct, bonus) {
   const m = src.fx && src.fx.has('plague') ? 2.5 : 1;
   const d = src.atk * pct / 100 * m * (1 + (bonus || 0) / 100), old = tgt.st.poison;
   const own = src.kind === 'minion' ? null : src;   // 五毒独行：毒可以叠，最多叠到单次的 DUXING_STACK 倍
-  tgt.st.poison = { d: own && own.fx && own.fx.has('duXing6') && old ? Math.min(d * (own.fx.has('baiguBelt') ? 8 : DUXING_STACK), old.d + d) : d, t: 3 + stExt(own) };
+  tgt.st.poison = { d: own && own.fx && own.fx.has('duXing6') && old ? Math.min(d * (own.fx.has('baiguBelt') ? 8 : DUXING_STACK), old.d + d) : d, t: 3 + stExt(own), by: stKey(src) || 'P' };
 }
 const mageCap = P => SUST.mage.cap + (P.fx && P.fx.has('taijiOff') ? 20 : 0);
 const dariCap = u => u.fx && u.fx.has('dariBelt') ? 0.8 : DARI_CAP;
@@ -1727,6 +1751,16 @@ let R_WEARY = [10, 0.10, 20], R_REGEN = 0.02;   // [普通战从第几轮起, �
 let BNOW = null;
 const riftB = b => !!(b && b.run && b.run.mode === 'rift' && b.run.world);
 const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'boss' ? 2 : 0] + 1) : 0;
+// ---------------- 小队统计：输出、控制、治疗、护体挡下、承伤、挡刀（按人分；僵尸合一行） ----------------
+const stKey = u => !u ? null : u.kind === 'minion' ? 'Z' : u.side === 'p' && u.kind !== 'ward' ? u.id : null;
+function stAddK(b, k, f, v) {
+  if (!b || !k || !(v > 0)) return; b.stat = b.stat || {};
+  let r = b.stat[k]; if (!r) { const u = k === 'Z' ? null : b.units.find(x => x.id === k); r = b.stat[k] = { n: k === 'Z' ? '僵尸' : u ? u.name : k, cid: k === 'P' || k === 'Z' ? k : (u && (u.cid || (u.fox ? 'ngoc' : u.comp))) || k, dmg: 0, ctrl: 0, heal: 0, shield: 0, taken: 0, guard: 0 }; }
+  r[f] += v;
+}
+const stAdd = (b, u, f, v) => stAddK(b, stKey(u), f, v);
+const stActor = b => b && b.curActor && b.curActor.side === 'p' ? b.curActor : b && b.P;   // 控制、治疗记在正在出手的那个人头上
+function mergeStat(into, st) { if (!st) return into; into = into || {}; for (const k in st) { const r = st[k], key = r.cid; const t = into[key] = into[key] || { n: r.n, cid: key, dmg: 0, ctrl: 0, heal: 0, shield: 0, taken: 0, guard: 0 }; for (const f of ['dmg', 'ctrl', 'heal', 'shield', 'taken', 'guard']) t[f] += r[f] || 0; } return into; }
 function battleStep(b) {
   const out = { lines: [], pops: [], actor: null, cast: null };
   if (b.over) return out;
@@ -1735,7 +1769,7 @@ function battleStep(b) {
   let actor = null, bt = Infinity;
   for (const u of live) { const t = (100 - u.g) / spdOf(u); if (t < bt) { bt = t; actor = u; } }
   for (const u of live) u.g += bt * spdOf(u);
-  actor.g = 0; out.actor = actor.id; out.dt = bt;
+  actor.g = 0; out.actor = actor.id; out.dt = bt; b.curActor = actor;
   if (b.run && b.run.mode === 'rift' && !b.run.riftDone) b.run.clock = (b.run.clock || 0) + bt * (b.run.world ? R_BT_MS : 1);
   act(b, actor, out);
   resolveDeaths(b, out);
@@ -1745,14 +1779,14 @@ function battleStep(b) {
 function act(b, u, out) {
   for (const k of ['burn', 'poison']) {
     const d = u.st[k]; if (!d) continue;
-    const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg;
+    const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
     out.pops.push([u.id, '-' + popN(u, dmg), k]);
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
     if (u.hp <= 0) { out.lines.push(`${u.name}${k === 'burn' ? '被烧' : '被毒'}死了`); return; }
   }
   if (u.st.frozen) { delete u.st.frozen; if (u.charging) { delete u.charging; out.pops.push([u.id, '打断', 'buff']); out.lines.push(`${u.name}被打晕，蓄力断了！`); } else out.lines.push(`${u.name}晕住了`); out.actor = null; return; }
   if (u.trait === 'regen' && u.hp > 0 && !u.st.burn && !(riftB(b) && u.st.poison)) heal(u, u.maxHp * (riftB(b) ? R_REGEN : 0.05), out);   // 幻境里精英血厚三倍多，回 5% 打不动：改成 2%，中毒也压得住
-  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG']) if (u.st[k] && --u.st[k] <= 0) {
+  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG', 'liuDr', 'tieArm']) if (u.st[k] && --u.st[k] <= 0) {
     delete u.st[k];
     if (k === 'smoke' && u.kind === 'hero' && u.fx && u.fx.has('cJinchan') && u.hp > 0) {   // 金蝉手：烟遁散了，回血、清负面
       heal(u, u.maxHp * 0.15, out); for (const z of ['frozen', 'poison', 'burn', 'slow', 'curse', 'weak', 'vuln', 'melt']) delete u.st[z]; delete u.st.weakV; out.pops.push([u.id, '金蝉', 'buff']); }
@@ -1816,6 +1850,25 @@ function compAct(b, u, out) {
   } else if (u.comp === 'kang') {
     if (u.n % 3 === 0 && P.hp > 0) { P.st.kangG = 3; out.pops.push(['P', '挡刀', 'buff']); out.cast = { id: 'kangGuard', elem: 'phys', target: 'P' }; if (RNG.ch(0.4)) out.say = [u.id, RNG.pick(['躲我后面！', '这一下记账上！', '赔钱的买卖我也做了！'])]; }
     else { const st = compStart(b, u, 'stun', foes, out), t = st || foes[0]; out.cast = { id: 'blade2', elem: 'phys', target: t.id, wx: 'tu' }; hit(b, u, t, 0.8, 'phys', out, { sk: { ap: 'stun', apc: st ? 1 : 0.2 } }); }
+  } else if (u.comp === 'lei') {   // 雷老虎：砍血最少的；每三招断头刀
+    const low = foes.reduce((a, c) => c.hp / c.maxHp < a.hp / a.maxHp ? c : a);
+    if (u.n % 3 === 0) { const line = u.afl >= 10 ? 0.5 : 0.35, t = low, m = t.hp / t.maxHp < line ? 3.2 : 1.6;
+      out.cast = { id: 'leiFinish', elem: 'phys', target: t.id, wx: 'jin' }; hit(b, u, t, m, 'phys', out, { sk: { ap: 'armor', apc: 1 } });
+      if (t.hp <= 0 && u.afl >= 20) { const n2 = aliveOf(b, 'e').filter(f => f !== t); if (n2.length) { const t2 = n2.reduce((a, c) => c.hp < a.hp ? c : a); out.pops.push([u.id, '再一刀', 'buff']); hit(b, u, t2, 1, 'phys', out, { sk: { ap: 'armor', apc: 1 } }); } }
+      if (RNG.ch(0.3)) out.say = [u.id, RNG.pick(['人头我收了！', '跑？跑得过我的刀？', '下一个！'])]; }
+    else { const st = compStart(b, u, 'armor', foes, out), t = st || low; out.cast = { id: 'leiCut', elem: 'phys', target: t.id, wx: 'jin' }; hit(b, u, t, 1, 'phys', out, { sk: { ap: 'armor', apc: st ? 1 : 0.5 } }); }
+  } else if (u.comp === 'liu') {   // 刘师傅：每三招念经，全队减伤；木鱼敲晕
+    if (u.n % 3 === 0) { const T = b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward'); b.liuDrV = u.afl >= 10 ? 0.3 : 0.2; T.forEach(x => { x.st.liuDr = 3; });
+      out.pops.push(['P', '经声护体', 'buff']); out.cast = { id: 'liuChant', elem: 'holy', target: 'P' };
+      if (u.afl >= 20) { const t = foes.reduce((a, c) => c.atk > a.atk ? c : a); freezeU(t, out, '眩晕'); }
+      if (RNG.ch(0.3)) out.say = [u.id, RNG.pick(['都别乱，按规矩来。', '老夫办了四十年路引，还没见过这么不讲理的。', '安魂经念到这儿——别动。'])]; }
+    else { const st = compStart(b, u, 'stun', foes, out), t = st || RNG.pick(foes); out.cast = { id: 'liuBell', elem: 'holy', target: t.id, wx: 'shui' }; hit(b, u, t, 0.85, 'holy', out, { sk: { ap: 'stun', apc: st ? 1 : 0.3 } }); }
+  } else if (u.comp === 'tie') {   // 铁蛋：火铳灼烧；每三招给前排加固
+    if (u.n % 3 === 0) { const T = b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward' && (u.afl >= 10 || x.front || (x === P && FRONT_CLS.has(P.cls)) || x.kind === 'minion'));
+      T.forEach(x => { x.st.tieArm = 3; }); out.pops.push([T.includes(P) ? 'P' : (T[0] || u).id, '加固', 'buff']); out.cast = { id: 'tieBolt', elem: 'phys', target: 'P' };
+      if (RNG.ch(0.3)) out.say = [u.id, RNG.pick(['师父说铆钉要打三遍！', '这块甲片是我亲手敲的！', '顶住，我再给你加一片！'])]; }
+    else if (u.afl >= 20) { out.cast = { id: 'tieGun', elem: 'fire', aoe: true }; foes.forEach(f => hit(b, u, f, 0.55, 'fire', out, { aoe: 1, sk: { ap: 'burn', apc: 0.5 } })); }
+    else { const st = compStart(b, u, 'burn', foes, out), t = st || RNG.pick(foes); out.cast = { id: 'tieGun', elem: 'fire', target: t.id, wx: 'huo' }; hit(b, u, t, 0.9, 'fire', out, { sk: { ap: 'burn', apc: st ? 1 : 0.6 } }); }
   }
 }
 function ngocAct(b, u, out) {
@@ -1861,6 +1914,9 @@ function ultimate(b, P, foes, out) {
     else if (u.cid === 'ngoc') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => heal(x, x.maxHp * 0.15, out, true)); out.pops.push([u.id, '狐光', 'buff']); }
     else if (u.cid === 'long') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.warcry = Math.max(x.st.warcry || 0, 3); }); out.pops.push([u.id, '正气', 'buff']); }
     else if (u.cid === 'kang') { const capS = Math.round(P.maxHp * 0.5); P.shield = Math.min(Math.max(capS, P.shield || 0), (P.shield || 0) + Math.round(P.maxHp * 0.15)); out.pops.push(['P', '护体', 'buff']); }
+    else if (u.cid === 'lei') { foes.forEach(f => { f.st.melt = Math.max(f.st.melt || 0, 3); }); out.pops.push([u.id, '卸甲', 'buff']); }
+    else if (u.cid === 'liu') { b.liuDrV = Math.max(b.liuDrV || 0, u.afl >= 10 ? 0.3 : 0.2); b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.liuDr = 4; }); out.pops.push([u.id, '经声', 'buff']); }
+    else if (u.cid === 'tie') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.tieArm = 4; }); foes.forEach(f => stSet(u, f, 'burn', out)); out.pops.push([u.id, '火铳齐鸣', 'buff']); }
   });
   // 打断首领蓄力
   for (const f of foes) if (f.charging) { delete f.charging; out.pops.push([f.id, '打断', 'buff']); out.lines.push(`${f.name}的蓄力被打断了！`); }
@@ -2013,7 +2069,7 @@ function heroAct(b, P, out) {
   }
   if (P.fx.has('wXiuluo') && BUSI_SK.has(sk.id) && P.hp > 0) { const al = aliveOf(b, 'e'); if (al.length) { out.pops.push(['P', '修罗血刃', 'crit']); al.forEach(f => hit(b, P, f, 0.6 * P.wpK, 'phys', out, { proc: 1, aoe: 1 })); } }
   if (P.yi.langwang && RNG.ch((18 + P.yi.langwang * 5) / 100)) { const t2 = aliveOf(b, 'e')[0];
-    if (t2) { out.pops.push([t2.id, '狼影', 'crit']); hit(b, P, t2, 0.6 + P.yi.langwang * 0.2, 'phys', out, { proc: 1 }); } }
+    if (t2) { out.pops.push([t2.id, '狼影', 'crit']); out.yi = 'langwang'; hit(b, P, t2, 0.6 + P.yi.langwang * 0.2, 'phys', out, { proc: 1 }); } }
 }
 // 自动出招：有状态先收招，没状态先起手；职业各有讲究
 function autoPick(b, P, foes) {
@@ -2228,8 +2284,8 @@ function stClear(f, s) { for (const k of s === 'any' ? ['burn', 'slow', 'melt', 
 function stSet(src, f, s, out) {
   if (f.hp <= 0) return;
   if (s === 'burn' && f.cocoon && f.shield > 0) { f.shield = 0; f.cocoon = false; out.pops.push([f.id, '丝茧烧穿', 'react']); out.lines.push(`${f.name}的丝茧烧着了！`); }
-  if (s === 'burn') { f.st.burn = { d: src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1), t: 3 + stExt(src) }; out.pops.push([f.id, '灼烧', 'fire', 1]); }
-  else if (s === 'chill') { f.st.slow = 3 + stExt(src); out.pops.push([f.id, '冰冻', 'cold', 1]); if (f.lavaShell && f.shield > 0) { f.shield = 0; f.lavaShell = false; out.pops.push([f.id, '外壳裂开', 'react']); out.lines.push(`${f.name}的熔岩外壳被冻裂了！`); } }
+  if (s === 'burn') { f.st.burn = { d: src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1), t: 3 + stExt(src), by: stKey(src) || 'P' }; out.pops.push([f.id, '灼烧', 'fire', 1]); }
+  else if (s === 'chill') { if (!f.st.slow) stAdd(BNOW, stKey(src) ? src : stActor(BNOW), 'ctrl', 1); f.st.slow = 3 + stExt(src); out.pops.push([f.id, '冰冻', 'cold', 1]); if (f.lavaShell && f.shield > 0) { f.shield = 0; f.lavaShell = false; out.pops.push([f.id, '外壳裂开', 'react']); out.lines.push(`${f.name}的熔岩外壳被冻裂了！`); } }
   else if (s === 'armor') { f.st.melt = 3 + stExt(src); out.pops.push([f.id, '破甲', 'crit', 1]); if (f.shield > 0 && (f.trait === 'shield' || f.silver)) { f.shield = 0; out.pops.push([f.id, f.silver ? '银甲碎了' : '碎甲', 'react']); if (f.silver) out.lines.push(`${f.name}的银甲被打碎了！`); } }
   else if (s === 'stun') freezeU(f, out, '眩晕');
   else if (s === 'poison') { applyPoison(src, f, 35, src.poisonPct || 0); out.pops.push([f.id, '中毒', 'poison', 1]); }
@@ -2411,7 +2467,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     }
   }
   if (src === b.P && b.guiYuan && !opt.proc) d *= 3;
-  if (src.side === 'p' && b.P && b.P.yi && b.P.yi.xuanbing && (tgt.st.frozen || tgt.st.slow)) d *= 1 + (12 + b.P.yi.xuanbing * 6) / 100;
+  if (src.side === 'p' && b.P && b.P.yi && b.P.yi.xuanbing && (tgt.st.frozen || tgt.st.slow)) { d *= 1 + (12 + b.P.yi.xuanbing * 6) / 100; if (src === b.P && (!b.xbTold || RNG.ch(0.12))) { b.xbTold = 1; out.yi = 'xuanbing'; out.pops.push([tgt.id, '封镇', 'cold']); } }
   if (src.xBoss && (tgt.kind === 'boss' || tgt.kind === 'elite')) d *= 1 + src.xBoss / 100;
   if (src.xExec && tgt.hp / tgt.maxHp < 0.3) d *= 1 + src.xExec / 100;
   if (src.xBreak && tgt.charging) d *= 1 + src.xBreak / 100;
@@ -2429,8 +2485,9 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   else if (RNG.ch(((src.crit || 0) + (src === b.P && fx && fx.has('cFuryCrit') ? (src.fury || 0) / 5 : 0)) / 100)) crit = true;   // 战意带：每 10 点怒意暴击 +2%
   if (crit && src === b.P && fx.has('gReset') && !opt.proc && RNG.ch(0.1)) { const k2 = src.skills.find(k => k.left > 0 && !(b.castSk && b.castSk.id === k.id)); if (k2) { k2.left = 0; out.pops.push(['P', '回风', 'buff']); } }
   if (crit) { d *= ((src.critDmg || 150) + (src === b.P && fx && fx.has('cKiCrit') ? 10 * (b.kiSnap != null ? b.kiSnap : src.ki || 0) : 0)) / 100;   /* 夜行带：每点杀意暴伤 +10% */ if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; if (src === b.P) src.cbNext = true; }
-  if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1)); }
+  if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1) * (tgt.st.tieArm ? 1.4 : 1)); }
   else d *= 1 - Math.max(0, Math.min(75, tgt.res || 0) - (tgt.st.melt ? 20 : 0)) / 100;
+  if (tgt.st.liuDr && tgt.side === 'p' && src.side === 'e') d *= 1 - (b.liuDrV || 0.2);   // 刘师傅念经
   // 收招：打带状态的敌人
   let pay = null;
   const SK = opt.sk || (src === b.P && !opt.ult ? b.castSk : null);
@@ -2492,10 +2549,10 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (tgt.kind === 'ally' && src.side === 'e' && b.P && b.P.fx && b.P.fx.has('cBodhi')) d = Math.max(1, Math.round(d * 0.7));   // 菩提子
   if (tgt === b.P && src.side === 'e' && tgt.st.kangG && d > 1) {   // 康总管挡刀
     const K = b.units.find(x => x.cid === 'kang' && x.hp > 0);
-    if (K) { const part = Math.min(K.hp - 1, Math.round(d * (K.afl >= 10 ? 0.4 : 0.3))); if (part > 0) { K.hp -= part; d -= part; out.pops.push([K.id, popN(K, part), 'phys']); } } }
+    if (K) { const part = Math.min(K.hp - 1, Math.round(d * (K.afl >= 10 ? 0.4 : 0.3))); if (part > 0) { K.hp -= part; d -= part; out.pops.push([K.id, popN(K, part), 'phys']); stAdd(b, K, 'guard', part); } } }
   const dPre = d, shieldThorns = tgt.shield > 0 && tgt.runes && tgt.runes.aegis === 'a';
   if (tgt.shield > 0) {
-    const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a;
+    const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a; if (tgt.side === 'p') stAdd(b, tgt, 'shield', a);
     if (tgt === b.P && a > 0 && tgt.shield <= 0 && tfx && tfx.has('cTagang') && (b.tagang || 0) < 2) {   // 踏罡步：护体打光，冰冻全场
       b.tagang = (b.tagang || 0) + 1; out.lines.push('踏罡步：护体碎了，寒气卷过全场'); aliveOf(b, 'e').forEach(f => freezeU(f, out, '冰冻')); }
     if (d <= 0) {
@@ -2507,6 +2564,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   if (tgt.kind === 'hero' && src.side === 'e' && !opt.noBlock && RNG.ch(0.12)) { d = Math.max(1, Math.round(d * 0.5)); out.pops.push([tgt.id, '格挡', 'block']); }
   tgt.hp -= d;
+  if (tgt.side === 'e') stAdd(b, src, 'dmg', d + Math.min(0, tgt.hp)); else stAdd(b, tgt, 'taken', d);
   out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem]);
   if (tgt.side === 'e' && b.P && b.P.fx) {   // 职业神兵：打中之后
     const PF = b.P.fx;
@@ -2518,12 +2576,12 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (tgt.thornsP && src.side === 'e' && src.hp > 0) { const r = Math.max(1, Math.round(d * tgt.thornsP)); src.hp -= r; out.pops.push([src.id, '反震' + r, 'thorn']); }
   counterHit(b, tgt, src, out, opt);
   if (tgt.kind === 'hero' && tgt.yi && src.side === 'e' && !opt.proc) {
-    if (tgt.yi.shimo && src.hp > 0 && tgt.hp > 0 && RNG.ch((15 + tgt.yi.shimo * 5) / 100)) { out.pops.push([tgt.id, '熔心', 'fire']); hit(b, tgt, src, 0.8 + tgt.yi.shimo * 0.3, 'fire', out, { proc: 1 }); stSet(tgt, src, 'burn', out); }
+    if (tgt.yi.shimo && src.hp > 0 && tgt.hp > 0 && RNG.ch((15 + tgt.yi.shimo * 5) / 100)) { out.pops.push([tgt.id, '熔心', 'fire']); out.yi = 'shimo'; hit(b, tgt, src, 0.8 + tgt.yi.shimo * 0.3, 'fire', out, { proc: 1 }); stSet(tgt, src, 'burn', out); }
     if (tgt.yi.shemu && !b.shed && tgt.hp > 0 && tgt.hp / tgt.maxHp < 0.35) { b.shed = true; heal(tgt, tgt.maxHp * (14 + tgt.yi.shemu * 5) / 100, out);
-      for (const k of ['poison', 'burn', 'frozen', 'slow']) delete tgt.st[k]; out.pops.push([tgt.id, '蜕皮', 'buff']); out.lines.push('役使·蛇母：你蜕下一层皮，伤口合上了'); }
+      for (const k of ['poison', 'burn', 'frozen', 'slow']) delete tgt.st[k]; out.pops.push([tgt.id, '蜕皮', 'buff']); out.yi = 'shemu'; out.lines.push('役使·蛇母：你蜕下一层皮，伤口合上了'); }
   }
-  if (src.side === 'p' && tgt.side === 'e' && tgt.hp > 0 && b.P && b.P.yi && b.P.yi.niuma && (tgt.kind === 'normal' || tgt.kind === 'mini') && tgt.hp / tgt.maxHp < (8 + b.P.yi.niuma * 3) / 100) {
-    tgt.hp = 0; out.pops.push([tgt.id, '勾魂', 'curse']); }
+  if (src.side === 'p' && tgt.side === 'e' && tgt.hp > 0 && b.P && b.P.yi && b.P.yi.niuma && (tgt.kind === 'normal' || tgt.kind === 'mini') && tgt.hp / tgt.maxHp < YI_HOOK(b.P.yi.niuma) / 100) {
+    tgt.hp = 0; out.pops.push([tgt.id, '勾魂', 'curse']); out.yi = 'niuma'; }
   if (pay) {
     b.reacts = (b.reacts || 0) + 1;
     out.pops.push([tgt.id, pay.n, 'react']); (out.react = out.react || []).push({ id: tgt.id, n: pay.n, s: pay.s });
@@ -2682,7 +2740,8 @@ function dropItem(run, q, ilvl, mf) { return makeItem({ ilvl, rarity: rollRarity
 function finishBattle(b) {
   const run = b.run, s = runStats(run);
   run.hp = Math.max(0, Math.min(b.P.hp, s.maxHp));
-  const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null };
+  const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null, stat: b.stat || null };
+  run.stat = mergeStat(run.stat, b.stat);
   if (!b.win) return res;
   const lv = SAVE.chars[run.cls].level, di = diffIdx(run), rw = run.mode === 'rift' && !!run.world, sw = !!run.world && !rw;   // rw：新幻境（一局要打上百只，单只的掉落和经验减半）
   DROP_LUCK = s.xLuck || 0; DROP_MF = s.mf || 0;

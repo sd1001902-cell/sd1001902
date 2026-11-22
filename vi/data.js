@@ -35,14 +35,14 @@ const STAT_NAMES = {
   spd: "Tốc độ", leech: "Hút máu", res: "Kháng toàn bộ", dmgPct: "Sát thương", elem: "ST thuật pháp",
   hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", regen: "Hồi khí huyết mỗi lượt", thorns: "Phản chấn",
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
-  dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu",
+  dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
   // 稀有词条（只能洗炼出）和灵玉用到的
   xDouble: "Liên trảm (tỉ lệ bồi thêm một đòn sau khi ra tay)", xRage: "Nộ khí tất sát nhận được", xTen: "Thanh thần (kháng choáng, bất động)", xDr: "Giảm sát thương phải nhận", xLast: "Bất khuất (giảm sát thương khi khí huyết dưới 30%)",
   xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
   regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };
-const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -79,6 +79,13 @@ const AFFIXES = [
   { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: "có gai", no: ['offhand'] },
   { k: 'mf',      r: [8, 20],  w: 4, p: "có phúc" },
   { k: 'gf',      r: [10, 30], w: 4, p: "chiêu tài" },
+  // 2026-11 新加：pg＝通关后才会随掉落出（洗炼随时都能洗到）；st：算到哪个属性上
+  { k: 'armorPct', r: [6, 12], w: 5, g: 'd', pg: 1, p: "vững như tường", slots: ['helm', 'chest', 'boots', 'belt'] },
+  { k: 'healPct', r: [8, 15],  w: 4, g: 'd', pg: 1, p: "diệu thủ", slots: ['helm', 'amulet', 'offhand'] },
+  { k: 'eva',     r: [2, 4],   w: 4, g: 'd', pg: 1, st: 'dodge', p: "linh động", slots: ['boots', 'gloves', 'helm'] },
+  { k: 'freeze',  r: [2, 4],   w: 4, pg: 1, p: "ngưng sương", slots: ['weapon', 'gloves'] },
+  { k: 'poison',  r: [10, 18], w: 4, pg: 1, p: "tẩm độc", slots: ['weapon', 'ring'] },
+  { k: 'skd',     r: [8, 15],  w: 5, pg: 1, p: "tinh chuyên", slots: ['weapon', 'gloves', 'ring', 'amulet'] },   // 某一招伤害：洗出来时按这件装备的职业随机挑一招，存成 sk_<招式>
   // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
   // 2026-11：也是各部位的稀有词条——洗炼时每条有 WASH_RARE 的几率洗出来（rs：出在哪个部位）
   { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: "tiên phát", rs: 'gloves' },
@@ -585,6 +592,13 @@ const COMPANIONS = {
     up: ["Hảo cảm 10: Chính Khí Quyết từ bốn chiêu một lần thành ba chiêu một lần", "Hảo cảm 20: Chính Khí Quyết tăng công cho cả đội"] },
   kang: { n: "Quản gia Khang", spr: 'merchant', wx: 'tu', ap: 'stun', apc: 0.2, hp: 1.2, atk: 0.35, spd: 85, d: "Tiền tuyến chịu đòn: biết khiêu khích; cứ ba chiêu thì “Đỡ đao” hai lượt, đỡ thay bạn ba phần sát thương", row: 'front', role: "Khiêu khích · Đỡ đao", pg: 1,
     up: ["Hảo cảm 10: Đỡ đao đỡ thay bạn bốn phần", "Hảo cảm 20: khiêu khích dữ hơn, kéo thêm một nửa số đòn"] },
+  // 2026-11 新伙伴：通关后达成条件认识（lock：认识的条件，界面上显示）
+  lei: { n: "Lôi Lão Hổ", spr: 'blade', wx: 'jin', ap: 'armor', hp: 0.9, atk: 0.65, spd: 100, d: "Thợ săn già tiền tuyến: chuyên chém kẻ ít máu nhất; Chém làm địch phá giáp, mỗi ba chiêu một nhát “Đoạn Đầu Đao”, gây sát thương gấp đôi lên địch tàn máu", row: 'front', role: "Kết liễu · Phá giáp", pg: 1,
+    lock: "Hoàn thành 10 lần truy nã", up: ["Hảo cảm 10: Đoạn Đầu Đao gấp đôi khi địch dưới nửa máu", "Hảo cảm 20: Đoạn Đầu Đao chém chết người thì bồi thêm một đao cho kẻ kế tiếp"] },
+  liu: { n: "Sư phụ Lưu", spr: 'oldman', wx: 'shui', ap: 'stun', apc: 0.3, hp: 0.55, atk: 0.45, spd: 92, d: "Lão sư gia nhà quàn ở hậu tuyến: mỗi ba chiêu tụng một đoạn An Hồn Kinh, cả đội giảm 20% sát thương phải nhận trong hai lượt; lắc chuông làm địch choáng", row: 'back', role: "Cả đội giảm sát thương · Choáng", pg: 1,
+    lock: "Trấn Yêu Lục đủ 3 trang", up: ["Hảo cảm 10: tụng kinh giảm sát thương lên 30%", "Hảo cảm 20: khi tụng kinh tiện tay gõ choáng một kẻ địch"] },
+  tie: { n: "Thiết Đản", spr: 'smith', wx: 'huo', ap: 'burn', hp: 0.6, atk: 0.6, spd: 96, d: "Đồ đệ thợ rèn ở hậu tuyến: hỏa súng làm địch thiêu đốt; mỗi ba chiêu “Gia cố” cho tiền tuyến ba lượt, hộ giáp +40%", row: 'back', role: "Thiêu đốt · Tăng giáp tiền tuyến", pg: 1,
+    lock: "Rèn một món binh khí chuyên thuộc chỗ Trương Đại Chùy", up: ["Hảo cảm 10: Gia cố cả hậu tuyến", "Hảo cảm 20: hỏa súng bắn tất cả địch"] },
 };
 
 // ---------------- 状态配合 ----------------
