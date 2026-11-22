@@ -37,8 +37,13 @@ const STAT_NAMES = {
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
   dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
+  // 稀有词条（只能洗炼出）和灵玉用到的
+  xDouble: '连斩（出手后再补一击的几率）', xRage: '必杀怒气获取', xTen: '清神（抵抗眩晕、定身）', xDr: '受到的伤害减少', xLast: '不屈（气血低于 30% 时减伤）',
+  xHaste: '疾行（开战前两回合速度）', xKill: '贪狼（每杀一个敌人回复气血）', cdSkip: '招式不进冷却的几率', xLuck: '神兵掉率', xShield: '磐石（开战自带护体，按最大气血）',
+  regenPct: '每回合回复气血', xCritNext: '会心（暴击后下一招伤害）', allyPct: '同伴、僵尸的伤害和气血',
 };
-const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak']);
+const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+  'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
   weapon: [['柴刀', 1], ['铁剑', 1], ['青锋剑', 8], ['九环刀', 16], ['玄铁重剑', 26], ['斩妖剑', 40]],
@@ -75,11 +80,27 @@ const AFFIXES = [
   { k: 'mf',      r: [8, 20],  w: 4, p: '有福的' },
   { k: 'gf',      r: [10, 30], w: 4, p: '招财的' },
   // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
-  { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: '先发的' },
-  { k: 'xBoss',   r: [8, 18],  w: 0, sp: true, fixed: true, p: '屠魁的' },
-  { k: 'xExec',   r: [15, 30], w: 0, sp: true, fixed: true, p: '断命的' },
-  { k: 'xBreak',  r: [20, 40], w: 0, sp: true, fixed: true, p: '破势的' },
+  // 2026-11：也是各部位的稀有词条——洗炼时每条有 WASH_RARE 的几率洗出来（rs：出在哪个部位）
+  { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: '先发的', rs: 'gloves' },
+  { k: 'xBoss',   r: [8, 18],  w: 0, sp: true, fixed: true, p: '屠魁的', rs: 'weapon' },
+  { k: 'xExec',   r: [15, 30], w: 0, sp: true, fixed: true, p: '断命的', rs: 'ring' },
+  { k: 'xBreak',  r: [20, 40], w: 0, sp: true, fixed: true, p: '破势的', rs: 'gloves' },
+  { k: 'xDouble', r: [6, 10],  w: 0, sp: true, fixed: true, p: '连斩的', rs: 'weapon' },
+  { k: 'xRage',   r: [15, 25], w: 0, sp: true, fixed: true, p: '明心的', rs: 'helm' },
+  { k: 'xTen',    r: [30, 50], w: 0, sp: true, fixed: true, p: '清神的', rs: 'helm' },
+  { k: 'xDr',     r: [4, 7],   w: 0, sp: true, fixed: true, p: '金刚的', rs: 'chest' },
+  { k: 'xLast',   r: [12, 20], w: 0, sp: true, fixed: true, p: '不屈的', rs: 'chest' },
+  { k: 'dodge',   r: [4, 7],   w: 0, sp: true, fixed: true, p: '踏风的', rs: 'boots' },
+  { k: 'xHaste',  r: [20, 35], w: 0, sp: true, fixed: true, p: '疾行的', rs: 'boots' },
+  { k: 'xKill',   r: [2, 4],   w: 0, sp: true, fixed: true, p: '贪狼的', rs: 'ring' },
+  { k: 'cdSkip',  r: [4, 7],   w: 0, sp: true, fixed: true, p: '聚灵的', rs: 'amulet' },
+  { k: 'xLuck',   r: [10, 20], w: 0, sp: true, fixed: true, p: '福星的', rs: 'amulet' },
+  { k: 'xShield', r: [8, 14],  w: 0, sp: true, fixed: true, p: '磐石的', rs: 'belt' },
+  { k: 'regenPct', r: [1, 2],  w: 0, sp: true, fixed: true, p: '回元的', rs: 'belt' },
+  { k: 'xCritNext', r: [10, 18], w: 0, sp: true, fixed: true, p: '会心的', rs: 'offhand' },
+  { k: 'allyPct', r: [8, 14],  w: 0, sp: true, fixed: true, p: '同调的', rs: 'offhand' },
 ];
+const WASH_RARE = 0.01;   // 洗炼：每条被洗的词条变成本部位稀有词条的几率
 const SP_AFFIXES = AFFIXES.filter(a => a.sp).map(a => a.k);
 const RARE_NAME_A = ['玄冥', '赤血', '太乙', '九幽', '无相', '青冥', '紫电', '寒霜', '修罗', '阴阳', '乾坤', '噬魂'];
 const RARE_NAME_B = { weapon: ['刃', '锋', '斩'], helm: ['冠', '盔', '面'], chest: ['甲', '袍', '铠'],
@@ -154,6 +175,24 @@ const LEGENDS = [
   { id: 'muyu',       n: '镇心木鱼', slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: '每次反击恢复 2% 最大气血，并给同伴恢复 5%' },
   { id: 'daridai',    n: '大日带',   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'dariBelt',    d: '护体真气的上限从最大气血的 50% 提高到 80%（要配大日如来 4 件）' },
   { id: 'zijinbo',    n: '紫金钵',   slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'zijinOff',    d: '施放般若心经、甘露时，对所有敌人造成 150% 佛光伤害' },
+  // 2026-11：专属兵器（w: 1）。每条幻境套装路线一把，直接改写主力招式；自带攻击比普通神兵高三成，每强化 +1 特效再涨 3%。
+  // 不走普通掉落：攒「兵魄」找张大锤打，幻境妖王另有很小的几率直接掉
+  { id: 'bawangdao',  n: '霸王刀',     slot: 'weapon', cls: 'berserker', ch: 9, w: 1, set: 'xuehai',  imp: { critDmg: 40 },  fx: 'wBawang',  d: '霸王卸甲伤害 +100%；用它打死敌人，吃掉的怒意全数返还' },
+  { id: 'xiuluoren',  n: '修罗血刃',   slot: 'weapon', cls: 'berserker', ch: 9, w: 1, set: 'busi',    imp: { leech: 5 },     fx: 'wXiuluo',  d: '旋风刀、裂地斩之后追加一击，对所有敌人造成 60% 伤害；气血低于一半时吸血翻倍' },
+  { id: 'taiyifuchen', n: '太乙拂尘',  slot: 'weapon', cls: 'mage',      ch: 9, w: 1, set: 'guiyuan', imp: { elem: 20 },     fx: 'wTaiyi',   d: '「连」的上限 +2 层；「连」满 5 层后，所有招式伤害再 +30%' },
+  { id: 'wanfubi',    n: '万符笔',     slot: 'weapon', cls: 'mage',      ch: 9, w: 1, set: 'wanfu',   imp: { elem: 20 },     fx: 'wWanfu',   d: '引爆符同时引爆全场每个敌人身上的状态，每个敌人都按自己身上的状态算，伤害再 +30%' },
+  { id: 'zhenshiling', n: '镇尸铜铃',  slot: 'weapon', cls: 'necro',     ch: 9, w: 1, set: 'yinbing', imp: { minionPct: 20 }, fx: 'wZhenshi', d: '僵尸每次出手有 25% 几率连打两下' },
+  { id: 'wandufan',   n: '万毒幡',     slot: 'weapon', cls: 'necro',     ch: 9, w: 1, set: 'duxing',  imp: { elem: 20 },     fx: 'wWandu',   d: '敌人身上的毒不再随回合消退；尸毒蔓、土遁葬的毒发结算 +100%' },
+  { id: 'qishabi',    n: '七杀匕',     slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qisha',   imp: { critDmg: 40 },  fx: 'wQisha',   d: '杀意上限 +1；终结技打死敌人时，溢出的伤害转给下一个敌人' },
+  { id: 'lihuaxia',   n: '暴雨梨花匣', slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qianji',  imp: { crit: 8 },      fx: 'wLihua',   d: '暗器招式每次命中有 30% 几率追加一根冰魄针（60% 伤害，并冰冻）' },
+  { id: 'fumozhang',  n: '伏魔禅杖',   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'luohan',  imp: { hpPct: 12 },    fx: 'wFumo',    d: '反击伤害 +100%' },
+  { id: 'darilun',    n: '大日金轮',   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'dari',    imp: { dmgPct: 12 },   fx: 'wDari',    d: '大日如来追加的佛光伤害 +75%，每打中一个敌人恢复 2% 最大气血' },
+  // 其他部位再添几件门派神兵（正常掉落；穿了幻境套装的可以收进乾坤袋用）
+  { id: 'duanyue',    n: '断岳护腕',   slot: 'gloves', cls: 'berserker', ch: 7, imp: { atk: 10 },     fx: 'duanyue',    d: '断骨打中的敌人同时破甲和灼烧' },
+  { id: 'xuantian',   n: '玄天冠',     slot: 'helm',   cls: 'mage',      ch: 7, imp: { elem: 12 },    fx: 'xuantian',   d: '寒冰诀、落石诀冷却 -1' },
+  { id: 'huangquan',  n: '黄泉履',     slot: 'boots',  cls: 'necro',     ch: 7, imp: { minionPct: 10 }, fx: 'huangquan', d: '僵尸的速度和气血 +25%' },
+  { id: 'youying',    n: '幽影佩',     slot: 'amulet', cls: 'assassin',  ch: 7, imp: { crit: 5 },     fx: 'youying',    d: '烟遁期间你的伤害 +50%；烟遁冷却 -2' },
+  { id: 'jingangjia', n: '金刚袈裟',   slot: 'chest',  cls: 'paladin',   ch: 7, imp: { hpPct: 8 },    fx: 'jingangjia', d: '金钟罩冷却 -2；身上有护体真气时，每回合恢复 3% 最大气血' },
 ];
 
 const SETS = [

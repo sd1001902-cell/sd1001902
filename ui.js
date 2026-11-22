@@ -159,6 +159,15 @@ function setTip(S, n) {
   const L = syncLoadout(S.cls), miss = n >= 4 ? (S.need || []).filter(id => !L.includes(id)).map(id => (CLASSES[S.cls].skills.find(k => k.id === id) || {}).n).filter(Boolean) : [];
   return `<div class="settip">搭配：${S.tip}${miss.length ? `<b class="warn">　还没带上：${miss.join('、')}（去「武学」页换）</b>` : ''}</div>`;
 }
+// 洗炼之前先看清楚：没锁的每一条会变成什么、各有多大几率、数值在什么范围；金色的是这个部位专属的稀有词条
+function washOddsHTML(it, locks) {
+  const O = washOdds(it, locks), n = it.aff.length - locks.length; if (!O.length || n <= 0) return '';
+  const sh = (k, x) => k === 'hp' || k === 'regen' ? fmtBig(hpShow(Math.round(x * statMult(it, k)), heroLv())) : Math.round(x * statMult(it, k));
+  const pc = p => p >= 0.1 ? Math.round(p * 100) + '%' : (p * 100).toFixed(1) + '%';
+  return `<details class="odds" open><summary>这次会洗 ${n} 条 · 每一条可能变成</summary>
+    <div class="odds-l">${O.map(o => `<div class="${o.rare ? 'rare' : ''}"><span>${STAT_NAMES[o.k] || o.k}${o.rare ? '<i>稀有</i>' : ''}</span><small>${sh(o.k, o.lo)}–${sh(o.k, o.hi)}${PCT_STATS.has(o.k) ? '%' : ''}</small><b>${pc(o.p)}</b></div>`).join('')}</div>
+    <p class="sub">金色的是${SLOT_NAME[it.slot]}专属的稀有词条，只能洗出来。${n > 1 ? `这次洗 ${n} 条，至少出一条稀有的几率约 ${(100 * (1 - Math.pow(1 - WASH_RARE, n))).toFixed(1)}%。` : ''}洗出来了记得先锁住，再洗别的。</p></details>`;
+}
 function bestModal(cls, plan) {
   const ni = plan.filter(e => e.inh), g = ni.reduce((a, e) => a + e.cost.gold, 0), m = ni.reduce((a, e) => a + e.cost.mats, 0), plain = plan.length - ni.length;
   return `<h2 class="mh">一键换上最强</h2>
@@ -231,7 +240,7 @@ function stashBody(cls, D) {
   list.sort((a, b) => GSLOT || FILTER === 'up' ? ((D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)) : (order[a.rarity] - order[b.rarity] || (b.anc || 0) - (a.anc || 0) || b.ilvl - a.ilvl));
   const cur = GSLOT && SAVE.chars[cls].eq[GSLOT];
   // 点了部位：身上那件的完整属性直接摊开（以前只有一行名字，还得再点一下才看得到）
-  const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">身上的${SLOT_NAME[GSLOT]}</span>${cur ? `<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">强化 / 更多</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">卸下</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">收起</button></div>
+  const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">身上的${SLOT_NAME[GSLOT]}</span>${cur ? `${VIEW === 'town' && wsTabs().length > 1 ? `<button class="btn sm ghost" data-act="wsopen" data-arg="enh|${cur.id}">去养成</button>` : ''}<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">更多</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">卸下</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">收起</button></div>
       ${cur ? itemCard(cur, cls, '') : '<p class="sub" style="margin:6px 0 0">空着</p>'}</div>
       <h4 class="sub-h gcur-t">储物箱里能换的${SLOT_NAME[slotType(GSLOT)]}</h4>` : '';
   const chips = [['all', '全部'], ['up', '只看能提升的'], ...(featureOn('cube') ? [['leg', '乾坤袋未收']] : [])];
@@ -411,6 +420,65 @@ const npcModal = () => {
   return `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button>${fns.length > 1 ? `<div class="stabs">${fns.map(f => `<button class="${f[0] === fn ? 'on' : ''}" data-act="npcfn" data-arg="${f[0]}">${f[1]}</button>`).join('')}</div>` : ''}</div>
     <div class="svc-head">${unitIcon(Sp.spr, 56, Sp.pal, '', 'stand')}<div><b>${Sp.n}</b><p>${SVC[id].hi}</p></div></div>${body}`;
 };
+// ---------------- 养成台 ----------------
+// 以前：找人 → 选职能 → 挑装备 → 操作，换一样手艺又得从头找这件装备。现在一个页面：
+// 顶上一排身上的装备，点一下选中；下面一排页签切手艺，选中的装备不变；第一页「一览」直接列出现在能做的事。镇上的三位师傅只是入口
+let WS = { tab: 'ov', item: null, stash: false };
+const WS_TABS = [['ov', '一览', () => true, null], ['enh', '强化', () => featureOn('enhance'), 'smith'], ['inh', '传承', () => featureOn('enhance'), 'smith'], ['refine', '淬炼洗炼', () => featureOn('reroll'), 'tiedan'],
+  ['up', '升阶', () => featureOn('enhance'), 'tiedan'], ['sock', '镶玉', () => featureOn('sockets'), 'yujiang'], ['forge', '铸兵', () => featureOn('rift'), 'smith']];
+const wsTabs = () => WS_TABS.filter(t => t[2]());
+const WS_NPC = { smith: 'enh', tiedan: 'refine', yujiang: 'sock' };
+// 这件装备现在能做什么（一览和页签红点共用）
+function wsCan(it, where) {
+  const c = {}, cls = ctxCls();
+  if (featureOn('enhance') && (it.plus || 0) < smithMax()) { const e = enhanceCost(it); if (SAVE.gold >= e.gold && SAVE.mats >= e.mats) c.enh = `可以强化到 +${(it.plus || 0) + 1}（成功率 ${Math.round(e.rate * 100)}%）`; }
+  if (featureOn('sockets')) { const free = (it.sockets || 0) - (it.gems || []).length, sc = socketCost(it);
+    if (free > 0 && Object.keys(SAVE.gems).some(k => SAVE.gems[k] > 0)) c.sock = `有 ${free} 个空孔，可以镶玉`;
+    else if ((it.sockets || 0) < MAX_SOCKETS[it.slot] && SAVE.gold >= sc.gold && SAVE.mats >= sc.mats) c.sock = '可以再打一个孔'; }
+  if (featureOn('reroll') && it.aff.length) { const q = itemQ(it); if (busyRoll(it)) c.refine = '有一次洗炼／淬炼的结果还没选'; else if (q != null && q < 0.5) c.refine = `词条成色只有 ${Math.round(q * 100)}%，可以淬炼洗炼`; }
+  if (featureOn('enhance') && upTierOK(it)) { const L = upTierTarget(cls); if (L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const u = upTierCost(it, L); if (SAVE.gold >= u.gold && SAVE.mats >= u.mats) c.up = `可以升到${TIER_N[tierOf(L)]}`; } }
+  if (featureOn('enhance') && where === 'eq' && SAVE.stash.some(x => canInherit(it, x))) c.inh = '储物箱里有旧装备的强化／玉可以传过来';
+  return c;
+}
+function wsWorn(cls) { const eq = SAVE.chars[cls].eq; return eqSlots().map(p => [p, eq[p]]).filter(e => e[1]); }
+function wsForgeBody(cls) {
+  const W = wpnList(cls), bp = SAVE.bp || 0, owned = new Set(allItems().map(it => it.legend).filter(Boolean));
+  return `<p class="help-p"><b>专属兵器</b>：每条幻境套装路线一把，直接改写主力招式。自带攻击比普通神兵高三成；每强化 +1，特效再涨 3%。攒够 <b>${WPN_COST}</b> 颗兵魄，指定打一把。</p>
+    <div class="row wallet"><span class="pill gold">兵魄 ${bp} / ${WPN_COST}</span></div>
+    <p class="sub">兵魄：幻境 ${WPN_LV} 层起，每局按时打完得 2 颗，香烧完只有 1 颗。${RSET2_LV} 层起，妖王还有很小的几率直接掉一把。</p>
+    ${W.map(L => { const S = SETS.find(x => x.id === L.set);
+      return `<div class="wpn"><div class="wpn-h">${SPR.img('i_weapon', 34, { M: SPR.RAR_COL.legend })}<span class="nm"><b class="r-legend">${L.n}</b><small>配「${S ? S.n : ''}」 · 打出来 ${wpnIlvl()} 阶${owned.has(L.id) ? ' · 已经有一把' : ''}</small></span>
+        <button class="btn sm" ${bp >= WPN_COST ? '' : 'disabled'} data-act="wsforge" data-arg="${L.id}">打造</button></div><p>${L.d}</p></div>`; }).join('')}`;
+}
+function wsModal() {
+  const cls = ctxCls(), tabs = wsTabs(); if (!tabs.some(t => t[0] === WS.tab)) WS.tab = 'ov';
+  const tab = WS.tab, T = tabs.find(t => t[0] === tab), worn = wsWorn(cls), f = WS.item && findItem(WS.item); if (WS.item && !f) WS.item = null;
+  const cans = new Map(worn.map(([p, it]) => [it.id, wsCan(it, 'eq')]));
+  const dot = k => [...cans.values()].some(c => c[k]) || (k === 'forge' && (SAVE.bp || 0) >= WPN_COST);
+  const strip = `<div class="ws-strip">${worn.map(([p, it]) => `<button class="ws-it ${WS.item === it.id ? 'on' : ''} b-${it.rarity}" data-act="wsitem" data-arg="${it.id}">${SPR.item(it, 30)}<small>${it.plus ? '+' + it.plus : SLOTS.find(z => z.id === p).s}</small>${tab !== 'ov' && cans.get(it.id)[tab] ? '<i></i>' : ''}</button>`).join('')}
+      <button class="ws-it more ${WS.stash ? 'on' : ''}" data-act="wsstash"><span>库</span><small>储物箱</small></button></div>`;
+  let body;
+  if (tab === 'forge') body = wsForgeBody(cls);
+  else if (tab === 'ov') {
+    const todo = []; for (const [p, it] of worn) { const c = cans.get(it.id); for (const k of ['refine', 'enh', 'sock', 'up', 'inh']) if (c[k] && tabs.some(t => t[0] === k)) todo.push([it, k, c[k]]); }
+    body = `<h4 class="sub-h">现在能做的 <small>点一条直接过去</small></h4>
+      <div class="ws-todo">${todo.length ? todo.slice(0, 12).map(([it, k, txt]) => `<button data-act="wsgo" data-arg="${k}|${it.id}">${SPR.item(it, 24)}<span><b class="r-${it.rarity}">${itemTitle(it)}</b><small>${txt}</small></span><em>${tabs.find(t => t[0] === k)[1]} ›</em></button>`).join('') : '<div class="empty-note">身上的装备眼下没有能做的：银两、魂晶不够，或者都已经做到头了。</div>'}</div>
+      <h4 class="sub-h">身上的装备</h4>
+      <div class="ws-tbl"><div class="hd"><span>装备</span><span>强化</span><span>孔</span><span>成色</span><span>阶</span></div>${worn.map(([p, it]) => { const q = itemQ(it);
+        return `<button data-act="wsitem" data-arg="${it.id}"><span class="r-${it.rarity}">${SPR.item(it, 20)}${itemTitle(it)}</span><span>+${it.plus || 0}</span><span>${(it.gems || []).length}/${it.sockets || 0}</span><span class="${q != null && q < 0.5 ? 'lo' : ''}">${q == null ? '—' : Math.round(q * 100) + '%'}</span><span>${tierOf(it.ilvl)}</span></button>`; }).join('')}</div>`;
+  } else if (f) {
+    body = `<div class="svc-it">${SPR.item(f.it, 30)}<span class="nm r-${f.it.rarity}">${itemTitle(f.it)}<small>${SLOT_NAME[f.it.slot]} · ${f.where === 'eq' ? '穿在身上' : '储物箱里'}</small></span><button class="btn sm ghost" data-act="item" data-arg="${f.it.id}">看属性</button></div>${smithHTML(f.it, f.where, new Set([tab]), T[1])}`;
+  } else body = '<p class="sub" style="text-align:center;margin:14px 0">先在上面点一件装备。</p>';
+  if (WS.stash && tab !== 'forge') { const L = svcItems(tab === 'ov' ? 'enh' : tab).filter(e => !e.eq);
+    body = `<div class="svc-list ws-stash">${L.map(({ it }) => `<button class="svc-row ${ancCls(it)} ${WS.item === it.id ? 'on' : ''}" data-act="wsitem" data-arg="${it.id}">${SPR.item(it, 28)}<span class="nm r-${it.rarity}">${itemTitle(it)}<small>${SLOT_NAME[it.slot]} · ${it.ilvl} 阶</small></span><em>${svcInfo(tab === 'ov' ? 'enh' : tab, it)}</em></button>`).join('') || '<div class="empty-note">储物箱里没有合适的装备。</div>'}</div>` + body; }
+  if (tab === 'sock' && featureOn('gems')) body += `<details class="wxinfo"><summary>玉石合成</summary>${gemsBody()}</details>`;
+  const Sp = T[3] && SPEAKERS[T[3]];
+  return `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button><b class="ws-title">养成台</b><span class="ws-res">${fmtBig(SAVE.gold)} 两 · ${fmtBig(SAVE.mats)} 魂晶</span></div>
+    ${tab === 'forge' ? '' : strip}
+    <div class="ws-tabs">${tabs.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="wstab" data-arg="${t[0]}">${t[1]}${t[0] !== 'ov' && dot(t[0]) ? '<i></i>' : ''}</button>`).join('')}</div>
+    ${Sp ? `<div class="ws-npc">${unitIcon(Sp.spr, 30, Sp.pal, '', 'stand')}<span>${Sp.n}</span></div>` : ''}${body}`;
+}
+function wsOpen(tab, item) { const tabs = wsTabs(); WS = { tab: tabs.some(t => t[0] === tab) ? tab : 'ov', item: item || null, stash: false }; if (item) { const f = findItem(item); if (f && f.where !== 'eq') WS.stash = false; } BACK = null; openModal(wsModal); }
 const boxNoteModal = () => `<h2 class="mh">多了几个装备位</h2>
   <p class="help-p"><b>灵玉匣</b>：通关后每个角色都有一个，在「人物」页装备栏里。匣子自带一点气血和伤害，三个孔专门镶灵玉。灵玉全账号共用，每个角色各挑三颗。原来镶在扳指、玉佩上的灵玉已经搬进匣里，那两个孔还给普通玉了。</p>
   <p class="help-p"><b>新装备位</b>跟着幻境最高纪录逐个开：<b>腰带</b>（10 层，偏防御）、<b>副手</b>（20 层，偏进攻，各门派自己的物件）、<b>第二枚扳指</b>（30 层）。开了以后，这类装备会在幻境里掉。</p>
@@ -514,6 +582,8 @@ function buildCard(cls) {
   const nSet = s.setCount[S.id] || 0;
   const legRow = B.leg.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = owned.has(lid), open = slotOpen(X.slot);
     return `<div class="bc-line">${ok(has)}<b class="r-legend">${X.n}</b><small>${SLOT_NAME[X.slot]} · ${has ? '已有' : open ? '幻境里掉' : `幻境 ${SLOTS.find(z => z.id === X.slot).rift} 层开${SLOT_NAME[X.slot]}后掉`}</small><p>${X.d}</p></div>`; }).join('');
+  const WX0 = LEGENDS.find(l => l.w && l.set === B.set), hasW = WX0 && owned.has(WX0.id);
+  const wpnRow = WX0 ? `<div class="bc-line">${ok(hasW)}<b class="r-legend">${WX0.n}</b><small>${hasW ? '已有' : `兵魄 ${SAVE.bp || 0}/${WPN_COST}，攒够了找张大锤打`}</small><p>${WX0.d}</p></div>` : '';
   const cubeRow = B.cube.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = !!SAVE.cube[lid], inb = (ch.cube || []).includes(lid);
     return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}${X.n}<small>${has ? (inb ? '' : '已收，没放上') : `第${CN[X.ch || 1]}章起掉`}</small></span>`; }).join('');
   const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t), inb = !!g && (ch.lgs || []).includes(g.id);
@@ -523,6 +593,7 @@ function buildCard(cls) {
     <p class="help-p">${B.d}。</p>
     <div class="bc-sec"><span class="bc-h">招式</span><div class="bc-bits">${skRow}</div></div>
     <div class="bc-sec"><span class="bc-h">套装</span><div class="bc-bits"><span class="bc-bit ${nSet >= 6 ? 'on' : ''}">${ok(nSet >= 6)}<b class="r-set">${S.n}</b><small>已穿 ${nSet}/6 · 幻境 ${S.rlv || RSET_LV} 层起掉</small></span></div></div>
+    <div class="bc-sec"><span class="bc-h">兵器</span><div>${wpnRow}</div></div>
     <div class="bc-sec"><span class="bc-h">神兵</span><div>${legRow}</div></div>
     ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">乾坤袋</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
     <div class="bc-sec"><span class="bc-h">灵玉</span><div class="bc-bits">${gemRow}</div></div>
@@ -1340,6 +1411,7 @@ function zoneName() { const r = SAVE.run, S = wstate(r.chapter), m = wmap(r.chap
 const TQ = []; let TQon = false;
 function qtoast(msg) { TQ.push(msg); if (!TQon) nextToast(); }
 function nextToast() { const m = TQ.shift(); if (m == null) { TQon = false; return; } TQon = true; toast(m); setTimeout(nextToast, TQ.length ? 1500 : 200); }
+const eliteTagTxt = (mn, def) => { if (!SAVE.run) return ''; const A = eliteAffsOf(SAVE.run, mn).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean); if (def && def.trait && TRAITS[def.trait]) A.unshift(TRAITS[def.trait].n); return A.join(' · '); };
 const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? '守关妖王已经现身——找到它，打倒它'
   : `撞上一群妖物，旁边的会一起卷进来。精英倒下会掉精魄，走过去捡。${R.last ? '这是最后一层，妖物最肥。' : R.fi ? `这一层每只妖物的进度 +${Math.round((R_DEEP[R.fi] - 1) * 100)}%，越往下越肥。` : '越往下越肥：下一层每只妖物给的进度更多。'}`; };
 // 幻境的地图界面：没有任务栏，换成进度条和香
@@ -1628,7 +1700,9 @@ function wDraw(cv, dpr, ts, t) {
     g.globalAlpha = 1;
     if (mn.beh === 'sleep') { g.fillStyle = '#9ab'; g.font = `bold ${Math.round(ts * 0.3)}px sans-serif`; g.fillText('z', px + ts * 0.85, py + ts * 0.1 - (t / 400 % 1) * 6); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
     if (mn.beh === 'chase' && d2 <= 25 && wInSight(ch, mn.x, mn.y)) { g.fillStyle = '#ff5a3a'; g.font = `900 ${Math.round(ts * 0.4)}px sans-serif`; g.fillText('!', px + ts / 2, py - ts * 0.1); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
+    const etag = mn.elite && !mn.boss ? eliteTagTxt(mn, def) : '';   // 精英：词缀、特性在地图上就写出来
     if (mn.z === 'r' && mn.elite) { g.fillStyle = mn.rare ? '#d8a8ff' : '#ffb066'; g.fillText(mn.rare ? '稀有精英' : '精英', px + ts / 2, py + ts * 1.15); }
+    if (etag) { g.font = `bold ${Math.round(ts * 0.22)}px "Noto Serif SC",serif`; g.fillStyle = '#ffd27a'; g.strokeStyle = 'rgba(0,0,0,.75)'; g.lineWidth = 3; g.strokeText(etag, px + ts / 2, py + ts * 1.42); g.fillText(etag, px + ts / 2, py + ts * 1.42); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
     if (mn.boss) { g.fillStyle = '#ff6a5a'; g.fillText('守关妖王 · ' + def.n, px + ts / 2, py + ts * 1.2); }
     if (mn.name && (mn.elite || mn.tag)) { const dl = mn.lv - SAVE.chars[SAVE.run.cls].level;
       g.fillStyle = dl >= 3 ? '#ff4a3a' : dl >= 1 ? '#ffb066' : '#d8d0b0'; g.fillText(`${mn.name}${mn.elite ? ` ${mn.lv}级` : ''}`, px + ts / 2, py + ts * 1.15); }
@@ -2562,6 +2636,7 @@ function endHTML() {
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
       <div><p>${r.world ? `用时 <b>${fmtClock(r.clock || 0)}</b> · 香还剩 <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `用时 <b>${used}</b> 回合 · 香还剩 <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · 倒下 ${r.deaths} 次` : ''}</p>
       <p>${tl > 0 ? `灵玉可以升级 <b>${r.upg}</b> 次 · 现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : '香烧完了：这一层不算过，灵玉只能升 1 次'}</p>
+      ${r.bp ? `<p class="newslot">兵魄 <b>+${r.bp}</b>（现在 ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? '，够打一把专属兵器了：去找张大锤' : ''}）</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">新的装备位开了：<b>${r.newSlots.map(p => SLOT_NAME[p]).join('、')}</b>。去「人物」页看看；这一类装备从现在起会在幻境里掉。</p>` : ''}
       ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${r.world ? '用时 ' + fmtClock(r.clock || 0) : used + ' 回合'}</p>` : ''}</div></div>`;
     extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
@@ -2648,7 +2723,8 @@ function smithHTML(it, where, W, title) {
       h += `<div class="srow col"><span>淬炼 · 洗炼 <small>淬炼：一条词条的数值重摇，新旧二选一（${rc.gold} 两 + ${rc.mats} 魂晶）。洗炼：锁住想留的，其余全部换新，洗完整套二选一；锁得越多越贵。</small></span>
         <div class="rflist">${it.aff.map(([k, v], i) => `<div class="rfrow ${lk.has(i) ? 'lk' : ''}"><button class="lockb ${lk.has(i) ? 'on' : ''}" data-act="wlock" data-arg="${it.id}|${i}">${lk.has(i) ? '已锁' : '锁'}</button><span class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</span><button class="btn sm ghost" ${SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rf" data-arg="${it.id}|${i}">淬炼</button></div>`).join('')}</div>
         ${unlockedSp ? '<p class="sub warn">特殊词条没锁——洗炼会把它洗掉（洗不回来）。</p>' : ''}
-        <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">洗炼（锁 ${lk.size} 条 · ${wc.gold} 两 + ${wc.mats} 魂晶）</button></div>`;
+        <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">洗炼（锁 ${lk.size} 条 · ${wc.gold} 两 + ${wc.mats} 魂晶）</button>
+        ${washOddsHTML(it, [...lk])}</div>`;
     }
   }
   if (W.has('refine') && it.aff.length && featureOn('reroll') && it.rrPending) {
@@ -2812,6 +2888,7 @@ const ACT = {
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast('Ngoc：「早就该带上我了。」'); else toast('Ngoc：「……那你早点回来。」'); },
   npc: id => {
     const qc = townCh();
+    if (!(qc && wNpcMark(qc, id)) && WS_NPC[id] && svcFns(id).length) return wsOpen(WS_NPC[id], null);   // 三位师傅：都通到养成台，停在他的那一页
     if (!(qc && wNpcMark(qc, id)) && svcFns(id).length) { NPCV = { id, fn: null, item: null }; GAMBLE = null; BULKX = new Set(); BULKARM = false; BACK = null; return openModal(npcModal); }   // 没有任务要说：开他的铺子
     if (qc && (wNpcMark(qc, id) || WNPC[id])) { const acts = wTalk(qc, id, SAVE.run && SAVE.run.world ? SAVE.run : null);
       if (acts.length === 1 && acts[0].dlg && acts[0].dlg.length === 1 && !wNpcMark(qc, id) && NPC_LINES[id] && storyCleared('normal') >= 1) return npcTalk(id);
@@ -2862,7 +2939,13 @@ const ACT = {
   itab: k => { ITAB = k; refresh(); },
   npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },
   npcitem: id => { NPCV.item = id || null; refresh(); },
-  npcgo: a => { const [id, fn, item] = split(a); NPCV = { id, fn, item: item || null }; GAMBLE = null; BACK = null; openModal(npcModal); },
+  npcgo: a => { const [id, fn, item] = split(a); if (WS_NPC[id]) return wsOpen(fn, item || null); NPCV = { id, fn, item: item || null }; GAMBLE = null; BACK = null; openModal(npcModal); },
+  wstab: k => { WS.tab = k; refresh(); },
+  wsitem: id => { WS.item = WS.item === id && WS.tab !== 'ov' ? null : id; if (WS.tab === 'ov') WS.tab = wsTabs().some(t => t[0] === 'enh') ? 'enh' : wsTabs()[1] ? wsTabs()[1][0] : 'ov'; refresh(); },
+  wsstash: () => { WS.stash = !WS.stash; refresh(); },
+  wsgo: a => { const [k, id] = split(a); WS.tab = k; WS.item = id; WS.stash = false; refresh(); },
+  wsopen: a => { const [k, id] = split(a); wsOpen(k || 'ov', id || null); },
+  wsforge: lid => { const r = forgeWeapon(ctxCls(), lid); if (r.err) return toast(r.err); SFX.play('legend'); toast(`打出来了：<b>${esc(r.it.name)}</b>（已放进储物箱）`); refresh(); achToast(checkAch()); },
   gamb: slot => { const it = gamble(SAVE.cls, slot); if (!it) return toast('银两不够'); GAMBLE = it; SFX.play(it.rarity === 'legend' || it.rarity === 'set' ? 'legend' : it.rarity === 'rare' ? 'rare' : 'coin'); refresh(); },
   bulkopen: () => { BULKX = new Set(); BULKARM = false; BACK = null; openModal(bulkModal); },
   bulkmode: m => { bulkFilter().mode = m; BULKARM = false; refresh(); },

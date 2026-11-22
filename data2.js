@@ -225,7 +225,7 @@ SETS.push(
     pieces: [['helm', '阴兵斗笠'], ['chest', '阴兵寿衣'], ['gloves', '阴兵指套'], ['boots', '阴兵草鞋'], ['ring', '阴兵扳指'], ['amulet', '阴兵铜铃']],
     b2: { minion: 1, minionPct: 20 }, b2d: '尸位 +1，僵尸强度 +20%',
     b4: 'yinBing4', b4d: '僵尸倒下时炸开，按它最大气血的 50% 打所有敌人',
-    b6: 'yinBing6', b6d: '僵尸的伤害 ×2.5；每有一具僵尸在场，你受到的伤害 -7%' },
+    b6: 'yinBing6', b6d: '僵尸的伤害 ×2；每有一具僵尸在场，你受到的伤害 -7%' },
   { id: 'qisha', n: '七杀', cls: 'assassin', rift: true,
     pieces: [['helm', '七杀面罩'], ['chest', '七杀夜行衣'], ['gloves', '七杀指套'], ['boots', '七杀软靴'], ['ring', '七杀扳指'], ['amulet', '七杀玉佩']],
     b2: { crit: 8, critDmg: 30 }, b2d: '暴击率 +8%，暴击伤害 +30%',

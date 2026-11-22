@@ -159,6 +159,15 @@ function setTip(S, n) {
   const L = syncLoadout(S.cls), miss = n >= 4 ? (S.need || []).filter(id => !L.includes(id)).map(id => (CLASSES[S.cls].skills.find(k => k.id === id) || {}).n).filter(Boolean) : [];
   return `<div class="settip">Phối hợp: ${S.tip}${miss.length ? `<b class="warn"> Chưa mang: ${miss.join(", ")} (vào trang “Võ học” để đổi)</b>` : ''}</div>`;
 }
+// 洗炼之前先看清楚：没锁的每一条会变成什么、各有多大几率、数值在什么范围；金色的是这个部位专属的稀有词条
+function washOddsHTML(it, locks) {
+  const O = washOdds(it, locks), n = it.aff.length - locks.length; if (!O.length || n <= 0) return '';
+  const sh = (k, x) => k === 'hp' || k === 'regen' ? fmtBig(hpShow(Math.round(x * statMult(it, k)), heroLv())) : Math.round(x * statMult(it, k));
+  const pc = p => p >= 0.1 ? Math.round(p * 100) + '%' : (p * 100).toFixed(1) + '%';
+  return `<details class="odds" open><summary>Lần này tẩy ${n} dòng · mỗi dòng có thể thành</summary>
+    <div class="odds-l">${O.map(o => `<div class="${o.rare ? 'rare' : ''}"><span>${STAT_NAMES[o.k] || o.k}${o.rare ? "<i>hiếm</i>" : ''}</span><small>${sh(o.k, o.lo)}–${sh(o.k, o.hi)}${PCT_STATS.has(o.k) ? '%' : ''}</small><b>${pc(o.p)}</b></div>`).join('')}</div>
+    <p class="sub">Màu vàng là dòng hiếm riêng của ${SLOT_NAME[it.slot]}, chỉ tẩy luyện mới ra. ${n > 1 ? `Lần này tẩy ${n} dòng, tỉ lệ ra ít nhất một dòng hiếm khoảng ${(100 * (1 - Math.pow(1 - WASH_RARE, n))).toFixed(1)}%. ` : ''}Ra rồi nhớ khóa lại trước, rồi hãy tẩy dòng khác.</p></details>`;
+}
 function bestModal(cls, plan) {
   const ni = plan.filter(e => e.inh), g = ni.reduce((a, e) => a + e.cost.gold, 0), m = ni.reduce((a, e) => a + e.cost.mats, 0), plain = plan.length - ni.length;
   return `<h2 class="mh">Thay nhanh bộ mạnh nhất</h2>
@@ -231,7 +240,7 @@ function stashBody(cls, D) {
   list.sort((a, b) => GSLOT || FILTER === 'up' ? ((D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)) : (order[a.rarity] - order[b.rarity] || (b.anc || 0) - (a.anc || 0) || b.ilvl - a.ilvl));
   const cur = GSLOT && SAVE.chars[cls].eq[GSLOT];
   // 点了部位：身上那件的完整属性直接摊开（以前只有一行名字，还得再点一下才看得到）
-  const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">${SLOT_NAME[GSLOT]} đang mặc</span>${cur ? `<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">Cường hóa / Thêm</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">Tháo</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">Thu gọn</button></div>
+  const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">${SLOT_NAME[GSLOT]} đang mặc</span>${cur ? `${VIEW === 'town' && wsTabs().length > 1 ? `<button class="btn sm ghost" data-act="wsopen" data-arg="enh|${cur.id}">Nuôi đồ</button>` : ''}<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">Thêm</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">Tháo</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">Thu gọn</button></div>
       ${cur ? itemCard(cur, cls, '') : "<p class=\"sub\" style=\"margin:6px 0 0\">Đang trống</p>"}</div>
       <h4 class="sub-h gcur-t">${SLOT_NAME[slotType(GSLOT)]} đổi được trong kho</h4>` : '';
   const chips = [['all', "Tất cả"], ['up', "Chỉ đồ tốt hơn"], ...(featureOn('cube') ? [['leg', "Chưa cất vào Túi"]] : [])];
@@ -412,6 +421,65 @@ const npcModal = () => {
   return `<div class="shead"><button class="btn sm ghost" data-act="close">Đóng</button>${fns.length > 1 ? `<div class="stabs">${fns.map(f => `<button class="${f[0] === fn ? 'on' : ''}" data-act="npcfn" data-arg="${f[0]}">${f[1]}</button>`).join('')}</div>` : ''}</div>
     <div class="svc-head">${unitIcon(Sp.spr, 56, Sp.pal, '', 'stand')}<div><b>${Sp.n}</b><p>${SVC[id].hi}</p></div></div>${body}`;
 };
+// ---------------- 养成台 ----------------
+// 以前：找人 → 选职能 → 挑装备 → 操作，换一样手艺又得从头找这件装备。现在一个页面：
+// 顶上一排身上的装备，点一下选中；下面一排页签切手艺，选中的装备不变；第一页「一览」直接列出现在能做的事。镇上的三位师傅只是入口
+let WS = { tab: 'ov', item: null, stash: false };
+const WS_TABS = [['ov', "Tổng quan", () => true, null], ['enh', "Cường hóa", () => featureOn('enhance'), 'smith'], ['inh', "Truyền thừa", () => featureOn('enhance'), 'smith'], ['refine', "Tôi luyện, tẩy luyện", () => featureOn('reroll'), 'tiedan'],
+  ['up', "Thăng giai", () => featureOn('enhance'), 'tiedan'], ['sock', "Khảm ngọc", () => featureOn('sockets'), 'yujiang'], ['forge', "Đúc binh", () => featureOn('rift'), 'smith']];
+const wsTabs = () => WS_TABS.filter(t => t[2]());
+const WS_NPC = { smith: 'enh', tiedan: 'refine', yujiang: 'sock' };
+// 这件装备现在能做什么（一览和页签红点共用）
+function wsCan(it, where) {
+  const c = {}, cls = ctxCls();
+  if (featureOn('enhance') && (it.plus || 0) < smithMax()) { const e = enhanceCost(it); if (SAVE.gold >= e.gold && SAVE.mats >= e.mats) c.enh = `Cường hóa được lên +${(it.plus || 0) + 1} (tỉ lệ thành công ${Math.round(e.rate * 100)}%)`; }
+  if (featureOn('sockets')) { const free = (it.sockets || 0) - (it.gems || []).length, sc = socketCost(it);
+    if (free > 0 && Object.keys(SAVE.gems).some(k => SAVE.gems[k] > 0)) c.sock = `Có ${free} lỗ trống, khảm ngọc được`;
+    else if ((it.sockets || 0) < MAX_SOCKETS[it.slot] && SAVE.gold >= sc.gold && SAVE.mats >= sc.mats) c.sock = "Đục thêm được một lỗ"; }
+  if (featureOn('reroll') && it.aff.length) { const q = itemQ(it); if (busyRoll(it)) c.refine = "Còn một kết quả tẩy luyện / tôi luyện chưa chọn"; else if (q != null && q < 0.5) c.refine = `Phẩm chất dòng chỉ ${Math.round(q * 100)}%, nên tôi luyện tẩy luyện`; }
+  if (featureOn('enhance') && upTierOK(it)) { const L = upTierTarget(cls); if (L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const u = upTierCost(it, L); if (SAVE.gold >= u.gold && SAVE.mats >= u.mats) c.up = `Thăng được lên ${TIER_N[tierOf(L)]}`; } }
+  if (featureOn('enhance') && where === 'eq' && SAVE.stash.some(x => canInherit(it, x))) c.inh = "Trong kho có đồ cũ, cường hóa / ngọc truyền sang được";
+  return c;
+}
+function wsWorn(cls) { const eq = SAVE.chars[cls].eq; return eqSlots().map(p => [p, eq[p]]).filter(e => e[1]); }
+function wsForgeBody(cls) {
+  const W = wpnList(cls), bp = SAVE.bp || 0, owned = new Set(allItems().map(it => it.legend).filter(Boolean));
+  return `<p class="help-p"><b>Binh khí chuyên thuộc</b>: mỗi hướng Bộ Ảo Cảnh một món, đổi hẳn cách dùng chiêu chủ lực. Công có sẵn cao hơn thần binh thường ba phần; mỗi +1 cường hóa, hiệu ứng tăng thêm 3%. Gom đủ <b>${WPN_COST}</b> viên Binh phách thì chỉ định đúc một món.</p>
+    <div class="row wallet"><span class="pill gold">Binh phách ${bp} / ${WPN_COST}</span></div>
+    <p class="sub">Binh phách: từ Ảo Cảnh tầng ${WPN_LV}, mỗi ván xong đúng giờ được 2 viên, hương tàn chỉ được 1 viên. Từ tầng ${RSET2_LV}, yêu vương còn có tỉ lệ rất nhỏ rơi thẳng một món.</p>
+    ${W.map(L => { const S = SETS.find(x => x.id === L.set);
+      return `<div class="wpn"><div class="wpn-h">${SPR.img('i_weapon', 34, { M: SPR.RAR_COL.legend })}<span class="nm"><b class="r-legend">${L.n}</b><small>hợp “${S ? S.n : ''}” · đúc ra giai ${wpnIlvl()}${owned.has(L.id) ? " · đã có một món" : ''}</small></span>
+        <button class="btn sm" ${bp >= WPN_COST ? '' : 'disabled'} data-act="wsforge" data-arg="${L.id}">Đúc</button></div><p>${L.d}</p></div>`; }).join('')}`;
+}
+function wsModal() {
+  const cls = ctxCls(), tabs = wsTabs(); if (!tabs.some(t => t[0] === WS.tab)) WS.tab = 'ov';
+  const tab = WS.tab, T = tabs.find(t => t[0] === tab), worn = wsWorn(cls), f = WS.item && findItem(WS.item); if (WS.item && !f) WS.item = null;
+  const cans = new Map(worn.map(([p, it]) => [it.id, wsCan(it, 'eq')]));
+  const dot = k => [...cans.values()].some(c => c[k]) || (k === 'forge' && (SAVE.bp || 0) >= WPN_COST);
+  const strip = `<div class="ws-strip">${worn.map(([p, it]) => `<button class="ws-it ${WS.item === it.id ? 'on' : ''} b-${it.rarity}" data-act="wsitem" data-arg="${it.id}">${SPR.item(it, 30)}<small>${it.plus ? '+' + it.plus : SLOTS.find(z => z.id === p).s}</small>${tab !== 'ov' && cans.get(it.id)[tab] ? '<i></i>' : ''}</button>`).join('')}
+      <button class="ws-it more ${WS.stash ? 'on' : ''}" data-act="wsstash"><span>Kho</span><small>Nhà kho</small></button></div>`;
+  let body;
+  if (tab === 'forge') body = wsForgeBody(cls);
+  else if (tab === 'ov') {
+    const todo = []; for (const [p, it] of worn) { const c = cans.get(it.id); for (const k of ['refine', 'enh', 'sock', 'up', 'inh']) if (c[k] && tabs.some(t => t[0] === k)) todo.push([it, k, c[k]]); }
+    body = `<h4 class="sub-h">Làm được ngay <small>chạm một dòng để tới thẳng</small></h4>
+      <div class="ws-todo">${todo.length ? todo.slice(0, 12).map(([it, k, txt]) => `<button data-act="wsgo" data-arg="${k}|${it.id}">${SPR.item(it, 24)}<span><b class="r-${it.rarity}">${itemTitle(it)}</b><small>${txt}</small></span><em>${tabs.find(t => t[0] === k)[1]} ›</em></button>`).join('') : "<div class=\"empty-note\">Đồ đang mặc hiện chưa có gì làm được: không đủ bạc, hồn tinh, hoặc đã làm tới hết mức.</div>"}</div>
+      <h4 class="sub-h">Đồ đang mặc</h4>
+      <div class="ws-tbl"><div class="hd"><span>Trang bị</span><span>C.hóa</span><span>Lỗ</span><span>P.chất</span><span>Giai</span></div>${worn.map(([p, it]) => { const q = itemQ(it);
+        return `<button data-act="wsitem" data-arg="${it.id}"><span class="r-${it.rarity}">${SPR.item(it, 20)}${itemTitle(it)}</span><span>+${it.plus || 0}</span><span>${(it.gems || []).length}/${it.sockets || 0}</span><span class="${q != null && q < 0.5 ? 'lo' : ''}">${q == null ? '—' : Math.round(q * 100) + '%'}</span><span>${tierOf(it.ilvl)}</span></button>`; }).join('')}</div>`;
+  } else if (f) {
+    body = `<div class="svc-it">${SPR.item(f.it, 30)}<span class="nm r-${f.it.rarity}">${itemTitle(f.it)}<small>${SLOT_NAME[f.it.slot]} · ${f.where === 'eq' ? "đang mặc" : "trong kho"}</small></span><button class="btn sm ghost" data-act="item" data-arg="${f.it.id}">Xem</button></div>${smithHTML(f.it, f.where, new Set([tab]), T[1])}`;
+  } else body = "<p class=\"sub\" style=\"text-align:center;margin:14px 0\">Chạm một món trang bị ở trên trước.</p>";
+  if (WS.stash && tab !== 'forge') { const L = svcItems(tab === 'ov' ? 'enh' : tab).filter(e => !e.eq);
+    body = `<div class="svc-list ws-stash">${L.map(({ it }) => `<button class="svc-row ${ancCls(it)} ${WS.item === it.id ? 'on' : ''}" data-act="wsitem" data-arg="${it.id}">${SPR.item(it, 28)}<span class="nm r-${it.rarity}">${itemTitle(it)}<small>${SLOT_NAME[it.slot]} · giai ${it.ilvl}</small></span><em>${svcInfo(tab === 'ov' ? 'enh' : tab, it)}</em></button>`).join('') || "<div class=\"empty-note\">Trong kho không có trang bị phù hợp.</div>"}</div>` + body; }
+  if (tab === 'sock' && featureOn('gems')) body += `<details class="wxinfo"><summary>Ghép ngọc</summary>${gemsBody()}</details>`;
+  const Sp = T[3] && SPEAKERS[T[3]];
+  return `<div class="shead"><button class="btn sm ghost" data-act="close">Đóng</button><b class="ws-title">Đài Nuôi Đồ</b><span class="ws-res">${fmtBig(SAVE.gold)} lượng · ${fmtBig(SAVE.mats)} hồn tinh</span></div>
+    ${tab === 'forge' ? '' : strip}
+    <div class="ws-tabs">${tabs.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="wstab" data-arg="${t[0]}">${t[1]}${t[0] !== 'ov' && dot(t[0]) ? '<i></i>' : ''}</button>`).join('')}</div>
+    ${Sp ? `<div class="ws-npc">${unitIcon(Sp.spr, 30, Sp.pal, '', 'stand')}<span>${Sp.n}</span></div>` : ''}${body}`;
+}
+function wsOpen(tab, item) { const tabs = wsTabs(); WS = { tab: tabs.some(t => t[0] === tab) ? tab : 'ov', item: item || null, stash: false }; if (item) { const f = findItem(item); if (f && f.where !== 'eq') WS.stash = false; } BACK = null; openModal(wsModal); }
 const boxNoteModal = () => `<h2 class="mh">Có thêm mấy ô trang bị</h2>
   <p class="help-p"><b>Hộp Linh Ngọc</b>: phá đảo xong mỗi nhân vật có một cái, nằm ở ô trang bị trong trang “Nhân vật”. Hộp có sẵn một ít khí huyết và sát thương, ba lỗ chuyên khảm linh ngọc. Linh ngọc dùng chung cả tài khoản, mỗi nhân vật tự chọn ba viên. Linh ngọc trước đây khảm trên nhẫn, ngọc bội đã được chuyển vào hộp, hai lỗ đó trả lại cho ngọc thường.</p>
   <p class="help-p"><b>Ô trang bị mới</b> mở dần theo kỷ lục Ảo Cảnh: <b>Thắt lưng</b> (tầng 10, thiên phòng thủ), <b>Tay phụ</b> (tầng 20, thiên tấn công, mỗi môn phái một món riêng), <b>Nhẫn thứ hai</b> (tầng 30). Mở rồi thì loại trang bị đó sẽ rơi trong Ảo Cảnh.</p>
@@ -515,6 +583,8 @@ function buildCard(cls) {
   const nSet = s.setCount[S.id] || 0;
   const legRow = B.leg.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = owned.has(lid), open = slotOpen(X.slot);
     return `<div class="bc-line">${ok(has)}<b class="r-legend">${X.n}</b><small>${SLOT_NAME[X.slot]} · ${has ? "đã có" : open ? "rơi trong Ảo Cảnh" : `Ảo Cảnh tầng ${SLOTS.find(z => z.id === X.slot).rift} mở ${SLOT_NAME[X.slot]} rồi mới rơi`}</small><p>${X.d}</p></div>`; }).join('');
+  const WX0 = LEGENDS.find(l => l.w && l.set === B.set), hasW = WX0 && owned.has(WX0.id);
+  const wpnRow = WX0 ? `<div class="bc-line">${ok(hasW)}<b class="r-legend">${WX0.n}</b><small>${hasW ? "đã có" : `Binh phách ${SAVE.bp || 0}/${WPN_COST}, gom đủ thì tìm Trương Đại Chùy đúc`}</small><p>${WX0.d}</p></div>` : '';
   const cubeRow = B.cube.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = !!SAVE.cube[lid], inb = (ch.cube || []).includes(lid);
     return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}${X.n}<small>${has ? (inb ? '' : "đã cất, chưa đặt") : `rơi từ chương ${CN[X.ch || 1]}`}</small></span>`; }).join('');
   const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t), inb = !!g && (ch.lgs || []).includes(g.id);
@@ -524,6 +594,7 @@ function buildCard(cls) {
     <p class="help-p">${B.d}.</p>
     <div class="bc-sec"><span class="bc-h">Chiêu</span><div class="bc-bits">${skRow}</div></div>
     <div class="bc-sec"><span class="bc-h">Bộ</span><div class="bc-bits"><span class="bc-bit ${nSet >= 6 ? 'on' : ''}">${ok(nSet >= 6)}<b class="r-set">${S.n}</b><small>đã mặc ${nSet}/6 · rơi từ Ảo Cảnh tầng ${S.rlv || RSET_LV}</small></span></div></div>
+    <div class="bc-sec"><span class="bc-h">Binh khí</span><div>${wpnRow}</div></div>
     <div class="bc-sec"><span class="bc-h">Thần binh</span><div>${legRow}</div></div>
     ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">Túi Càn Khôn</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
     <div class="bc-sec"><span class="bc-h">Linh ngọc</span><div class="bc-bits">${gemRow}</div></div>
@@ -1341,6 +1412,7 @@ function zoneName() { const r = SAVE.run, S = wstate(r.chapter), m = wmap(r.chap
 const TQ = []; let TQon = false;
 function qtoast(msg) { TQ.push(msg); if (!TQon) nextToast(); }
 function nextToast() { const m = TQ.shift(); if (m == null) { TQon = false; return; } TQon = true; toast(m); setTimeout(nextToast, TQ.length ? 1500 : 200); }
+const eliteTagTxt = (mn, def) => { if (!SAVE.run) return ''; const A = eliteAffsOf(SAVE.run, mn).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean); if (def && def.trait && TRAITS[def.trait]) A.unshift(TRAITS[def.trait].n); return A.join(' · '); };
 const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? "Yêu vương giữ ải đã hiện thân — tìm nó, hạ nó"
   : `Đụng một bầy yêu vật, các bầy bên cạnh bị cuốn vào cùng. Tinh anh ngã xuống rơi tinh phách, đi tới nhặt. ${R.last ? "Đây là tầng cuối, yêu vật béo nhất." : R.fi ? `Tầng này mỗi con yêu vật cho tiến độ +${Math.round((R_DEEP[R.fi] - 1) * 100)}%, càng xuống sâu càng béo.` : "Càng xuống sâu càng béo: tầng kế mỗi con yêu vật cho nhiều tiến độ hơn."}`; };
 // 幻境的地图界面：没有任务栏，换成进度条和香
@@ -1629,7 +1701,9 @@ function wDraw(cv, dpr, ts, t) {
     g.globalAlpha = 1;
     if (mn.beh === 'sleep') { g.fillStyle = '#9ab'; g.font = `bold ${Math.round(ts * 0.3)}px sans-serif`; g.fillText('z', px + ts * 0.85, py + ts * 0.1 - (t / 400 % 1) * 6); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
     if (mn.beh === 'chase' && d2 <= 25 && wInSight(ch, mn.x, mn.y)) { g.fillStyle = '#ff5a3a'; g.font = `900 ${Math.round(ts * 0.4)}px sans-serif`; g.fillText('!', px + ts / 2, py - ts * 0.1); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
+    const etag = mn.elite && !mn.boss ? eliteTagTxt(mn, def) : '';   // 精英：词缀、特性在地图上就写出来
     if (mn.z === 'r' && mn.elite) { g.fillStyle = mn.rare ? '#d8a8ff' : '#ffb066'; g.fillText(mn.rare ? "Tinh anh hiếm" : "Tinh anh", px + ts / 2, py + ts * 1.15); }
+    if (etag) { g.font = `bold ${Math.round(ts * 0.22)}px "Noto Serif SC",serif`; g.fillStyle = '#ffd27a'; g.strokeStyle = 'rgba(0,0,0,.75)'; g.lineWidth = 3; g.strokeText(etag, px + ts / 2, py + ts * 1.42); g.fillText(etag, px + ts / 2, py + ts * 1.42); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
     if (mn.boss) { g.fillStyle = '#ff6a5a'; g.fillText("Yêu vương giữ ải · " + def.n, px + ts / 2, py + ts * 1.2); }
     if (mn.name && (mn.elite || mn.tag)) { const dl = mn.lv - SAVE.chars[SAVE.run.cls].level;
       g.fillStyle = dl >= 3 ? '#ff4a3a' : dl >= 1 ? '#ffb066' : '#d8d0b0'; g.fillText(`${mn.name}${mn.elite ? ` Lv${mn.lv}` : ''}`, px + ts / 2, py + ts * 1.15); }
@@ -2563,6 +2637,7 @@ function endHTML() {
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
       <div><p>${r.world ? `Mất <b>${fmtClock(r.clock || 0)}</b> · hương còn <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `Mất <b>${used}</b> lượt · hương còn <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · ngã ${r.deaths} lần` : ''}</p>
       <p>${tl > 0 ? `Linh ngọc được nâng <b>${r.upg}</b> lần · giờ thử thách tối đa tầng <b>${SAVE.riftCap}</b>${SAVE.riftCap > (r.capBefore || 0) ? " (đã mở lên trên)" : ''}` : "Hương tàn: tầng này không tính qua, linh ngọc chỉ nâng được 1 lần"}</p>
+      ${r.bp ? `<p class="newslot">Binh phách <b>+${r.bp}</b> (hiện ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? ", đủ đúc một binh khí chuyên thuộc rồi: tìm Trương Đại Chùy" : ''})</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">Mở ô trang bị mới: <b>${r.newSlots.map(p => SLOT_NAME[p]).join(", ")}</b>. Vào trang “Nhân vật” xem; loại trang bị này từ giờ sẽ rơi trong Ảo Cảnh.</p>` : ''}
       ${r.record ? `<p class="evres">Kỷ lục mới của ${CLASSES[r.cls].n}: tầng ${r.riftLv} · ${r.world ? "mất " + fmtClock(r.clock || 0) : used + " lượt"}</p>` : ''}</div></div>`;
     extra += `<div class="lgup"><h3>Linh ngọc</h3>${r.newGem ? `<p class="evres">Nhận linh ngọc mới: <b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
@@ -2649,7 +2724,8 @@ function smithHTML(it, where, W, title) {
       h += `<div class="srow col"><span>Tôi luyện · Tẩy luyện <small>Tôi luyện: tung lại trị số một thuộc tính, chọn cũ hoặc mới (${rc.gold} lượng + ${rc.mats} hồn tinh). Tẩy luyện: khóa cái muốn giữ, còn lại đổi mới hết, xong chọn một trong hai bộ; khóa càng nhiều càng đắt.</small></span>
         <div class="rflist">${it.aff.map(([k, v], i) => `<div class="rfrow ${lk.has(i) ? 'lk' : ''}"><button class="lockb ${lk.has(i) ? 'on' : ''}" data-act="wlock" data-arg="${it.id}|${i}">${lk.has(i) ? "Đã khóa" : "Khóa"}</button><span class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</span><button class="btn sm ghost" ${SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rf" data-arg="${it.id}|${i}">Tôi luyện</button></div>`).join('')}</div>
         ${unlockedSp ? "<p class=\"sub warn\">Thuộc tính đặc biệt chưa khóa — tẩy luyện sẽ xóa mất nó (không lấy lại được).</p>" : ''}
-        <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">Tẩy luyện (khóa ${lk.size} · ${wc.gold} lượng + ${wc.mats} hồn tinh)</button></div>`;
+        <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">Tẩy luyện (khóa ${lk.size} · ${wc.gold} lượng + ${wc.mats} hồn tinh)</button>
+        ${washOddsHTML(it, [...lk])}</div>`;
     }
   }
   if (W.has('refine') && it.aff.length && featureOn('reroll') && it.rrPending) {
@@ -2813,6 +2889,7 @@ const ACT = {
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast("Ngoc: “Đáng lẽ phải dẫn ta theo từ lâu rồi.”"); else toast("Ngoc: “…Vậy thì về sớm một chút.”"); },
   npc: id => {
     const qc = townCh();
+    if (!(qc && wNpcMark(qc, id)) && WS_NPC[id] && svcFns(id).length) return wsOpen(WS_NPC[id], null);   // 三位师傅：都通到养成台，停在他的那一页
     if (!(qc && wNpcMark(qc, id)) && svcFns(id).length) { NPCV = { id, fn: null, item: null }; GAMBLE = null; BULKX = new Set(); BULKARM = false; BACK = null; return openModal(npcModal); }   // 没有任务要说：开他的铺子
     if (qc && (wNpcMark(qc, id) || WNPC[id])) { const acts = wTalk(qc, id, SAVE.run && SAVE.run.world ? SAVE.run : null);
       if (acts.length === 1 && acts[0].dlg && acts[0].dlg.length === 1 && !wNpcMark(qc, id) && NPC_LINES[id] && storyCleared('normal') >= 1) return npcTalk(id);
@@ -2863,7 +2940,13 @@ const ACT = {
   itab: k => { ITAB = k; refresh(); },
   npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },
   npcitem: id => { NPCV.item = id || null; refresh(); },
-  npcgo: a => { const [id, fn, item] = split(a); NPCV = { id, fn, item: item || null }; GAMBLE = null; BACK = null; openModal(npcModal); },
+  npcgo: a => { const [id, fn, item] = split(a); if (WS_NPC[id]) return wsOpen(fn, item || null); NPCV = { id, fn, item: item || null }; GAMBLE = null; BACK = null; openModal(npcModal); },
+  wstab: k => { WS.tab = k; refresh(); },
+  wsitem: id => { WS.item = WS.item === id && WS.tab !== 'ov' ? null : id; if (WS.tab === 'ov') WS.tab = wsTabs().some(t => t[0] === 'enh') ? 'enh' : wsTabs()[1] ? wsTabs()[1][0] : 'ov'; refresh(); },
+  wsstash: () => { WS.stash = !WS.stash; refresh(); },
+  wsgo: a => { const [k, id] = split(a); WS.tab = k; WS.item = id; WS.stash = false; refresh(); },
+  wsopen: a => { const [k, id] = split(a); wsOpen(k || 'ov', id || null); },
+  wsforge: lid => { const r = forgeWeapon(ctxCls(), lid); if (r.err) return toast(r.err); SFX.play('legend'); toast(`Đã đúc xong: <b>${esc(r.it.name)}</b> (đã cất vào kho)`); refresh(); achToast(checkAch()); },
   gamb: slot => { const it = gamble(SAVE.cls, slot); if (!it) return toast("Không đủ bạc"); GAMBLE = it; SFX.play(it.rarity === 'legend' || it.rarity === 'set' ? 'legend' : it.rarity === 'rare' ? 'rare' : 'coin'); refresh(); },
   bulkopen: () => { BULKX = new Set(); BULKARM = false; BACK = null; openModal(bulkModal); },
   bulkmode: m => { bulkFilter().mode = m; BULKARM = false; refresh(); },

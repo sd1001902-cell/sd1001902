@@ -858,6 +858,7 @@ function wWatchCells(ch, p, P) {
 function wFightMon(ch, mn, first) {
   if (WMAPS[ch].rift) return rFight(ch, mn, first);
   const enc = { kind: mn.elite ? 'elite' : 'battle', mon: mn.m, lv: mn.lv, name: mn.name, pal: mn.pal, first, tag: mn.tag };
+  if (mn.elite && SAVE.run) { enc.affs = eliteAffsOf(SAVE.run, mn); enc.rare = !!mn.rr; }
   if (mn.bty) { enc.bty = mn.bty; return { fight: enc, key: { mon: mn.id } }; }
   const P = mn.pt && wmap(ch).def.pts[mn.pt]; if (P && P.abs) enc.abs = P.abs;
   const z = (wmap(ch).def.zones || []).find(z => z.id === mn.z); if (z && z.mons.length) enc.mix = z.mons;
@@ -1197,7 +1198,7 @@ function wCompNow(ch) {
 function wPrepBattle(run, enc) {
   if (enc.rift) return rPrep(run, enc);
   const ch = run.chapter, S = wstate(ch), F = CHAPTERS[ch - 1];
-  run.encCell = { mon: enc.mon, lv: enc.lv };
+  run.encCell = { mon: enc.mon, lv: enc.lv, affs: enc.affs, rare: enc.rare };
   run.theme = wmap(ch).def.theme;
   const c = wCompNow(ch);
   run.ngoc = c === 'ngoc' ? (S.flags.ngocFox ? 'fox' : 'normal') : null;
@@ -1353,7 +1354,7 @@ function rPrep(run, enc) {
   const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0]); u.atk *= R_NORM[1]; return u; };
   for (const id of enc.ids) { const mn = D.mons.find(o => o.id === id); if (!mn) continue; const def = F.mons[mn.m] || F.mons[0];
     if (mn.elite) {
-      const affs = RNG.shuffle(ELITE_AFFIXES.map(a => a.id)).slice(0, nAff + (mn.rare ? 1 : 0)), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);
+      const affs = eliteAffsOf(run, mn), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);
       e.name = mn.rare ? RNG.pick(RARE_ELITE_NAMES) : joinName(RNG.pick(ELITE_TITLES), def.n);
       e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * (mn.rare ? 1.3 : 1)); e.atk *= R_ELITE[1]; if (mn.rare) e.rare = true; if (e.shield) e.shield = Math.round(e.maxHp * 0.3);
       el.push(e); if (RNG.ch(0.6)) no.push(norm(def, mn.lv));

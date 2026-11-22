@@ -37,8 +37,13 @@ const STAT_NAMES = {
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
+  // 稀有词条（只能洗炼出）和灵玉用到的
+  xDouble: "Liên trảm (tỉ lệ bồi thêm một đòn sau khi ra tay)", xRage: "Nộ khí tất sát nhận được", xTen: "Thanh thần (kháng choáng, bất động)", xDr: "Giảm sát thương phải nhận", xLast: "Bất khuất (giảm sát thương khi khí huyết dưới 30%)",
+  xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
+  regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };
-const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak']);
+const PCT_STATS = new Set(['crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+  'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
   weapon: [["Dao rựa", 1], ["Kiếm sắt", 1], ["Thanh Phong Kiếm", 8], ["Cửu Hoàn Đao", 16], ["Huyền Thiết Trọng Kiếm", 26], ["Trảm Yêu Kiếm", 40]],
@@ -75,11 +80,27 @@ const AFFIXES = [
   { k: 'mf',      r: [8, 20],  w: 4, p: "có phúc" },
   { k: 'gf',      r: [10, 30], w: 4, p: "chiêu tài" },
   // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
-  { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: "tiên phát" },
-  { k: 'xBoss',   r: [8, 18],  w: 0, sp: true, fixed: true, p: "đồ khôi" },
-  { k: 'xExec',   r: [15, 30], w: 0, sp: true, fixed: true, p: "đoạn mệnh" },
-  { k: 'xBreak',  r: [20, 40], w: 0, sp: true, fixed: true, p: "phá thế" },
+  // 2026-11：也是各部位的稀有词条——洗炼时每条有 WASH_RARE 的几率洗出来（rs：出在哪个部位）
+  { k: 'xFirst',  r: [20, 40], w: 0, sp: true, fixed: true, p: "tiên phát", rs: 'gloves' },
+  { k: 'xBoss',   r: [8, 18],  w: 0, sp: true, fixed: true, p: "đồ khôi", rs: 'weapon' },
+  { k: 'xExec',   r: [15, 30], w: 0, sp: true, fixed: true, p: "đoạn mệnh", rs: 'ring' },
+  { k: 'xBreak',  r: [20, 40], w: 0, sp: true, fixed: true, p: "phá thế", rs: 'gloves' },
+  { k: 'xDouble', r: [6, 10],  w: 0, sp: true, fixed: true, p: "liên trảm", rs: 'weapon' },
+  { k: 'xRage',   r: [15, 25], w: 0, sp: true, fixed: true, p: "minh tâm", rs: 'helm' },
+  { k: 'xTen',    r: [30, 50], w: 0, sp: true, fixed: true, p: "thanh thần", rs: 'helm' },
+  { k: 'xDr',     r: [4, 7],   w: 0, sp: true, fixed: true, p: "kim cương", rs: 'chest' },
+  { k: 'xLast',   r: [12, 20], w: 0, sp: true, fixed: true, p: "bất khuất", rs: 'chest' },
+  { k: 'dodge',   r: [4, 7],   w: 0, sp: true, fixed: true, p: "đạp phong", rs: 'boots' },
+  { k: 'xHaste',  r: [20, 35], w: 0, sp: true, fixed: true, p: "tật hành", rs: 'boots' },
+  { k: 'xKill',   r: [2, 4],   w: 0, sp: true, fixed: true, p: "tham lang", rs: 'ring' },
+  { k: 'cdSkip',  r: [4, 7],   w: 0, sp: true, fixed: true, p: "tụ linh", rs: 'amulet' },
+  { k: 'xLuck',   r: [10, 20], w: 0, sp: true, fixed: true, p: "phúc tinh", rs: 'amulet' },
+  { k: 'xShield', r: [8, 14],  w: 0, sp: true, fixed: true, p: "bàn thạch", rs: 'belt' },
+  { k: 'regenPct', r: [1, 2],  w: 0, sp: true, fixed: true, p: "hồi nguyên", rs: 'belt' },
+  { k: 'xCritNext', r: [10, 18], w: 0, sp: true, fixed: true, p: "hội tâm", rs: 'offhand' },
+  { k: 'allyPct', r: [8, 14],  w: 0, sp: true, fixed: true, p: "đồng điệu", rs: 'offhand' },
 ];
+const WASH_RARE = 0.01;   // 洗炼：每条被洗的词条变成本部位稀有词条的几率
 const SP_AFFIXES = AFFIXES.filter(a => a.sp).map(a => a.k);
 const RARE_NAME_A = ["Huyền Minh", "Xích Huyết", "Thái Ất", "Cửu U", "Vô Tướng", "Thanh Minh", "Tử Điện", "Hàn Sương", "Tu La", "Âm Dương", "Càn Khôn", "Phệ Hồn"];
 const RARE_NAME_B = { weapon: ["Nhận", "Phong", "Trảm"], helm: ["Quan", "Khôi", "Diện"], chest: ["Giáp", "Bào", "Khải"],
@@ -154,6 +175,24 @@ const LEGENDS = [
   { id: 'muyu',       n: "Mõ Trấn Tâm", slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: "Mỗi lần phản kích hồi 2% khí huyết tối đa, và hồi cho đồng hành 5%" },
   { id: 'daridai',    n: "Đại Nhật Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'dariBelt',    d: "Giới hạn hộ thể chân khí từ 50% lên 80% khí huyết tối đa (cần Đại Nhật Như Lai 4 món)" },
   { id: 'zijinbo',    n: "Bát Tử Kim",   slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'zijinOff',    d: "Khi dùng Bát Nhã Tâm Kinh, Cam Lộ thì gây 150% sát thương Phật quang lên mọi kẻ địch" },
+  // 2026-11：专属兵器（w: 1）。每条幻境套装路线一把，直接改写主力招式；自带攻击比普通神兵高三成，每强化 +1 特效再涨 3%。
+  // 不走普通掉落：攒「兵魄」找张大锤打，幻境妖王另有很小的几率直接掉
+  { id: 'bawangdao',  n: "Bá Vương Đao",     slot: 'weapon', cls: 'berserker', ch: 9, w: 1, set: 'xuehai',  imp: { critDmg: 40 },  fx: 'wBawang',  d: "Bá Vương Giải Giáp sát thương +100%; dùng nó giết địch thì Nộ ý đã tiêu được hoàn lại hết" },
+  { id: 'xiuluoren',  n: "Tu La Huyết Nhận",   slot: 'weapon', cls: 'berserker', ch: 9, w: 1, set: 'busi',    imp: { leech: 5 },     fx: 'wXiuluo',  d: "Sau Toàn Phong Đao, Liệt Địa Trảm bồi thêm một đòn, gây 60% sát thương lên mọi kẻ địch; khí huyết dưới một nửa thì hút máu gấp đôi" },
+  { id: 'taiyifuchen', n: "Thái Ất Phất Trần",  slot: 'weapon', cls: 'mage',      ch: 9, w: 1, set: 'guiyuan', imp: { elem: 20 },     fx: 'wTaiyi',   d: "Giới hạn “Liên” +2 tầng; “Liên” đủ 5 tầng thì mọi chiêu sát thương thêm +30%" },
+  { id: 'wanfubi',    n: "Vạn Phù Bút",     slot: 'weapon', cls: 'mage',      ch: 9, w: 1, set: 'wanfu',   imp: { elem: 20 },     fx: 'wWanfu',   d: "Dẫn Bạo Phù kích nổ cùng lúc trạng thái trên mọi kẻ địch cả sân, mỗi kẻ địch tính theo trạng thái của chính nó, sát thương thêm +30%" },
+  { id: 'zhenshiling', n: "Chuông Đồng Trấn Thi",  slot: 'weapon', cls: 'necro',     ch: 9, w: 1, set: 'yinbing', imp: { minionPct: 20 }, fx: 'wZhenshi', d: "Cương thi mỗi lần ra tay có 25% tỉ lệ đánh liền hai phát" },
+  { id: 'wandufan',   n: "Vạn Độc Phan",     slot: 'weapon', cls: 'necro',     ch: 9, w: 1, set: 'duxing',  imp: { elem: 20 },     fx: 'wWandu',   d: "Độc trên kẻ địch không còn tan theo lượt; phần kết toán độc phát của Thi Độc Lan, Thổ Độn Táng +100%" },
+  { id: 'qishabi',    n: "Thất Sát Chủy",     slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qisha',   imp: { critDmg: 40 },  fx: 'wQisha',   d: "Giới hạn Sát ý +1; đòn kết liễu giết địch thì sát thương dư chuyển sang kẻ địch kế" },
+  { id: 'lihuaxia',   n: "Bạo Vũ Lê Hoa Hạp", slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qianji',  imp: { crit: 8 },      fx: 'wLihua',   d: "Chiêu ám khí mỗi lần trúng có 30% tỉ lệ bồi thêm một cây Băng Phách Châm (60% sát thương, kèm đóng băng)" },
+  { id: 'fumozhang',  n: "Phục Ma Thiền Trượng",   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'luohan',  imp: { hpPct: 12 },    fx: 'wFumo',    d: "Sát thương phản kích +100%" },
+  { id: 'darilun',    n: "Đại Nhật Kim Luân",   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'dari',    imp: { dmgPct: 12 },   fx: 'wDari',    d: "Phật quang bồi thêm của Đại Nhật Như Lai sát thương +75%, mỗi kẻ địch trúng đòn hồi 2% khí huyết tối đa" },
+  // 其他部位再添几件门派神兵（正常掉落；穿了幻境套装的可以收进乾坤袋用）
+  { id: 'duanyue',    n: "Đoạn Nhạc Hộ Uyển",   slot: 'gloves', cls: 'berserker', ch: 7, imp: { atk: 10 },     fx: 'duanyue',    d: "Kẻ địch trúng Đoạn Cốt đồng thời bị phá giáp và thiêu đốt" },
+  { id: 'xuantian',   n: "Huyền Thiên Quan",     slot: 'helm',   cls: 'mage',      ch: 7, imp: { elem: 12 },    fx: 'xuantian',   d: "Hàn Băng Quyết, Lạc Thạch Quyết hồi chiêu -1" },
+  { id: 'huangquan',  n: "Hoàng Tuyền Lý",     slot: 'boots',  cls: 'necro',     ch: 7, imp: { minionPct: 10 }, fx: 'huangquan', d: "Tốc độ và khí huyết cương thi +25%" },
+  { id: 'youying',    n: "U Ảnh Bội",     slot: 'amulet', cls: 'assassin',  ch: 7, imp: { crit: 5 },     fx: 'youying',    d: "Trong lúc Yên Độn sát thương của bạn +50%; Yên Độn hồi chiêu -2" },
+  { id: 'jingangjia', n: "Kim Cương Cà Sa",   slot: 'chest',  cls: 'paladin',   ch: 7, imp: { hpPct: 8 },    fx: 'jingangjia', d: "Kim Chung Tráo hồi chiêu -2; đang có hộ thể chân khí thì mỗi lượt hồi 3% khí huyết tối đa" },
 ];
 
 const SETS = [
