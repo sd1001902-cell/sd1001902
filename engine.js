@@ -1579,6 +1579,7 @@ const mageCap = P => SUST.mage.cap + (P.fx && P.fx.has('taijiOff') ? 20 : 0);
 const dariCap = u => u.fx && u.fx.has('dariBelt') ? 0.8 : DARI_CAP;
 const stExt = u => u && u.fx && u.fx.has('baifuBelt') ? 2 : 0;   // 百符带：状态多挂两回合
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, '乏力', 'curse', 1]); } };
+let THORN_CAP = 0.15;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
 let YINBING_MUL = 2;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
@@ -1828,6 +1829,7 @@ function heroAct(b, P, out) {
   const run = b.run;
   b.pr = (b.pr || 0) + 1;
   if (P.hasteN > 0 && b.pr > 1) P.hasteN--;
+  b.thTurn = 0;   // 反震的封顶按「一次出手」算
   P.cbOn = !!P.cbNext; P.cbNext = false;   // 会心：上一招暴击过，这一招增伤
   P.kcOn = !!P.kcNext; P.kcNext = false;   // 连环戒：上一招之后有敌人倒下，这一招必暴
   P.evOn = !!P.evNext; P.evNext = false;   // 逍遥履：闪过之后这一招增伤
@@ -2423,7 +2425,14 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       const w = tgt.skills.find(s => s.id === 'whirl'); if (w && w.left > 0) w.left--;
     }
     if (shieldThorns) refl += dPre * 0.3;
-    if (tgt.aff && tgt.aff.includes('thorny')) refl += d * 0.25;
+    if (tgt.aff && tgt.aff.includes('thorny')) {   // 反震：弹回 25%。幻境里精英的血是主角的十几、几十倍，照单全收等于打死它之前先弹死自己——所以封顶，并且先扣护体
+      let r = d * 0.25;
+      if (src.kind === 'hero') {   // 主角：从这次出手到下次出手之间，合计最多弹掉最大气血的 THORN_CAP；护体真气先挡
+        r = Math.max(0, Math.min(r, src.maxHp * THORN_CAP - (b.thTurn || 0))); b.thTurn = (b.thTurn || 0) + r;
+        const a2 = Math.min(src.shield || 0, r); if (a2 >= 1) { src.shield -= a2; r -= a2; if (r < 1) out.pops.push([src.id, '护盾', 'miss']); }
+      } else r = Math.min(r, src.maxHp * THORN_CAP);   // 同伴、僵尸：每一击封顶
+      refl += r;
+    }
     if (tgt.st.butui && tgt.runes && tgt.runes.butui === 'b') refl *= 2;
     if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, '反伤' + refl, 'thorn']); }
     if (tfx && tfx.has('revenge') && src.hp > 0 && RNG.ch(0.3)) hit(b, tgt, src, 1, 'phys', out, { proc: 1 });

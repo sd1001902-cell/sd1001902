@@ -396,7 +396,7 @@ const ELITE_AFFIXES = [
   { id: 'cold',     n: "Hàn Sương", d: "Đòn đánh có tỉ lệ làm mục tiêu bất động" },
   { id: 'vamp',     n: "Hút máu", d: "Đòn đánh hút khí huyết" },
   { id: 'split',    n: "Phân Thân", d: "Chết rồi tách thành hai con" },
-  { id: 'thorny',   n: "Phản chấn", d: "Phản lại một phần sát thương phải nhận" },
+  { id: 'thorny',   n: "Phản chấn", d: "Dội lại một phần tư sát thương phải nhận: mỗi lần bạn ra tay, tối đa bị dội mất 15% khí huyết tối đa, hộ thể chân khí đỡ trước" },
   { id: 'enraged',  n: "Cuồng Bạo", d: "Quá nửa máu thì sát thương và tốc độ tăng mạnh" },
   { id: 'tough',    n: "Da Đồng", d: "Khí huyết tăng mạnh" },
   { id: 'fast',     n: "Thần Hành", d: "Tốc độ hành động tăng mạnh" },
