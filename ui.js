@@ -221,8 +221,10 @@ function stashBody(cls, D) {
   let list = SAVE.stash.filter(it => (!GSLOT || it.slot === GSLOT) && (FILTER === 'all' || (FILTER === 'up' && D.get(it.id) > 0) || (FILTER === 'leg' && it.legend && !SAVE.cube[it.legend])));
   list.sort((a, b) => GSLOT || FILTER === 'up' ? ((D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)) : (order[a.rarity] - order[b.rarity] || (b.anc || 0) - (a.anc || 0) || b.ilvl - a.ilvl));
   const cur = GSLOT && SAVE.chars[cls].eq[GSLOT];
-  const curRow = GSLOT ? `<div class="gcur"><span class="sub">身上的${SLOT_NAME[GSLOT]}：</span>${cur ? `<button class="linkish r-${cur.rarity}" data-act="item" data-arg="${cur.id}">${SPR.item(cur, 22)}${itemTitle(cur)}</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">卸下</button>` : '<span class="sub">空着</span>'}
-      <button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">看全部</button></div>` : '';
+  // 点了部位：身上那件的完整属性直接摊开（以前只有一行名字，还得再点一下才看得到）
+  const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">身上的${SLOT_NAME[GSLOT]}</span>${cur ? `<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">强化 / 更多</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">卸下</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">收起</button></div>
+      ${cur ? itemCard(cur, cls, '') : '<p class="sub" style="margin:6px 0 0">空着</p>'}</div>
+      <h4 class="sub-h gcur-t">储物箱里能换的${SLOT_NAME[GSLOT]}</h4>` : '';
   const chips = [['all', '全部'], ['up', '只看能提升的'], ...(featureOn('cube') ? [['leg', '乾坤袋未收']] : [])];
   return `${curRow}<div class="chips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
       ${VIEW === 'town' ? '<button class="chip bulkc" data-act="bulkopen">筛选分解 / 出售</button>' : ''}</div>
@@ -273,7 +275,7 @@ const riftHelpModal = () => `<h2 class="mh">幻境换了打法</h2>
   <p class="help-p"><b>进度</b>：斩妖攒进度，精英给得多，倒下后还会掉一颗精魄，要走过去捡。进度满了，守关妖王就在你身边现身。</p>
   <p class="help-p"><b>换层</b>：每层进度不封顶，想在这一层打到底、还是去远处的传送阵换下一层，你自己定。越往下越肥：妖物高一级，每只给的进度更多（第二层 +15%，第三层 +30%，第四层 +50%），精英也多一只。每层还有一座塔，踩上去有三场战斗的加成。</p>
   <p class="help-p"><b>一炷香</b>：十二分钟。在地图上按真实时间烧；战斗里按回合折算，一轮算三秒，开几倍速、跳不跳过战斗都一样。</p>
-  <p class="help-p">掉的装备都记在这一局里，打完一起看；中途不会停下来结算。</p>
+  <p class="help-p"><b>久战破绽</b>：一场打到第 10 轮（妖王战第 20 轮），妖物不再回血，之后每轮多受 10% 伤害——再能回血的妖物也拖不成死局。会回血的妖物在幻境里每回合只回 2%，灼烧、中毒都压得住。</p>\n  <p class="help-p">掉的装备都记在这一局里，打完一起看；中途不会停下来结算。</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`;
 function xiangBar(run) {
   const L = xiangLeft(run), G = run.riftDone ? null : RIFT_GRADES.find(g => g.min >= 0 && L >= g.min);
@@ -458,16 +460,48 @@ function bountyHTML() {
       ${Bn.bonus ? '<span class="sub">已领取</span>' : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">领取大箱</button>`}</div></section>`;
 }
 function gearTab() { return `<section class="panel"><h3>人物属性</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+// 本职续航那一段（带当前数值）：「人物」页和「武学」页的本门功法卡共用
+function sustText(cls, s) {
+  const ch = SAVE.chars[cls], SU = SUST[cls], lvF = sustLv(ch.level);
+  const suV = k => k === 'dr' || k === 'cap' ? SU[k] : Math.round(Math.min(k === 'a' && cls === 'necro' ? 60 : 999, SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * lvF) * 10) / 10;
+  const desc = SU.d.replace(/\{(\w+)\}/g, (m, k) => suV(k));
+  return `<b>本职续航 · ${SU.n}</b>：${desc}。${cls === 'berserker' ? '' : `<br>别的门派的「吸血」在你身上只有三成；每 1% 吸血另外折成 4% 续航强度${s.sust ? `（现在 +${s.sust}%）` : ''}。`}`;
+}
+// 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
+const CLS_MECH = {
+  berserker: ['怒意', '出手攒 5 点，挨一下攒 8 点，最多 100 点。怒意过半：伤害 +15%。气血每少一成：伤害再 +3%。霸王卸甲把怒意一口气换成伤害（每点 +2%）。'],
+  mage: ['五行相生', '按 木→火→土→金→水→木 的顺序出招，每接上一招叠一层「连」（最多 5 层），每层伤害 +8%；接错了清零。每招是哪一行，招式名旁边写着；灵符是木。'],
+  necro: ['尸阵', '开战时僵尸已经按尸阵列好（基础尸位 3），它们的攻击和气血按你的属性算。镇魂钉钉中的敌人，僵尸优先去咬。僵尸倒了，用摇铃唤尸补回来。'],
+  assassin: ['杀意', '淬毒镖、冰魄针这些招式出手攒杀意（最多 5 点），终结技一次花光：夺命印每点伤害 +25%，影杀每点多刺一下。开战你先出手。'],
+  paladin: ['金刚反击', '挨打时有 15% 几率格挡并反击（80% 佛光伤害）；身上有护体真气时再 +15%。每回合自己回一点气血。'],
+};
+const wxBadge = k => k.wx && WX[k.wx] ? `<i class="wxb" style="--c:${WX[k.wx].c}">${WX[k.wx].n}</i>` : '';
+function mechCard(cls) {
+  const M = CLS_MECH[cls], s = charStats(cls);
+  let extra = '';
+  if (cls === 'mage') {   // 道士：现在带的招式凑不凑得齐一圈五行
+    const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => k.wx)), miss = WX_IDS.filter(w => !have.has(w));
+    extra = `<p class="help-p wxrow">你现在带的：${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join('<span>→</span>')}　${miss.length ? `<b class="warn">缺${miss.map(w => WX[w].n).join('、')}，一圈接不上</b>` : '<b class="ok">五行齐了，可以一圈一圈接下去</b>'}</p>`;
+  }
+  return `<div class="mech"><h4 class="sub-h">本门功法 <small>被动 · 不占格子，一直生效</small></h4>
+    <p class="help-p"><b>门派机制 · ${M[0]}</b>：${M[1]}</p>${extra}<p class="help-p">${sustText(cls, s)}</p></div>`;
+}
+// 现在身上哪些东西在加强这一招：套装、神兵（穿着的和乾坤袋里启用的）、点过的心法——说明里点了这招名字的都列出来
+function skillBoosts(cls, k) {
+  const ch = SAVE.chars[cls], s = charStats(cls), out = [], hit = d => d && d.includes(k.n);
+  for (const S of SETS) { if (S.cls !== cls) continue; const n = s.setCount[S.id] || 0;
+    if (n >= 2 && hit(S.b2d)) out.push([`${S.n} 2 件`, S.b2d, 'set']); if (n >= 4 && hit(S.b4d)) out.push([`${S.n} 4 件`, S.b4d, 'set']); if (n >= 6 && S.b6 && hit(S.b6d)) out.push([`${S.n} 6 件`, S.b6d, 'set']); }
+  const lids = new Set(); for (const sl in ch.eq) if (ch.eq[sl] && ch.eq[sl].legend) lids.add(ch.eq[sl].legend); for (const lid of ch.cube || []) if (lid && SAVE.cube[lid]) lids.add(lid);
+  for (const lid of lids) { const L = LEGENDS.find(l => l.id === lid); if (L && hit(L.d)) out.push([L.n, L.d, 'legend']); }
+  for (const Bq of talentBranches(cls)) for (const T of Bq.t) { const r = ch.tal[Bq.id + '.' + T.id] || 0; if (r && T.fx && hit(T.d)) out.push([`心法·${T.n}`, T.d, 'tal']); }
+  return out.length ? `<div class="skboost">${out.map(([n, d, c]) => `<div><b class="${c === 'set' ? 'r-set' : c === 'legend' ? 'r-legend' : 'tl'}">${n}</b>${d}</div>`).join('')}</div>` : '';
+}
 // 人物属性：一排数值 + 本职续航。城镇「人物」「修炼」和游戏里的「人物」弹窗共用
 function statBlock(cls) {
   const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
   const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
     ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ['福缘', '+' + s.mf + '%']];
-  const SU = SUST[cls], lvF = sustLv(ch.level);
-  const suV = k => k === 'dr' || k === 'cap' ? SU[k] : Math.round(Math.min(k === 'a' && cls === 'necro' ? 60 : 999, SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * lvF) * 10) / 10;
-  const desc = SU.d.replace(/\{(\w+)\}/g, (m, k) => suV(k));
-  const sustP = `<p class="help-p sustp"><b>本职续航 · ${SU.n}</b>：${desc}。${cls === 'berserker' ? '' : `<br>别的门派的「吸血」在你身上只有三成；每 1% 吸血另外折成 4% 续航强度${s.sust ? `（现在 +${s.sust}%）` : ''}。`}</p>`;
-  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p>`;
 }
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
@@ -519,7 +553,7 @@ function formHTML(cls) {
   if (cls !== 'necro') return '';
   const ch = SAVE.chars.necro, cap = 3 + charStats('necro').minion + (charStats('necro').fx.has('minionArmor') ? 1 : 0), form = necroForm(ch.level, ch.form);
   const opts = ZOMBIE_ORDER.filter(z => ZOMBIES[z].lv <= ch.level);
-  return `<div class="form"><h4 class="sub-h">尸阵 <small>摇铃唤尸按这个顺序把空位补上（尸位 ${cap}）</small></h4>
+  return `<div class="form"><h4 class="sub-h">尸阵 <small>开战时按这个顺序列好阵；倒下的用摇铃唤尸补回来（尸位 ${cap}）</small></h4>
     ${Array.from({ length: cap }, (_, i) => `<div class="frow"><span class="fpos">${i + 1}</span>${ZOMBIE_ORDER.map(z => { const Z = ZOMBIES[z], lock = Z.lv > ch.level;
       return `<button class="fz ${form[i] === z ? 'on' : ''}" ${lock ? 'disabled' : ''} data-act="form" data-arg="${i}|${z}">${SPR.img(Z.spr, 26, Z.pal)}<b>${Z.n}</b><small>${lock ? Z.lv + ' 级' : esc(Z.d.split('，')[0])}</small></button>`; }).join('')}</div>`).join('')}
     <p class="help-p">${ZOMBIE_ORDER.concat('shiwang').map(z => `<b>${ZOMBIES[z].n}</b>（${ZOMBIES[z].lv} 级）：${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
@@ -528,20 +562,20 @@ function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
   const eqIds = new Set(act.map(k => k.id));
   const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${k.n}</b><small>${lock ? k.lv + ' 级领悟' : '冷却 ' + k.cd}</small>
+    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k)}${k.n}</b><small>${lock ? k.lv + ' 级领悟' : '冷却 ' + k.cd}</small>
       <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="上移">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="下移">▼</button>` : ''}
       ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? '卸下' : '装配'}</button>`}</span></div>
-      <p>${k.d}${s.sk[k.id] ? `<span class="skb">（心法 +${s.sk[k.id]}%）</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}
+      <p>${k.d}${s.sk[k.id] ? `<span class="skb">（心法 +${s.sk[k.id]}%）</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
       ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
   const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv);
-  return `${formHTML(cls)}<details class="wxinfo"><summary>状态配合 · 怎么打连招</summary>
+  return `${mechCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>状态配合 · 怎么打连招</summary>
       <p class="help-p">起手技能给敌人「挂状态」，收招技能打带这个状态的敌人，会有额外效果（伤害翻倍、必定暴击、打碎、传染……）。</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
       <p class="help-p">同伴也会挂状态：Ngoc 灼烧，珍姑娘破甲，龙道长冰冻。带对了同伴，你的收招就有得打。</p></details>
     <h4 class="sub-h">出战武学 <small>${act.length}/${LOADOUT_MAX} · 自动出招时从上到下优先${rOn ? ' · 可以给每招选一种变招' : ''}</small></h4>
     ${comboHints(act, SAVE.comp)}
     <div class="skl">${act.map((k, i) => row(k, i, true)).join('') || '<div class="empty-note">还没有装配武学</div>'}
-      <div class="sk basic"><div class="skh"><b>${basic.n}</b><small>基本招式，其他武学都在冷却时使用</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}</div></div>
+      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b><small>基本招式，其他武学都在冷却时使用</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
     ${rest.length ? `<h4 class="sub-h">没带上的武学</h4><div class="skl">${rest.map(k => row(k, 0, false)).join('')}</div>` : ''}`;
 }
 function talentGrid(cls) {
@@ -2770,7 +2804,7 @@ const ACT = {
   credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
   replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : C[part]; playDialog(lines, C.boss); },
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
-  gsl: sl => { GSLOT = GSLOT === sl ? null : sl; refresh(); },
+  gsl: sl => { GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
   gsub: k => { GSUB = k; refresh(); },
   itab: k => { ITAB = k; refresh(); },
   npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },

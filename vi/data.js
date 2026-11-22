@@ -205,7 +205,7 @@ const CLASSES = {
     base: { hp: 125, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 12 }, per: { hp: 17, atk: 3.35, armor: 2.4 },
     res: { n: "Thi vị" },
     skills: [
-      { id: 'summon',    n: "Rung Chuông Gọi Xác", lv: 1,  cd: 2, wx: 'tu', d: "Gọi một cương thi theo Thi trận (thi vị cơ bản 3)" },
+      { id: 'summon',    n: "Rung Chuông Gọi Xác", lv: 1,  cd: 2, wx: 'tu', d: "Gọi lại một cương thi đã ngã theo Thi trận (vào trận cương thi đã xếp sẵn; thi vị cơ bản 3)" },
       { id: 'jihuo',     n: "Rung Chuông · Tập Hỏa", lv: 3, cd: 3, wx: 'jin', d: "Mọi cương thi lập tức đánh mục tiêu mỗi con một lần" },
       { id: 'shidu',     n: "Thi Độc Lan",   lv: 6,  cd: 4, wx: 'mu',  k: 'aoe', m: 0.4, d: "Thi độc lan tràn, gây 40% sát thương lên mọi kẻ địch" },
       { id: 'corpse',    n: "Thi Bạo",     lv: 9,  cd: 3, wx: 'huo', d: "Kích nổ cương thi ít máu nhất, đánh mọi kẻ địch bằng 80% khí huyết còn lại của nó" },

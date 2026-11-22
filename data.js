@@ -205,7 +205,7 @@ const CLASSES = {
     base: { hp: 125, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 12 }, per: { hp: 17, atk: 3.35, armor: 2.4 },
     res: { n: '尸位' },
     skills: [
-      { id: 'summon',    n: '摇铃唤尸', lv: 1,  cd: 2, wx: 'tu', d: '按尸阵补一具僵尸（基础尸位 3）' },
+      { id: 'summon',    n: '摇铃唤尸', lv: 1,  cd: 2, wx: 'tu', d: '把倒下的僵尸按尸阵补回一具（开战时僵尸已经列好阵；基础尸位 3）' },
       { id: 'jihuo',     n: '摇铃·集火', lv: 3, cd: 3, wx: 'jin', d: '所有僵尸立刻对目标各出手一次' },
       { id: 'shidu',     n: '尸毒蔓',   lv: 6,  cd: 4, wx: 'mu',  k: 'aoe', m: 0.4, d: '尸毒蔓延，对所有敌人造成 40% 伤害' },
       { id: 'corpse',    n: '尸爆',     lv: 9,  cd: 3, wx: 'huo', d: '引爆血最少的一具僵尸，按它剩余气血的 80% 打所有敌人' },

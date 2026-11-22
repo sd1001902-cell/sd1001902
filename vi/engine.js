@@ -299,7 +299,7 @@ function rollRarity(quality, mf, diffLoot) {
     w.rare *= m * m2; w.set *= (1 + (mf || 0) / 300) * m2; w.legend *= (1 + (mf || 0) / 300) * m2;
     return RNG.w(w);
   }
-  const w = { normal: 40, magic: 36, rare: 18, set: 2.5, legend: 0.5 };   // 神兵原来是 0.12，幻境里一局难得见一件
+  const w = { normal: 40, magic: 36, rare: 18, set: 2.5, legend: 1.05 };   // 神兵：幻境 30 层一局一件出头（最早是 0.12，一局难得见一件）
   if (quality === 'elite') { w.normal = 6; w.magic = 40; w.rare *= 2.2; w.set *= 3; w.legend *= 3; }
   if (quality === 'boss')  { w.normal = 0; w.magic = 18; w.rare *= 3; w.set *= 6; w.legend *= 6; }
   if (quality === 'gamble'){ w.normal = 0; w.magic = 50; w.rare = 36; w.set = 7; w.legend = 2.5; }
@@ -910,7 +910,7 @@ function rollGem(run) {
 }
 
 // ---------------- 技能顺序与符文 ----------------
-const LOADOUT_MAX = 4;
+const LOADOUT_MAX = 5;
 const SKILL_PRIO = { berserker: ['liedi', 'lieyan', 'whirl', 'bloodlust', 'bawang', 'hanren', 'warcry', 'butui'],
   mage: ['fireball', 'luoshi', 'jinguang', 'frostnova', 'chain', 'lunzhuan', 'meteor', 'wulei'],
   necro: ['summon', 'shidu', 'jihuo', 'corpse', 'bonestorm', 'yangshi', 'curse', 'tudun'],
@@ -920,7 +920,7 @@ const SKILL_PRIO = { berserker: ['liedi', 'lieyan', 'whirl', 'bloodlust', 'bawan
 function syncLoadout(cls) {
   const ch = SAVE.chars[cls], C = CLASSES[cls];
   const ok = id => C.skills.some(k => k.id === id && k.cd && k.lv <= ch.level);
-  // 没手动换过技能的话，按推荐顺序自动带上最搭的四招
+  // 没手动换过技能的话，按推荐顺序自动带上最搭的几招
   if (!ch.loadoutManual && SKILL_PRIO[cls]) { const L0 = SKILL_PRIO[cls].filter(ok).slice(0, LOADOUT_MAX); for (const k of C.skills) if (L0.length < LOADOUT_MAX && k.cd && ok(k.id) && !L0.includes(k.id)) L0.push(k.id); ch.loadout = L0; return L0; }
   let L = (ch.loadout || []).filter(ok);
   for (const k of C.skills) if (L.length < LOADOUT_MAX && k.cd && k.lv <= ch.level && !L.includes(k.id) && !(ch.unequipped || {})[k.id]) L.push(k.id);
@@ -1404,6 +1404,7 @@ function startBattle(run, kind) {
   if (run.cls === 'mage') P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * 0.35));   // 五行道士：护身符箓
   if (run.cls === 'assassin') P.g = Math.max(P.g, 30);   // 夜行刺客：先手
   if (s.fx.has('undeadAlly')) summonSkel(b, P);
+  if (run.cls === 'necro' && !s.fx.has('duXing4')) summonSkel(b, P, P.runes.summon || null, P.minionCap || 3);   // 赶尸人：开战时僵尸已经按尸阵列好，不用先花几回合摇铃（五毒独行不带尸）
   if (P.yi.qingxu) P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * (8 + P.yi.qingxu * 4) / 100));
   if (run.encWard) {   // 守护战：一个不能打的人在念，念完就赢；他倒了就输
     const W = run.encWard; delete run.encWard;
@@ -1443,6 +1444,7 @@ const popN = (u, n) => String(n);   // 跳字仍然给原始数；界面显示�
 let BK = 1;
 function heal(u, amt, out, quiet) {
   if (u.hp <= 0) return 0;
+  if (u.side === 'e' && BNOW && wearyN(BNOW) > 0) return 0;   // 久战破绽：妖物回不了血了
   const a = Math.min(u.maxHp - u.hp, Math.round(amt));
   if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); }
   if (u.kind === 'hero' && u.fx && u.fx.has('daRi4')) {   // 大日如来：溢出的治疗攒成护体
@@ -1523,9 +1525,15 @@ function turnOrder(b, n) {
   }
   return out;
 }
+// 幻境里的「久战破绽」：一场打到第 R_WEARY[0] 轮（按主角出手算），妖物不再回血，之后每轮多受 R_WEARY[1] 的伤害——再能回血的妖物也拖不成死局
+let R_WEARY = [10, 0.10, 20], R_REGEN = 0.02;   // [普通战从第几轮起, 每轮多受多少, 妖王战从第几轮起]：妖王是这一局的关口，晚一倍才露破绽
+let BNOW = null;
+const riftB = b => !!(b && b.run && b.run.mode === 'rift' && b.run.world);
+const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'boss' ? 2 : 0] + 1) : 0;
 function battleStep(b) {
   const out = { lines: [], pops: [], actor: null, cast: null };
   if (b.over) return out;
+  BNOW = b;
   const live = b.units.filter(u => u.hp > 0);
   let actor = null, bt = Infinity;
   for (const u of live) { const t = (100 - u.g) / spdOf(u); if (t < bt) { bt = t; actor = u; } }
@@ -1546,7 +1554,7 @@ function act(b, u, out) {
     if (u.hp <= 0) { out.lines.push(`${u.name} ${k === 'burn' ? "bị thiêu" : "trúng độc"} chết`); return; }
   }
   if (u.st.frozen) { delete u.st.frozen; if (u.charging) { delete u.charging; out.pops.push([u.id, "Ngắt", 'buff']); out.lines.push(`${u.name} bị đánh choáng, tụ lực bị ngắt!`); } else out.lines.push(`${u.name} bị choáng`); out.actor = null; return; }
-  if (u.trait === 'regen' && u.hp > 0 && !u.st.burn) heal(u, u.maxHp * 0.05, out);
+  if (u.trait === 'regen' && u.hp > 0 && !u.st.burn && !(riftB(b) && u.st.poison)) heal(u, u.maxHp * (riftB(b) ? R_REGEN : 0.05), out);   // 幻境里精英血厚三倍多，回 5% 打不动：改成 2%，中毒也压得住
   for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'yang']) if (u.st[k] && --u.st[k] <= 0) {
     delete u.st[k];
     if (k === 'curse') { delete u.st.curseW; delete u.st.curseB; }
@@ -1685,6 +1693,8 @@ function drinkPotion(b, out) {
 }
 function heroAct(b, P, out) {
   const run = b.run;
+  b.pr = (b.pr || 0) + 1;
+  if (riftB(b)) { const w = wearyN(b); if (w === 1) { out.lines.push("Đánh lâu lộ sơ hở: khí tức yêu vật rối loạn — không hồi máu nữa, từ đây mỗi vòng nhận thêm " + Math.round(R_WEARY[1] * 100) + "% sát thương"); aliveOf(b, 'e').forEach(f => out.pops.push([f.id, "Phá Trán", 'react'])); } b.weary = w; }
   if (P.hp / P.maxHp < 0.35 && run.potions > 0) drinkPotion(b, out);   // 兜底：气血低于 35% 自动吃一颗
   for (const sk of P.skills) if (sk.left > 0) sk.left--;
   let foes = aliveOf(b, 'e'); if (!foes.length) return;
@@ -2035,6 +2045,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src.frozenDmg && tgt.st.frozen) d *= 1 + src.frozenDmg / 100;
   if (src.side === 'p' && tgt.def) d *= 1 + bestiaryBonus(tgt.def.n) / 100;
   if (tgt.st.mark) d *= 1.5 + (tgt.st.markB ? 0.25 : 0) + (fx && fx.has('deathMarkPlus') ? 0.5 : 0);
+  if (tgt.side === 'e' && b.weary) d *= 1 + R_WEARY[1] * b.weary;
   if (src.aff && src.aff.includes('enraged') && src.hp / src.maxHp < 0.5) d *= 1.6;
   if (src.enraged) d *= 1.3;
   let crit = false;

@@ -221,8 +221,10 @@ function stashBody(cls, D) {
   let list = SAVE.stash.filter(it => (!GSLOT || it.slot === GSLOT) && (FILTER === 'all' || (FILTER === 'up' && D.get(it.id) > 0) || (FILTER === 'leg' && it.legend && !SAVE.cube[it.legend])));
   list.sort((a, b) => GSLOT || FILTER === 'up' ? ((D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)) : (order[a.rarity] - order[b.rarity] || (b.anc || 0) - (a.anc || 0) || b.ilvl - a.ilvl));
   const cur = GSLOT && SAVE.chars[cls].eq[GSLOT];
-  const curRow = GSLOT ? `<div class="gcur"><span class="sub">${SLOT_NAME[GSLOT]} đang mặc: </span>${cur ? `<button class="linkish r-${cur.rarity}" data-act="item" data-arg="${cur.id}">${SPR.item(cur, 22)}${itemTitle(cur)}</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">Tháo</button>` : "<span class=\"sub\">Trống</span>"}
-      <button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">Xem tất cả</button></div>` : '';
+  // 点了部位：身上那件的完整属性直接摊开（以前只有一行名字，还得再点一下才看得到）
+  const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">${SLOT_NAME[GSLOT]} đang mặc</span>${cur ? `<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">Cường hóa / Thêm</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">Tháo</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">Thu gọn</button></div>
+      ${cur ? itemCard(cur, cls, '') : "<p class=\"sub\" style=\"margin:6px 0 0\">Đang trống</p>"}</div>
+      <h4 class="sub-h gcur-t">${SLOT_NAME[GSLOT]} đổi được trong kho</h4>` : '';
   const chips = [['all', "Tất cả"], ['up', "Chỉ đồ tốt hơn"], ...(featureOn('cube') ? [['leg', "Chưa cất vào Túi"]] : [])];
   return `${curRow}<div class="chips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
       ${VIEW === 'town' ? "<button class=\"chip bulkc\" data-act=\"bulkopen\">Lọc để phân giải / bán</button>" : ''}</div>
@@ -273,6 +275,7 @@ const riftHelpModal = () => `<h2 class="mh">Ảo Cảnh đổi cách đánh</h2>
   <p class="help-p"><b>Tiến độ</b>: diệt yêu tích tiến độ, tinh anh cho nhiều hơn, ngã xuống còn rơi một viên tinh phách, phải đi tới nhặt. Tiến độ đầy thì yêu vương giữ ải hiện thân ngay cạnh bạn.</p>
   <p class="help-p"><b>Đổi tầng</b>: tiến độ mỗi tầng không giới hạn; muốn đánh tới cùng ở tầng này hay tới trận truyền tống ở xa để sang tầng kế là tùy bạn. Càng xuống sâu càng béo: yêu vật cao hơn một cấp, mỗi con cho nhiều tiến độ hơn (tầng hai +15%, tầng ba +30%, tầng bốn +50%), tinh anh cũng thêm một con. Mỗi tầng còn có một ngọn tháp, giẫm lên được cộng sức trong ba trận.</p>
   <p class="help-p"><b>Một nén hương</b>: mười hai phút. Trên bản đồ cháy theo thời gian thật; trong trận tính theo lượt, một vòng tính ba giây, mở tốc độ mấy hay bỏ qua trận đều như nhau.</p>
+  <p class="help-p"><b>Đánh lâu lộ sơ hở</b>: một trận đánh tới vòng 10 (trận yêu vương là vòng 20) thì yêu vật không hồi máu nữa, từ đó mỗi vòng nhận thêm 10% sát thương — yêu vật hồi máu giỏi mấy cũng không kéo thành thế bí. Trong Ảo Cảnh, yêu vật biết hồi máu mỗi lượt chỉ hồi 2%, thiêu đốt và trúng độc đều chặn được.</p>
   <p class="help-p">Trang bị rơi ra đều ghi vào ván này, đánh xong xem một thể; giữa chừng không dừng lại tổng kết.</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">Đã hiểu</button></div>`;
 function xiangBar(run) {
@@ -458,16 +461,48 @@ function bountyHTML() {
       ${Bn.bonus ? "<span class=\"sub\">Đã nhận</span>" : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">Nhận rương lớn</button>`}</div></section>`;
 }
 function gearTab() { return `<section class="panel"><h3>Chỉ số nhân vật</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+// 本职续航那一段（带当前数值）：「人物」页和「武学」页的本门功法卡共用
+function sustText(cls, s) {
+  const ch = SAVE.chars[cls], SU = SUST[cls], lvF = sustLv(ch.level);
+  const suV = k => k === 'dr' || k === 'cap' ? SU[k] : Math.round(Math.min(k === 'a' && cls === 'necro' ? 60 : 999, SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * lvF) * 10) / 10;
+  const desc = SU.d.replace(/\{(\w+)\}/g, (m, k) => suV(k));
+  return `<b>Hồi phục bản môn · ${SU.n}</b>: ${desc}. ${cls === 'berserker' ? '' : `<br>“Hút máu” của môn phái khác trên người bạn chỉ còn ba phần; mỗi 1% hút máu còn được quy thành 4% sức hồi phục${s.sust ? ` (hiện +${s.sust}%)` : ''}.`}`;
+}
+// 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
+const CLS_MECH = {
+  berserker: ["Nộ ý", "Ra đòn tích 5 điểm, trúng một đòn tích 8 điểm, tối đa 100 điểm. Nộ ý quá nửa: sát thương +15%. Khí huyết mỗi thiếu một phần mười: sát thương thêm +3%. Bá Vương Giải Giáp đổi hết Nộ ý thành sát thương (mỗi điểm +2%)."],
+  mage: ["Ngũ hành tương sinh", "Ra chiêu theo thứ tự Mộc→Hỏa→Thổ→Kim→Thủy→Mộc, mỗi lần nối đúng thì chồng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%; nối sai thì về không. Chiêu nào thuộc hành nào ghi ngay cạnh tên chiêu; Linh Phù là Mộc."],
+  necro: ["Thi trận", "Vào trận cương thi đã xếp sẵn theo Thi trận (thi vị cơ bản 3), công và khí huyết của chúng tính theo chỉ số của bạn. Kẻ địch bị Trấn Hồn Đinh đóng trúng sẽ bị cương thi ưu tiên cắn. Cương thi ngã thì dùng Rung Chuông Gọi Xác gọi lại."],
+  assassin: ["Sát ý", "Tiêu Tẩm Độc, Băng Phách Châm và các chiêu như vậy khi ra đòn sẽ tích Sát ý (tối đa 5 điểm), đòn kết liễu tiêu sạch một lần: Đoạt Mệnh Ấn mỗi điểm sát thương +25%, Ảnh Sát mỗi điểm đâm thêm một nhát. Vào trận bạn ra tay trước."],
+  paladin: ["Kim Cương phản kích", "Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (80% sát thương Phật quang); đang có hộ thể chân khí thì thêm +15%. Mỗi lượt tự hồi một ít khí huyết."],
+};
+const wxBadge = k => k.wx && WX[k.wx] ? `<i class="wxb" style="--c:${WX[k.wx].c}">${WX[k.wx].n}</i>` : '';
+function mechCard(cls) {
+  const M = CLS_MECH[cls], s = charStats(cls);
+  let extra = '';
+  if (cls === 'mage') {   // 道士：现在带的招式凑不凑得齐一圈五行
+    const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => k.wx)), miss = WX_IDS.filter(w => !have.has(w));
+    extra = `<p class="help-p wxrow">Bạn đang mang: ${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join('<span>→</span>')} ${miss.length ? `<b class="warn">Thiếu ${miss.map(w => WX[w].n).join(", ")}, không nối được trọn vòng</b>` : "<b class=\"ok\">Đủ ngũ hành, nối được hết vòng này sang vòng khác</b>"}</p>`;
+  }
+  return `<div class="mech"><h4 class="sub-h">Công pháp bản môn <small>bị động · không chiếm ô, luôn có hiệu lực</small></h4>
+    <p class="help-p"><b>Cơ chế môn phái · ${M[0]}</b>: ${M[1]}</p>${extra}<p class="help-p">${sustText(cls, s)}</p></div>`;
+}
+// 现在身上哪些东西在加强这一招：套装、神兵（穿着的和乾坤袋里启用的）、点过的心法——说明里点了这招名字的都列出来
+function skillBoosts(cls, k) {
+  const ch = SAVE.chars[cls], s = charStats(cls), out = [], hit = d => d && d.includes(k.n);
+  for (const S of SETS) { if (S.cls !== cls) continue; const n = s.setCount[S.id] || 0;
+    if (n >= 2 && hit(S.b2d)) out.push([`${S.n} 2 món`, S.b2d, 'set']); if (n >= 4 && hit(S.b4d)) out.push([`${S.n} 4 món`, S.b4d, 'set']); if (n >= 6 && S.b6 && hit(S.b6d)) out.push([`${S.n} 6 món`, S.b6d, 'set']); }
+  const lids = new Set(); for (const sl in ch.eq) if (ch.eq[sl] && ch.eq[sl].legend) lids.add(ch.eq[sl].legend); for (const lid of ch.cube || []) if (lid && SAVE.cube[lid]) lids.add(lid);
+  for (const lid of lids) { const L = LEGENDS.find(l => l.id === lid); if (L && hit(L.d)) out.push([L.n, L.d, 'legend']); }
+  for (const Bq of talentBranches(cls)) for (const T of Bq.t) { const r = ch.tal[Bq.id + '.' + T.id] || 0; if (r && T.fx && hit(T.d)) out.push([`Tâm pháp·${T.n}`, T.d, 'tal']); }
+  return out.length ? `<div class="skboost">${out.map(([n, d, c]) => `<div><b class="${c === 'set' ? 'r-set' : c === 'legend' ? 'r-legend' : 'tl'}">${n}</b>${d}</div>`).join('')}</div>` : '';
+}
 // 人物属性：一排数值 + 本职续航。城镇「人物」「修炼」和游戏里的「人物」弹窗共用
 function statBlock(cls) {
   const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
   const stats = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Tỉ lệ chí mạng", s.crit + '%'], ["ST chí mạng", s.critDmg + '%'],
     ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["ST thuật pháp", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ["Phúc duyên", '+' + s.mf + '%']];
-  const SU = SUST[cls], lvF = sustLv(ch.level);
-  const suV = k => k === 'dr' || k === 'cap' ? SU[k] : Math.round(Math.min(k === 'a' && cls === 'necro' ? 60 : 999, SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * lvF) * 10) / 10;
-  const desc = SU.d.replace(/\{(\w+)\}/g, (m, k) => suV(k));
-  const sustP = `<p class="help-p sustp"><b>Hồi phục bản môn · ${SU.n}</b>: ${desc}. ${cls === 'berserker' ? '' : `<br>“Hút máu” của môn phái khác trên người bạn chỉ còn ba phần; mỗi 1% hút máu còn được quy thành 4% sức hồi phục${s.sust ? ` (hiện +${s.sust}%)` : ''}.`}</p>`;
-  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p>`;
 }
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
@@ -519,7 +554,7 @@ function formHTML(cls) {
   if (cls !== 'necro') return '';
   const ch = SAVE.chars.necro, cap = 3 + charStats('necro').minion + (charStats('necro').fx.has('minionArmor') ? 1 : 0), form = necroForm(ch.level, ch.form);
   const opts = ZOMBIE_ORDER.filter(z => ZOMBIES[z].lv <= ch.level);
-  return `<div class="form"><h4 class="sub-h">Thi trận <small>Rung Chuông Gọi Xác lấp chỗ trống theo thứ tự này (thi vị ${cap})</small></h4>
+  return `<div class="form"><h4 class="sub-h">Thi trận <small>Vào trận xếp sẵn theo thứ tự này; con nào ngã thì dùng Rung Chuông Gọi Xác gọi lại (thi vị ${cap})</small></h4>
     ${Array.from({ length: cap }, (_, i) => `<div class="frow"><span class="fpos">${i + 1}</span>${ZOMBIE_ORDER.map(z => { const Z = ZOMBIES[z], lock = Z.lv > ch.level;
       return `<button class="fz ${form[i] === z ? 'on' : ''}" ${lock ? 'disabled' : ''} data-act="form" data-arg="${i}|${z}">${SPR.img(Z.spr, 26, Z.pal)}<b>${Z.n}</b><small>${lock ? Z.lv + " cấp" : esc(Z.d.split(", ")[0])}</small></button>`; }).join('')}</div>`).join('')}
     <p class="help-p">${ZOMBIE_ORDER.concat('shiwang').map(z => `<b>${ZOMBIES[z].n}</b> (cấp ${ZOMBIES[z].lv}): ${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
@@ -528,20 +563,20 @@ function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
   const eqIds = new Set(act.map(k => k.id));
   const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${k.n}</b><small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
+    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k)}${k.n}</b><small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
       <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="Lên">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="Xuống">▼</button>` : ''}
       ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? "Tháo" : "Mang"}</button>`}</span></div>
-      <p>${k.d}${s.sk[k.id] ? `<span class="skb"> (tâm pháp +${s.sk[k.id]}%)</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}
+      <p>${k.d}${s.sk[k.id] ? `<span class="skb"> (tâm pháp +${s.sk[k.id]}%)</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
       ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
   const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv);
-  return `${formHTML(cls)}<details class="wxinfo"><summary>Phối hợp trạng thái · cách đánh liên hoàn</summary>
+  return `${mechCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>Phối hợp trạng thái · cách đánh liên hoàn</summary>
       <p class="help-p">Chiêu mở đòn “gây trạng thái” lên địch, chiêu kết đòn đánh vào địch đang mang trạng thái đó sẽ có thêm hiệu ứng (gấp đôi sát thương, chắc chắn chí mạng, đập vỡ, lây lan…).</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
       <p class="help-p">Đồng hành cũng gây trạng thái: Ngoc thiêu đốt, cô Trân phá giáp, Long đạo trưởng đóng băng. Dẫn đúng người, chiêu kết đòn của bạn mới có đất dụng võ.</p></details>
     <h4 class="sub-h">Võ học xuất chiến <small>${act.length}/${LOADOUT_MAX} · khi tự động ra chiêu thì ưu tiên từ trên xuống${rOn ? " · mỗi chiêu được chọn một biến chiêu" : ''}</small></h4>
     ${comboHints(act, SAVE.comp)}
     <div class="skl">${act.map((k, i) => row(k, i, true)).join('') || "<div class=\"empty-note\">Chưa mang võ học nào</div>"}
-      <div class="sk basic"><div class="skh"><b>${basic.n}</b><small>Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}</div></div>
+      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b><small>Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
     ${rest.length ? `<h4 class="sub-h">Võ học chưa mang</h4><div class="skl">${rest.map(k => row(k, 0, false)).join('')}</div>` : ''}`;
 }
 function talentGrid(cls) {
@@ -2770,7 +2805,7 @@ const ACT = {
   credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
   replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : C[part]; playDialog(lines, C.boss); },
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
-  gsl: sl => { GSLOT = GSLOT === sl ? null : sl; refresh(); },
+  gsl: sl => { GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
   gsub: k => { GSUB = k; refresh(); },
   itab: k => { ITAB = k; refresh(); },
   npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },
