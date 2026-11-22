@@ -1260,6 +1260,8 @@ function stDesc(u, k) {
   if (!u) return null;
   if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + '（妖物特性）', c: '#e8c88a', d: TRAITS[u.trait].d };
   if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + '（精英词缀）', c: '#ffb066', d: A.d } : null; }
+  if (k === 'all') { const L = [...(u.trait ? [TRAITS[u.trait].n] : []), ...(u.aff || []).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean), ...unitSts(u).map(x => x.n)];
+    return { n: '全部状态', c: '#e8c88a', d: L.join('、') + '。点状态栏里的单个状态看说明。' }; }
   const x = unitSts(u).find(y => y.k === k), I = ST_INFO[k]; if (!x || !I) return null;
   const t = u.st[k], left = typeof t === 'number' ? t : t && t.t;
   return { n: I[0] + (left > 0 && left < 99 ? ` · 还剩 ${left} 回合` : ''), c: I[1], d: I[3] };
@@ -1289,6 +1291,14 @@ function drawSbar() {
     fo.innerHTML = `<div class="sbh"><b>${esc(T.name)}</b><small>${tag}</small></div>${sbHp(T.hp, T.maxHp, '#d8463a')}<div class="sbt">${Math.round(T.hp / T.maxHp * 100)}%${T.kind === 'boss' && E.length > 1 ? ` · 还有 ${E.length - 1} 只帮手` : ''}</div><div class="sbcs">${sbChips(T, true)}</div>`; }
   else { const h = E.reduce((a, u) => a + Math.max(0, u.hp), 0), m = E.reduce((a, u) => a + u.maxHp, 0), more = (B.reinf || []).length;
     fo.innerHTML = `<div class="sbh"><b>小怪 ×${E.length}</b>${more ? `<small>后面还有 ${more} 只</small>` : ''}</div>${sbHp(h, m, '#d8463a')}<div class="sbt">总血 ${Math.round(h / m * 100)}%</div><div class="sbcs"></div>`; }
+  sbFit(me, 'P'); if (T) sbFit(fo, T.id);
+}
+// 状态多了只显示放得下的两行，剩下的折成「+N」（点开看全部），状态栏高度固定不跳
+function sbFit(box, id) {
+  const c = box.querySelector('.sbcs'); if (!c || c.scrollHeight <= c.clientHeight + 1) return;
+  const kids = [...c.children]; let n = 0;
+  const more = document.createElement('span'); more.className = 'sbc m'; more.dataset.act = 'stinfo'; more.dataset.arg = id + '|all'; c.appendChild(more);
+  while (kids.length && c.scrollHeight > c.clientHeight + 1) { kids.pop().remove(); n++; more.textContent = '+' + n; }
 }
 // 役使：跟在你身边的两只首领精魄（小图标）；本事一触发就闪一下
 const yiBoss = id => { const Y = YISHI[id], e = Y && zyEntries(Y.pg).find(x => x.boss); return e ? allMonsterDefs().find(d => d.n === e.n) : null; };
