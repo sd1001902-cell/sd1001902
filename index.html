@@ -1493,6 +1493,28 @@ body[data-view=title] .wrap{max-width:none;padding:0}
 .sbcs{height:calc(2 * (17px * var(--fs,1)) + 3px);overflow:hidden;align-content:flex-start}
 .sbc{line-height:calc(15px * var(--fs,1));height:calc(17px * var(--fs,1));box-sizing:border-box}.sbc.m{--c:#cfc3a8}
 .unit .sts .stm{color:#cfc3a8}.unit .sts{white-space:nowrap}
+/* 2026-11 一屏战斗：顶栏两条细行、日志收进战场、统计改成占比条 */
+.bbar{display:block;padding:5px 8px;margin-bottom:6px}
+.bbar .bb1{display:flex;align-items:center;gap:8px;min-width:0}.bbar .bb1 .fl{flex:none;font-size:calc(14px * var(--fs,1));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.bbar .bb1 .xprow{flex:1;min-width:0;margin:0}
+.bbar .bb2{display:flex;gap:4px;flex-wrap:nowrap;overflow:hidden;margin-top:4px}.bbar .bb2 .pill{font-size:calc(11px * var(--fs,1));padding:1px 7px;white-space:nowrap}.bbar .bb2 .pill i{display:none}
+.blog.inar{position:absolute;left:6px;bottom:6px;right:96px;z-index:6;min-height:0;padding:2px 8px;font-size:calc(11px * var(--fs,1));background:rgba(8,6,6,.55);border:1px solid rgba(255,220,150,.15);border-radius:6px}
+.blog.inar:not(.open)::after{top:3px;right:6px}
+.blog.inar.open{max-height:60%;overflow-y:auto;bottom:6px;background:rgba(8,6,6,.9)}
+.bstatp{cursor:pointer;padding:4px 8px}
+.smr{display:grid;grid-template-columns:3.2em minmax(0,1fr) 2.6em 2em 3.2em 3.4em;gap:5px;align-items:center;font-size:calc(11px * var(--fs,1));line-height:1.55;font-variant-numeric:tabular-nums}
+.smr span:nth-child(n+3){text-align:right;white-space:nowrap}.smr span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smh{color:var(--dim);font-size:calc(10px * var(--fs,1))}.smb{height:6px;background:#2a1f19;border-radius:3px;overflow:hidden}.smb i{display:block;height:100%;background:#d8a05a;border-radius:3px}
+.smn{font-size:calc(11px * var(--fs,1));color:var(--dim)}
+.stpop.full{bottom:auto;top:8px;max-height:calc(100% - 16px);overflow-y:auto;width:min(94%,420px)}
+@media(max-width:700px){.arena.sv{height:clamp(270px,calc(100vh - 345px),430px);height:clamp(270px,calc(100svh - 345px),430px);padding-bottom:30px}}
+/* 再压矮：招式条一行（计数固定宽度在最左），状态栏名字和血量一行、状态一行 */
+.hud-sk{flex-direction:row;align-items:center;gap:4px}
+.hs-top{flex:none;width:5.6em;height:28px;min-height:28px}.hs-top .rchip{width:100%;justify-content:center;overflow:hidden;box-sizing:border-box;height:26px}
+.hs-grid{flex:1;min-width:0}
+.ultb{min-height:28px;height:30px}
+.sbar{padding:4px 8px;gap:8px}.sbh b{font-size:calc(12px * var(--fs,1))}.sbh b small{font-weight:400;color:var(--dim);margin-left:3px}
+.sbcs{height:calc(17px * var(--fs,1));margin-top:2px}
 </style>
 </head>
 <body>
