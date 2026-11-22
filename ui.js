@@ -438,7 +438,7 @@ function wsCan(it, where) {
     else if ((it.sockets || 0) < MAX_SOCKETS[it.slot] && SAVE.gold >= sc.gold && SAVE.mats >= sc.mats) c.sock = '可以再打一个孔'; }
   if (featureOn('reroll') && it.aff.length) { const q = itemQ(it); if (busyRoll(it)) c.refine = '有一次洗炼／淬炼的结果还没选'; else if (q != null && q < 0.5) c.refine = `词条成色只有 ${Math.round(q * 100)}%，可以淬炼洗炼`; }
   if (featureOn('enhance') && upTierOK(it)) { const L = upTierTarget(cls); if (L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const u = upTierCost(it, L); if (SAVE.gold >= u.gold && SAVE.mats >= u.mats) c.up = `可以升到${TIER_N[tierOf(L)]}`; } }
-  if (featureOn('enhance') && !c.up && ancOK(it) && SAVE.mats >= ANC_COST) c.up = `可以点化成上古（${ANC_COST} 魂晶）`;
+  if (featureOn('enhance') && !c.up && ancOK(it) && SAVE.mats >= ancCost(it) && (!it.anc || primalGate())) c.up = `可以点化成${it.anc ? '太古' : '上古'}（${ancCost(it)} 魂晶）`;
   if (featureOn('enhance') && where === 'eq' && SAVE.stash.some(x => canInherit(it, x))) c.inh = '储物箱里有旧装备的强化／玉可以传过来';
   return c;
 }
@@ -2730,8 +2730,11 @@ function smithHTML(it, where, W, title) {
     if (upTierOK(it) && L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const c = upTierCost(it, L);
       h += `<div class="srow"><span>升阶 ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>装备等级 ${it.ilvl} → ${L}，攻击、气血、护甲这些实数属性一起涨，百分比词条不变 · ${c.gold} 两 + ${c.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">升阶</button></div>`; }
     else h += `<div class="srow">${upTierOK(it) ? '这件已经是眼下能到的最高阶了。' : '只有宝品、套装、神兵能升阶。'}</div>`;
-    if (it.rarity === 'legend' || it.rarity === 'set') h += it.anc ? `<div class="srow">${it.anc === 2 ? '这件是太古：全属性 +30%，词条全是满值。' : '这件已经是上古：全属性 +30%。太古只能靠掉。'}</div>`
-      : `<div class="srow"><span>点化成上古<small>全属性 +30%，强化、玉、词条都不动 · ${ANC_COST} 魂晶（你有 ${fmtBig(SAVE.mats)}）。太古点不出来，只能靠掉。</small></span><button class="btn sm" ${SAVE.mats >= ANC_COST ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`;
+    if (it.rarity === 'legend' || it.rarity === 'set') { const c = ancCost(it), can = SAVE.mats >= c;
+      h += it.anc === 2 ? '<div class="srow">这件是太古：全属性 +30%，词条全是满值。</div>'
+        : !it.anc ? `<div class="srow"><span>点化成上古<small>全属性 +30%，一半几率多长一条词条；强化、玉、原有词条都不动 · ${c} 魂晶（你有 ${fmtBig(SAVE.mats)}）。点成上古之后，还能再点化成太古。</small></span><button class="btn sm" ${can ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`
+        : primalGate() ? `<div class="srow"><span>点化成太古<small>多长一条词条，所有词条变成满值；强化、玉不动 · ${c} 魂晶（你有 ${fmtBig(SAVE.mats)}）</small></span><button class="btn sm" ${can ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`
+        : `<div class="srow">这件已经是上古。幻境打到 ${PRIMAL_FROM} 层以后，可以花 ${c} 魂晶再点化成太古。</div>`; }
   }
   if (W.has('refine') && it.aff.length && featureOn('reroll') && !it.rrPending) {
     const m = itemMult(it);
@@ -3022,7 +3025,7 @@ const ACT = {
   ws: id => { const it = findOwned(id); const r = washStart(it, [...wlockOf(it)]); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   wspick: a => { const [id, i] = split(a); washPick(findOwned(id), +i); SFX.play('forge'); toast(+i ? '洗炼完成：换上了新词条' : '留下了原样'); refresh(); },
   inh: a => { const [d, s] = split(a); const r = inheritFrom(findOwned(d), findOwned(s)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`传承完成：现在 +${r.plus}${r.gems ? `，带过来 ${r.gems} 颗玉` : ''}`); refresh(); },
-  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); toast(`点化成了：<b>${esc(itemTitle(it))}</b>`); save(); refresh(); achToast(checkAch()); },
+  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); toast(`点化成了：<b>${esc(itemTitle(it))}</b>${r.add ? '，多长了一条词条' : ''}`); save(); refresh(); achToast(checkAch()); },
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`升阶完成：现在是${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),

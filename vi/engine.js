@@ -352,23 +352,40 @@ function rollSockets(slot, rarity) {
 const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
 const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%：神兵掉得多了，这两档收一收才显得珍贵）
 // 上古、太古跟着幻境层数走：30 层以内 5% / 0.3%，往上每层 +0.25% / +0.03%（69 层约 14.8% / 1.5%），封顶 20% / 2%。幻境以外（主线、赌装备、铸兵）按底数
-const ANC_STEP = [0.0025, 0.0005], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 800, PRIMAL_FROM = 90, PRIMAL_P0 = 0.005;   // 太古：幻境 90 层起才出，90 层 0.5%，每层 +0.05%，120 层到 2% 封顶
+const ANC_STEP = [0.0025, 0.0005], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 500, PRIMAL_COST = 1000, PRIMAL_FROM = 90, PRIMAL_P0 = 0.005;   // 太古：幻境 90 层起才出，90 层 0.5%，每层 +0.05%，120 层到 2% 封顶
 const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };
 const ancNow = () => ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0);
-// 点化：花魂晶把一件神兵／套装变成上古（保底的路；太古只能靠掉）
-const ancOK = it => !!it && (it.rarity === 'legend' || it.rarity === 'set') && !it.anc;
+// 点化：花魂晶逐级点——普通 → 上古（500，一半几率多长一条词条）→ 太古（1000，再多长一条，全部词条变满值）。太古要幻境到过 90 层
+const ancOK = it => !!it && (it.rarity === 'legend' || it.rarity === 'set') && (it.anc || 0) < 2;
+const ancCost = it => (it.anc || 0) === 0 ? ANC_COST : PRIMAL_COST;
+const primalGate = () => (SAVE.riftMax || 0) >= PRIMAL_FROM;
 function ancientize(it) {
   if (!it || !(it.rarity === 'legend' || it.rarity === 'set')) return { err: "Chỉ thần binh và đồ Bộ mới điểm hóa được" };
-  if (it.anc) return { err: it.anc === 2 ? "Món này đã là Thái Cổ rồi" : "Món này đã là Thượng Cổ rồi" };
-  if (SAVE.mats < ANC_COST) return { err: "Không đủ hồn tinh" };
-  SAVE.mats -= ANC_COST; it.anc = 1; SAVE.flags.ancient = true; return { ok: true };
+  if (it.anc === 2) return { err: "Món này đã là Thái Cổ rồi" };
+  if (busyRoll(it)) return { err: "Món này còn một kết quả tẩy luyện / tôi luyện chưa chọn" };
+  if (it.anc === 1 && !primalGate()) return { err: `Đánh Ảo Cảnh tới tầng ${PRIMAL_FROM} mới điểm hóa được Thái Cổ` };
+  const c = ancCost(it); if (SAVE.mats < c) return { err: "Không đủ hồn tinh" };
+  SAVE.mats -= c; let add = 0;
+  if (!it.anc) { it.anc = 1; SAVE.flags.ancient = true; if (RNG.ch(0.5)) add = addAffixes(it, 1); }
+  else { it.anc = 2; SAVE.flags.primal = true; add = addAffixes(it, 1); it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]); }
+  return { ok: true, add };
 }
 const primalOK = () => !!(SAVE && SAVE.run && SAVE.run.mode === 'rift' && SAVE.run.riftLv >= PRIMAL_FROM);
+// 通关后掉的装备按新的词条数（主线照旧，已有的装备不动）：宝品 2 条；神兵、套装 3 条；上古 3–4 条；太古 4–5 条
+const PG_AFF = () => !!(SAVE && SAVE.story && SAVE.story.ended);
+function addAffixes(it, n) { const L = it.legend && LEGENDS.find(l => l.id === it.legend), ex = [...it.aff.map(a => a[0]), ...(L ? Object.keys(L.imp) : [])];
+  const more = rollAffixes(n, it.ilvl, affMult(it), ex, it.anc === 2, it.slot);
+  while (more.length < n) {   // 副手这种格子攻击类词条多、又封顶两条：凑不够就放开封顶，保证上古 3–4、太古 4–5 条
+    const used = new Set([...ex, ...more.map(a => a[0])]), pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && affOK(a, slotType(it.slot) || it.slot)); if (!pool.length) break;
+    const A = RNG.pick(pool); more.push([A.k, affixValue(A, it.ilvl, affMult(it), it.anc === 2)]);
+  }
+  it.aff.push(...more); return more.length; }
 function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
   it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
   if (it.rarity === 'legend' || it.rarity === 'set') {
     const ap = ancNow(); it.anc = primalOK() && RNG.ch(ap[1]) ? 2 : RNG.ch(ap[0]) ? 1 : 0;
+    if (PG_AFF() && it.anc) { const want = (it.anc === 2 ? 4 : 3) + (RNG.ch(0.5) ? 1 : 0); if (it.aff.length < want) addAffixes(it, want - it.aff.length); }   // 通关后：上古 3–4 条，太古 4–5 条
     if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]);
   }
   return it;
@@ -389,7 +406,7 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket, legendId }) {
       const imp = scaleObj(implicitFor(slot, ilvl), L.w ? 1.05 * WPN_BASE : 1.05), lsc = 0.45 + ilvl / 20;
       for (const k in L.imp) imp[k] = (imp[k] || 0) + (FLAT_STATS.has(k) ? Math.max(1, Math.round(L.imp[k] * lsc)) : L.imp[k]);   // 神兵自带的百分比属性也不随等级涨
       return finishItem({ id: uid(), slot, ilvl, rarity, name: L.n, base: pickBase(slot, ilvl, L.cls || cls), legend: L.id, imp, ...(slot === 'offhand' && L.cls ? { cls: L.cls } : {}),
-                          aff: rollAffixes(RNG.i(2, 3), ilvl, 1.05, Object.keys(L.imp), false, slot) }, noSocket);
+                          aff: rollAffixes(PG_AFF() ? 3 : RNG.i(2, 3), ilvl, 1.05, Object.keys(L.imp), false, slot) }, noSocket);
     }
     rarity = 'rare';
   }
@@ -402,7 +419,7 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket, legendId }) {
       const p = RNG.pick(pool); slot = p.sl;
       const rs = p.S.rift;   // 幻境套装：底子更厚，多一条词条
       return finishItem({ id: uid(), slot, ilvl, rarity, name: p.n, base: pickBase(slot, ilvl), set: p.S.id, cls: p.S.cls,
-                          imp: scaleObj(implicitFor(slot, ilvl), rs ? 1.4 : 1.25), aff: rollAffixes(rs ? 3 : 2, ilvl, rs ? 1.3 : 1.2, [], false, slot) }, noSocket);
+                          imp: scaleObj(implicitFor(slot, ilvl), rs ? 1.4 : 1.25), aff: rollAffixes(rs || PG_AFF() ? 3 : 2, ilvl, rs ? 1.3 : 1.2, [], false, slot) }, noSocket);
     }
     rarity = 'rare';
   }
@@ -411,7 +428,7 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket, legendId }) {
   const ocls = slot === 'offhand' ? (cls || (SAVE && SAVE.cls) || 'berserker') : null;   // 副手是各门派自己的物件，别的门派用不了
   const base = pickBase(slot, ilvl, ocls);
   const R = RARITY[rarity];
-  const aff = rollAffixes(RNG.i(R.aff[0], R.aff[1]), ilvl, rarity === 'rare' ? 1.1 : 1, [], false, slot);
+  const aff = rollAffixes(rarity === 'rare' && PG_AFF() ? 2 : RNG.i(R.aff[0], R.aff[1]), ilvl, rarity === 'rare' ? 1.1 : 1, [], false, slot);
   let name = base;
   if (rarity === 'magic') name = joinName(AFFIXES.find(x => x.k === aff[0][0]).p, base);
   if (rarity === 'rare') name = slot === 'offhand' ? joinName(RNG.pick(RARE_NAME_A), OFFHAND_BASE[ocls]) : RNG.pick(RARE_NAME_A) + (isVi() ? ' ' : '') + RNG.pick(RARE_NAME_B[slot]);
