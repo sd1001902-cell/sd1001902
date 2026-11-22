@@ -455,6 +455,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   if (SAVE) { const g = globalStats(); for (const k in g) add(k, g[k]); }
   if (buffs) for (const k in buffs) add(k, buffs[k]);
   s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100)));
+  s.cls = clsId; s.sust = clsId === 'berserker' ? 0 : Math.round(s.leech * 4);   // 别的职业：每 1% 吸血折成 4% 续航强度（本职的护体／替死／身法／金刚）
   s.armorT = Math.round(s.armor * (1 + s.armorPct / 100));
   s.atk = Math.round(s.atk);
   s.crit = Math.min(75, Math.round(s.crit * 10) / 10); s.res = Math.min(75, Math.round(s.res * 10) / 10);
@@ -465,12 +466,29 @@ function calcStats(clsId, eq, level, buffs, ch) {
   return s;
 }
 function charStats(clsId, buffs) { const ch = SAVE.chars[clsId]; return calcStats(clsId, ch.eq, ch.level, buffs, ch); }
+// ============ 气血放大（2026-11）============
+// 主角一刀几千、自己只有几百血，不像话。做法：主角这一边所有和气血有关的数字——最大气血、挨的伤害、回的血、护体——
+// 一律乘一个随等级变大的倍数 hpK（10 级约 ×3.6，26 级约 ×10，满级约 ×20）。
+// 战斗内部仍按原来的数算，只在显示和存取时换算，所以「挨几下死」和改之前一模一样，难度不会因为这一条而变。
+const hpK = lv => 1 + 0.18 * Math.pow(Math.max(0, (lv || 1) - 1), 1.22);
+const hpShow = (v, lv) => Math.round(v * hpK(lv));
+const heroLv = () => { try { return SAVE.chars[SAVE.cls].level || 1; } catch (e) { return 1; } };
+// 各职业的续航：狂刀客靠吸血；别的职业吸血只有三成（按放大后的气血算），各有各的路子。sust = 续航强度加成（%）
+const SUST = {
+  mage:     { n: "Thủy hành hộ thể", d: "Mỗi lần nối thêm một tầng “Liên”, trên người thêm một lớp hộ thể ({a}% khí huyết tối đa, cộng dồn tối đa {cap}%)" , a: 2.5, cap: 22 },
+  necro:    { n: "Thế mạng", d: "Khi trên sân có cương thi, {a}% sát thương bạn phải chịu sẽ do cương thi gánh thay; cương thi ngã xuống thì bạn hồi {b}% khí huyết tối đa", a: 10, b: 2 },
+  assassin: { n: "Thân Pháp", d: "Né tránh +{a}%; mỗi lần né được hồi {b}% khí huyết tối đa, hạ gục kẻ địch hồi {c}%", a: 15, b: 12, c: 14 },
+  paladin:  { n: "Kim Cương Bất Hoại", d: "Mỗi lần phản kích hồi {a}% khí huyết tối đa; mỗi lượt hồi thêm {b}%", a: 3.2, b: 0.8 },
+};
+// 等级越高，气血倍数越大，吸血缩水得越厉害，所以续航也跟着等级涨：10 级约 0.75 倍，23 级 1 倍，43 级起 1.4 倍封顶
+const sustLv = lv => Math.min(1.4, 0.55 + (lv || 1) / 50);
+const sustV = (u, k) => SUST[u.cls][k] * (1 + (u.sust || 0) / 100) * sustLv(u.lv);
 function power(s) {
   const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100);
   const ehp = s.maxHp * (1 + s.armorT / 120) / (1 - s.res / 100 * 0.6) * (1 + s.dodge / 100) + s.regen * 25 + s.thorns * 8;
   let skb = 0; for (const k in s.sk) skb += s.sk[k];
   let rs = 0; for (const f of s.fx) if (RSET_FX.has(f)) rs++;   // 幻境套装的 4 件、6 件效果很值钱，「一键换上最强」不能把它拆散
-  return Math.round(Math.sqrt(off * ehp) * (1 + s.leech / 40) * (1 + s.fx.size * 0.08 + s.minion * 0.1 + s.freeze / 200 + s.poison / 200 + skb / 600) * (1 + rs * 0.3));
+  return Math.round(Math.sqrt(off * ehp) * (1 + s.leech / (s.cls === 'berserker' || !s.cls ? 40 : 160)) * (1 + s.fx.size * 0.08 + s.minion * 0.1 + s.freeze / 200 + s.poison / 200 + skb / 600) * (1 + rs * 0.3));
 }
 const RSET_FX = new Set(SETS.filter(S => S.rift).flatMap(S => [S.b4, S.b6]));
 function powerWith(cls, item) { const ch = SAVE.chars[cls]; return power(calcStats(cls, { ...ch.eq, [item.slot]: item }, ch.level, null, ch)); }
@@ -1230,9 +1248,10 @@ function startBattle(run, kind) {
   const s = runStats(run), C = CLASSES[run.cls], ch = SAVE.chars[run.cls], lv = ch.level, cell = curCell(run);
   const { act, basic } = skillList(run.cls);
   const skills = [...act.filter(k => k.lv <= lv), basic].map(k => ({ ...k, left: 0 }));
+  BK = hpK(lv);
   const P = { id: 'P', side: 'p', kind: 'hero', name: C.n, lv, cls: run.cls, spr: C.spr, hp: Math.min(run.hp, s.maxHp), maxHp: s.maxHp, atk: s.atk,
               armor: s.armorT, res: s.res, spd: 100 + s.spd, crit: s.crit, critDmg: s.critDmg, leech: s.leech, regen: s.regen,
-              thorns: s.thorns, dodge: s.dodge, dmgPct: s.dmgPct, elem: s.elem, freeze: s.freeze, poison: s.poison, frozenDmg: s.frozenDmg,
+              thorns: s.thorns, sust: s.sust || 0, dodge: s.dodge, dmgPct: s.dmgPct, elem: s.elem, freeze: s.freeze, poison: s.poison, frozenDmg: s.frozenDmg,
               minionCap: 3 + s.minion + (s.fx && s.fx.has('minionArmor') ? 1 : 0), minionPct: s.minionPct, healPct: s.healPct, sk: s.sk, runes: featureOn('runes') ? { ...ch.runes } : {},
               xBoss: s.xBoss, xExec: s.xExec, xBreak: s.xBreak,
               fury: 0, furyGain: s.furyGain || 0, lian: 0, lastWx: null, lianPct: s.lianPct || 0, ki: 0, kiMax: 5 + (s.fx.has('deathMarkPlus') ? 1 : 0) + (s.fx.has('qiSha4') ? 2 : 0), kiPct: s.kiPct || 0,
@@ -1280,10 +1299,12 @@ function spdOf(u) {
   return Math.max(0.2, s);
 }
 function addRage(u, n) { if (u.rage == null) return; u.rage = Math.min(100, u.rage + n); }
+const popN = (u, n) => String(n);   // 跳字仍然给原始数；界面显示时再乘倍数、把上万的写成「1.2万」
+let BK = 1;
 function heal(u, amt, out, quiet) {
   if (u.hp <= 0) return 0;
   const a = Math.min(u.maxHp - u.hp, Math.round(amt));
-  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + a, 'heal']); }
+  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); }
   return Math.max(0, a);
 }
 function freezeU(u, out, label) {
@@ -1370,7 +1391,7 @@ function act(b, u, out) {
   for (const k of ['burn', 'poison']) {
     const d = u.st[k]; if (!d) continue;
     const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg;
-    out.pops.push([u.id, '-' + dmg, k]);
+    out.pops.push([u.id, '-' + popN(u, dmg), k]);
     if (--d.t <= 0) delete u.st[k];
     if (u.hp <= 0) { out.lines.push(`${u.name} ${k === 'burn' ? "bị thiêu" : "trúng độc"} chết`); return; }
   }
@@ -1382,6 +1403,7 @@ function act(b, u, out) {
     if (k === 'mark') delete u.st.markB;
   }
   if (u.regen) heal(u, u.regen, out, true);
+  if (u.kind === 'hero' && u.cls === 'paladin' && u.hp > 0) heal(u, u.maxHp * sustV(u, 'b') / 100, out, true);
   if (u.st.renew) { heal(u, u.maxHp * 0.06, out); if (--u.st.renew <= 0) delete u.st.renew; }
   if (u.kind === 'hero') return heroAct(b, u, out);
   if (u.kind === 'ally') return ngocAct(b, u, out);
@@ -1513,7 +1535,9 @@ function heroAct(b, P, out) {
   else if (sk.pay) foes = foes.slice().sort((x, y) => stHas(y, sk.pay.s) - stHas(x, sk.pay.s));   // 收招打带状态的那个
   // 五行道士：按相生顺序出招叠「连」
   if (P.cls === 'mage' && sk.wx) { const cap = P.fx.has('tianshi') ? 7 : 5;
+    const lian0 = P.lian;
     P.lian = P.lastWx && WX_SHENG[P.lastWx] === sk.wx ? Math.min(cap, P.lian + 1) : P.fx.has('guiYuan4') ? Math.max(0, P.lian - 2) : 0; P.lastWx = sk.wx;
+    if (P.cls === 'mage' && (P.lian > lian0 || (P.lian === cap && lian0 === cap))) { const capS = Math.round(P.maxHp * SUST.mage.cap / 100), add = Math.round(P.maxHp * sustV(P, 'a') / 100); if ((P.shield || 0) < capS) { P.shield = Math.min(capS, (P.shield || 0) + add); out.pops.push(['P', "Hộ Thể", 'buff']); } }
     if (P.fx.has('guiYuan6') && P.lian >= 5) { b.guiYuan = true; out.pops.push(['P', "Quy Nguyên", 'crit']); }
     if (P.lian) out.pops.push(['P', `Liên ${P.lian}`, 'buff']);
     if (P.fx.has('tianshi') && P.lian >= cap) { b.castCrit = true; b.lianReset = true; } }
@@ -1777,8 +1801,9 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (!tgt || tgt.hp <= 0 || src.hp <= 0) return 0;
   if (tgt.trait === 'fly' && !tgt.st.slow && src.kind === 'hero' && !opt.aoe && !opt.ult && ['berserker', 'assassin', 'paladin'].includes(src.cls) && RNG.ch(0.25)) { out.pops.push([tgt.id, "Hụt", 'miss']); return 0; }
   if (tgt.st.smoke && src.side === 'e') { out.pops.push([tgt.id, "Yên Độn", 'miss']); return 0; }
-  const dodge = (tgt.dodge || 0) + (tgt.st.shadow ? 40 : 0) + (tgt.ghostForm ? 25 : 0);
-  if (dodge && RNG.ch(Math.min(70, dodge) / 100)) { out.pops.push([tgt.id, "Né tránh", 'miss']); return 0; }
+  const isAss = tgt.kind === 'hero' && tgt.cls === 'assassin' && src.side === 'e';
+  const dodge = (tgt.dodge || 0) + (tgt.st.shadow ? 40 : 0) + (tgt.ghostForm ? 25 : 0) + (isAss ? SUST.assassin.a * sustLv(tgt.lv) : 0);
+  if (dodge && RNG.ch(Math.min(70, dodge) / 100)) { out.pops.push([tgt.id, "Né tránh", 'miss']); if (isAss && tgt.hp > 0) heal(tgt, tgt.maxHp * sustV(tgt, 'b') / 100, out); return 0; }
   const fx = src.fx, tfx = tgt.fx;
   let d = opt.flat != null ? opt.flat : src.atk * mult * (1 + (src.dmgPct || 0) / 100 + (elem !== 'phys' ? (src.elem || 0) / 100 : 0));
   if (src.st.warcry) d *= 1.4;
@@ -1853,6 +1878,10 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
   if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, "Hộ giá", 'miss']); }
+  if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分
+    const Z = zombiesOf(b).sort((x, y) => (y.taunt ? 1 : 0) - (x.taunt ? 1 : 0) || y.hp - x.hp)[0];
+    if (Z) { const part = Math.min(Z.hp, Math.round(d * Math.min(60, sustV(tgt, 'a')) / 100)); if (part >= 1) { Z.hp -= part; d -= part; out.pops.push([Z.id, popN(Z, part), 'phys']); } }
+  }
   const dPre = d, shieldThorns = tgt.shield > 0 && tgt.runes && tgt.runes.aegis === 'a';
   if (tgt.shield > 0) {
     const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a;
@@ -1865,7 +1894,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   if (tgt.kind === 'hero' && src.side === 'e' && !opt.noBlock && RNG.ch(0.12)) { d = Math.max(1, Math.round(d * 0.5)); out.pops.push([tgt.id, "Đỡ đòn", 'block']); }
   tgt.hp -= d;
-  out.pops.push([tgt.id, String(d), crit ? 'crit' : elem]);
+  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem]);
   if (tgt.kind === 'hero' && src.side === 'e' && tgt.cls === 'berserker') tgt.fury = Math.min(100, (tgt.fury || 0) + 8 * (tgt.st.butui ? 2 : 1) * (1 + (tgt.furyGain || 0) / 100));
   if (tgt.thornsP && src.side === 'e' && src.hp > 0) { const r = Math.max(1, Math.round(d * tgt.thornsP)); src.hp -= r; out.pops.push([src.id, "Phản chấn" + r, 'thorn']); }
   counterHit(b, tgt, src, out, opt);
@@ -1900,6 +1929,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   let lee = (src.leech || 0) / 100 * (fx && fx.has('vampire') ? 2 : 1);
   if (src.aff && src.aff.includes('vamp')) lee += 0.3;
   if (src.st.warcry && src.runes && src.runes.warcry === 'b') lee += 0.1;
+  if (lee && src.kind === 'hero' && src.cls !== 'berserker') { const k = BK || 1; lee *= (0.3 + 0.7 / (k * k)) / k; }   // 三成；刚出门那几级气血还没放大多少，吸血也就还没怎么缩，平滑过渡
   if (lee) heal(src, d * lee, out, true);
   if (opt.proc) return d;
   if (src.side === 'p') {
@@ -1939,6 +1969,7 @@ function counterHit(b, tgt, src, out, opt) {
   const tfx = tgt.fx, ch = (tgt.counter + (tgt.shield > 0 ? 15 : 0) + (tgt.st.chan ? 40 : 0)) / 100;
   if (!RNG.ch(Math.min(0.85, ch))) return;
   b.inCounter = true; out.pops.push([tgt.id, "Phản kích", 'buff']);
+  if (tgt.cls === 'paladin') heal(tgt, tgt.maxHp * sustV(tgt, 'a') / 100, out, true);
   const lh = tfx && tfx.has('luoHan4');
   (lh ? aliveOf(b, 'e') : [src]).forEach(f => hit(b, tgt, f, lh ? 2 : 0.8, 'holy', out, { proc: 1, aoe: lh ? 1 : 0 }));
   if (tgt.st.chan && src.hp > 0) freezeU(src, out, "Choáng");
@@ -1951,9 +1982,11 @@ function resolveDeaths(b, out) {
     if (u.hp > 0 || u.dead) continue;
     if (u.kind === 'hero' && u.fx && u.fx.has('lastBreath') && !b.lastBreath) { b.lastBreath = true; u.hp = 1; u.st.butui = 2; out.pops.push([u.id, "Bất Tử", 'buff']); out.lines.push("Còn một hơi thở — bạn vẫn đứng vững!"); continue; }
     if (u.kind === 'hero' && run && run.tishen > 0) { run.tishen--; u.hp = Math.round(u.maxHp * 0.3); out.pops.push([u.id, "Hình nhân thế mạng", 'buff']); out.lines.push(`Một hình nhân giấy “phụt” một cái đỡ thay bạn đòn này, cháy thành tro (còn ${run.tishen} cái)`); continue; }
+    if (u.side === 'e' && P && P.cls === 'assassin' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'c') / 100, out);
     u.dead = true; u.hp = 0;
     if (u.kind === 'ally') { out.say = [u.id, "Tôi, tôi rút lui chút đã! Ngươi chống đỡ cho ta!"]; out.lines.push("Ngoc lui về phía sau"); continue; }
     if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name} ngã xuống rồi…`); continue; }
+    if (u.kind === 'minion' && P.cls === 'necro' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'b') / 100, out);
     if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * 0.5); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1 })); out.pops.push([u.id, "Âm binh nổ", 'fire']); }
     if (u.kind === 'minion' && P.fx.has('corpseBurst')) { aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out)); out.lines.push("Cương thi nổ tung, thi hỏa văng tứ tung"); }
     if (u.side !== 'e') continue;

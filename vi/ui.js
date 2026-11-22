@@ -40,7 +40,9 @@ const heroSpr = (cls, size, extra) => typeof HERO !== 'undefined' && HERO.has(cl
 const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== 'undefined' && HERO.lookOf(spr);
   return lk ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(lk, mode || (size >= 100 ? 'full' : size >= 50 ? 'stand' : 'head'), HERO.mapPal(lk, pal))}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(spr, size, pal, extra); };
 // 顶栏的大数字缩写：十万以上写成「12.3万」，省地方
-const fmtBig = n => n >= 100000 ? `${(n / 10000).toFixed(n >= 1000000 ? 0 : 1)} vạn` : String(n);
+const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); const v = n >= 1000000 ? Math.round(n / 10000) : Math.round(n / 1000) / 10; return `${v} vạn`; };
+const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
+const uK = u => u && u.side === 'p' && B && B.P ? hpK(B.P.lv) : 1;                       // 战斗里某个单位的显示倍数
 const chTitle = ch => `Chương ${CN[ch]} · ${CHAPTERS[ch - 1].n}`;
 
 // ---------- 对话 ----------
@@ -115,6 +117,7 @@ function fmtStat(k, v) {
   if (k === 'poison') return `Đòn đánh gây trúng độc: mỗi lượt ${v}% công`;
   if (k.startsWith('sk_')) { const id = k.slice(3); for (const c of CLASS_IDS) { const s = CLASSES[c].skills.find(x => x.id === id); if (s) return `+${v}% sát thương ${s.n}`; } }
   const sign = v >= 0 ? '+' : '';
+  if (k === 'hp' || k === 'regen') return `${sign}${fmtBig(hpShow(v, heroLv()))} ${STAT_NAMES[k] || k}`;   // 气血类的固定数值：和最大气血同一个倍数
   return `${sign}${v}${PCT_STATS.has(k) ? '%' : ''} ${STAT_NAMES[k] || k}`;
 }
 const itemTitle = it => `${ancName(it)}${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}`;
@@ -241,7 +244,7 @@ function runBar(run) {
     : `<span class="pill ${run.hasKey ? 'gold' : 'dim'}">${SPR.img('key', 18)}${run.hasKey ? "Đã có chìa khóa" : "Chưa tìm thấy chìa khóa"}</span>`;
   return `<header class="runbar"><div class="rb-hero">${heroSpr(run.cls, 44)}<div><div class="fl">${title}</div>
       <div class="sub">${CLASSES[run.cls].n} Lv ${SAVE.chars[run.cls].level} · ${run.mode === 'rift' ? "Ảo Cảnh" : DIFFS[run.diff].n}${run.ngoc ? " · cùng Ngoc" : ''}${run.mods.length ? ' · ' + run.mods.map(id => DUNGEON_MODS.find(m => m.id === id).n).join(", ") : ''}</div></div></div>
-    <div class="hpw"><div class="hpbar big" id="rbhp"><i style="width:${hp / s.maxHp * 100}%"></i><span>${hp} / ${s.maxHp}</span></div>${xpRow(run.cls)}</div>
+    <div class="hpw"><div class="hpbar big" id="rbhp"><i style="width:${hp / s.maxHp * 100}%"></i><span>${hpTxt(hp)} / ${hpTxt(s.maxHp)}</span></div>${xpRow(run.cls)}</div>
     <div class="row"><span class="pill" id="rbpot">Đan dược ${run.potions}</span>${goal}<span class="pill gold">Bạc ${SAVE.gold}</span>${run.world && (run.chapter === 7 || SAVE.mb) ? `<span class="pill mb">Minh tệ ${SAVE.mb || 0}</span>` : ''}${run.tishen ? `<span class="pill">Hình nhân ${run.tishen}</span>` : ''}</div></header>
     ${buffs ? `<div class="buffs">Tăng cường chuyến này: ${buffs}</div>` : ''}`;
 }
@@ -345,13 +348,16 @@ function heroTab() {
   const bar = `<div class="gsubs htabs" style="--n:${tabs.length}">${tabs.map(([k, n]) => `<button class="${HTAB === k ? 'on' : ''}" data-act="htab" data-arg="${k}">${n}</button>`).join('')}</div>`;
   let body = '';
   if (HTAB === 'stat') {
-    const stats = [["Khí huyết", s.maxHp], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Tỉ lệ chí mạng", s.crit + '%'], ["ST chí mạng", s.critDmg + '%'],
-      ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["ST thuật pháp", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", s.dodge + '%'], ["Phúc duyên", '+' + s.mf + '%']];
+    const stats = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Tỉ lệ chí mạng", s.crit + '%'], ["ST chí mạng", s.critDmg + '%'],
+      ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["ST thuật pháp", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ["Phúc duyên", '+' + s.mf + '%']];
     const fxList = [...s.fx].map(f => { const L = LEGENDS.find(l => l.fx === f); if (L) return `<li><b class="r-legend">${L.n}</b>: ${L.d}</li>`;
       const S = SETS.find(x => x.b4 === f); if (S) return `<li><b class="r-set">${S.n} 4 món</b>: ${S.b4d}</li>`;
       const S6 = SETS.find(x => x.b6 === f); if (S6) return `<li><b class="r-set">${S6.n} 6 món</b>: ${S6.b6d}</li>`;
       for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<li><b style="color:var(--gold2)">Tâm pháp · ${T.n}</b>: ${T.d}</li>`; } return ''; }).join('');
-    body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>
+    const SU = SUST[cls], suV = k => Math.round(SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * sustLv(ch.level) * 10) / 10;
+    const sustP = SU ? `<p class="help-p sustp"><b>Hồi phục bản môn · ${SU.n}</b>: ${SU.d.replace('{a}', suV('a')).replace('{b}', suV('b')).replace('{c}', suV('c')).replace('{cap}', SU.cap)}.<br>“Hút máu” của môn phái khác trên người bạn chỉ còn ba phần; mỗi 1% hút máu còn được quy thành 4% sức hồi phục${s.sust ? ` (hiện +${s.sust}%)` : ''}.</p>`
+      : `<p class="help-p sustp"><b>Hồi phục bản môn · Hút máu</b>: gây ra bao nhiêu sát thương thì hồi máu theo tỉ lệ hút máu bấy nhiêu. Chỉ Cuồng Đao Khách mới hút máu trọn vẹn.</p>`;
+    body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}
       <h4 class="sub-h">Bộ trang bị môn phái</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
         return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>Rơi từ Ảo Cảnh tầng ${RSET_LV} trở lên</em>` : ''} (đã mặc ${n}/${S.pieces.length})<div class="${n >= 2 ? 'on' : 'off'}">2 món: ${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 món: ${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 món: ${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">Hiệu ứng đang có</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
@@ -970,7 +976,7 @@ function applyStep(o, anim) {
     el.classList.toggle('tgt', u.side === 'e' && B.target === u.id && u.hp > 0);
     el.querySelector('.hpbar i').style.width = Math.max(0, u.hp / u.maxHp * 100) + '%';
     el.querySelector('.hpbar .sh').style.width = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100) + '%' : '0';
-    el.querySelector('.hpbar span').textContent = u.escaped ? "chuồn rồi" : u.kind === 'ally' && u.dead ? "tạm lui" : `${Math.max(0, Math.round(u.hp))} / ${u.maxHp}`;
+    el.querySelector('.hpbar span').textContent = u.escaped ? "chuồn rồi" : u.kind === 'ally' && u.dead ? "tạm lui" : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`;
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">Giữ lấy ông ấy!</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} lượt nữa chuồn</span>`);
@@ -1026,7 +1032,7 @@ function applyStep(o, anim) {
         if (!pop || !pop.isConnected) { pop = document.createElement('span'); pop.style.left = (28 + Math.random() * 44) + '%'; el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100 + parts.length * 90); }
         sum += dmgN ? +v : 0;
         pop.className = 'pop ' + c + tier(dmgN ? sum : 0) + (parts.length > 1 && !last ? ' tick' : '') + (parts.length > 1 && k > 0 ? ' re' : '');
-        pop.textContent = dmgN ? (cr ? sum + '!' : String(sum)) : v;
+        pop.textContent = dmgN ? fmtBig(sum * uK(tu)) + (cr ? '!' : '') : String(v).replace(/\d+/, n => fmtBig(+n * uK(tu)));
         if (parts.length > 1 && k > 0) { pop.style.animation = 'none'; void pop.offsetWidth; pop.style.animation = ''; }
         if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr);
       }, k * 90 * spdF()));
@@ -1062,7 +1068,7 @@ function applyStep(o, anim) {
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
     $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full && !B.ultAuto); ub.classList.toggle('queued', !!B.ultReq);
     $('#ultpct').textContent = B.ultReq ? "Chiêu sau tung ra" : full ? (B.ultAuto ? "Nộ khí đã đầy" : "Chạm để tung!") : `Nộ khí ${r}%`; ub.disabled = B.over; }
-  if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${Math.max(0, Math.round(P.hp))} / ${P.maxHp}`; }
+  if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = "Đan dược " + SAVE.run.potions;
   const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `Tiến độ ${Math.floor(SAVE.run.prog)}%`;
   const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `Hương ${Math.round(L * 100)}%`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
@@ -1559,7 +1565,7 @@ function trkTD(q) {
 function updWorldHud() {
   const run = SAVE.run; if (!run || VIEW !== 'world') return;
   const s = runStats(run), rb = $('#rbhp');
-  if (rb) { rb.querySelector('i').style.width = Math.max(0, run.hp / s.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${Math.round(run.hp)} / ${s.maxHp}`; }
+  if (rb) { rb.querySelector('i').style.width = Math.max(0, run.hp / s.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${hpTxt(run.hp)} / ${hpTxt(s.maxHp)}`; }
   const z = $('#wzone'); if (z) z.textContent = zoneName();
   updXp();
 }

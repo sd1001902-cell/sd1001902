@@ -808,7 +808,7 @@ function wStep(ch, x, y, run) {
   const c1 = wTile(m0, x, y);
   if (run && ((c1 === '*' && wLavaHot() && !wHasKey(ch, TR.lava)) || (c1 === '"' && !wHasKey(ch, TR.swamp)))) {
     const mx = runStats(run).maxHp, d = Math.round(mx * (c1 === '*' ? (wHasKey(ch, 'bihuofu') ? 0.045 : 0.09) : 0.05));
-    if (run.hp > mx * 0.15) { run.hp = Math.max(1, run.hp - d); pre.push({ toast: c1 === '*' ? `岩浆正烫！气血 -${d}（等它暗下去再走）` : `毒水渗进鞋里，气血 -${d}` }); }
+    if (run.hp > mx * 0.15) { run.hp = Math.max(1, run.hp - d); pre.push({ toast: c1 === '*' ? `岩浆正烫！气血 -${hpShow(d, heroLv())}（等它暗下去再走）` : `毒水渗进鞋里，气血 -${hpShow(d, heroLv())}` }); }
   }
   // 每章自己的地形规矩（暴风雪、塌方、扒手……）
   if (run && WMAPS[ch].onStep) { const r = WMAPS[ch].onStep(ch, S, run, x, y); if (r) { if (r.stop) return { acts: [...pre, ...r.acts] }; pre.push(...(r.acts || [])); } }

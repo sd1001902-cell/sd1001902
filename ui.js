@@ -40,7 +40,9 @@ const heroSpr = (cls, size, extra) => typeof HERO !== 'undefined' && HERO.has(cl
 const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== 'undefined' && HERO.lookOf(spr);
   return lk ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(lk, mode || (size >= 100 ? 'full' : size >= 50 ? 'stand' : 'head'), HERO.mapPal(lk, pal))}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(spr, size, pal, extra); };
 // 顶栏的大数字缩写：十万以上写成「12.3万」，省地方
-const fmtBig = n => n >= 100000 ? `${(n / 10000).toFixed(n >= 1000000 ? 0 : 1)}万` : String(n);
+const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); const v = n >= 1000000 ? Math.round(n / 10000) : Math.round(n / 1000) / 10; return `${v}万`; };
+const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
+const uK = u => u && u.side === 'p' && B && B.P ? hpK(B.P.lv) : 1;                       // 战斗里某个单位的显示倍数
 const chTitle = ch => `第${CN[ch]}章 · ${CHAPTERS[ch - 1].n}`;
 
 // ---------- 对话 ----------
@@ -115,6 +117,7 @@ function fmtStat(k, v) {
   if (k === 'poison') return `攻击附带中毒：每回合 ${v}% 攻击`;
   if (k.startsWith('sk_')) { const id = k.slice(3); for (const c of CLASS_IDS) { const s = CLASSES[c].skills.find(x => x.id === id); if (s) return `+${v}% ${s.n}伤害`; } }
   const sign = v >= 0 ? '+' : '';
+  if (k === 'hp' || k === 'regen') return `${sign}${fmtBig(hpShow(v, heroLv()))} ${STAT_NAMES[k] || k}`;   // 气血类的固定数值：和最大气血同一个倍数
   return `${sign}${v}${PCT_STATS.has(k) ? '%' : ''} ${STAT_NAMES[k] || k}`;
 }
 const itemTitle = it => `${ancName(it)}${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}`;
@@ -241,7 +244,7 @@ function runBar(run) {
     : `<span class="pill ${run.hasKey ? 'gold' : 'dim'}">${SPR.img('key', 18)}${run.hasKey ? '已有钥匙' : '未找到钥匙'}</span>`;
   return `<header class="runbar"><div class="rb-hero">${heroSpr(run.cls, 44)}<div><div class="fl">${title}</div>
       <div class="sub">${CLASSES[run.cls].n} Lv ${SAVE.chars[run.cls].level} · ${run.mode === 'rift' ? '幻境' : DIFFS[run.diff].n}${run.ngoc ? ' · Ngoc 同行' : ''}${run.mods.length ? ' · ' + run.mods.map(id => DUNGEON_MODS.find(m => m.id === id).n).join('、') : ''}</div></div></div>
-    <div class="hpw"><div class="hpbar big" id="rbhp"><i style="width:${hp / s.maxHp * 100}%"></i><span>${hp} / ${s.maxHp}</span></div>${xpRow(run.cls)}</div>
+    <div class="hpw"><div class="hpbar big" id="rbhp"><i style="width:${hp / s.maxHp * 100}%"></i><span>${hpTxt(hp)} / ${hpTxt(s.maxHp)}</span></div>${xpRow(run.cls)}</div>
     <div class="row"><span class="pill" id="rbpot">丹药 ${run.potions}</span>${goal}<span class="pill gold">银两 ${SAVE.gold}</span>${run.world && (run.chapter === 7 || SAVE.mb) ? `<span class="pill mb">冥币 ${SAVE.mb || 0}</span>` : ''}${run.tishen ? `<span class="pill">纸人 ${run.tishen}</span>` : ''}</div></header>
     ${buffs ? `<div class="buffs">本局加成：${buffs}</div>` : ''}`;
 }
@@ -345,13 +348,16 @@ function heroTab() {
   const bar = `<div class="gsubs htabs" style="--n:${tabs.length}">${tabs.map(([k, n]) => `<button class="${HTAB === k ? 'on' : ''}" data-act="htab" data-arg="${k}">${n}</button>`).join('')}</div>`;
   let body = '';
   if (HTAB === 'stat') {
-    const stats = [['气血', s.maxHp], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
-      ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', s.dodge + '%'], ['福缘', '+' + s.mf + '%']];
+    const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
+      ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ['福缘', '+' + s.mf + '%']];
     const fxList = [...s.fx].map(f => { const L = LEGENDS.find(l => l.fx === f); if (L) return `<li><b class="r-legend">${L.n}</b>：${L.d}</li>`;
       const S = SETS.find(x => x.b4 === f); if (S) return `<li><b class="r-set">${S.n} 4 件</b>：${S.b4d}</li>`;
       const S6 = SETS.find(x => x.b6 === f); if (S6) return `<li><b class="r-set">${S6.n} 6 件</b>：${S6.b6d}</li>`;
       for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<li><b style="color:var(--gold2)">心法·${T.n}</b>：${T.d}</li>`; } return ''; }).join('');
-    body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>
+    const SU = SUST[cls], suV = k => Math.round(SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * sustLv(ch.level) * 10) / 10;
+    const sustP = SU ? `<p class="help-p sustp"><b>本职续航 · ${SU.n}</b>：${SU.d.replace('{a}', suV('a')).replace('{b}', suV('b')).replace('{c}', suV('c')).replace('{cap}', SU.cap)}。<br>别的门派的「吸血」在你身上只有三成；每 1% 吸血另外折成 4% 续航强度${s.sust ? `（现在 +${s.sust}%）` : ''}。</p>`
+      : `<p class="help-p sustp"><b>本职续航 · 吸血</b>：打出多少伤害，就按吸血的比例回多少血。只有狂刀客的吸血是足额的。</p>`;
+    body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}
       <h4 class="sub-h">门派套装</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
         return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>幻境 ${RSET_LV} 层以上掉落</em>` : ''}（已穿 ${n}/${S.pieces.length}）<div class="${n >= 2 ? 'on' : 'off'}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 件：${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">生效中的特效</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
@@ -970,7 +976,7 @@ function applyStep(o, anim) {
     el.classList.toggle('tgt', u.side === 'e' && B.target === u.id && u.hp > 0);
     el.querySelector('.hpbar i').style.width = Math.max(0, u.hp / u.maxHp * 100) + '%';
     el.querySelector('.hpbar .sh').style.width = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100) + '%' : '0';
-    el.querySelector('.hpbar span').textContent = u.escaped ? '溜走了' : u.kind === 'ally' && u.dead ? '暂时退下' : `${Math.max(0, Math.round(u.hp))} / ${u.maxHp}`;
+    el.querySelector('.hpbar span').textContent = u.escaped ? '溜走了' : u.kind === 'ally' && u.dead ? '暂时退下' : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`;
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">守住他！</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} 回合后溜走</span>`);
@@ -1026,7 +1032,7 @@ function applyStep(o, anim) {
         if (!pop || !pop.isConnected) { pop = document.createElement('span'); pop.style.left = (28 + Math.random() * 44) + '%'; el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100 + parts.length * 90); }
         sum += dmgN ? +v : 0;
         pop.className = 'pop ' + c + tier(dmgN ? sum : 0) + (parts.length > 1 && !last ? ' tick' : '') + (parts.length > 1 && k > 0 ? ' re' : '');
-        pop.textContent = dmgN ? (cr ? sum + '!' : String(sum)) : v;
+        pop.textContent = dmgN ? fmtBig(sum * uK(tu)) + (cr ? '!' : '') : String(v).replace(/\d+/, n => fmtBig(+n * uK(tu)));
         if (parts.length > 1 && k > 0) { pop.style.animation = 'none'; void pop.offsetWidth; pop.style.animation = ''; }
         if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr);
       }, k * 90 * spdF()));
@@ -1062,7 +1068,7 @@ function applyStep(o, anim) {
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
     $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full && !B.ultAuto); ub.classList.toggle('queued', !!B.ultReq);
     $('#ultpct').textContent = B.ultReq ? '下一招释放' : full ? (B.ultAuto ? '怒气已满' : '点我释放！') : `怒气 ${r}%`; ub.disabled = B.over; }
-  if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${Math.max(0, Math.round(P.hp))} / ${P.maxHp}`; }
+  if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
   const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `进度 ${Math.floor(SAVE.run.prog)}%`;
   const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `香 ${Math.round(L * 100)}%`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
@@ -1559,7 +1565,7 @@ function trkTD(q) {
 function updWorldHud() {
   const run = SAVE.run; if (!run || VIEW !== 'world') return;
   const s = runStats(run), rb = $('#rbhp');
-  if (rb) { rb.querySelector('i').style.width = Math.max(0, run.hp / s.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${Math.round(run.hp)} / ${s.maxHp}`; }
+  if (rb) { rb.querySelector('i').style.width = Math.max(0, run.hp / s.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${hpTxt(run.hp)} / ${hpTxt(s.maxHp)}`; }
   const z = $('#wzone'); if (z) z.textContent = zoneName();
   updXp();
 }
