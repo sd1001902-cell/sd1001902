@@ -1231,7 +1231,10 @@ function wPrepBattle(run, enc) {
 // 撞上一群怪，旁边两格内的怪群一起卷进来（拉怪合战）；精英倒下掉一颗精魄球，走过去捡；每层一座塔。
 // 幻境用一个假的章节号 RCH：地图是从别的章节抄来、抹掉机关和人物的；任务表是空的。
 const RCH = 99;
-var R_NORM = [1.3, 0.8], R_ELITE = [3.2, 1.25], R_BOSS = [2.6, 2.2];   // 幻境妖物在 makeMonster 基础上再乘的 [气血, 攻击]
+var R_NORM = [1.3, 0.8], R_ELITE = [3.2, 1.25], R_BOSS = [2.6, 2.2];
+// 50 层以后精英涨得比小怪慢一点（每层 +6% 气血、+3.5% 攻击，小怪和妖王是 +8%、+5%）：实测精英战比小怪群、妖王战早二三十层就打不过，只能绕着走
+var R_ELITE_LIN = [0.06, 0.035];
+function rEliteEase(N) { const k = Math.max(0, N - R_LIN[0]); return [(1 + R_ELITE_LIN[0] * k) / (1 + R_LIN[1] * k), (1 + R_ELITE_LIN[1] * k) / (1 + R_LIN[2] * k)]; }   // 幻境妖物在 makeMonster 基础上再乘的 [气血, 攻击]
 var R_NEED = 100;            // 召唤妖王要攒的分：小妖 1、精英 4（精魄球再 4）、稀有精英 6（球 6）
 const R_FLOORS = 4, R_PULL = 3, R_PULL_MAX = 4, R_STAGE = 5;   // 四层；拉怪半径 3 格、一次最多 4 群；台上最多 5 只，其余排队上
 const R_BT_MS = 30;          // 战斗里的时间按读条折算：读条 100（主角出手一轮）= 3 秒。和几倍速、跳不跳过战斗无关
@@ -1356,7 +1359,7 @@ function rPrep(run, enc) {
     if (mn.elite) {
       const affs = eliteAffsOf(run, mn), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);
       e.name = mn.rare ? RNG.pick(RARE_ELITE_NAMES) : joinName(RNG.pick(ELITE_TITLES), def.n);
-      e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * (mn.rare ? 1.3 : 1)); e.atk *= R_ELITE[1]; if (mn.rare) e.rare = true; if (e.shield) e.shield = Math.round(e.maxHp * 0.3);
+      const ez = rEliteEase(run.riftLv); e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * (mn.rare ? 1.3 : 1)); e.atk *= R_ELITE[1] * ez[1]; if (mn.rare) e.rare = true; if (e.shield) e.shield = Math.round(e.maxHp * 0.3);
       el.push(e); if (RNG.ch(0.6)) no.push(norm(def, mn.lv));
     } else { const n = riftNewbie(run) ? 1 : Math.min(3, +RNG.w({ 1: 35, 2: 45, 3: 20 }) + (def.pack ? 1 : 0)); for (let i = 0; i < n; i++) no.push(norm(i === 0 || RNG.ch(0.6) ? def : F.mons[RNG.pick(Z.mons)] || def, mn.lv)); }
   }

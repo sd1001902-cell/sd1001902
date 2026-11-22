@@ -530,7 +530,7 @@ function goTab() {
         <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <p class="help-p" style="text-align:center">最多可以挑战 ${maxR} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
-      <p class="help-p" style="text-align:center">这一层掉的神兵、套装：<b>${(ancRate(SAVE.riftLv)[0] * 100).toFixed(1)}%</b> 是上古，<b>${(ancRate(SAVE.riftLv)[1] * 100).toFixed(2)}%</b> 是太古。${ANC_FROM} 层往上，层数越高越容易出。</p>
+      <p class="help-p" style="text-align:center">这一层掉的神兵、套装：<b>${(ancRate(SAVE.riftLv)[0] * 100).toFixed(1)}%</b> 是上古${ancRate(SAVE.riftLv)[1] ? `，<b>${(ancRate(SAVE.riftLv)[1] * 100).toFixed(2)}%</b> 是太古` : `；太古要 ${PRIMAL_FROM} 层起才出`}。${ANC_FROM} 层往上，层数越高越容易出。</p>
       <p class="help-p" style="text-align:center">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
       ${cu > 1 ? `<p class="cu-note">追赶中：${CLASSES[cls].n}比你等级最高的角色低 <b>${topLevel() - SAVE.chars[cls].level}</b> 级，战斗经验 <b>×${cuTxt(cu)}</b>（差得越多越快，追平为止）。${SAVE.riftLv <= R_EASY ? `前 ${R_EASY} 层的妖物迁就你的等级（最多高 2 级；10 级以前不比你高，来得也少），放心进。` : `前 ${R_EASY} 层的妖物会迁就你的等级。`}</p>` : ''}
       <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `这一层两套<b class="r-set">幻境套装</b>都会掉` : SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>（${RSET2_LV} 层起多一套）` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>

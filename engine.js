@@ -352,8 +352,8 @@ function rollSockets(slot, rarity) {
 const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
 const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%：神兵掉得多了，这两档收一收才显得珍贵）
 // 上古、太古跟着幻境层数走：30 层以内 5% / 0.3%，往上每层 +0.25% / +0.03%（69 层约 14.8% / 1.5%），封顶 20% / 2%。幻境以外（主线、赌装备、铸兵）按底数
-const ANC_STEP = [0.0025, 0.0003], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 800;
-const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), Math.min(ANC_CAP[1], ANC_P[1] + d * ANC_STEP[1])]; };
+const ANC_STEP = [0.0025, 0.0005], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 800, PRIMAL_FROM = 90, PRIMAL_P0 = 0.005;   // 太古：幻境 90 层起才出，90 层 0.5%，每层 +0.05%，120 层到 2% 封顶
+const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };
 const ancNow = () => ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0);
 // 点化：花魂晶把一件神兵／套装变成上古（保底的路；太古只能靠掉）
 const ancOK = it => !!it && (it.rarity === 'legend' || it.rarity === 'set') && !it.anc;
@@ -363,7 +363,7 @@ function ancientize(it) {
   if (SAVE.mats < ANC_COST) return { err: '魂晶不够' };
   SAVE.mats -= ANC_COST; it.anc = 1; SAVE.flags.ancient = true; return { ok: true };
 }
-const primalOK = () => SAVE && (SAVE.unlocked.hell || SAVE.riftMax >= 10);
+const primalOK = () => !!(SAVE && SAVE.run && SAVE.run.mode === 'rift' && SAVE.run.riftLv >= PRIMAL_FROM);
 function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
   it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
@@ -1053,7 +1053,15 @@ function setRune(cls, id, r) { const rs = SAVE.chars[cls].runes; if (rs[id] === 
 // ---------------- 一局地下城（迷宫） ----------------
 const MW = 5, MH = 6;
 // 怪的全抗：原来 N×1.2、60 封顶，50 层起术法只剩 40%，而物理打在护甲上还剩 64%——道士凭空少三成多。改成跟着护甲的减伤走（30 层 24%、50 层 34%、69 层 43%）
-function riftD(N) { return { n: '秘境 ' + N + ' 层', base: 6 + Math.round(N * 1.4), res: Math.round(Math.min(N * 1.2, 10 + N * 0.48, 55)), hpMul: Math.pow(1.075, N), atkMul: Math.pow(1.055, N), loot: Math.min(4, 0.5 + N / 15) }; }
+// 50 层以后不再利滚利：每高一层，气血加 50 层时的 8%、攻击加 5%，妖物等级只涨 0.7 级（原来 1.4）。原来每 10 层气血翻一倍多，80 层的精英谁都打不动。
+// 改后 80 层 ≈ 原来 67 层，100 层 ≈ 原来 73 层，原来 80 层的难度落在 125–130 层
+const R_LIN = [50, 0.08, 0.05, 0.7];
+const rOldLv = N => 6 + Math.round(N * 1.4);   // 没改之前的妖物等级：幻境里的经验还按它算，免得层数高了经验反而少
+function riftD(N) {
+  const M = Math.min(N, R_LIN[0]), k = Math.max(0, N - R_LIN[0]), base = 6 + Math.round(M * 1.4) + Math.round(k * R_LIN[3]), ar = 4 + base * 3.5;
+  return { n: '秘境 ' + N + ' 层', base, res: Math.round(Math.min(N * 1.2, 100 * ar / (490 + ar))),   // 全抗跟着这一层妖物护甲的减伤走（对 50 级的主角），术法和物理吃一样的亏
+    hpMul: Math.pow(1.075, M) * (1 + R_LIN[1] * k), atkMul: Math.pow(1.055, M) * (1 + R_LIN[2] * k), loot: Math.min(4, 0.5 + N / 15) };
+}
 const dOf = run => run.mode === 'rift' ? riftD(run.riftLv) : DIFFS[run.diff];
 const themeOf = run => run.mode === 'rift' ? RIFT_THEMES[run.theme] : CHAPTERS[run.chapter - 1];
 const diffIdx = run => run.mode === 'rift' ? Math.min(2, Math.floor(run.riftLv / 15)) : DIFF_IDS.indexOf(run.diff);
@@ -1455,7 +1463,7 @@ function eliteAffsOf(run, mn) {
   if (mn.affs) return mn.affs;
   const rift = run.mode === 'rift';
   if (!rift && mn.rr == null) mn.rr = RNG.ch(0.15) ? 1 : 0;
-  const n = (rift ? 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= 45 ? 1 : 0) : 1 + diffIdx(run) + (run.world ? W_EAFF : 0)) + (mn.rare || mn.rr ? 1 : 0);
+  const n = (rift ? 1 + (run.riftLv >= 20 ? 1 : 0) :   /* 原来 45 层起再加一个（三个词缀）：高层精英叠三个词缀是打不过的主因之一，收回两个；稀有精英仍然多一个 */ 1 + diffIdx(run) + (run.world ? W_EAFF : 0)) + (mn.rare || mn.rr ? 1 : 0);
   mn.affs = RNG.shuffle(ELITE_AFFIXES.map(a => a.id)).slice(0, n); return mn.affs;
 }
 function makeEncounter(run, kind, cell) {
@@ -2541,7 +2549,9 @@ function finishBattle(b) {
   DROP_LUCK = s.xLuck || 0;
   for (const u of b.dead) {
     const mult = u.guard ? 5 : u.kind === 'boss' ? 12 : u.kind === 'elite' ? (u.rare ? 5 : 3) : u.kind === 'mini' ? 0.3 : u.kind === 'goblin' ? 2 : 1;
-    let x = (6 + u.lv * 3) * (sw && u.kind === 'elite' ? 5 : mult) * run.xpMul * (rw ? 0.5 : 1); const gap = lv - u.lv;
+    let x = (6 + u.lv * 3) * (sw && u.kind === 'elite' ? 5 : mult) * run.xpMul * (rw ? 0.5 : 1);
+    if (run.mode === 'rift' && run.riftLv > R_LIN[0]) x *= (6 + 3 * rOldLv(run.riftLv)) / (6 + 3 * riftD(run.riftLv).base);   // 妖物等级涨慢了，经验照原来的层数给
+    const gap = lv - u.lv;
     if (sw) { if (gap >= 3) x *= Math.max(0.08, 1 - (gap - 2) * 0.3); }   // 大地图：比你低 3 级以上的妖物，经验大减
     else if (gap > 5) x *= Math.max(0.1, 1 - (gap - 5) * 0.12);
     res.xp += Math.round(x);
