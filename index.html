@@ -1456,6 +1456,17 @@ body[data-view=title] .wrap{max-width:none;padding:0}
 .wt-more.k{border-color:#c9952a;color:#ffd98a}
 .dossl li .bh-go{margin-top:6px;align-self:flex-start}
 @media(max-width:700px){.top{flex-wrap:wrap;gap:4px 8px}.top h1{flex:none;font-size:min(calc(30px * var(--fs,1)),5.8vw)}.top .homeb{margin-right:0}.top .rescur{flex:none;gap:4px}.top .rescur .pill{flex:none;white-space:nowrap;gap:3px;padding:2px 6px}.top .rescur .pill img,.top .rescur .pill canvas{width:14px;height:14px}}
+/* 2026-11 战斗底栏：招式缩成一排小标签，统计一直显示在下面 */
+.hud{grid-template-columns:minmax(0,1fr) auto;gap:5px;margin:6px 0 4px;align-items:center}
+.hud-sk{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:4px;overflow:visible}
+.hs-top{height:auto;flex:none}.hs-top .rchip{margin:0;font-size:calc(11px * var(--fs,1));padding:2px 6px}.hs-top .rchip em{font-style:normal;margin-left:2px}.hs-top .rcnt{font-size:calc(11px * var(--fs,1))}
+.hs-grid{display:flex;flex-wrap:wrap;gap:3px}
+@media(min-width:701px){.hs-grid{display:flex}}
+.hs-grid .skb2{flex:none;height:28px;min-height:28px;padding:0 7px;font-size:calc(12px * var(--fs,1));overflow:visible;position:relative}
+.hs-grid .skb2 i{position:static;transform:none;margin-left:3px;font-size:calc(10px * var(--fs,1));padding:0 4px}
+.ultb{min-width:62px;min-height:30px;padding:0 6px}.ultb b{font-size:15px;line-height:1}.ultb small{font-size:calc(10px * var(--fs,1))}
+@media(max-width:700px){.ultb{min-width:58px}}
+.bstatp{margin:4px auto 6px;padding:4px 6px;max-width:560px}.stbl.mini{margin-top:0;font-size:calc(11px * var(--fs,1))}.stbl.mini td,.stbl.mini th{padding:1px 3px}.stbl.mini small{font-size:calc(9.5px * var(--fs,1))}
 </style>
 </head>
 <body>

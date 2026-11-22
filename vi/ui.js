@@ -1208,12 +1208,12 @@ function battleHTML() {
       <div class="turnbar" id="turnbar"></div><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div><div id="bres"></div></div>
     <div class="hud" id="hud"><div class="hud-sk" id="hudsk"></div>
-      <button class="ultb" id="ultb" data-act="ult"><i id="ultfill"></i><span><b>Tuyệt kỹ · ${U.n}</b><small id="ultpct"></small></span></button>
+      <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">x${s}</button>`).join('')}
-      ${SAVE.showSkip ? "<button class=\"btn sm ghost\" data-act=\"skip\">Bỏ qua trận</button>" : ''}<button class="btn sm ${STATOPEN ? '' : 'ghost'}" data-act="bstat">Thống kê</button>
+      ${SAVE.showSkip ? "<button class=\"btn sm ghost\" data-act=\"skip\">Bỏ qua trận</button>" : ''}
       <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>Uống đan ×${run.potions}</button></div>
-    <div class="bstatp" id="bstatp" ${STATOPEN ? '' : 'hidden'}></div>
+    <div class="bstatp" id="bstatp"></div>
     <div class="blog" id="blog" data-act="logt" title="Chạm để mở/thu"></div>`;
 }
 // 役使：跟在你身边的两只首领精魄（小图标）；本事一触发就闪一下
@@ -1271,16 +1271,18 @@ function showCutin(kind, data) {
 const ALLY_MOVES = { chain2: "Xích sắt", zhengjue: "Chính Khí Quyết", zhengqi: "Chính khí", foxfire: "Hồ hỏa", foxfireAll: "Hồ hỏa trận", foxHeal: "Hồ quang", ngocHeal: "Gói thuốc", potionThrow: "Bình thuốc", kangGuard: "Đỡ đao",
   leiCut: "Chém", leiFinish: "Đoạn Đầu Đao", liuChant: "Tụng kinh", liuBell: "Lắc chuông", tieGun: "Hỏa súng", tieBolt: "Gia cố" };
 const allyMoveName = (u, id) => id === 'blade2' ? ({ zhen: "Đao bộ khoái", kang: "Bàn tính", lei: "Chém" }[u.comp] || "Ra đao") : ALLY_MOVES[id] || '';
+const skShort = n => /[\u4e00-\u9fff]/.test(n) ? n.slice(0, 2) : n.split(' ').slice(0, 2).join(' ');   // 招式条上的短名：中文取两个字，越南语取前两个词
 // 小队统计表（战斗里、结算、幻境一局）
-let STATOPEN = false;
-function statTable(st) {
+let STATOPEN = true;   // 统计一直显示在招式条下面
+function statTable(st, mini) {
   const rows = Object.values(st || {}); if (!rows.length) return "<p class=\"sub\">Chưa có dữ liệu.</p>";
   const ord = r => r.cid === 'P' ? 0 : r.cid === 'Z' ? 2 : 1; rows.sort((a, b) => ord(a) - ord(b) || b.dmg - a.dmg);
   const tot = rows.reduce((a, r) => a + r.dmg, 0) || 1, f = v => v ? fmtBig(Math.round(v)) : '—';
-  return `<table class="stbl"><tr><th></th><th>Sát thương</th><th>Khống chế</th><th>Hồi máu</th><th>Hộ thể</th><th>Chịu đòn</th></tr>${rows.map(r => `<tr><td>${esc(r.cid === 'P' ? "Bạn" : r.n)}</td><td>${f(r.dmg)}<small>${Math.round(r.dmg / tot * 100)}%</small></td><td>${r.ctrl || '—'}</td><td>${f(r.heal)}</td><td>${f(r.shield)}</td><td>${f(r.taken)}${r.guard ? `<small>Đỡ đao ${fmtBig(Math.round(r.guard))}</small>` : ''}</td></tr>`).join('')}</table>
-    <p class="stbl-n">Khống chế = số lần làm địch choáng, đóng băng; Hộ thể = sát thương chân khí hộ thể chặn được; Chịu đòn = máu thật sự mất.</p>`;
+  const sub = r => [r.shield ? `Hộ thể ${fmtBig(Math.round(r.shield))}` : '', r.guard ? `Đỡ đao ${fmtBig(Math.round(r.guard))}` : ''].filter(Boolean).join(' ');
+  return `<table class="stbl ${mini ? 'mini' : ''}"><tr><th></th><th>Sát thương</th><th>Khống chế</th><th>Hồi máu</th><th>Chịu đòn</th></tr>${rows.map(r => `<tr><td>${esc(r.cid === 'P' ? "Bạn" : r.n)}</td><td>${f(r.dmg)}<small>${Math.round(r.dmg / tot * 100)}%</small></td><td>${r.ctrl || '—'}</td><td>${f(r.heal)}</td><td>${f(r.taken)}${sub(r) ? `<small>${sub(r)}</small>` : ''}</td></tr>`).join('')}</table>
+    ${mini ? '' : "<p class=\"stbl-n\">Khống chế = số lần làm địch choáng, đóng băng; Hộ thể = sát thương chân khí hộ thể chặn được; Chịu đòn = máu thật sự mất.</p>"}`;
 }
-function updStat() { const el = document.getElementById('bstatp'); if (!el) return; el.hidden = !STATOPEN; if (STATOPEN && B) el.innerHTML = `<b class="stt-h">Thống kê trận này</b>${statTable(B.stat)}`; }
+function updStat() { const el = document.getElementById('bstatp'); if (!el || !B) return; el.innerHTML = statTable(B.stat, true); }
 function updBattle(o, anim) {
   if (STATOPEN) updStat();
   if (!B) return;
@@ -1307,7 +1309,7 @@ function updBattle(o, anim) {
 function resChip(P) {
   const R = CLASSES[P.cls].res; if (!R) return '';
   if (P.cls === 'berserker') return `<span class="rchip fury ${P.fury >= 50 ? 'hot' : ''}">Nộ ý <i style="--w:${Math.round(P.fury || 0)}%"></i><b>${Math.round(P.fury || 0)}</b></span>`;
-  if (P.cls === 'mage') { const lw = P.lastWx; return `<span class="rchip lian">Liên <b>${P.lian || 0}</b>${lw ? `<small>Chiêu trước <em style="color:${WX[lw].c}">${WX[lw].n}</em> · đổi hành khác +1</small>` : ''}</span>`; }
+  if (P.cls === 'mage') { const lw = P.lastWx; return `<span class="rchip lian" title="Đổi sang một hành khác để ra chiêu +1">Liên <b>${P.lian || 0}</b>${lw ? `<em style="color:${WX[lw].c}">${WX[lw].n}</em>` : ''}</span>`; }
   if (P.cls === 'assassin') return `<span class="rchip ki">Sát ý ${Array.from({ length: P.kiMax }, (_, i) => `<i class="${i < P.ki ? 'on' : ''}"></i>`).join('')}</span>`;
   if (P.cls === 'necro') return `<span class="rchip">Thi vị <b>${zombiesOf(B).filter(z => !ZOMBIES[z.zt].ult).length}/${P.minionCap}</b></span>`;
   if (P.cls === 'paladin') return `<span class="rchip">Phản kích <b>${Math.min(85, P.counter + (P.shield > 0 ? 15 : 0) + (P.st.chan ? 40 : 0))}%</b></span>`;
@@ -1446,10 +1448,10 @@ function applyStep(o, anim) {
   const foes0 = aliveOf(B, 'e'), tg = foes0.find(f => f.id === B.target) || foes0[0];
   const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}${B.reacts ? `<span class="rcnt">Liên chiêu ×${B.reacts}</span>` : ''}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? "Cơ" : payOn ? "Kết" : k.ap ? STATES[k.ap].n[0] : k.pay ? "Kết" : '';
-      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}">${tag ? `<em>${tag}</em>` : ''}${k.n}${k.left > 0 ? `<i>${k.left}</i>` : ''}</button>`; }).join('') + '</div>';
+      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}">${skShort(k.n)}${k.left > 0 ? `<i>${k.left}</i>` : ''}</button>`; }).join('') + '</div>';
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
     $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full && !B.ultAuto); ub.classList.toggle('queued', !!B.ultReq);
-    $('#ultpct').textContent = B.ultReq ? "Chiêu sau tung ra" : full ? (B.ultAuto ? "Nộ khí đã đầy" : "Chạm để tung!") : `Nộ khí ${r}%`; ub.disabled = B.over; }
+    $('#ultpct').textContent = B.ultReq ? "Chiêu sau" : full ? (B.ultAuto ? "Đầy" : "Chạm!") : `${r}%`; ub.disabled = B.over; }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = "Đan dược " + SAVE.run.potions;
   { const pb = $('#potb'); if (pb) { pb.textContent = `Uống đan ×${SAVE.run.potions}`; pb.disabled = B.over || SAVE.run.potions <= 0 || P.hp <= 0 || P.hp >= P.maxHp; } }
@@ -3209,7 +3211,6 @@ const ACT = {
   kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
     const k = kitsOf(SAVE.cls)[+i]; toast(`Đã thay “<b>${esc(k.n)}</b>”${r.miss.length ? `. Không tìm thấy: ${r.miss.join(", ")} (các ô này giữ nguyên)` : ''}${r.away.length ? `. Có trang bị đang mặc trên người ${r.away.join(", ")}, không lấy qua` : ''}`); },
   skip: () => skipBattle(),
-  bstat: () => { STATOPEN = !STATOPEN; const bt = document.querySelector('[data-act=bstat]'); if (bt) bt.classList.toggle('ghost', !STATOPEN); updStat(); },
   bcont: () => battleContinue(),
   choice: i => { EVRES = resolveEvent(SAVE.run, curCell(SAVE.run).ev, +i); if (!EVRES.fight) clearCell(SAVE.run); SFX.play(EVRES.items && EVRES.items.length ? 'loot' : 'magic'); refresh(); },
   evcont: () => { const run = SAVE.run;
