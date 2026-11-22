@@ -1522,12 +1522,17 @@ function skillCd(P, sk) {
   if (fx.has('cdr')) cd--;
   return Math.max(1, cd);
 }
+// 吃丹药：回最大气血的 45%。可以自己点（随时，不占出手），也会在气血低于 35% 时自动吃
+function drinkPotion(b, out) {
+  const P = b.P, run = b.run;
+  if (!P || b.over || P.hp <= 0 || !run || run.potions <= 0 || P.hp >= P.maxHp) return false;
+  run.potions--; heal(P, P.maxHp * 0.45 * (P.fx.has('potionPlus') ? 1.6 : 1) * (1 + bLv('alchemist') * 0.1), out);
+  out.lines.push(`你喝下一瓶药水（剩 ${run.potions} 瓶）`);
+  return true;
+}
 function heroAct(b, P, out) {
   const run = b.run;
-  if (P.hp / P.maxHp < 0.35 && run.potions > 0) {
-    run.potions--; heal(P, P.maxHp * 0.45 * (P.fx.has('potionPlus') ? 1.6 : 1) * (1 + bLv('alchemist') * 0.1), out);
-    out.lines.push(`你喝下一瓶药水（剩 ${run.potions} 瓶）`);
-  }
+  if (P.hp / P.maxHp < 0.35 && run.potions > 0) drinkPotion(b, out);   // 兜底：气血低于 35% 自动吃一颗
   for (const sk of P.skills) if (sk.left > 0) sk.left--;
   let foes = aliveOf(b, 'e'); if (!foes.length) return;
   if (P.rage >= 100 && (b.ultAuto || b.ultReq)) return ultimate(b, P, foes, out);

@@ -861,7 +861,8 @@ function battleHTML() {
       <button class="ultb" id="ultb" data-act="ult"><i id="ultfill"></i><span><b>必杀·${U.n}</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">${s} 倍速</button>`).join('')}
-      <button class="btn sm ghost" data-act="skip">跳过战斗</button></div>
+      <button class="btn sm ghost" data-act="skip">跳过战斗</button>
+      <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>吃丹药 ×${run.potions}</button></div>
     <div class="blog" id="blog" data-act="logt" title="点击展开/收起"></div>`;
 }
 function unitEl(u) {
@@ -1076,6 +1077,7 @@ function applyStep(o, anim) {
     $('#ultpct').textContent = B.ultReq ? '下一招释放' : full ? (B.ultAuto ? '怒气已满' : '点我释放！') : `怒气 ${r}%`; ub.disabled = B.over; }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
+  { const pb = $('#potb'); if (pb) { pb.textContent = `吃丹药 ×${SAVE.run.potions}`; pb.disabled = B.over || SAVE.run.potions <= 0 || P.hp <= 0 || P.hp >= P.maxHp; } }
   const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `进度 ${Math.floor(SAVE.run.prog)}%`;
   const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `香 ${Math.round(L * 100)}%`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
@@ -2615,6 +2617,7 @@ const ACT = {
     WALK = { path: R.path, i: 0, onArrive: done }; wStepLoop();
   },
   wtrk: () => { WTRK = !WTRK; render(); },
+  bpot: () => { if (!B || B.over) return; const o = { pops: [], lines: [] }; if (!drinkPotion(B, o)) return toast(SAVE.run.potions <= 0 ? '丹药吃完了' : '气血是满的，不用吃'); SFX.play('heal'); applyStep(o, true); save(); },
   bhgo: id => { BACK = null; closeModal(); WTRK = true; render(); ACT.wgo(id); },
   shoptab: k => { SHOPTAB = k; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); },
   shopsel: i => { SHOPSEL = SHOPSEL === +i ? -1 : +i; openModal(shopModal); },

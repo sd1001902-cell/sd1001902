@@ -861,7 +861,8 @@ function battleHTML() {
       <button class="ultb" id="ultb" data-act="ult"><i id="ultfill"></i><span><b>Tuyệt kỹ · ${U.n}</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">x${s}</button>`).join('')}
-      <button class="btn sm ghost" data-act="skip">Bỏ qua trận</button></div>
+      <button class="btn sm ghost" data-act="skip">Bỏ qua trận</button>
+      <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>Uống đan ×${run.potions}</button></div>
     <div class="blog" id="blog" data-act="logt" title="Chạm để mở/thu"></div>`;
 }
 function unitEl(u) {
@@ -1076,6 +1077,7 @@ function applyStep(o, anim) {
     $('#ultpct').textContent = B.ultReq ? "Chiêu sau tung ra" : full ? (B.ultAuto ? "Nộ khí đã đầy" : "Chạm để tung!") : `Nộ khí ${r}%`; ub.disabled = B.over; }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = "Đan dược " + SAVE.run.potions;
+  { const pb = $('#potb'); if (pb) { pb.textContent = `Uống đan ×${SAVE.run.potions}`; pb.disabled = B.over || SAVE.run.potions <= 0 || P.hp <= 0 || P.hp >= P.maxHp; } }
   const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `Tiến độ ${Math.floor(SAVE.run.prog)}%`;
   const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `Hương ${Math.round(L * 100)}%`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
@@ -2615,6 +2617,7 @@ const ACT = {
     WALK = { path: R.path, i: 0, onArrive: done }; wStepLoop();
   },
   wtrk: () => { WTRK = !WTRK; render(); },
+  bpot: () => { if (!B || B.over) return; const o = { pops: [], lines: [] }; if (!drinkPotion(B, o)) return toast(SAVE.run.potions <= 0 ? "Đã hết đan dược" : "Khí huyết đang đầy, không cần uống"); SFX.play('heal'); applyStep(o, true); save(); },
   bhgo: id => { BACK = null; closeModal(); WTRK = true; render(); ACT.wgo(id); },
   shoptab: k => { SHOPTAB = k; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); },
   shopsel: i => { SHOPSEL = SHOPSEL === +i ? -1 : +i; openModal(shopModal); },
