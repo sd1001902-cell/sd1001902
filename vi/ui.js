@@ -1491,10 +1491,44 @@ function wTap(px, py, cv, ts) {
   const S = wstate(ch);
   if (x === S.pos.x && y === S.pos.y) { const P = wPt(ch, x, y); if (P && P.t === 'camp') openModal(campModal(P)); return; }
   if (wBoxAt(ch, x, y)) { const dx = x - S.pos.x, dy = y - S.pos.y; if (Math.abs(dx) + Math.abs(dy) === 1) return wDirStep(dx, dy); return qtoast("Đứng cạnh khối băng, chạm vào nó theo hướng muốn đẩy"); }
+  if (wIceTap(x, y)) return;
   const act = wInteract(ch, x, y);
   if (act) return wWalkTo(x, y, act);
   const P = wPt(ch, x, y);
   wWalkTo(x, y, P && P.t === 'camp' && wPtVisible(ch, x, y) ? () => openModal(campModal(P)) : null, true);
+}
+// 冰面上用手点：寻路不会替人解冰面，所以原来点冰面一点反应都没有（只能用方向键）。现在：
+//   人站在冰上，或者站在冰边、点的那格顺着冰面的方向——往点的那个方向滑；
+//   人离冰面还远——先走到冰边（正对着点的那一格的那个入口），再点一下才滑。
+let ICEHINT = 0;
+function wIceTap(x, y) {
+  const ch = wch(), S = wstate(ch), m = wmap(ch), T = wTerr(ch);
+  if (wHasKey(ch, T.ice)) return false;
+  const ice = (a, b) => wTile(m, a, b) === '_', onIce = ice(S.pos.x, S.pos.y);
+  if (!onIce && !ice(x, y)) return false;
+  const ddx = x - S.pos.x, ddy = y - S.pos.y, sx = Math.sign(ddx), sy = Math.sign(ddy);
+  const dirs = (Math.abs(ddx) >= Math.abs(ddy) ? [[sx, 0], [0, sy]] : [[0, sy], [sx, 0]]).filter(d => d[0] || d[1]);
+  const slide = (dx, dy) => { const t = wDirTarget(dx, dy); if (!t) return false; wDirStep(dx, dy); return true; };
+  if (onIce) {   // 在冰上：点哪边就往哪边滑；正对的方向走不动，再试另一个方向
+    for (const [dx, dy] of dirs) if (slide(dx, dy)) return true;
+    qtoast("Bên đó không trượt qua được"); return true;
+  }
+  // 在岸上、点的是冰：点的那格和人在同一行（列），而且人就贴着冰——直接滑
+  if ((!ddx || !ddy) && ice(S.pos.x + sx, S.pos.y + sy)) { if (!slide(sx, sy)) qtoast("Bên đó không trượt qua được"); return true; }
+  // 否则先走到入口：从点的那格往四个方向退到冰面外头的第一格，挑走得到、最近的一个
+  let best = null;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    let ex = x - dx, ey = y - dy; while (ice(ex, ey)) { ex -= dx; ey -= dy; }
+    if (!wSeen(ch, ex, ey) || !wPassHero(ch, ex, ey) || wBoxAt(ch, ex, ey) || wPuzzle(ch, ex, ey)) continue;
+    const here = ex === S.pos.x && ey === S.pos.y, path = here ? [] : wPath(ch, ex, ey); if (!path) continue;
+    if (!best || path.length < best.path.length) best = { ex, ey, dx, dy, path };
+  }
+  if (!best) { for (const [dx, dy] of dirs) if (ice(S.pos.x + dx, S.pos.y + dy) && slide(dx, dy)) return true;   // 站在冰面中间的石台上，别的入口都走不到：就按点的方向滑
+    qtoast("Từ phía này không tới được mảng băng đó"); return true; }
+  if (!best.path.length) { if (!slide(best.dx, best.dy)) qtoast("Bên đó không trượt qua được"); return true; }
+  WALK = { path: best.path, i: 0, onArrive: () => { if (ICEHINT++ < 2) qtoast("Đã tới mép băng: chạm lên mặt băng lần nữa để trượt về hướng đó"); } };
+  wStepLoop();
+  return true;
 }
 function wWalkTo(x, y, onArrive) {
   const ch = wch();
