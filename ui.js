@@ -535,12 +535,12 @@ function goTab() {
       ${cu > 1 ? `<p class="cu-note">追赶中：${CLASSES[cls].n}比你等级最高的角色低 <b>${topLevel() - SAVE.chars[cls].level}</b> 级，战斗经验 <b>×${cuTxt(cu)}</b>（差得越多越快，追平为止）。${SAVE.riftLv <= R_EASY ? `前 ${R_EASY} 层的妖物迁就你的等级（最多高 2 级；10 级以前不比你高，来得也少），放心进。` : `前 ${R_EASY} 层的妖物会迁就你的等级。`}</p>` : ''}
       <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `这一层两套<b class="r-set">幻境套装</b>都会掉` : SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>（${RSET2_LV} 层起多一套）` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
         <span>精魄：<b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><span>役使：${yi.length ? yi.map(id => `<b>${YISHI[id].n}</b>`).join('、') : '<i>没带</i>'} <button class="linkbtn" data-act="zyopen">镇妖录</button></span></div>
-      <button class="ngoc-toggle ${SAVE.ngocJoin ? 'on' : ''}" data-act="ngoctog">${SPR.img('ngocfox', 36)}<span><b>带上 Ngoc</b><small>${SAVE.ngocJoin ? '她会和你一起闯幻境' : '这次你一个人去'}</small></span></button>`;
+      ${teamRow()}`;
   }
   const mods = featureOn('mods') ? `<button class="modsbtn" data-act="modsopen">加难度${SAVE.mods.length ? ` · 已选 ${SAVE.mods.length} 项` : ''} ${MODSOPEN ? '▲' : '▼'}</button>
     ${MODSOPEN ? `<div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}` : '';
   const comps = Object.keys(COMPANIONS).filter(c => (SAVE.comps || {})[c]);
-  const compSel = comps.length > 1 ? `<div class="compsel"><span class="sub">同伴</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${unitIcon(C2.spr, 34, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
+  const compSel = comps.length > 1 && mode !== 'rift' ? `<div class="compsel"><span class="sub">同伴</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${unitIcon(C2.spr, 34, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
   return `${campStrip()}<section class="panel gopanel">${modeSel}${body}${compSel}${mods}
     <button class="btn big" data-act="start">${mode === 'rift' ? `进入九幽幻境 ${SAVE.riftLv} 层` : `出发：${chTitle(SAVE.chapter)}`}</button></section>`;
 }
@@ -675,6 +675,25 @@ function heroTab() {
   return `<section class="panel herop">${bar}<div class="hbody">${body}</div></section>`;
 }
 const stTag = (st, txt) => st && STATES[st] ? `<span class="stt" style="--c:${STATES[st].c}">${txt || STATES[st].n}</span>` : '';
+// ---- 伙伴组队（通关后的幻境） ----
+const rowTag = c => `<i class="rowt ${COMPANIONS[c].row}">${COMPANIONS[c].row === 'front' ? '前排' : '后排'}</i>`;
+function teamRow() {
+  const T = teamOf(), N = teamSlots();
+  return `<button class="teamrow" data-act="teamopen"><span class="sub">伙伴 ${T.length}/${N}</span>${T.length ? T.map(c => `<span class="tm">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 30, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b>${rowTag(c)}</span>`).join('') : '<i class="sub">这次一个人去</i>'}<em>调整 ›</em></button>`;
+}
+const teamModal = () => () => {
+  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen);
+  return `<h2 class="mh">伙伴</h2>
+    <p class="help-p">幻境里能带 <b>${N}</b> 个伙伴${N < 3 ? `（幻境最高层过 ${N < 2 ? 120 : 150} 层再开一个位）` : ''}。妖物七成的攻击打前排，前排倒光了才打后排。伙伴吃你的伤害加成和暴击；你带了收某种状态的招式，伙伴会优先帮你把这种状态挂上。必杀时怒气满的伙伴一起合击，各带一段效果。</p>
+    <div class="teaml">${L.map(c => { const C = COMPANIONS[c], v = wAffOf(c), on = T.includes(c), cost = giftCost(c);
+      return `<div class="tmc ${on ? 'on' : ''}"><div class="tmh">${unitIcon(c === 'ngoc' ? 'ngocfox' : C.spr, 44, null, '', 'head')}<span><b>${c === 'ngoc' ? 'Ngoc（九尾）' : C.n}</b>${rowTag(c)}<small>${C.role}</small></span>
+          <button class="btn sm ${on ? '' : 'ghost'}" data-act="teamtog" data-arg="${c}">${on ? '取下' : '带上'}</button></div>
+        <p>${C.d}</p>
+        <div class="tmaff">好感 <b>${v}</b>/${COMP_AFF_MAX}（气血、攻击 +${v * 4}%）<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `送礼 ${fmtBig(cost)} 两` : '满了'}</button></div>
+        ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; }).join('')}</div>
+    <p class="sub">你有 ${fmtBig(SAVE.gold)} 两。</p>
+    <button class="btn ghost" data-act="close">好了</button>`;
+};
 const compTag = c => COMPANIONS[c] && COMPANIONS[c].ap ? stTag(COMPANIONS[c].ap, '挂' + STATES[COMPANIONS[c].ap].n) : '';
 // 技能卡上的状态说明
 const skTags = k => `${k.ap ? stTag(k.ap, `挂${STATES[k.ap].n}${k.apc && k.apc < 1 ? ' ' + Math.round(k.apc * 100) + '%' : ''}`) : ''}${k.pay ? (k.pay.s === 'any' ? `<span class="stt pay" style="--c:#e8b0ff">打带状态的：${payText(k.pay)}</span>` : stTag(k.pay.s, `打${STATES[k.pay.s].n}：${payText(k.pay)}`).replace('class="stt"', 'class="stt pay"')) : ''}`;
@@ -1204,7 +1223,7 @@ function showCutin(kind, data) {
   let h;
   if (kind === 'ult') {
     const run = SAVE.run;
-    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? unitIcon(run.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 104, null, '', 'full') : ''}</div>
+    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, data.sprs && data.sprs.length > 1 ? 84 : 104, null, '', 'full')).join('') : ''}</div>
       <div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
     el.className = 'cutin on' + (data.combo ? ' combo' : '');
     SFX.play('gong'); if (typeof GFX !== 'undefined') GFX.ult(data.combo ? '#ff9ac0' : '#ffb04a');
@@ -2487,8 +2506,8 @@ const affMet = (S, k) => k === 'ngoc' || (k === 'liu' && mPast(S, 'm3')) || (k =
 function affHTML(ch) {
   const S = wstate(ch);
   const L = Object.keys(AFF_WHO).filter(k => affMet(S, k));
-  return `<div class="affl">${L.map(k => { const v = wAffOf(k), h = Math.round(v / 2); const Sp = SPEAKERS[k];
-    return `<div class="aff">${SPR.img(Sp.por || Sp.spr, 44, Sp.por ? null : Sp.pal)}<div><b>${esc(AFF_WHO[k])}</b><small>${AFF_LV[v]}</small></div><span class="hearts">${'♥'.repeat(h)}<i>${'♡'.repeat(5 - h)}</i></span></div>`; }).join('')}</div>
+  return `<div class="affl">${L.map(k => { const v = wAffOf(k), h = Math.min(5, Math.round(v / 2)); const Sp = SPEAKERS[k];
+    return `<div class="aff">${SPR.img(Sp.por || Sp.spr, 44, Sp.por ? null : Sp.pal)}<div><b>${esc(AFF_WHO[k])}</b><small>${AFF_LV[Math.min(10, v)]}${v > 10 ? ' +' + (v - 10) : ''}</small></div><span class="hearts">${'♥'.repeat(h)}<i>${'♡'.repeat(5 - h)}</i></span></div>`; }).join('')}</div>
     <p class="help-p">好感来自任务、对话里的选择、篝火夜话。好感越高，带着同行时战斗越强（每点 +4% 气血和攻击）。</p>`;
 }
 const questModal = () => () => {
@@ -2910,6 +2929,9 @@ const ACT = {
   zyp: a => { ZYPG = ZYPG === +a ? -1 : +a; refresh(); },
   yi: id => { const r = setYi(SAVE.cls, id); if (r.err) return toast(r.err); save(); refresh(); },
   modt: id => { const i = SAVE.mods.indexOf(id); if (i >= 0) SAVE.mods.splice(i, 1); else SAVE.mods.push(id); refresh(); },
+  teamopen: () => { BACK = null; openModal(teamModal()); },
+  teamtog: c => { const T = teamOf(); if (T.includes(c)) SAVE.team = T.filter(x => x !== c); else if (T.length < teamSlots()) SAVE.team = [...T, c]; else return toast(`位置满了（${teamSlots()} 个），先取下一个`); save(); refresh(); },
+  gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} 好感 +1 ♥（现在 ${r.v}）${r.v === 10 || r.v === 20 ? '：技能变强了！' : ''}`); save(); refresh(); },
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast('Ngoc：「早就该带上我了。」'); else toast('Ngoc：「……那你早点回来。」'); },
   npc: id => {
     const qc = townCh();

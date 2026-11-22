@@ -308,7 +308,7 @@ function wMoveMons(ch) {
 // ---------------- 好感度 ----------------
 const AFF_WHO = { ngoc: 'Ngoc', zhen: '珍姑娘', liu: '刘师傅', kang: '康总管', long: '龙道长' };
 const AFF_LV = ['陌生', '陌生', '相识', '相识', '熟络', '熟络', '信任', '信任', '知己', '知己', '生死之交'];
-function wAff(id, d) { SAVE.aff = SAVE.aff || {}; const v = Math.max(0, Math.min(10, (SAVE.aff[id] || 0) + d)); SAVE.aff[id] = v; return v; }
+function wAff(id, d) { SAVE.aff = SAVE.aff || {}; const v = Math.max(0, Math.min(Math.max(10, SAVE.aff[id] || 0), (SAVE.aff[id] || 0) + d));   /* 送礼能把好感送到 25，剧情里的加减不会把它压回 10 */ SAVE.aff[id] = v; return v; }
 const wAffOf = id => (SAVE.aff || {})[id] || 0;
 function wAffActs(o) { const a = []; for (const k in o) { wAff(k, o[k]); a.push({ aff: [k, o[k]] }); } return a; }
 // 对话里的选择、选择题的后果
@@ -1291,6 +1291,7 @@ function newRiftRun(cls, riftLv) {
     maze: { v: 2, cells: [], maxDist: 1 }, pos: 0, hasKey: true, theme: floors[0].c - 1,
     rw: { floors, f: 0, bossC: RNG.i(1, 10), boss: 0 } };
   run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
+  if (SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
   rBuild(run);
   if (SAVE.world) delete SAVE.world[RCH];
   const prev = SAVE.run; SAVE.run = run; wstate(RCH).flags.rfree = 1; SAVE.run = prev;
@@ -1347,6 +1348,7 @@ function rPrep(run, enc) {
   const ch = RCH, D = wScene(ch), R = rFloorOf(ch);
   run.encCell = { lv: enc.lv };
   run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
+  if (SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
   if (enc.kind === 'boss') {
     run.theme = enc.c - 1;
     const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0]); u.atk *= R_BOSS[1]; });

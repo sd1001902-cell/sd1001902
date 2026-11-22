@@ -577,9 +577,14 @@ const MON_TRAIT = {yayi:'shield', yong:'shield', headless:'fly',  skeleton: 'shi
 const TRAITS = { shield: { n: '骨甲', d: '开场带一层护体；被「破甲」就碎' }, regen: { n: '回春', d: '每回合回血；被「灼烧」时回不了' }, fly: { n: '飞行', d: '近战攻击有 25% 落空；被「冰冻」后掉下来，不会再落空' } };
 // 同伴
 const COMPANIONS = {
-  ngoc: { n: 'Ngoc', spr: 'ngoc', wx: 'huo', ap: 'burn', hp: 0.5, atk: 0.5, spd: 95, d: '给你回血；扔的药瓶会让敌人灼烧' },
-  zhen: { n: '珍姑娘', spr: 'constable', wx: 'jin', ap: 'armor', hp: 0.65, atk: 0.6, spd: 105, d: '捕快刀会让敌人破甲，每三招甩一次锁链让敌人眩晕' },
-  long: { n: '龙道长', spr: 'scholar', wx: 'mu', ap: 'chill', hp: 0.45, atk: 0.55, spd: 98, d: '正气诀会让敌人冰冻，时不时念一段给你加攻击' },
+  ngoc: { n: 'Ngoc', spr: 'ngoc', wx: 'huo', ap: 'burn', hp: 0.5, atk: 0.5, spd: 95, d: '给你回血；扔的药瓶会让敌人灼烧', row: 'back', role: '回血 · 灼烧',
+    up: ['好感 10：气血低于七成就给你回血，顺手清掉中毒、眩晕', '好感 20：回血时全队一起回'] },
+  zhen: { n: '珍姑娘', spr: 'constable', wx: 'jin', ap: 'armor', hp: 0.65, atk: 0.6, spd: 105, d: '捕快刀会让敌人破甲，每三招甩一次锁链让敌人眩晕', row: 'front', role: '破甲 · 眩晕',
+    up: ['好感 10：锁链眩晕的几率从五成提到八成', '好感 20：锁链甩向所有敌人'] },
+  long: { n: '龙道长', spr: 'scholar', wx: 'mu', ap: 'chill', hp: 0.45, atk: 0.55, spd: 98, d: '正气诀会让敌人冰冻，时不时念一段给你加攻击', row: 'back', role: '加攻 · 冰冻',
+    up: ['好感 10：正气诀从每四招一次变成每三招一次', '好感 20：正气诀给全队加攻击'] },
+  kang: { n: '康总管', spr: 'merchant', wx: 'tu', ap: 'stun', apc: 0.2, hp: 1.2, atk: 0.35, spd: 85, d: '前排肉盾：会嘲讽；每三招「挡刀」两回合，替你挡下三成伤害', row: 'front', role: '嘲讽 · 挡刀', pg: 1,
+    up: ['好感 10：挡刀替你挡四成', '好感 20：嘲讽更凶，多拉一半的攻击'] },
 };
 
 // ---------------- 状态配合 ----------------

@@ -577,9 +577,14 @@ const MON_TRAIT = {yayi:'shield', yong:'shield', headless:'fly',  skeleton: 'shi
 const TRAITS = { shield: { n: "Cốt giáp", d: "Vào trận mang sẵn một lớp hộ thể; bị “Phá giáp” là vỡ" }, regen: { n: "Hồi xuân", d: "Mỗi lượt hồi máu; khi bị “Thiêu đốt” thì không hồi được" }, fly: { n: "Phi hành", d: "Đòn cận chiến có 25% đánh hụt; bị “Đóng băng” thì rơi xuống, không còn hụt nữa" } };
 // 同伴
 const COMPANIONS = {
-  ngoc: { n: 'Ngoc', spr: 'ngoc', wx: 'huo', ap: 'burn', hp: 0.5, atk: 0.5, spd: 95, d: "Hồi máu cho bạn; bình thuốc ném ra làm địch thiêu đốt" },
-  zhen: { n: "Cô Trân", spr: 'constable', wx: 'jin', ap: 'armor', hp: 0.65, atk: 0.6, spd: 105, d: "Đao bộ khoái làm địch phá giáp, cứ ba chiêu lại quăng xích một lần làm địch choáng" },
-  long: { n: "Long đạo trưởng", spr: 'scholar', wx: 'mu', ap: 'chill', hp: 0.45, atk: 0.55, spd: 98, d: "Chính khí quyết làm địch đóng băng, thỉnh thoảng ngâm một đoạn tăng công cho bạn" },
+  ngoc: { n: 'Ngoc', spr: 'ngoc', wx: 'huo', ap: 'burn', hp: 0.5, atk: 0.5, spd: 95, d: "Hồi máu cho bạn; bình thuốc ném ra làm địch thiêu đốt", row: 'back', role: "Hồi máu · Thiêu đốt",
+    up: ["Hảo cảm 10: khí huyết dưới bảy phần là hồi máu cho bạn, tiện tay xóa trúng độc, choáng", "Hảo cảm 20: khi hồi máu cả đội cùng hồi"] },
+  zhen: { n: "Cô Trân", spr: 'constable', wx: 'jin', ap: 'armor', hp: 0.65, atk: 0.6, spd: 105, d: "Đao bộ khoái làm địch phá giáp, cứ ba chiêu lại quăng xích một lần làm địch choáng", row: 'front', role: "Phá giáp · Choáng",
+    up: ["Hảo cảm 10: tỉ lệ xích sắt gây choáng từ năm phần lên tám phần", "Hảo cảm 20: xích sắt quăng vào mọi kẻ địch"] },
+  long: { n: "Long đạo trưởng", spr: 'scholar', wx: 'mu', ap: 'chill', hp: 0.45, atk: 0.55, spd: 98, d: "Chính khí quyết làm địch đóng băng, thỉnh thoảng ngâm một đoạn tăng công cho bạn", row: 'back', role: "Tăng công · Đóng băng",
+    up: ["Hảo cảm 10: Chính Khí Quyết từ bốn chiêu một lần thành ba chiêu một lần", "Hảo cảm 20: Chính Khí Quyết tăng công cho cả đội"] },
+  kang: { n: "Quản gia Khang", spr: 'merchant', wx: 'tu', ap: 'stun', apc: 0.2, hp: 1.2, atk: 0.35, spd: 85, d: "Tiền tuyến chịu đòn: biết khiêu khích; cứ ba chiêu thì “Đỡ đao” hai lượt, đỡ thay bạn ba phần sát thương", row: 'front', role: "Khiêu khích · Đỡ đao", pg: 1,
+    up: ["Hảo cảm 10: Đỡ đao đỡ thay bạn bốn phần", "Hảo cảm 20: khiêu khích dữ hơn, kéo thêm một nửa số đòn"] },
 };
 
 // ---------------- 状态配合 ----------------

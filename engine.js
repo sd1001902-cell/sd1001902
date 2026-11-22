@@ -26,7 +26,7 @@ let onPersist = null;
 function newChar() { return { level: 1, xp: 0, tal: {}, runes: {}, order: null, off: {}, yi: [], cube: [null, null, null],
   eq: { weapon: makeItem({ slot: 'weapon', ilvl: 1, rarity: 'normal', noSocket: true }) } }; }
 function newSave() {
-  const s = { v: 4, gv: 2, boxv: 1, pv: 1, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
+  const s = { v: 4, gv: 2, boxv: 1, pv: 1, team: ['ngoc'], t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
@@ -59,6 +59,7 @@ function migrate(s) {
     if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp = [L0, L]; }
   }
   s.pv = 1;
+  if (!Array.isArray(s.team)) s.team = s.ngocJoin !== false ? ['ngoc'] : s.comp && s.comp !== 'ngoc' ? [s.comp] : [];   // 幻境组队：老存档按原来带的那位
   s.disp = {};
   if (s.riftCap == null || s.riftCap < s.riftMax + 1) s.riftCap = Math.max(3, s.riftMax + 3);   // 老存档：保持原来「最高纪录 +3」的上限
   if (!s.comps) s.comps = { ngoc: 1 };
@@ -1112,6 +1113,7 @@ function newRun(cls, opts = {}) {
   if (mode === 'rift') { run.theme = RNG.i(0, RIFT_THEMES.length - 1); run.xpMul += 0.25; run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; }
   else { const C = CHAPTERS[run.chapter - 1]; run.ngoc = C.ngoc === 'normal' ? 'normal' : C.ngoc === 'fox' ? 'fox' : null; }
   if (!run.ngoc) run.comp = (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
+  if (mode === 'rift' && SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }
   genMaze(run);
   run.hp = runStats(run).maxHp;
   return run;
@@ -1564,11 +1566,12 @@ function startBattle(run, kind) {
     b.units.push({ id: 'WD', side: 'p', kind: 'ward', name: W.name, lv, spr: W.spr, pal: W.pal, maxHp: Math.round(P.maxHp * (W.hp || 1)), hp: Math.round(P.maxHp * (W.hp || 1)),
       atk: 0, armor: P.armor * (W.arm || 1), res: P.res, spd: W.spd || 80, crit: 0, critDmg: 100, g: 10, st: {} });
   }
-  const comp = run.comp && run.comp !== 'ngoc' ? COMPANIONS[run.comp] : null;
+  const comp = !run.team && run.comp && run.comp !== 'ngoc' ? COMPANIONS[run.comp] : null;
   const afB = 1 + 0.04 * ((SAVE.aff || {})[run.comp || 'ngoc'] || 0);
-  if (comp) b.units.push({ id: 'NG', side: 'p', kind: 'ally', comp: run.comp, name: comp.n, lv, spr: comp.spr, wx: comp.wx,
+  if (run.team) run.team.forEach((c, i) => b.units.push(makeAlly(b, P, c, i)));   // 幻境组队：一到三个伙伴
+  else if (comp) b.units.push({ id: 'NG', side: 'p', kind: 'ally', comp: run.comp, name: comp.n, lv, spr: comp.spr, wx: comp.wx,
       maxHp: Math.round(P.maxHp * comp.hp * afB), hp: Math.round(P.maxHp * comp.hp * afB), atk: P.atk * comp.atk * afB, armor: P.armor * 0.8, res: P.res, spd: comp.spd, crit: 10, critDmg: 160, g: 30, st: {}, rage: 0, n: 0 });
-  else if (run.ngoc || run.comp === 'ngoc') {
+  else if (!run.team && (run.ngoc || run.comp === 'ngoc')) {
     const fox = run.ngoc === 'fox';
     b.units.push({ id: 'NG', side: 'p', kind: 'ally', name: fox ? 'Ngoc（九尾）' : 'Ngoc', lv, spr: fox ? 'ngocfox' : 'ngoc', fox,
       maxHp: Math.round(P.maxHp * (fox ? 0.7 : 0.5) * afB), hp: Math.round(P.maxHp * (fox ? 0.7 : 0.5) * afB), atk: P.atk * (fox ? 0.85 : 0.5) * afB,
@@ -1597,6 +1600,30 @@ function spdOf(u) {
   if (u.frenzy) s *= 1 + 0.04 * u.frenzy;
   if (u.mom) s *= 1 + 0.15 * u.mom;
   return Math.max(0.2, s);
+}
+// ---------------- 伙伴组队（通关后的幻境） ----------------
+// 伙伴吃你的伤害加成、暴击、暴伤，再乘 COMP_DMG；一个伙伴约占全队一成伤害，好感满（25 点，+100%）约两成
+let COMP_DK = { ngoc: 5, zhen: 14, long: 14, kang: 12 };   // 各伙伴的伤害系数（对着幻境 40 层的配装校出来的）
+const COMP_AFF_MAX = 25, FRONT_CLS = new Set(['berserker', 'paladin']);
+const teamSlots = () => 1 + ((SAVE.riftMax || 0) >= 120 ? 1 : 0) + ((SAVE.riftMax || 0) >= 150 ? 1 : 0);
+const compOpen = c => !!COMPANIONS[c] && (c === 'kang' ? !!(SAVE.story && SAVE.story.ended) : !!(SAVE.comps || {})[c]);
+function teamOf() { const T = (SAVE.team || []).filter(compOpen); return [...new Set(T)].slice(0, teamSlots()); }
+const giftCost = c => 5000 + 2000 * wAffOf(c);
+function giftComp(c) {
+  if (!compOpen(c)) return { err: '还没认识' };
+  const v = wAffOf(c); if (v >= COMP_AFF_MAX) return { err: '好感已经满了' };
+  const cost = giftCost(c); if (SAVE.gold < cost) return { err: '银两不够' };
+  SAVE.gold -= cost; SAVE.aff = SAVE.aff || {}; SAVE.aff[c] = v + 1; return { ok: true, v: v + 1 };
+}
+const compNeeds = (P, s) => P.skills.some(k => k.cd && k.pay && (k.pay.s === s || k.pay.s === 'any'));   // 你带的招式里有没有收这种状态的
+function makeAlly(b, P, c, idx) {
+  const C = COMPANIONS[c], aff = wAffOf(c), afB = 1 + 0.04 * aff, fox = c === 'ngoc';
+  const hp = fox ? 0.7 : C.hp, at = fox ? 0.85 : C.atk;
+  const u = { id: idx ? 'NG' + (idx + 1) : 'NG', side: 'p', kind: 'ally', comp: fox ? null : c, cid: c, fox, front: C.row === 'front', afl: aff, name: fox ? 'Ngoc（九尾）' : C.n, lv: P.lv, spr: fox ? 'ngocfox' : C.spr, wx: C.wx,
+    maxHp: Math.round(P.maxHp * hp * afB), atk: P.atk * at * afB * (COMP_DK[c] || 1), armor: P.armor * (C.row === 'front' ? 1.2 : 0.8), res: P.res, spd: fox ? 108 : C.spd,
+    crit: Math.max(10, P.crit || 0), critDmg: Math.max(160, P.critDmg || 0), dmgPct: P.dmgPct || 0, elem: P.elem || 0, g: 30, st: {}, rage: 0, n: 0, healCd: 0,
+    taunt: c === 'kang' ? (aff >= 20 ? 0.55 : 0.35) : 0 };
+  u.hp = u.maxHp; return u;
 }
 function addRage(u, n) { if (u.rage == null) return; u.rage = Math.min(100, u.rage + n * (1 + (u.xRage || 0) / 100)); }
 const popN = (u, n) => String(n);   // 跳字仍然给原始数；界面显示时再乘倍数、把上万的写成「1.2万」
@@ -1725,7 +1752,7 @@ function act(b, u, out) {
   }
   if (u.st.frozen) { delete u.st.frozen; if (u.charging) { delete u.charging; out.pops.push([u.id, '打断', 'buff']); out.lines.push(`${u.name}被打晕，蓄力断了！`); } else out.lines.push(`${u.name}晕住了`); out.actor = null; return; }
   if (u.trait === 'regen' && u.hp > 0 && !u.st.burn && !(riftB(b) && u.st.poison)) heal(u, u.maxHp * (riftB(b) ? R_REGEN : 0.05), out);   // 幻境里精英血厚三倍多，回 5% 打不动：改成 2%，中毒也压得住
-  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'yang', 'weak', 'vuln', 'shijia', 'gourd']) if (u.st[k] && --u.st[k] <= 0) {
+  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG']) if (u.st[k] && --u.st[k] <= 0) {
     delete u.st[k];
     if (k === 'smoke' && u.kind === 'hero' && u.fx && u.fx.has('cJinchan') && u.hp > 0) {   // 金蝉手：烟遁散了，回血、清负面
       heal(u, u.maxHp * 0.15, out); for (const z of ['frozen', 'poison', 'burn', 'slow', 'curse', 'weak', 'vuln', 'melt']) delete u.st[z]; delete u.st.weakV; out.pops.push([u.id, '金蝉', 'buff']); }
@@ -1764,16 +1791,31 @@ function wardAct(b, u, out) {
     out.lines.push(W.end || '正气冲天而起，鬼潮退了下去。'); out.cast = { id: 'zhengqi', elem: 'holy', aoe: true, target: u.id };
   }
 }
+// 伙伴起手：你带了收某种状态的招式，伙伴就专挑没挂这种状态的敌人、并且一定挂上（伙伴帮你起手）
+function compStart(b, u, s, foes, out) {
+  if (!compNeeds(b.P, s)) return null;
+  const f = foes.find(x => !stHas(x, s)); if (!f) return null;
+  if (!u.toldStart) { u.toldStart = 1; out.pops.push([u.id, '起手', 'buff']); }
+  return f;
+}
 function compAct(b, u, out) {
   const P = b.P, foes = aliveOf(b, 'e'); if (!foes.length) return;
   addRage(u, 9); u.n = (u.n || 0) + 1;
   if (u.comp === 'zhen') {
-    const t = foes.reduce((a, c) => c.hp < a.hp ? c : a);
-    if (u.n % 3 === 0) { out.cast = { id: 'chain2', elem: 'phys', target: t.id, wx: 'jin' }; if (hit(b, u, t, 0.7, 'phys', out, { sk: { ap: 'stun', apc: 0.5 } })) {} if (RNG.ch(0.25)) out.say = [u.id, RNG.pick(['老实点！', '跟我回衙门！', '哼，就这点本事？'])]; }
-    else { out.cast = { id: 'blade2', elem: 'phys', target: t.id, wx: 'jin' }; hit(b, u, t, 1, 'phys', out, { sk: { ap: 'armor', apc: 0.4 } }); }
+    if (u.n % 3 === 0) { const all = b.run && b.run.team && u.afl >= 20, apc = b.run && b.run.team && u.afl >= 10 ? 0.8 : 0.5, st = compStart(b, u, 'stun', foes, out);
+      const tt = all ? foes : [st || foes.reduce((a, c) => c.hp < a.hp ? c : a)];
+      out.cast = { id: 'chain2', elem: 'phys', target: tt[0].id, wx: 'jin', aoe: all }; tt.forEach(t => hit(b, u, t, 0.7, 'phys', out, { sk: { ap: 'stun', apc: st && t === st ? 1 : apc }, aoe: all ? 1 : 0 }));
+      if (RNG.ch(0.25)) out.say = [u.id, RNG.pick(['老实点！', '跟我回衙门！', '哼，就这点本事？'])]; }
+    else { const st = compStart(b, u, 'armor', foes, out), t = st || foes.reduce((a, c) => c.hp < a.hp ? c : a); out.cast = { id: 'blade2', elem: 'phys', target: t.id, wx: 'jin' }; hit(b, u, t, 1, 'phys', out, { sk: { ap: 'armor', apc: st ? 1 : 0.4 } }); }
   } else if (u.comp === 'long') {
-    if (u.n % 4 === 0 && P.hp > 0) { P.st.warcry = Math.max(P.st.warcry || 0, 2); out.pops.push(['P', '正气', 'buff']); out.cast = { id: 'zhengqi', elem: 'holy', target: 'P' }; out.say = [u.id, RNG.pick(['天地有正气！', '浩然之气，至大至刚！', '兄台，在下为你助威！'])]; }
-    else { const t = RNG.pick(foes); out.cast = { id: 'zhengjue', elem: 'poison', target: t.id, wx: 'mu' }; hit(b, u, t, 0.95, 'poison', out, { sk: { ap: 'chill', apc: 0.45 } }); }
+    const every = b.run && b.run.team && u.afl >= 10 ? 3 : 4;
+    if (u.n % every === 0 && P.hp > 0) { P.st.warcry = Math.max(P.st.warcry || 0, 2); out.pops.push(['P', '正气', 'buff']);
+      if (b.run && b.run.team && u.afl >= 20) b.units.filter(x => x.side === 'p' && x !== P && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.warcry = Math.max(x.st.warcry || 0, 2); });
+      out.cast = { id: 'zhengqi', elem: 'holy', target: 'P' }; out.say = [u.id, RNG.pick(['天地有正气！', '浩然之气，至大至刚！', '兄台，在下助你一臂之力！'])]; }
+    else { const st = compStart(b, u, 'chill', foes, out), t = st || RNG.pick(foes); out.cast = { id: 'zhengjue', elem: 'poison', target: t.id, wx: 'mu' }; hit(b, u, t, 0.95, 'poison', out, { sk: { ap: 'chill', apc: st ? 1 : 0.45 } }); }
+  } else if (u.comp === 'kang') {
+    if (u.n % 3 === 0 && P.hp > 0) { P.st.kangG = 3; out.pops.push(['P', '挡刀', 'buff']); out.cast = { id: 'kangGuard', elem: 'phys', target: 'P' }; if (RNG.ch(0.4)) out.say = [u.id, RNG.pick(['躲我后面！', '这一下记账上！', '赔钱的买卖我也做了！'])]; }
+    else { const st = compStart(b, u, 'stun', foes, out), t = st || foes[0]; out.cast = { id: 'blade2', elem: 'phys', target: t.id, wx: 'tu' }; hit(b, u, t, 0.8, 'phys', out, { sk: { ap: 'stun', apc: st ? 1 : 0.2 } }); }
   }
 }
 function ngocAct(b, u, out) {
@@ -1782,14 +1824,17 @@ function ngocAct(b, u, out) {
   if (u.healCd > 0) u.healCd--;
   addRage(u, 9);
   if (RNG.ch(0.16)) { out.say = [u.id, RNG.pick(NGOC_QUIPS[u.fox ? 'fox' : 'normal'])]; }
-  if (P.hp > 0 && P.hp / P.maxHp < 0.6 && u.healCd <= 0) {
+  const tm = b.run && b.run.team;
+  if (P.hp > 0 && P.hp / P.maxHp < (tm && u.afl >= 10 ? 0.7 : 0.6) && u.healCd <= 0) {
     heal(P, P.maxHp * (u.fox ? 0.15 : 0.1), out); u.healCd = 3;
+    if (tm && u.afl >= 10) { delete P.st.poison; delete P.st.frozen; }
+    if (tm && u.afl >= 20) b.units.filter(x => x.side === 'p' && x !== P && x.hp > 0 && x.kind !== 'ward').forEach(x => heal(x, x.maxHp * 0.15, out, true));
     out.lines.push(u.fox ? 'Ngoc 的狐光笼罩了你' : 'Ngoc 扔来一包药');
     out.cast = { id: u.fox ? 'foxHeal' : 'ngocHeal', elem: 'heal', target: 'P' }; return;
   }
   if (u.fox) {
     if (RNG.ch(0.3)) { out.cast = { id: 'foxfireAll', elem: 'fire', aoe: true }; foes.forEach(f => hit(b, u, f, 0.55, 'fire', out, { aoe: 1, sk: { ap: 'burn', apc: 0.4 } })); }
-    else { const t = RNG.pick(foes); out.cast = { id: 'foxfire', elem: 'fire', target: t.id }; hit(b, u, t, 1, 'fire', out, { sk: { ap: 'burn' } }); }
+    else { const t = compStart(b, u, 'burn', foes, out) || RNG.pick(foes); out.cast = { id: 'foxfire', elem: 'fire', target: t.id }; hit(b, u, t, 1, 'fire', out, { sk: { ap: 'burn' } }); }
   } else { const t = foes[0]; out.cast = { id: 'potionThrow', elem: 'poison', target: t.id }; hit(b, u, t, 0.8, 'magic', out, { sk: { ap: 'burn', apc: 0.5 } }); }
 }
 
@@ -1804,12 +1849,19 @@ const ULTS = {
 function ultimate(b, P, foes, out) {
   P.rage = 0; b.ultReq = false; b.ults++;
   const NG = b.units.find(u => u.kind === 'ally' && u.hp > 0);
-  const combo = !!(NG && NG.rage >= 100);
-  if (combo) NG.rage = 0;
-  const U = ULTS[P.cls], m = combo ? 1.3 : 1;
-  out.ult = { cls: P.cls, n: combo ? '双人合击 · ' + U.n : U.n, g: U.g, combo, comp: NG && NG.comp };
+  const J = b.units.filter(u => u.kind === 'ally' && u.hp > 0 && u.rage >= 100);   // 怒气满的伙伴一起出手
+  const combo = J.length > 0;
+  J.forEach(u => { u.rage = 0; });
+  const U = ULTS[P.cls], m = 1 + 0.3 * J.length;
+  out.ult = { cls: P.cls, n: combo ? (J.length > 1 ? `${J.length + 1}人合击 · ` : '双人合击 · ') + U.n : U.n, g: U.g, combo, comp: NG && NG.comp, sprs: J.map(u => u.spr) };
   out.cast = { id: 'ult', elem: U.elem, aoe: true, cls: P.cls, combo };
-  out.lines.push(combo ? `你和 Ngoc 同时出手——「${U.n}」！` : `必杀「${U.n}」！`);
+  out.lines.push(combo ? `你和${J.map(u => u.name).join('、')}同时出手——「${U.n}」！` : `必杀「${U.n}」！`);
+  if (b.run && b.run.team) J.forEach(u => {   // 合击里各带一段
+    if (u.cid === 'zhen') { foes.forEach(f => freezeU(f, out, '眩晕')); out.pops.push([u.id, '锁链', 'buff']); }
+    else if (u.cid === 'ngoc') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => heal(x, x.maxHp * 0.15, out, true)); out.pops.push([u.id, '狐光', 'buff']); }
+    else if (u.cid === 'long') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.warcry = Math.max(x.st.warcry || 0, 3); }); out.pops.push([u.id, '正气', 'buff']); }
+    else if (u.cid === 'kang') { const capS = Math.round(P.maxHp * 0.5); P.shield = Math.min(Math.max(capS, P.shield || 0), (P.shield || 0) + Math.round(P.maxHp * 0.15)); out.pops.push(['P', '护体', 'buff']); }
+  });
   // 打断首领蓄力
   for (const f of foes) if (f.charging) { delete f.charging; out.pops.push([f.id, '打断', 'buff']); out.lines.push(`${f.name}的蓄力被打断了！`); }
   const o = { ult: 1, aoe: 1, wx: U.wx };
@@ -2193,7 +2245,13 @@ function enemyAct(b, u, out) {
   const allies = aliveOf(b, 'p'), P = b.P;
   const others = allies.filter(a => a !== P), tank = others.find(a => a.taunt), wd = others.find(a => a.kind === 'ward');
   if (wd && !(tank && RNG.ch(tank.taunt)) && RNG.ch(0.4)) { out.cast = { id: 'atk', elem: u.ae, target: wd.id, enemy: true }; hit(b, u, wd, 1, u.ae, out); return; }
-  const t = tank && RNG.ch(tank.taunt * (u.kind === 'boss' ? 0.5 : 1)) ? tank : P.hp > 0 && (!others.length || RNG.ch(0.55)) ? P : RNG.pick(others);
+  let t = tank && RNG.ch(tank.taunt * (u.kind === 'boss' ? 0.5 : 1)) ? tank : null;
+  if (!t && b.run && b.run.team) {   // 幻境组队：七成打前排，前排倒光了才打后排
+    const isF = a => a.kind === 'hero' ? FRONT_CLS.has(a.cls) : a.kind === 'ally' && a.front;
+    const fr = allies.filter(a => a.kind !== 'ward' && isF(a));
+    if (fr.length && RNG.ch(0.7)) t = RNG.pick(fr);
+  }
+  if (!t) t = P.hp > 0 && (!others.length || RNG.ch(0.55)) ? P : RNG.pick(others);
   if (t) { out.cast = { id: 'atk', elem: u.ae, target: t.id, enemy: true }; hit(b, u, t, 1, u.ae, out); }
 }
 function bossSay(u, out, text) { if (!text) return; out.say = [u.id, text]; out.lines.push(`${u.name}：「${text}」`); }
@@ -2426,6 +2484,9 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (Z) { const all = !!tgt.st.guardZ; if (all) delete tgt.st.guardZ; const part = Math.min(Z.hp, all ? d - 1 : Math.round(d * Math.min(60, sustV(tgt, 'a')) / 100)); if (part >= 1) { Z.hp -= part; d -= part; out.pops.push([Z.id, popN(Z, part), 'phys']); } }
   }
   if (tgt.kind === 'ally' && src.side === 'e' && b.P && b.P.fx && b.P.fx.has('cBodhi')) d = Math.max(1, Math.round(d * 0.7));   // 菩提子
+  if (tgt === b.P && src.side === 'e' && tgt.st.kangG && d > 1) {   // 康总管挡刀
+    const K = b.units.find(x => x.cid === 'kang' && x.hp > 0);
+    if (K) { const part = Math.min(K.hp - 1, Math.round(d * (K.afl >= 10 ? 0.4 : 0.3))); if (part > 0) { K.hp -= part; d -= part; out.pops.push([K.id, popN(K, part), 'phys']); } } }
   const dPre = d, shieldThorns = tgt.shield > 0 && tgt.runes && tgt.runes.aegis === 'a';
   if (tgt.shield > 0) {
     const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a;
@@ -2564,7 +2625,7 @@ function resolveDeaths(b, out) {
     if (u.side === 'e' && P && P.cls === 'assassin' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'c') / 100, out);
     if (u.side === 'e' && P && P.xKill && P.hp > 0) heal(P, P.maxHp * P.xKill / 100, out, true);
     u.dead = true; u.hp = 0;
-    if (u.kind === 'ally') { out.say = [u.id, '我、我先撤一下！你给我撑住！']; out.lines.push('Ngoc 退到了后面'); continue; }
+    if (u.kind === 'ally') { out.say = [u.id, u.cid === 'kang' ? '哎哟我的老腰……撤了撤了！' : '我、我先撤一下！你给我撑住！']; out.lines.push(`${u.name}退到了后面`); continue; }
     if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name}倒下了……`); continue; }
     if (u.kind === 'minion' && P.cls === 'necro' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'b') / 100, out);
     if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * 0.5); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1 })); out.pops.push([u.id, '阴兵爆', 'fire']); }

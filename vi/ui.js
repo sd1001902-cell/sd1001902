@@ -536,12 +536,12 @@ function goTab() {
       ${cu > 1 ? `<p class="cu-note">Đang đuổi cấp: ${CLASSES[cls].n} thấp hơn nhân vật cấp cao nhất của bạn <b>${topLevel() - SAVE.chars[cls].level}</b> cấp, kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (chênh càng nhiều càng nhanh, đuổi kịp thì hết). ${SAVE.riftLv <= R_EASY ? `Yêu vật ở ${R_EASY} tầng đầu nhường theo cấp của bạn (cao hơn tối đa 2 cấp; trước cấp 10 thì không cao hơn bạn, kéo tới cũng ít hơn), cứ yên tâm vào.` : `Yêu vật ở ${R_EASY} tầng đầu sẽ nhường theo cấp của bạn.`}</p>` : ''}
       <div class="riftinfo"><span>Kỷ lục ${CLASSES[cls].n}: <b>${rec ? riftRecTxt(rec) : "Chưa có"}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `Tầng này rơi cả hai <b class="r-set">Bộ Ảo Cảnh</b>` : SAVE.riftLv >= RSET_LV ? `Tầng này rơi <b class="r-set">Bộ Ảo Cảnh</b> (từ tầng ${RSET2_LV} có thêm một bộ)` : `Từ tầng ${RSET_LV} rơi <b class="r-set">Bộ Ảo Cảnh</b>`}</span>
         <span>Tinh phách: <b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><span>Dịch Sứ: ${yi.length ? yi.map(id => `<b>${YISHI[id].n}</b>`).join(", ") : "<i>Chưa mang</i>"} <button class="linkbtn" data-act="zyopen">Trấn Yêu Lục</button></span></div>
-      <button class="ngoc-toggle ${SAVE.ngocJoin ? 'on' : ''}" data-act="ngoctog">${SPR.img('ngocfox', 36)}<span><b>Dẫn Ngoc theo</b><small>${SAVE.ngocJoin ? "Cô ấy sẽ cùng bạn xông Ảo Cảnh" : "Lần này bạn đi một mình"}</small></span></button>`;
+      ${teamRow()}`;
   }
   const mods = featureOn('mods') ? `<button class="modsbtn" data-act="modsopen">Tăng độ khó${SAVE.mods.length ? ` · đã chọn ${SAVE.mods.length}` : ''} ${MODSOPEN ? '▲' : '▼'}</button>
     ${MODSOPEN ? `<div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}` : '';
   const comps = Object.keys(COMPANIONS).filter(c => (SAVE.comps || {})[c]);
-  const compSel = comps.length > 1 ? `<div class="compsel"><span class="sub">Đồng hành</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${unitIcon(C2.spr, 34, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
+  const compSel = comps.length > 1 && mode !== 'rift' ? `<div class="compsel"><span class="sub">Đồng hành</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="comp" data-arg="${c}">${unitIcon(C2.spr, 34, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : '';
   return `${campStrip()}<section class="panel gopanel">${modeSel}${body}${compSel}${mods}
     <button class="btn big" data-act="start">${mode === 'rift' ? `Vào Ảo Cảnh Cửu U tầng ${SAVE.riftLv}` : `Xuất phát: ${chTitle(SAVE.chapter)}`}</button></section>`;
 }
@@ -676,6 +676,25 @@ function heroTab() {
   return `<section class="panel herop">${bar}<div class="hbody">${body}</div></section>`;
 }
 const stTag = (st, txt) => st && STATES[st] ? `<span class="stt" style="--c:${STATES[st].c}">${txt || STATES[st].n}</span>` : '';
+// ---- 伙伴组队（通关后的幻境） ----
+const rowTag = c => `<i class="rowt ${COMPANIONS[c].row}">${COMPANIONS[c].row === 'front' ? "Tiền tuyến" : "Hậu tuyến"}</i>`;
+function teamRow() {
+  const T = teamOf(), N = teamSlots();
+  return `<button class="teamrow" data-act="teamopen"><span class="sub">Đồng hành ${T.length}/${N}</span>${T.length ? T.map(c => `<span class="tm">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 30, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b>${rowTag(c)}</span>`).join('') : "<i class=\"sub\">Lần này đi một mình</i>"}<em>Điều chỉnh ›</em></button>`;
+}
+const teamModal = () => () => {
+  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen);
+  return `<h2 class="mh">Đồng hành</h2>
+    <p class="help-p">Trong Ảo Cảnh dẫn theo được <b>${N}</b> đồng hành${N < 3 ? ` (tầng cao nhất Ảo Cảnh qua tầng ${N < 2 ? 120 : 150} thì mở thêm một chỗ)` : ''}. Bảy phần đòn của yêu vật đánh vào tiền tuyến, tiền tuyến ngã hết mới đánh hậu tuyến. Đồng hành ăn theo mức tăng sát thương và chí mạng của bạn; bạn mang chiêu kết thúc ăn trạng thái nào, đồng hành sẽ ưu tiên giúp bạn treo trạng thái đó. Khi tất sát, đồng hành đầy nộ khí cùng hợp kích, mỗi người kèm một hiệu ứng.</p>
+    <div class="teaml">${L.map(c => { const C = COMPANIONS[c], v = wAffOf(c), on = T.includes(c), cost = giftCost(c);
+      return `<div class="tmc ${on ? 'on' : ''}"><div class="tmh">${unitIcon(c === 'ngoc' ? 'ngocfox' : C.spr, 44, null, '', 'head')}<span><b>${c === 'ngoc' ? "Ngoc (Cửu Vĩ)" : C.n}</b>${rowTag(c)}<small>${C.role}</small></span>
+          <button class="btn sm ${on ? '' : 'ghost'}" data-act="teamtog" data-arg="${c}">${on ? "Cho nghỉ" : "Dẫn theo"}</button></div>
+        <p>${C.d}</p>
+        <div class="tmaff">Hảo cảm <b>${v}</b>/${COMP_AFF_MAX} (khí huyết, công +${v * 4}%)<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `Tặng quà ${fmtBig(cost)} lượng` : "Đầy rồi"}</button></div>
+        ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; }).join('')}</div>
+    <p class="sub">Bạn có ${fmtBig(SAVE.gold)} lượng.</p>
+    <button class="btn ghost" data-act="close">Xong</button>`;
+};
 const compTag = c => COMPANIONS[c] && COMPANIONS[c].ap ? stTag(COMPANIONS[c].ap, "Gây" + STATES[COMPANIONS[c].ap].n) : '';
 // 技能卡上的状态说明
 const skTags = k => `${k.ap ? stTag(k.ap, `Gây ${STATES[k.ap].n}${k.apc && k.apc < 1 ? ' ' + Math.round(k.apc * 100) + '%' : ''}`) : ''}${k.pay ? (k.pay.s === 'any' ? `<span class="stt pay" style="--c:#e8b0ff">Đánh mục tiêu có trạng thái: ${payText(k.pay)}</span>` : stTag(k.pay.s, `Đánh ${STATES[k.pay.s].n}: ${payText(k.pay)}`).replace('class="stt"', 'class="stt pay"')) : ''}`;
@@ -1205,7 +1224,7 @@ function showCutin(kind, data) {
   let h;
   if (kind === 'ult') {
     const run = SAVE.run;
-    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? unitIcon(run.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 104, null, '', 'full') : ''}</div>
+    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, data.sprs && data.sprs.length > 1 ? 84 : 104, null, '', 'full')).join('') : ''}</div>
       <div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
     el.className = 'cutin on' + (data.combo ? ' combo' : '');
     SFX.play('gong'); if (typeof GFX !== 'undefined') GFX.ult(data.combo ? '#ff9ac0' : '#ffb04a');
@@ -2488,8 +2507,8 @@ const affMet = (S, k) => k === 'ngoc' || (k === 'liu' && mPast(S, 'm3')) || (k =
 function affHTML(ch) {
   const S = wstate(ch);
   const L = Object.keys(AFF_WHO).filter(k => affMet(S, k));
-  return `<div class="affl">${L.map(k => { const v = wAffOf(k), h = Math.round(v / 2); const Sp = SPEAKERS[k];
-    return `<div class="aff">${SPR.img(Sp.por || Sp.spr, 44, Sp.por ? null : Sp.pal)}<div><b>${esc(AFF_WHO[k])}</b><small>${AFF_LV[v]}</small></div><span class="hearts">${'♥'.repeat(h)}<i>${'♡'.repeat(5 - h)}</i></span></div>`; }).join('')}</div>
+  return `<div class="affl">${L.map(k => { const v = wAffOf(k), h = Math.min(5, Math.round(v / 2)); const Sp = SPEAKERS[k];
+    return `<div class="aff">${SPR.img(Sp.por || Sp.spr, 44, Sp.por ? null : Sp.pal)}<div><b>${esc(AFF_WHO[k])}</b><small>${AFF_LV[Math.min(10, v)]}${v > 10 ? ' +' + (v - 10) : ''}</small></div><span class="hearts">${'♥'.repeat(h)}<i>${'♡'.repeat(5 - h)}</i></span></div>`; }).join('')}</div>
     <p class="help-p">Thiện cảm đến từ nhiệm vụ, lựa chọn trong hội thoại, chuyện đêm bên lửa trại. Thiện cảm càng cao, dẫn theo càng đánh mạnh (mỗi điểm +4% khí huyết và công).</p>`;
 }
 const questModal = () => () => {
@@ -2911,6 +2930,9 @@ const ACT = {
   zyp: a => { ZYPG = ZYPG === +a ? -1 : +a; refresh(); },
   yi: id => { const r = setYi(SAVE.cls, id); if (r.err) return toast(r.err); save(); refresh(); },
   modt: id => { const i = SAVE.mods.indexOf(id); if (i >= 0) SAVE.mods.splice(i, 1); else SAVE.mods.push(id); refresh(); },
+  teamopen: () => { BACK = null; openModal(teamModal()); },
+  teamtog: c => { const T = teamOf(); if (T.includes(c)) SAVE.team = T.filter(x => x !== c); else if (T.length < teamSlots()) SAVE.team = [...T, c]; else return toast(`Hết chỗ rồi (${teamSlots()} chỗ), cho một người nghỉ trước`); save(); refresh(); },
+  gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} hảo cảm +1 ♥ (hiện ${r.v})${r.v === 10 || r.v === 20 ? ": kỹ năng mạnh lên rồi!" : ''}`); save(); refresh(); },
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast("Ngoc: “Đáng lẽ phải dẫn ta theo từ lâu rồi.”"); else toast("Ngoc: “…Vậy thì về sớm một chút.”"); },
   npc: id => {
     const qc = townCh();

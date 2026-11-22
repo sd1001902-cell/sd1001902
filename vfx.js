@@ -601,6 +601,9 @@ const VFX = (() => {
         if (ap) { glyph(ap, '狐', '#ffb3d8', 64, G, -40); fps.forEach((p, i) => later(() => proj('foxfire', ap, p, T, '#9ad8ff'), i * 30)); }
         later(() => fps.forEach(p => { boom(p, '#9ad8ff', 70, D); flames(p, 5, '#cfe8ff', 30, D); }), T + 60);
         return T + 60;
+      case 'kangGuard':
+        if (heroP) { ring(heroP, '#ffd75a', 110, D, 3); glyph(heroP, '挡', '#ffe9a0', 60, G, -40); }
+        return 0;
       case 'potionThrow':
         if (ap && tp) { proj('potion', ap, tp, T, '#7fe05a'); later(() => { boom(tp, '#7fe05a', 56, D * 0.8); parts(tp, 8, '#7fe05a', 30, D, { cls: 'bub', rise: -30 }); }, T); return T; }
         return 0;
