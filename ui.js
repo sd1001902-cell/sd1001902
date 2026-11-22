@@ -712,10 +712,10 @@ function mechCard(cls) {
   let extra = '';
   if (cls === 'mage') {   // 道士：现在带的招式凑不凑得齐一圈五行
     const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => effWx(cls, k))), miss = WX_IDS.filter(w => !have.has(w));
-    extra = `<p class="help-p wxrow">你现在带的：${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join('<span>→</span>')}　${miss.length ? `<b class="warn">缺${miss.map(w => WX[w].n).join('、')}，一圈接不上</b>` : '<b class="ok">五行齐了，可以一圈一圈接下去</b>'}</p>`;
+    extra = `<p class="help-p wxrow">你现在带的五行：${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join(' ')}　<small>带的五行越杂，「连」越好叠</small></p>`;
   }
-  return `<div class="mech"><h4 class="sub-h">本门功法 <small>被动 · 不占格子，一直生效</small></h4>
-    <p class="help-p"><b>门派机制 · ${M[0]}</b>：${M[1]}</p>${extra}<p class="help-p">${sustText(cls, s)}</p></div>`;
+  return `<details class="mech"><summary><b>本门功法 · ${M[0]}</b> <small>被动，一直生效 · 点开看说明</small></summary>
+    <p class="help-p">${M[1]}</p><p class="help-p">${sustText(cls, s)}</p></details>${extra}`;
 }
 // 现在身上哪些东西在加强这一招：套装、神兵（穿着的和乾坤袋里启用的）、点过的心法——说明里点了这招名字的都列出来
 function skillBoosts(cls, k) {
@@ -763,7 +763,7 @@ function heroTab() {
         ${[1, 10, 50].map(k => `<button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|${k}">+${k}</button>`).join('')}</div>`; }).join('')}</div>`).join('')}
       ${SAVE.para.lv ? '<button class="btn sm ghost" style="margin-top:8px" data-act="parareset">重新分配修为（免费）</button>' : ''}`;
   }
-  return `<section class="panel herop">${bar}<div class="hbody">${body}</div></section>`;
+  return `<section class="panel herop">${bar}<div class="hbody" data-scroll="hbody-${HTAB}">${body}</div></section>`;
 }
 const stTag = (st, txt) => st && STATES[st] ? `<span class="stt" style="--c:${STATES[st].c}">${txt || STATES[st].n}</span>` : '';
 // ---- 伙伴组队（通关后的幻境） ----
@@ -772,21 +772,24 @@ function teamRow() {
   const T = teamOf(), N = teamSlots();
   return `<button class="teamrow" data-act="teamopen"><span class="sub">伙伴 ${T.length}/${N}</span>${T.length ? T.map(c => `<span class="tm">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 30, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b>${rowTag(c)}</span>`).join('') : '<i class="sub">这次一个人去</i>'}<em>调整 ›</em></button>`;
 }
+let TEAMX = null;   // 伙伴弹窗里展开看详情的那位
 const teamModal = () => () => {
-  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen);
-  return `<h2 class="mh">伙伴</h2>
-    <p class="help-p">幻境里能带 <b>${N}</b> 个伙伴${N < 3 ? `（幻境最高层过 ${N < 2 ? 120 : 150} 层再开一个位）` : ''}。妖物七成的攻击打前排，前排倒光了才打后排。伙伴吃你的伤害加成和暴击；你带了收某种状态的招式，伙伴会优先帮你把这种状态挂上。必杀时怒气满的伙伴一起合击，各带一段效果。</p>
-    <div class="teaml">${L.map(c => { const C = COMPANIONS[c], v = wAffOf(c), on = T.includes(c), cost = giftCost(c);
-      return `<div class="tmc ${on ? 'on' : ''}"><div class="tmh">${unitIcon(c === 'ngoc' ? 'ngocfox' : C.spr, 44, null, '', 'head')}<span><b>${c === 'ngoc' ? 'Ngoc（九尾）' : C.n}</b>${rowTag(c)}<small>${C.role}</small></span>
-          <button class="btn sm ${on ? '' : 'ghost'}" data-act="teamtog" data-arg="${c}">${on ? '取下' : '带上'}</button></div>
-        <p>${C.d}</p>
-        <div class="tmaff">好感 <b>${v}</b>/${COMP_AFF_MAX}（气血、攻击 +${v * 4}%）<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `送礼 ${fmtBig(cost)} 两` : '满了'}</button></div>
-        ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; }).join('')}</div>
-    ${Object.keys(COMP_LOCK).filter(c => !compOpen(c)).map(c => { const C = COMPANIONS[c], [h, n] = COMP_LOCK[c]();
-      return `<div class="tmc lock"><div class="tmh">${unitIcon(C.spr, 44, null, '', 'head')}<span><b>${C.n}</b>${rowTag(c)}<small>${C.role}</small></span></div><p>${C.d}</p><div class="tmaff">🔒 还没认识：${C.lock}${SAVE.story && SAVE.story.ended ? `（${Math.min(h, n)}/${n}）` : '（通关后）'}</div></div>`; }).join('')}
-    <p class="sub">你有 ${fmtBig(SAVE.gold)} 两。</p>
-    <button class="btn ghost" data-act="close">好了</button>`;
+  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen), LK = Object.keys(COMP_LOCK).filter(c => !compOpen(c));
+  const row = (c, lock) => { const C = COMPANIONS[c], v = wAffOf(c), on = T.includes(c), cost = giftCost(c), x = TEAMX === c;
+    const head = `<div class="tmh" data-act="teamx" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : C.spr, 36, null, '', 'head')}<span><b>${c === 'ngoc' ? 'Ngoc（九尾）' : C.n}</b>${rowTag(c)}<small>${C.role}${lock ? '' : ` · 好感 ${v}/${COMP_AFF_MAX}`}</small></span>
+      ${lock ? `<em class="tml">🔒</em>` : `<button class="btn sm ${on ? '' : 'ghost'}" data-act="teamtog" data-arg="${c}">${on ? '取下' : '带上'}</button>`}</div>`;
+    if (!x) return `<div class="tmc ${on ? 'on' : ''} ${lock ? 'lock' : ''}">${head}</div>`;
+    if (lock) { const [h, n] = COMP_LOCK[c](); return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">还没认识：${C.lock}${SAVE.story && SAVE.story.ended ? `（${Math.min(h, n)}/${n}）` : '（通关后）'}</div></div>`; }
+    return `<div class="tmc x ${on ? 'on' : ''}">${head}<p>${C.d}</p>
+      <div class="tmaff">好感 <b>${v}</b>/${COMP_AFF_MAX}（气血、攻击 +${v * 4}%）<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `送礼 ${fmtBig(cost)} 两` : '满了'}</button></div>
+      ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; };
+  return `<h2 class="mh">伙伴 <small>带 ${T.length}/${N}</small><button class="qhelp sm" data-act="teamhelp" aria-label="说明">?</button></h2>
+    <p class="sub tm-tip">点名字看详情和送礼。${N < 3 ? `幻境最高层过 ${N < 2 ? 120 : 150} 层再开一个位。` : ''}</p>
+    <div class="teaml">${L.map(c => row(c)).join('')}${LK.map(c => row(c, true)).join('')}</div>
+    <div class="sheet-act"><span class="sub">你有 ${fmtBig(SAVE.gold)} 两</span><button class="btn ghost" data-act="close">好了</button></div>`;
 };
+const teamHelpModal = () => () => `<h2 class="mh">伙伴</h2><p class="help-p">妖物七成的攻击打前排，前排倒光了才打后排。伙伴吃你的伤害加成和暴击；你带了收某种状态的招式，伙伴会优先帮你把这种状态挂上。必杀时怒气满的伙伴一起合击，各带一段效果。</p>
+  <p class="help-p">带伙伴组队时妖物也会变强：小怪血量变多，首领会带护法。</p><button class="btn ghost" data-act="close">返回</button>`;
 const compTag = c => COMPANIONS[c] && COMPANIONS[c].ap ? stTag(COMPANIONS[c].ap, '挂' + STATES[COMPANIONS[c].ap].n) : '';
 // 技能卡上的状态说明
 const skTags = k => `${k.ap ? stTag(k.ap, `挂${STATES[k.ap].n}${k.apc && k.apc < 1 ? ' ' + Math.round(k.apc * 100) + '%' : ''}`) : ''}${k.pay ? (k.pay.s === 'any' ? `<span class="stt pay" style="--c:#e8b0ff">打带状态的：${payText(k.pay)}</span>` : stTag(k.pay.s, `打${STATES[k.pay.s].n}：${payText(k.pay)}`).replace('class="stt"', 'class="stt pay"')) : ''}`;
@@ -840,6 +843,8 @@ function talentGrid(cls) {
       return `<div class="tal ${locked ? 'locked' : ''} ${r ? 'has' : ''} ${T.max === 1 ? 'cap' : ''}"><div class="tt"><b>${T.n}</b><span>${r}/${T.max}</span></div><p>${T.d}${T.max > 1 ? '（每点）' : ''}</p>
         ${locked ? `<small>需要本路投入 ${i * TALENT_TIER_REQ} 点</small>` : `<button class="btn sm" ${can ? '' : 'disabled'} data-act="learn" data-arg="${Bq.id}|${i}">修习</button>`}</div>`; }).join('')}</div>`; }).join('')}</div>`;
 }
+let CTAB = null;
+// 江湖录（2026-11 一屏）：分成几个小页签，每个只在框里滚
 function colTab() {
   const ach = ACHIEVEMENTS.map(A => { const got = !!SAVE.ach[A.id];
     return `<div class="ach ${got ? 'got' : ''}"><b>${A.n}</b><span>${A.d}</span></div>`; }).join('');
@@ -851,17 +856,23 @@ function colTab() {
     return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">开场</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">结尾</button>` : ''}</div>`; }).join('') + (SAVE.story.ended ? '<div class="rp"><b>终章</b><button class="btn sm" data-act="replay" data-arg="10|ending">结局</button></div>' : '');
   const rec = [...CHAPTERS.map((C, i) => { const b = SAVE.best['normal-' + (i + 1)]; return [chTitle(i + 1), b ? fmtTime(b.t) : '—']; }),
     ['幻境最高层', SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ['幻境·' + CLASSES[c].n, riftRecTxt(SAVE.riftRec[c])]), ['累计斩妖', SAVE.stats.kills], ['招财金蟾', SAVE.stats.goblins], ['完成悬赏', SAVE.stats.bounties]];
-  return `${bountyHTML()}${featureOn('rift') ? zyHTML() : ''}<div class="cols"><div>
-    <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>
-    <section class="panel"><h3>成就 <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>
-  </div><div>
-    <section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
-    <section class="panel"><h3>传奇图鉴 <small>${Object.keys(SAVE.codex || {}).filter(k => LEGENDS.some(l => l.id === k)).length}/${LEGENDS.length} · 本职业的专属传奇标了职业名</small></h3><div class="codex">${LEGENDS.map(L => { const got = SAVE.codex && SAVE.codex[L.id];
+  const tabs = [...(featureOn('bounty') ? [['bty', '悬赏']] : []), ...(featureOn('rift') ? [['zy', '镇妖录']] : []), ['ach', `成就 ${nGot}/${ACHIEVEMENTS.length}`], ['dex', '图鉴'], ['rec', '纪录']];
+  if (!tabs.some(t => t[0] === CTAB)) CTAB = tabs[0][0];
+  const sec = {
+    ach: `<section class="panel"><h3>成就 <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>`,
+    dex: `<section class="panel"><h3>传奇图鉴 <small>${Object.keys(SAVE.codex || {}).filter(k => LEGENDS.some(l => l.id === k)).length}/${LEGENDS.length} · 本职业的专属传奇标了职业名</small></h3><div class="codex">${LEGENDS.map(L => { const got = SAVE.codex && SAVE.codex[L.id];
       return `<div class="${got ? 'got' : 'no'}"><b>${got ? L.n : '？？？'}</b><i>${(SLOTS.find(x => x.id === L.slot) || {}).n || ''}${L.cls ? ' · ' + CLASSES[L.cls].n : ' · 通用'}${L.ch ? ' · 多见于第' + L.ch + '章' : ''}</i><br>${got ? L.d : '尚未得到'}</div>`; }).join('')}</div></section>
-    <section class="panel"><h3>百妖谱 <small>每种妖物斩 ${BESTIARY_TIERS.join(' / ')} 只点亮一颗星</small></h3><div class="mons">${mons}</div></section>
-  </div></div>`;
+      <section class="panel"><h3>百妖谱 <small>每种妖物斩 ${BESTIARY_TIERS.join(' / ')} 只点亮一颗星</small></h3><div class="mons">${mons}</div></section>`,
+    rec: `<section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
+      <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>` };
+  const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : sec[CTAB];
+  return tpane(tabs, CTAB, 'ctab', body);
 }
+// 一屏页面的通用壳：上面一排小页签，下面的内容只在框里滚
+const tpane = (tabs, cur, act, body) => `<div class="tpane"><div class="gsubs gtop" style="--n:${tabs.length}">${tabs.map(([k, n]) => `<button class="${cur === k ? 'on' : ''}" data-act="${act}" data-arg="${k}">${n}</button>`).join('')}</div>
+  <div class="tscroll" data-scroll="${act}-${cur}">${body}</div></div>`;
 // ---------- 镇妖录 ----------
+const zyHelpModal = () => () => `<h2 class="mh">镇妖录</h2><p class="help-p">精魄的品级看幻境层数：1–19 层一品，20 层二品，40 层三品，60 层四品，80 层五品，往上每 24 层升一品（104 六品、128 七品、152 八品、176 九品），200 层十品。品级越高，这一页给的属性越多；收服一章的首领，就能把它带在身边「役使」。</p><button class="btn ghost" data-act="close">好了</button>`;
 let ZYOPEN = false, ZYPG = -1;
 function zyHTML() {
   const cls = SAVE.cls, my = SAVE.chars[cls].yi || [];
@@ -878,8 +889,8 @@ function zyHTML() {
       ${open ? `<div class="zyb"><div class="zyes">${ents}</div>
         <p class="sub">这一页每有 1 品，${Object.entries(Pg.st).map(([k, v]) => fmtStat(k, v)).join('，')}。${done ? '' : `收服首领和至少 ${ZY_NEED} 种妖物，可以读到这一页的后记（现在 ${E.filter(e => !e.boss && zyOf(e.n)).length}/${ZY_NEED}${E.some(e => e.boss && zyOf(e.n)) ? '' : '，首领还没收'}）。`}</p>
         ${done ? `<div class="hou"><h4>后记</h4>${Pg.hou.split('\n').map(t => `<p>${t}</p>`).join('')}</div>` : ''}</div>` : ''}</div>`; }).join('');
-  return `<section class="panel zylu" id="zylu"><h3>镇妖录 <small>${nAll}/${tot} 种 · 幻境里的首领、精英，偶尔还有小妖，会留下精魄</small></h3>
-    <p class="help-p">精魄的品级看幻境层数：1–19 层一品，20 层二品，40 层三品，60 层四品，80 层五品，往上每 24 层升一品（104 六品、128 七品、152 八品、176 九品），200 层十品。品级越高，这一页给的属性越多；收服一章的首领，就能把它带在身边「役使」。</p>
+  return `<section class="panel zylu" id="zylu"><h3>镇妖录 <small>${nAll}/${tot} 种</small><button class="qhelp sm" data-act="zyhelp" aria-label="说明">?</button></h3>
+
     <h4 class="sub-h">役使 <small>${CLASSES[cls].n}最多带 2 只，点一下带上或放下</small></h4><div class="yis">${yiList}</div>
     <div class="zyps">${pages}</div></section>`;
 }
@@ -1001,13 +1012,13 @@ async function tryImport(str) {
 }
 // 选章试玩：测试用，平时折起来，不打扰正常游玩
 const testFold = () => `<details class="testfold" ${SAVE.test || testBackup() || TEST_BAK ? 'open' : ''}><summary>选章试玩 <small>测试用</small></summary>${testPanel()}</details>`;
+let STAB = 'base';
+// 设置（2026-11 一屏）：分成常规、声音、存档、指南
+const secOf = (html, t) => { const m = html.split('</section>').map(x => x + '</section>').filter(x => x.includes('<section')); return m.filter(x => t.some(k => x.includes('<h3>' + k))).join(''); };
 function setTab() {
-  return `<div class="cols"><div>
-    ${setBasic()}
-    ${setSave()}
-    ${testFold()}
-  </div><div>
-    <section class="panel"><h3>江湖指南</h3>
+  const B0 = setBasic();
+  const tabs = [['base', '常规'], ['snd', '声音'], ['save', '存档'], ['help', '指南']];
+  const body = STAB === 'snd' ? secOf(B0, ['声音']) : STAB === 'save' ? setSave() : STAB === 'help' ? `<section class="panel"><h3>江湖指南</h3>
       <ul class="help">
         <li><b>主线</b>：十章故事，每章三层迷宫。每层先打败「守门妖将」拿钥匙，才能开首领的门。第三层是本章大首领。</li>
         <li><b>探索</b>：点地图上的地点，角色会走过去；也可以打开「自动探索」，有事才会停下。</li>
@@ -1016,10 +1027,9 @@ function setTab() {
         <li><b>通关后</b>：开启九幽幻境（无尽层数）、修罗难度、修为、灵玉、洗炼、江湖悬赏、加难度。</li>
         <li><b>招财金蟾</b>：迷宫里偶尔出现，几回合后会逃，打死能爆一地宝贝。</li>
         <li>死了不会丢任何装备、经验和材料。</li>
-      </ul></section>
-  </div></div>`;
+      </ul></section>${testFold()}` : secOf(B0, ['语言', '战斗', '操作', '画面']);
+  return tpane(tabs, STAB, 'stab', body);
 }
-
 // ---------- 迷宫 ----------
 function roomIcon(run, c) {
   const F = themeOf(run);
@@ -2885,15 +2895,17 @@ function endHTML() {
       <p>${tl > 0 ? `灵玉可以升级 <b>${r.upg}</b> 次 · 现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : '香烧完了：这一层不算过，灵玉只能升 1 次'}</p>
       ${r.bp ? `<p class="newslot">兵魄 <b>+${r.bp}</b>（现在 ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? '，够打一把专属兵器了：去找张大锤' : ''}）</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">新的装备位开了：<b>${r.newSlots.map(p => SLOT_NAME[p]).join('、')}</b>。去「人物」页看看；这一类装备从现在起会在幻境里掉。</p>` : ''}
-      ${r.stat ? `<details class="bstat-d" open><summary>这一局统计</summary>${statTable(r.stat)}</details>` : ''}
+      ${r.stat ? `<details class="bstat-d"><summary>这一局统计</summary>${statTable(r.stat)}</details>` : ''}
       ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${r.world ? '用时 ' + fmtClock(r.clock || 0) : used + ' 回合'}</p>` : ''}</div></div>`;
     extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${SAVE.lgems.length ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级。</p>
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
         <button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button></div>`).join('')}</div>` : ''}</div>`;
   }
-  return `<div class="scene"><div class="panel"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 80, 'float') + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 72, null, 'float', 'stand') : '') : SPR.img('skeleton', 80)}</div><h2>${title}</h2>
-    <p class="d">${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}</p>
+  // 2026-11 一屏：上面标题，中间在框里滚，按钮固定在底部
+  return `<div class="scene endv"><div class="panel endp"><div class="endtop"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 56, 'float') + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 50, null, 'float', 'stand') : '') : SPR.img('skeleton', 56)}</div><div><h2>${title}</h2>
+    <p class="d">${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}</p></div></div>
+    <div class="endscroll" data-scroll="end">
     ${r.record && !rift ? '<p class="evres">刷新了本章最快纪录！</p>' : ''}
     ${extra}
     <div class="endstats"><div><small>${rift && r.world ? '香烧了' : '用时'}</small><b>${rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)}</b></div><div><small>斩妖</small><b>${r.kills}</b></div>
@@ -2902,7 +2914,7 @@ function endHTML() {
       ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">这次得到 ${loot.length} 件装备（已放进储物箱）</p>${lootChips(loot)}
     ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>又打完一章。进度只存在这台设备上，备份一下更保险。</p><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bknudge">更多备份方式</button></div>` : ''}
-    ${r.loot && r.loot.length ? '<button class="btn ghost" style="width:100%;margin-bottom:8px" data-act="bulkopen">清点战利品：筛选分解 / 出售</button>' : ''}<button class="btn big" data-act="town">回青石镇</button></div></div>`;
+    </div><div class="endbtns">${r.loot && r.loot.length ? '<button class="btn ghost" data-act="bulkopen">清点战利品</button>' : ''}<button class="btn big" data-act="town">回青石镇</button></div></div></div>`;
 }
 function creditsHTML() {
   const E = (SAVE.wflags || {}).ending, EN = { 1: '结局一 · 一人一半', 2: '结局二 · 点灯', 3: '结局三 · 这次换我' }[E];
@@ -3005,6 +3017,18 @@ function diffChips(it, cur) {
   rows.sort((x, y) => y[1] - x[1]);
   return `<div class="diffs">${rows.map(([k, d]) => `<span class="${d > 0 ? 'up' : 'dn'}">${fmtStat(k, d)}</span>`).join('')}</div>`;
 }
+// 对比表：点储物箱里的装备，直接和身上那件一行一行对比（不用再点开）
+function cmpTable(it, cur) {
+  const a = statMap(it), b = statMap(cur), keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+  const nm = k => k.startsWith('sk_') ? fmtStat(k, 0).replace(/^\+0% /, '') : k === 'armorPct' ? '护甲%' : (STAT_NAMES[AFF_ST[k] || k] || k);
+  const fv = (k, v) => v == null ? '—' : (k === 'hp' || k === 'regen' ? fmtBig(hpShow(v, heroLv())) : v) + (PCT_STATS.has(AFF_ST[k] || k) || k.startsWith('sk_') ? '%' : '');
+  keys.sort((x, y) => ((b[x] != null) - (b[y] != null)) || ((a[y] || 0) - (b[y] || 0)) - ((a[x] || 0) - (b[x] || 0)));
+  const L = legendOf(it), Lc = legendOf(cur), S = setOf(it), Sc = setOf(cur);
+  const fx = (x, X, Y) => X ? `<b class="r-legend">${X.n}</b>：${X.d}` : Y ? `<b class="r-set">${Y.n}</b>` : '<span class="sub">无</span>';
+  return `<div class="cmpt"><div class="cmr cmh"><span></span><span class="r-${it.rarity}">这件</span><span class="r-${cur.rarity}">身上</span></div>
+    ${keys.map(k => { const x = a[k], y = b[k], d = (x || 0) - (y || 0); return `<div class="cmr"><span>${nm(k)}</span><b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${fv(k, x)}</b><span>${fv(k, y)}</span></div>`; }).join('')}
+    ${L || Lc || S || Sc ? `<div class="cmfx"><div><small>这件</small>${fx(it, L, S)}</div><div><small>身上</small>${fx(cur, Lc, Sc)}</div></div>` : ''}</div>`;
+}
 function itemModal(id, shopIdx) {
   return () => {
     const cls = ctxCls();
@@ -3024,12 +3048,12 @@ function itemModal(id, shopIdx) {
           if (pb.inh && where === 'stash') { const di = pb.p - base, c = inheritCost(it, cur);
             h += `<div class="pdelta2"><span>和身上的 <b class="r-${cur.rarity}">${itemTitle(cur)}</b> 比</span></div>
               <div class="pdelta3"><span>直接换上</span><b class="${d >= 0 ? 'up' : 'dn'}">战力 ${sg(d)}</b></div>
-              <div class="pdelta3 hl"><span>传承后再换<small>把身上那件的强化${cur.gems && cur.gems.length ? '和玉' : ''}搬过来，强化降一级 · ${c.gold} 两 ${c.mats} 魂晶</small></span><b class="${di >= 0 ? 'up' : 'dn'}">战力 ${sg(di)}</b></div>${diffChips(it, cur)}`;
-          } else h += `<div class="pdelta2"><span>${cur ? `和身上的 <b class="r-${cur.rarity}">${itemTitle(cur)}</b> 比` : `${SLOT_NAME[it.slot]}现在空着`}</span><b class="${d >= 0 ? 'up' : 'dn'}">战力 ${sg(d)}</b></div>${diffChips(it, cur)}`;
+              <div class="pdelta3 hl"><span>传承后再换<small>把身上那件的强化${cur.gems && cur.gems.length ? '和玉' : ''}搬过来，强化降一级 · ${c.gold} 两 ${c.mats} 魂晶</small></span><b class="${di >= 0 ? 'up' : 'dn'}">战力 ${sg(di)}</b></div>`;
+          } else h += `<div class="pdelta2"><span>${cur ? `和身上的 <b class="r-${cur.rarity}">${itemTitle(cur)}</b> 比` : `${SLOT_NAME[it.slot]}现在空着`}</span><b class="${d >= 0 ? 'up' : 'dn'}">战力 ${sg(d)}</b></div>`;
         } else h += `<p class="pdelta warn">${CLASSES[cls].n}用不了这件门派套装</p>`;
       }
-      h += itemCard(it, cls, isMine ? '当前装备' : where === 'eq' ? '别的角色正在用' : '');
-      if (cur && !isMine && where !== 'eq') h += `<details class="curd"><summary>展开身上那件的完整属性</summary>${itemCard(cur, cls, '身上穿的')}</details>`;
+      if (cur && !isMine && where !== 'eq' && canEquip(it, cls)) h += cmpTable(it, cur) + `<details class="curd"><summary>这件的完整属性（星级、孔、套装）</summary>${itemCard(it, cls, '')}</details>`;
+      else h += itemCard(it, cls, isMine ? '当前装备' : where === 'eq' ? '别的角色正在用' : '');
       if (atTown) {
         const go = [['smith', 'enh', '强化'], ['smith', 'inh', '传承'], ['tiedan', 'refine', '淬炼洗炼'], ['tiedan', 'up', '升阶点化'], ['yujiang', 'sock', '打孔镶玉']].filter(([n, fn]) => svcFns(n).some(f => f[0] === fn) && (fn !== 'refine' || it.aff.length) && (fn !== 'up' || upTierOK(it)));
         if (go.length) h += `<div class="svc-go"><span class="sub">拿去找：</span>${go.map(([n, fn, t]) => `<button class="chip" data-act="npcgo" data-arg="${n}|${fn}|${it.id}">${SPEAKERS[n].n} · ${t}</button>`).join('')}</div>`;
@@ -3041,8 +3065,9 @@ function itemModal(id, shopIdx) {
       const pbx = canEquip(it, cls) && !inFight ? powerBest(cls, it, gpos(it)) : null;
       if (pbx && pbx.inh) acts.push(`<button class="btn" data-act="inheq" data-arg="${it.id}">传承并换上</button>`);
       if (canEquip(it, cls)) acts.push(`<button class="btn ${pbx && pbx.inh ? 'ghost' : ''}" data-act="equip" data-arg="${it.id}">${pbx && pbx.inh ? '只换上' : '穿上'}</button>`);
-      if (!inFight) acts.push(`<button class="btn ghost" data-act="sell" data-arg="${it.id}">卖 ${sellPrice(it)} 两</button>`, `<button class="btn ghost" data-act="salv" data-arg="${it.id}">分解 ${salvageValue(it)} 魂晶</button>`, `<button class="btn ghost" data-act="lock" data-arg="${it.id}">${it.lk ? '解锁' : '锁定'}</button>`);
+      if (!inFight) h += `<div class="isub2"><button class="chip" data-act="sell" data-arg="${it.id}">卖 ${sellPrice(it)} 两</button><button class="chip" data-act="salv" data-arg="${it.id}">分解 ${salvageValue(it)} 魂晶</button><button class="chip" data-act="lock" data-arg="${it.id}">${it.lk ? '解锁' : '锁定'}</button></div>`;
     }
+    if (isMine && VIEW === 'town' && TT === 'gear') acts.push(`<button class="btn" data-act="gswap" data-arg="${ipos}">更换</button>`);
     if (isMine) acts.push(`<button class="btn ghost" data-act="unequip" data-arg="${ipos}">卸下</button>`);
     if (acts.length) h += `<div class="sheet-act">${acts.join('')}</div>`;
     return h;
@@ -3135,10 +3160,15 @@ const ACT = {
   auto: () => { if (AUTO) { stopAuto(); return; } AUTO = true; const b = document.querySelector('.autob'); if (b) { b.classList.remove('ghost'); b.textContent = '自动探索中…'; } autoStep(); },
   mode: m => { SAVE.mode = m; refresh(); },
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
-  zyopen: () => { TT = 'col'; ZYOPEN = true; VIEW = 'town'; refresh(); setTimeout(() => { const e = document.getElementById('zylu'); if (e) e.scrollIntoView({ block: 'start' }); }, 50); },
+  ctab: k => { CTAB = k; refresh(); },
+  zyhelp: () => openModal(zyHelpModal()),
+  stab: k => { STAB = k; refresh(); },
+  zyopen: () => { TT = 'col'; CTAB = 'zy'; ZYOPEN = true; VIEW = 'town'; refresh(); setTimeout(() => { const e = document.getElementById('zylu'); if (e) e.scrollIntoView({ block: 'start' }); }, 50); },
   zyp: a => { ZYPG = ZYPG === +a ? -1 : +a; refresh(); },
   yi: id => { const r = setYi(SAVE.cls, id); if (r.err) return toast(r.err); save(); refresh(); },
   modt: id => { const i = SAVE.mods.indexOf(id); if (i >= 0) SAVE.mods.splice(i, 1); else SAVE.mods.push(id); refresh(); },
+  teamx: c => { TEAMX = TEAMX === c ? null : c; refresh(); },
+  teamhelp: () => { const prev = MODALFN; openModal(teamHelpModal()); BACK = prev; },
   teamopen: () => { BACK = null; openModal(teamModal()); },
   teamtog: c => { const T = teamOf(); if (T.includes(c)) SAVE.team = T.filter(x => x !== c); else if (T.length < teamSlots()) SAVE.team = [...T, c]; else return toast(`位置满了（${teamSlots()} 个），先取下一个`); save(); refresh(); },
   gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} 好感 +1 ♥（现在 ${r.v}）${r.v === 10 || r.v === 20 ? '：技能变强了！' : ''}`); save(); refresh(); },
@@ -3193,7 +3223,10 @@ const ACT = {
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
   gview: k => { if (k === 'stash' && GVIEW === 'stash') GSLOT = null; if (k !== 'stash') GSLOT = null; GVIEW = k; GSUB = k === 'gems' || k === 'cube' ? k : 'stash'; FILTER = 'all'; refresh(); },
   statall: () => openModal(statAllModal(SAVE.cls)),
-  gsl: sl => { if (VIEW === 'town' && TT === 'gear') { if (sl === 'box') { GSLOT = GVIEW === 'box' ? null : 'box'; GVIEW = GVIEW === 'box' ? 'body' : 'box'; } else { GSLOT = sl; GVIEW = 'stash'; FILTER = 'all'; } return refresh(); } GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
+  gsl: sl => { if (VIEW === 'town' && TT === 'gear') { if (sl === 'box') { GSLOT = GVIEW === 'box' ? null : 'box'; GVIEW = GVIEW === 'box' ? 'body' : 'box'; return refresh(); }
+      const it = SAVE.chars[SAVE.cls].eq[sl]; if (it) { ITAB = 'info'; return openModal(itemModal(it.id)); }   // 点身上的装备格：弹出这件的属性
+      GSLOT = sl; GVIEW = 'stash'; FILTER = 'all'; return refresh(); }   // 空格子：去储物箱挑这一类
+  gswap: sl => { closeModal(); GSLOT = sl; GVIEW = 'stash'; FILTER = 'all'; refresh(); }, GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
   gsub: k => { GSUB = k; refresh(); },
   itab: k => { ITAB = k; refresh(); },
   npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },

@@ -1581,6 +1581,40 @@ html[lang=vi] .npc2 b{font-size:calc(10px * var(--fs,1))}html[lang=vi] .npc2 sma
 html[lang=vi] .gotop .seg button{font-size:calc(12px * var(--fs,1));line-height:1.1;padding:4px 6px}
 html[lang=vi] .kstats div{font-size:calc(11px * var(--fs,1))}
 .rinfo div:first-child{grid-column:1/-1}.rinfo span{flex:none}.rinfo b{min-width:0;text-align:right}
+.cmpt{margin:8px 0;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:#100b09}
+.cmr{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:6px;padding:3px 0;border-top:1px solid #1f1612;font-size:calc(13px * var(--fs,1));font-variant-numeric:tabular-nums}
+.cmr>*:not(:first-child){text-align:right}.cmr>span:first-child{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cmr b.up{color:#7ddc6a}.cmr b.dn{color:#e8685a}.cmh{border-top:0;font-size:calc(12px * var(--fs,1))}
+.cmfx{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;padding-top:6px;border-top:1px solid #1f1612;font-size:calc(11.5px * var(--fs,1));line-height:1.45}.cmfx small{display:block;color:var(--dim)}
+.isub2{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 0}
+.svc-go{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none;align-items:center}.svc-go::-webkit-scrollbar{display:none}.svc-go .chip,.svc-go .sub{flex:none}
+.tpane{display:flex;flex-direction:column;min-height:0}.tscroll{min-height:0}
+@media(max-width:700px){
+  body[data-view=town] .tcont.t-col,body[data-view=town] .tcont.t-set,body[data-view=town] .tcont.t-hero{display:flex;flex-direction:column;overflow:hidden}
+  body[data-view=town] .tpane{flex:1}body[data-view=town] .tscroll{flex:1;overflow-y:auto;overscroll-behavior:contain}
+  body[data-view=town] .t-hero .herop{flex:1;display:flex;flex-direction:column;min-height:0;margin:0}body[data-view=town] .t-hero .hbody{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  body[data-view=town] .tscroll>.panel:last-child{margin-bottom:0}
+}
+h3 .qhelp.sm{width:24px;height:24px;font-size:13px;margin-left:8px;vertical-align:middle}
+details.mech{margin:0 0 8px;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:#100b09}details.mech summary{cursor:pointer;font-size:calc(13px * var(--fs,1))}details.mech summary small{color:var(--dim);font-weight:400}
+.teaml .tmc{padding:6px 8px;margin-bottom:5px}.teaml .tmh{cursor:pointer;gap:8px}.teaml .tmh img{width:36px;height:36px}.tm-tip{margin:0 0 6px}.tml{font-style:normal;margin-left:auto}
+.teaml .tmc.x{border-color:var(--gold2)}.teaml .tmc p{margin:6px 0;font-size:calc(12.5px * var(--fs,1))}h2.mh small{font-size:calc(12px * var(--fs,1));color:var(--dim);margin-left:6px;font-weight:400}
+.sheet-act .sub{align-self:center;flex:none}
+.endtop{display:flex;align-items:center;gap:10px;text-align:left}.endtop .art{flex:none;margin:0}.endtop h2{margin:0;font-size:calc(22px * var(--fs,1))}.endtop .d{margin:2px 0 0}
+.endbtns{display:flex;gap:8px;padding-top:8px}.endbtns .btn.big{flex:2;margin:0}.endbtns .btn.ghost{flex:1}
+.endp .endstats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.endp .endstats div{padding:6px 4px}.endp .endstats b{font-size:calc(17px * var(--fs,1))}
+@media(max-width:700px){
+  body[data-view=end] #app{height:100vh;height:100svh;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box}
+  body[data-view=end] .endv{flex:1;min-height:0;display:flex;flex-direction:column;margin:0;padding:0}
+  body[data-view=end] .endp{flex:1;min-height:0;display:flex;flex-direction:column;margin:0}
+  body[data-view=end] .endscroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin-top:8px}
+}
+@media(max-width:700px){   /* 大地图也一屏：地图吃掉剩下的高度 */
+  body[data-view=world] #app{height:100vh;height:100svh;display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;padding-bottom:8px}
+  body[data-view=world] #app>*{flex:none}
+  body[data-view=world] #app>.wmap{flex:1 1 auto;height:auto;min-height:200px}
+  body[data-view=world] .rhint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 0 4px}
+}
 </style>
 </head>
 <body>
