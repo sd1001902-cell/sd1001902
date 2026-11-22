@@ -8,10 +8,18 @@ const SLOTS = [
   { id: 'boots',  n: "Giày", s: "Giày" },
   { id: 'ring',   n: "Nhẫn", s: "Nhẫn" },
   { id: 'amulet', n: "Ngọc bội", s: "Bội" },
+  // 通关后随幻境最高纪录逐个开的位置（rift：要打到第几层）。ring2 没有自己的装备，戴的是第二枚扳指
+  { id: 'belt',    n: "Thắt lưng", s: "Đai", rift: 10 },
+  { id: 'offhand', n: "Tay phụ", s: "Phụ", rift: 20 },
+  { id: 'ring2',   n: "Nhẫn·2", s: "Giới", rift: 30, type: 'ring' },
 ];
-const SLOT_IDS = SLOTS.map(s => s.id);
+const SLOT_IDS = SLOTS.filter(s => !s.rift).map(s => s.id);   // 剧情里就有的七个位置（也是会掉的七种装备）
+const POS_IDS = SLOTS.map(s => s.id);                         // 身上所有的位置
+const X_ITEM_SLOTS = SLOTS.filter(s => s.rift && !s.type).map(s => s.id);   // 通关后新增的装备种类：腰带、副手
+const slotType = pos => (SLOTS.find(s => s.id === pos) || {}).type || pos;
+const OFFHAND_BASE = { berserker: "Vỏ đao", mage: "Hộp bùa", necro: "Chuông dẫn hồn", assassin: "Túi tiêu", paladin: "Mõ gỗ" };
 const SLOT_NAME = Object.fromEntries(SLOTS.map(s => [s.id, s.n]));
-const MAX_SOCKETS = { weapon: 3, helm: 2, chest: 3, gloves: 1, boots: 1, ring: 1, amulet: 1 };
+const MAX_SOCKETS = { weapon: 3, helm: 2, chest: 3, gloves: 1, boots: 1, ring: 1, amulet: 1, belt: 1, offhand: 1 };
 
 const RARITY = {
   normal: { n: "Phàm phẩm", aff: [0, 0] },
@@ -40,6 +48,8 @@ const BASES = {
   boots:  [["Dép cỏ", 1], ["Ủng vải", 10], ["Giày sắt", 24], ["Đạp Vân Ngoa", 40]],
   ring:   [["Nhẫn", 1]],
   amulet: [["Ngọc bội", 1]],
+  belt:   [["Đai vải", 1], ["Đai da", 12], ["Đai khóa đồng", 26], ["Đai vân mãng", 40]],
+  offhand: [["cũ", 1], ["đồng", 14], ["huyền thiết", 28], ["tử kim", 42]],   // 副手：前缀 + 本门的物件（刀鞘、符匣、引魂铃、镖囊、木鱼）
 };
 // 2026-11 词条重做：
 //   ① 百分比词条（暴击、暴伤、伤害、术法、吸血、全抗、最大气血、速度……）的幅度不再跟着装备等级涨，第一章是多少，第十章还是多少；
@@ -49,19 +59,19 @@ const BASES = {
 //   ③ 词条的下限提高（比如攻击 2–5 改成 3–5），普通装备和极品装备的差距收窄。
 const AFFIXES = [
   // g：'o' 攻击类（一件装备最多两条）、'd' 防御类；ro：改之前的幅度，旧存档换算用
-  { k: 'atk',     r: [3, 5],   ro: [2, 5],   flat: true, w: 12, g: 'o', p: "sắc bén", slots: ['weapon', 'gloves', 'ring', 'amulet'] },
-  { k: 'hp',      r: [12, 20], ro: [8, 20],  flat: true, w: 12, g: 'd', p: "cường tráng", slots: ['weapon', 'helm', 'chest', 'boots', 'ring', 'amulet'] },
-  { k: 'armor',   r: [6, 10],  ro: [4, 10],  flat: true, w: 10, g: 'd', p: "vững chắc", slots: ['helm', 'chest', 'gloves', 'boots'] },
-  { k: 'crit',    r: [3, 6],   ro: [2, 6],   w: 7, g: 'o', p: "chí mạng", slots: ['gloves', 'ring', 'amulet'] },
-  { k: 'critDmg', r: [15, 28], ro: [10, 28], w: 7, g: 'o', p: "tàn độc", slots: ['weapon', 'ring', 'amulet'] },
-  { k: 'spd',     r: [4, 8],   ro: [3, 8],   w: 9, g: 'o', p: "nhanh nhẹn", slots: ['boots', 'gloves', 'amulet'] },
+  { k: 'atk',     r: [3, 5],   ro: [2, 5],   flat: true, w: 12, g: 'o', p: "sắc bén", slots: ['weapon', 'gloves', 'ring', 'amulet', 'offhand'] },
+  { k: 'hp',      r: [12, 20], ro: [8, 20],  flat: true, w: 12, g: 'd', p: "cường tráng", slots: ['weapon', 'helm', 'chest', 'boots', 'ring', 'amulet', 'belt'] },
+  { k: 'armor',   r: [6, 10],  ro: [4, 10],  flat: true, w: 10, g: 'd', p: "vững chắc", slots: ['helm', 'chest', 'gloves', 'boots', 'belt'] },
+  { k: 'crit',    r: [3, 6],   ro: [2, 6],   w: 7, g: 'o', p: "chí mạng", slots: ['gloves', 'ring', 'amulet', 'offhand'] },
+  { k: 'critDmg', r: [15, 28], ro: [10, 28], w: 7, g: 'o', p: "tàn độc", slots: ['weapon', 'ring', 'amulet', 'offhand'] },
+  { k: 'spd',     r: [4, 8],   ro: [3, 8],   w: 9, g: 'o', p: "nhanh nhẹn", slots: ['boots', 'gloves', 'amulet', 'offhand'] },
   { k: 'leech',   r: [2, 3],   ro: [1, 3],   w: 5, g: 'o', p: "khát máu", slots: ['weapon', 'helm', 'gloves'] },
-  { k: 'res',     r: [6, 10],  ro: [4, 10],  w: 7, g: 'd', p: "trừ tà", slots: ['helm', 'chest', 'boots'] },
-  { k: 'dmgPct',  r: [8, 14],  ro: [5, 14],  w: 8, g: 'o', p: "cuồng bạo", slots: ['weapon', 'gloves', 'ring'] },
-  { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: "thông linh", slots: ['weapon', 'helm', 'amulet'] },
-  { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: "dưỡng nguyên", slots: ['helm', 'chest', 'amulet'] },
-  { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: "hồi xuân" },
-  { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: "có gai" },
+  { k: 'res',     r: [6, 10],  ro: [4, 10],  w: 7, g: 'd', p: "trừ tà", slots: ['helm', 'chest', 'boots', 'belt'] },
+  { k: 'dmgPct',  r: [8, 14],  ro: [5, 14],  w: 8, g: 'o', p: "cuồng bạo", slots: ['weapon', 'gloves', 'ring', 'offhand'] },
+  { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: "thông linh", slots: ['weapon', 'helm', 'amulet', 'offhand'] },
+  { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: "dưỡng nguyên", slots: ['helm', 'chest', 'amulet', 'belt'] },
+  { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: "hồi xuân", no: ['offhand'] },
+  { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: "có gai", no: ['offhand'] },
   { k: 'mf',      r: [8, 20],  w: 4, p: "có phúc" },
   { k: 'gf',      r: [10, 30], w: 4, p: "chiêu tài" },
   // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
@@ -73,7 +83,7 @@ const AFFIXES = [
 const SP_AFFIXES = AFFIXES.filter(a => a.sp).map(a => a.k);
 const RARE_NAME_A = ["Huyền Minh", "Xích Huyết", "Thái Ất", "Cửu U", "Vô Tướng", "Thanh Minh", "Tử Điện", "Hàn Sương", "Tu La", "Âm Dương", "Càn Khôn", "Phệ Hồn"];
 const RARE_NAME_B = { weapon: ["Nhận", "Phong", "Trảm"], helm: ["Quan", "Khôi", "Diện"], chest: ["Giáp", "Bào", "Khải"],
-  gloves: ["Trảo", "Uyển", "Ác"], boots: ["Lý", "Bộ", "Ngoa"], ring: ["Giới", "Hoàn", "Ấn"], amulet: ["Bội", "Giác", "Phù"] };
+  gloves: ["Trảo", "Uyển", "Ác"], boots: ["Lý", "Bộ", "Ngoa"], ring: ["Giới", "Hoàn", "Ấn"], amulet: ["Bội", "Giác", "Phù"], belt: ["Đai", "Thao", "Thúc"] };
 
 const LEGENDS = [
   { id: 'butcher',  n: "Đoạn Hồn Trảm Mã Đao", slot: 'weapon', ch: 4, imp: { critDmg: 40 }, fx: 'execute',    d: "Sát thương lên địch dưới 30% khí huyết +60%" },

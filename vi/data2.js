@@ -34,7 +34,16 @@ const LGEMS = {
   ice:   { n: "Hàn Tủy Ngọc", c: '#8fd0ff', d: lv => `Tỉ lệ bất động +${(5 + lv * 0.2).toFixed(1)}%, sát thương lên địch bất động +${20 + lv}%`, st: lv => ({ freeze: 5 + lv * 0.2, frozenDmg: 20 + lv }) },
   greed: { n: "Chiêu Tài Ngọc", c: '#f1c94a', d: lv => `Thu hoạch bạc +${30 + lv * 2}%, phúc duyên +${10 + lv}%`, st: lv => ({ gf: 30 + lv * 2, mf: 10 + lv }) },
   zeal:  { n: "Tật Phong Ngọc", c: '#c39cff', d: lv => `Tốc độ +${(6 + lv * 0.3).toFixed(1)}`, st: lv => ({ spd: 6 + lv * 0.3 }) },
+  // 2026-11 加的五颗：两颗守、两颗辅、一颗攻
+  guard: { n: "Kim Chung Ngọc", c: '#e8c13a', d: lv => `Sát thương phải nhận -${(6 + lv * 0.3).toFixed(1)}%; khí huyết dưới 30% thì hiệu quả gấp đôi`, st: lv => ({ gDr: 6 + lv * 0.3 }) },
+  renew: { n: "Hồi Xuân Ngọc", c: '#7fe0b0', d: lv => `Mỗi lượt hồi ${(1.5 + lv * 0.05).toFixed(2)}% khí huyết; hiệu quả trị liệu +${10 + lv}%`, st: lv => ({ regenPct: 1.5 + lv * 0.05, healPct: 10 + lv }) },
+  bond:  { n: "Đồng Tâm Ngọc", c: '#ff9ad0', d: lv => `Sát thương và khí huyết của đồng hành, Ngoc, cương thi +${15 + lv}%`, st: lv => ({ allyPct: 15 + lv }) },
+  flow:  { n: "Lưu Quang Ngọc", c: '#9ae8ff', d: lv => `Chiêu có hồi chiêu sau khi dùng có ${(10 + lv * 0.4).toFixed(1)}% tỉ lệ không vào hồi chiêu`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
+  slay:  { n: "Phá Quân Ngọc", c: '#ff7a3a', d: lv => `Sát thương lên tinh anh và yêu vương +${(12 + lv * 0.5).toFixed(1)}%`, st: lv => ({ xBoss: 12 + lv * 0.5 }) },
 };
+// 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
+const BOX_SLOTS = 3;
+const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
 
 const RIFT_THEMES = CHAPTERS;
 

@@ -244,6 +244,12 @@ const SPR = (() => {
     i_ring: { pal: { K, M: '#c8c8d0', W: '#ffffff' }, rows: [
       '........', '........', '........', '........', '....KKKK', '...KMMMM', '...KMWMM', '...KMMMM',
       '...KMMMM', '...KMMMM', '...KKKKK', '........', '........', '........', '........', '........'] },
+    i_belt: { pal: { K, M: '#c8c8d0', Y: '#c9a45c', W: '#ffffff' }, rows: [
+      '........', '........', '........', '........', '........', 'KKKKKKKK', 'KMMMMKYY', 'KMMMMKYW',
+      'KMMMMKYW', 'KMMMMKYY', 'KKKKKKKK', '........', '........', '........', '........', '........'] },
+    i_offhand: { pal: { K, M: '#c8c8d0', Y: '#c9a45c', R: '#c4291f' }, rows: [
+      '........', '........', '....KKKK', '...KYYYY', '..KKKKKK', '..KMMMMM', '..KMMMRR', '..KMMMRR',
+      '..KMMMMM', '..KMMMMM', '..KMMMMM', '..KMMMMM', '...KKKKK', '........', '........', '........'] },
     i_amulet: { pal: { K, M: '#c8c8d0', R: '#c4291f' }, rows: [
       '........', '.......K', '......KR', '.......K', '.....KKK', '....KMMM', '...KMMKK', '...KMK..',
       '...KMK..', '...KMMKK', '....KMMM', '.....KKK', '......KR', '......KR', '.......R', '........'] },

@@ -34,7 +34,16 @@ const LGEMS = {
   ice:   { n: '寒髓玉', c: '#8fd0ff', d: lv => `定身几率 +${(5 + lv * 0.2).toFixed(1)}%，对定身敌人伤害 +${20 + lv}%`, st: lv => ({ freeze: 5 + lv * 0.2, frozenDmg: 20 + lv }) },
   greed: { n: '招财玉', c: '#f1c94a', d: lv => `银两获取 +${30 + lv * 2}%，福缘 +${10 + lv}%`, st: lv => ({ gf: 30 + lv * 2, mf: 10 + lv }) },
   zeal:  { n: '疾风玉', c: '#c39cff', d: lv => `速度 +${(6 + lv * 0.3).toFixed(1)}`, st: lv => ({ spd: 6 + lv * 0.3 }) },
+  // 2026-11 加的五颗：两颗守、两颗辅、一颗攻
+  guard: { n: '金钟玉', c: '#e8c13a', d: lv => `受到的伤害 -${(6 + lv * 0.3).toFixed(1)}%；气血低于 30% 时效果翻倍`, st: lv => ({ gDr: 6 + lv * 0.3 }) },
+  renew: { n: '回春玉', c: '#7fe0b0', d: lv => `每回合回复 ${(1.5 + lv * 0.05).toFixed(2)}% 气血；治疗效果 +${10 + lv}%`, st: lv => ({ regenPct: 1.5 + lv * 0.05, healPct: 10 + lv }) },
+  bond:  { n: '同心玉', c: '#ff9ad0', d: lv => `同伴、Ngoc、僵尸的伤害和气血 +${15 + lv}%`, st: lv => ({ allyPct: 15 + lv }) },
+  flow:  { n: '流光玉', c: '#9ae8ff', d: lv => `有冷却的招式放出后，${(10 + lv * 0.4).toFixed(1)}% 几率不进冷却`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
+  slay:  { n: '破军玉', c: '#ff7a3a', d: lv => `对精英和妖王伤害 +${(12 + lv * 0.5).toFixed(1)}%`, st: lv => ({ xBoss: 12 + lv * 0.5 }) },
 };
+// 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
+const BOX_SLOTS = 3;
+const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
 
 const RIFT_THEMES = CHAPTERS;
 

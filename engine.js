@@ -26,7 +26,7 @@ let onPersist = null;
 function newChar() { return { level: 1, xp: 0, tal: {}, runes: {}, order: null, off: {}, yi: [], cube: [null, null, null],
   eq: { weapon: makeItem({ slot: 'weapon', ilvl: 1, rarity: 'normal', noSocket: true }) } }; }
 function newSave() {
-  const s = { v: 4, gv: 2, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
+  const s = { v: 4, gv: 2, boxv: 1, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
@@ -36,7 +36,7 @@ function newSave() {
   return s;
 }
 function migrate(s) {
-  const d = newSave(), gv0 = s.gv || 0;
+  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   for (const k in d.stats) if (s.stats[k] === undefined) s.stats[k] = 0;
   for (const c of CLASS_IDS) {
@@ -45,6 +45,13 @@ function migrate(s) {
     for (const k of ['tal', 'runes', 'off', 'cube', 'yi']) if (!ch[k]) ch[k] = nc[k];
     if (ch.order === undefined) ch.order = null;
     if (ch.level > MAX_LEVEL) { ch.level = MAX_LEVEL; ch.xp = 0; }
+  }
+  if (!bx0) {   // 灵玉从扳指、玉佩搬进灵玉匣；孔还给普通玉
+    for (const c of CLASS_IDS) { const ch = s.chars[c]; if (!ch.lgs) ch.lgs = [];
+      for (const sl in ch.eq) { const it = ch.eq[sl]; if (!it || !it.gems) continue; for (const g of it.gems) if (g.startsWith('L:') && ch.lgs.length < BOX_SLOTS && !ch.lgs.includes(g.slice(2))) ch.lgs.push(g.slice(2)); } }
+    const strip = it => { if (it && it.gems) it.gems = it.gems.filter(g => !g.startsWith('L:')); };
+    (s.stash || []).forEach(strip); for (const c of CLASS_IDS) for (const sl in s.chars[c].eq) strip(s.chars[c].eq[sl]);
+    s.boxv = 1;
   }
   s.disp = {};
   if (s.riftCap == null || s.riftCap < s.riftMax + 1) s.riftCap = Math.max(3, s.riftMax + 3);   // 老存档：保持原来「最高纪录 +3」的上限
@@ -245,8 +252,27 @@ function tierOf(ilvl) { for (let c = 1; c <= 10; c++) if (ilvl <= CH_BAND[c][1] 
 const curChapter = () => (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world && SAVE.run.mode === 'rift') ? 10 : (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world) ? SAVE.run.chapter : Math.min(10, (typeof SAVE !== 'undefined' && SAVE && SAVE.story ? storyCleared('normal') : 0) + 1);
 // 本章装备的等级上限（任务奖励、宝箱不会超过本章）
 function chIlvl(ch, lv) { const B = CH_BAND[Math.min(10, Math.max(1, ch))]; return Math.max(B[0], Math.min(B[1], lv)) + 1; }
+// 通关后的新位置：腰带、副手、第二枚扳指，按幻境最高纪录逐个开；灵玉匣通关即得
+const slotOpen = pos => { const S = SLOTS.find(x => x.id === pos); return !!S && (!S.rift || !!(SAVE && SAVE.story && SAVE.story.ended && (SAVE.riftMax || 0) >= S.rift)); };
+const eqSlots = () => POS_IDS.filter(slotOpen);
+const boxOpen = () => !!(SAVE && SAVE.story && SAVE.story.ended);
+// 同一件神兵、同一套的扳指，只能戴一枚
+const sameRing = (a, b) => !!a && !!b && a !== b && ((a.legend && a.legend === b.legend) || (a.set && a.set === b.set));
+// 这件装备穿到哪个位置：扳指有两个位置（空的优先；都满了换掉更值得换的那枚），别的装备只有自己那个位置
+function posFor(cls, it, want) {
+  if (it.slot !== 'ring' || !slotOpen('ring2')) return it.slot;
+  const ch = SAVE.chars[cls], eq = ch.eq;
+  if (eq.ring === it) return 'ring'; if (eq.ring2 === it) return 'ring2';
+  if (sameRing(it, eq.ring)) return 'ring'; if (sameRing(it, eq.ring2)) return 'ring2';
+  if (want === 'ring' || want === 'ring2') return want;
+  if (!eq.ring) return 'ring'; if (!eq.ring2) return 'ring2';
+  const P = e => power(calcStats(cls, e, ch.level, null, ch));
+  return P({ ...eq, ring2: it }) > P({ ...eq, ring: it }) ? 'ring2' : 'ring';
+}
 function implicitFor(slot, L) {
   switch (slot) {
+    case 'belt':    return { hp: Math.round(6 + L * 5), armor: Math.round(2 + L * 1.6) };
+    case 'offhand': return { atk: Math.round(1 + L * 1.1) };
     case 'weapon': return { atk: Math.round(2 + L * 2.0) };
     case 'helm':   return { armor: Math.round(2 + L * 2.0) };
     case 'chest':  return { armor: Math.round(5 + L * 3.2), hp: Math.round(4 + L * 4.5) };
@@ -261,8 +287,8 @@ function scaleObj(o, m) { const r = {}; for (const k in o) r[k] = k === 'spd' ? 
 const affSc = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 1;   // 百分比词条不随装备等级涨（原来是 0.68 + ilvl / 22：第七章差不多翻倍）
 const affScOld = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 0.68 + ilvl / 22;   // 旧存档换算用
 const FLAT_STATS = new Set(['atk', 'hp', 'armor', 'regen', 'thorns']);   // 实数属性：随等级涨、吃强化
-const affOK = (a, slot) => !a.slots || !slot || a.slots.includes(slot);
-const OFF_SLOTS = new Set(['weapon', 'gloves', 'ring', 'amulet']);
+const affOK = (a, slot) => !slot || ((!a.slots || a.slots.includes(slot)) && !(a.no && a.no.includes(slot)));
+const OFF_SLOTS = new Set(['weapon', 'gloves', 'ring', 'amulet', 'offhand']);
 const AFF_OFF_MAX = 2;   // 一件装备最多两条攻击类词条（攻击、伤害、术法、暴击、暴伤、速度、吸血）
 function affixValue(a, ilvl, mult, max) {
   const sc = affSc(a, ilvl);
@@ -275,7 +301,7 @@ function rollAffixes(n, ilvl, mult, exclude = [], max, slot) {
   const needOff = slot && OFF_SLOTS.has(slot) && n + exclude.length >= 3 ? AFF_OFF_MAX : 0;
   while (out.length < n) {
     const left = n - out.length, must = needOff - nOff >= left;
-    let pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && (!a.slots || !slot || a.slots.includes(slot)) && (a.g !== 'o' || nOff < AFF_OFF_MAX));
+    let pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && affOK(a, slot) && (a.g !== 'o' || nOff < AFF_OFF_MAX));
     if (must) { const p2 = pool.filter(a => a.g === 'o'); if (p2.length) pool = p2; }
     if (!pool.length) break;
     let x = Math.random() * pool.reduce((s, a) => s + a.w, 0), pick = pool[0];
@@ -284,7 +310,10 @@ function rollAffixes(n, ilvl, mult, exclude = [], max, slot) {
   }
   return out;
 }
-function pickBase(slot, ilvl) { const ok = BASES[slot].filter(b => b[1] <= (ilvl || 1)); return (RNG.pick(ok.slice(-2)) || BASES[slot][0])[0]; }
+function pickBase(slot, ilvl, cls) { const ok = BASES[slot].filter(b => b[1] <= (ilvl || 1)); const b = (RNG.pick(ok.slice(-2)) || BASES[slot][0])[0];
+  return slot === 'offhand' ? joinName(b, OFFHAND_BASE[cls] || OFFHAND_BASE.berserker) : b; }
+// 会掉哪些种类：剧情里是那七种；通关后在幻境里，开了的腰带、副手也会掉
+const dropSlots = () => SAVE && SAVE.run && SAVE.run.mode === 'rift' ? [...SLOT_IDS, ...X_ITEM_SLOTS.filter(slotOpen)] : SLOT_IDS;
 // 大地图掉率：普通怪基本只掉凡品/灵品；稀有主要靠精英、首领、宝箱
 const W_RARITY = {
   normal: { normal: 50, magic: 45, rare: 5, set: 0.2, legend: 0.05 },
@@ -357,15 +386,17 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket }) {
     }
     rarity = 'rare';
   }
-  slot = slot || RNG.pick(SLOT_IDS);
+  slot = slot || RNG.pick(dropSlots());
   if (rarity === 'normal' && (slot === 'ring' || slot === 'amulet')) rarity = 'magic';
-  const base = pickBase(slot, ilvl);
+  const ocls = slot === 'offhand' ? (cls || (SAVE && SAVE.cls) || 'berserker') : null;   // 副手是各门派自己的物件，别的门派用不了
+  const base = pickBase(slot, ilvl, ocls);
   const R = RARITY[rarity];
   const aff = rollAffixes(RNG.i(R.aff[0], R.aff[1]), ilvl, rarity === 'rare' ? 1.1 : 1, [], false, slot);
   let name = base;
   if (rarity === 'magic') name = joinName(AFFIXES.find(x => x.k === aff[0][0]).p, base);
-  if (rarity === 'rare') name = RNG.pick(RARE_NAME_A) + (isVi() ? ' ' : '') + RNG.pick(RARE_NAME_B[slot]);
-  return finishItem({ id: uid(), slot, ilvl, rarity, name, base, imp: implicitFor(slot, ilvl), aff }, noSocket);
+  if (rarity === 'rare') name = slot === 'offhand' ? joinName(RNG.pick(RARE_NAME_A), OFFHAND_BASE[ocls]) : RNG.pick(RARE_NAME_A) + (isVi() ? ' ' : '') + RNG.pick(RARE_NAME_B[slot]);
+  const it0 = { id: uid(), slot, ilvl, rarity, name, base, imp: implicitFor(slot, ilvl), aff }; if (ocls) it0.cls = ocls;
+  return finishItem(it0, noSocket);
 }
 const ancName = it => it.anc === 2 ? '太古·' : it.anc === 1 ? '上古·' : '';
 function itemMult(it) { return (1 + (it.plus || 0) * 0.08) * (it.anc ? 1.3 : 1); }
@@ -482,7 +513,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.crit = C.base.crit; s.critDmg = C.base.critDmg; s.spd = C.base.spd || 0; s.res = C.base.res || 0;
   const fx = new Set(), setCount = {};
   const add = (k, v) => { if (k.startsWith('sk_')) s.sk[k.slice(3)] = (s.sk[k.slice(3)] || 0) + v; else s[k] = (s[k] || 0) + v; };
-  for (const sl of SLOT_IDS) {
+  for (const sl of POS_IDS) {
     const it = eq[sl]; if (!it) continue;
     const st = itemStats(it); for (const k in st) add(k, st[k]);
     if (it.set) setCount[it.set] = (setCount[it.set] || 0) + 1;
@@ -502,6 +533,10 @@ function calcStats(clsId, eq, level, buffs, ch) {
       if (T.fx) fx.add(T.fx);
     });
     for (const lid of ch.cube || []) { const L = lid && LEGENDS.find(l => l.id === lid); if (L && SAVE.cube[lid]) fx.add(L.fx); }
+    if (SAVE && boxOpen()) {   // 灵玉匣：自带的气血、伤害，加上匣里三颗灵玉
+      const bs = boxStat(SAVE.riftMax); add('hpPct', bs); add('dmgPct', bs);
+      for (const gid of ch.lgs || []) { const g = gid && SAVE.lgems.find(x => x.id === gid); if (g) { const st = LGEMS[g.t].st(g.lv); for (const k in st) add(k, st[k]); } }
+    }
     const yi = yiOf(ch);
     if (yi.guiwang) { add('mf', 12 + yi.guiwang * 8); add('gf', 20 + yi.guiwang * 10); }
     if (yi.mozun) add('dmgPct', 8 + yi.mozun * 4);
@@ -548,7 +583,7 @@ function power(s) {
   return Math.round(Math.sqrt(off * ehp) * (1 + s.leech / (s.cls === 'berserker' || !s.cls ? 40 : 160)) * (1 + s.fx.size * 0.08 + s.minion * 0.1 + s.freeze / 200 + s.poison / 200 + skb / 600) * (1 + rs * 0.3));
 }
 const RSET_FX = new Set(SETS.filter(S => S.rift).flatMap(S => [S.b4, S.b6]));
-function powerWith(cls, item) { const ch = SAVE.chars[cls]; return power(calcStats(cls, { ...ch.eq, [item.slot]: item }, ch.level, null, ch)); }
+function powerWith(cls, item, pos) { const ch = SAVE.chars[cls]; return power(calcStats(cls, { ...ch.eq, [posFor(cls, item, pos)]: item }, ch.level, null, ch)); }
 // 传承后的样子（不动原件）：把 src 的强化（降一级）、孔和玉搬到 dst 上。新捡的 +0 装备要这样才能和身上强化过的比
 function inheritSim(dst, src) {
   if (typeof canInherit !== 'function' || !canInherit(dst, src)) return dst;
@@ -559,20 +594,22 @@ function inheritSim(dst, src) {
   return c;
 }
 // 换上这件能到的战力：直接换、传承后换，取高的。inh：要传承才到得了这个数
-function powerBest(cls, item) {
-  const raw = powerWith(cls, item), sim = inheritSim(item, SAVE.chars[cls].eq[item.slot]);
+function powerBest(cls, item, pos0) {
+  const pos = posFor(cls, item, pos0), raw = powerWith(cls, item, pos), sim = inheritSim(item, SAVE.chars[cls].eq[pos]);
   if (sim === item) return { p: raw, raw, inh: false };
-  const pi = powerWith(cls, sim);
+  const ch = SAVE.chars[cls], pi = power(calcStats(cls, { ...ch.eq, [pos]: sim }, ch.level, null, ch));
   return pi > raw ? { p: pi, raw, inh: true } : { p: raw, raw, inh: false };
 }
 // 「一键换上最强」的打算：每个位置挑传承后最强的那件。不动存档，只出清单
 function bestPlan(cls) {
   const ch = SAVE.chars[cls], eq = { ...ch.eq }, plan = {};
   const P = e => power(calcStats(cls, e, ch.level, null, ch));
-  for (let pass = 0; pass < 2; pass++) for (const sl of SLOT_IDS) {
+  const taken = it => Object.values(plan).some(e => e.it === it);
+  for (let pass = 0; pass < 2; pass++) for (const sl of eqSlots()) {
     let bestP = P(eq), best = null;
     for (const it of SAVE.stash) {
-      if (it.slot !== sl || !canEquip(it, cls)) continue;
+      if (it.slot !== slotType(sl) || !canEquip(it, cls) || (taken(it) && !(plan[sl] && plan[sl].it === it))) continue;
+      if (it.slot === 'ring' && sameRing(it, eq[sl === 'ring' ? 'ring2' : 'ring'])) continue;
       const sim = inheritSim(it, ch.eq[sl]), pr = P({ ...eq, [sl]: it }), ps = sim === it ? pr : P({ ...eq, [sl]: sim });
       const inh = ps > pr, p = Math.max(pr, ps);
       if (p > bestP) { bestP = p; best = { it, sl, inh, sim: inh ? sim : it, cost: inh ? inheritCost(it, ch.eq[sl]) : null }; }
@@ -588,7 +625,7 @@ function bestApply(cls, useInh) {
   for (const e of bestPlan(cls)) {
     if (!SAVE.stash.includes(e.it)) continue;
     if (e.inh) { const r = inheritFrom(e.it, ch.eq[e.sl]); if (r.err) { if (powerWith(cls, e.it) <= power(calcStats(cls, ch.eq, ch.level, null, ch))) { skip++; continue; } } else ni++; }
-    if (equipItem(cls, e.it.id)) n++;
+    if (equipItem(cls, e.it.id, e.sl)) n++;
   }
   return { n, inh: ni, skip };
 }
@@ -629,14 +666,14 @@ function fixRunHp(cls, before) {
   r.hp = Math.max(1, Math.min(after, Math.round(r.hp * after / before)));
 }
 function checkSet4(cls) { const s = charStats(cls); if (Object.values(s.setCount).some(n => n >= 4)) SAVE.flags.set4 = true; }
-function equipItem(cls, id) {
+function equipItem(cls, id, pos0) {
   const ch = SAVE.chars[cls], i = SAVE.stash.findIndex(x => x.id === id);
   if (i < 0) return false;
   const it = SAVE.stash[i]; if (!canEquip(it, cls)) return false;
-  const before = runMaxHpIf(cls);
+  const before = runMaxHpIf(cls), pos = posFor(cls, it, pos0);
   SAVE.stash.splice(i, 1);
-  if (ch.eq[it.slot]) SAVE.stash.push(ch.eq[it.slot]);
-  ch.eq[it.slot] = it;
+  if (ch.eq[pos]) SAVE.stash.push(ch.eq[pos]);
+  ch.eq[pos] = it;
   fixRunHp(cls, before); checkSet4(cls); return true;
 }
 function unequip(cls, slot) {
@@ -659,10 +696,10 @@ function sellJunk() {
 }
 function bestGear(cls) {
   const ch = SAVE.chars[cls]; const before = runMaxHpIf(cls); let changed = 0;
-  for (let pass = 0; pass < 2; pass++) for (const sl of SLOT_IDS) {
+  for (let pass = 0; pass < 2; pass++) for (const sl of eqSlots()) {
     let bestP = power(calcStats(cls, ch.eq, ch.level, null, ch)), best = null;
     for (const it of SAVE.stash) {
-      if (it.slot !== sl || !canEquip(it, cls)) continue;
+      if (it.slot !== slotType(sl) || !canEquip(it, cls) || (it.slot === 'ring' && sameRing(it, ch.eq[sl === 'ring' ? 'ring2' : 'ring']))) continue;
       const p = power(calcStats(cls, { ...ch.eq, [sl]: it }, ch.level, null, ch));
       if (p > bestP) { bestP = p; best = it; }
     }
@@ -696,7 +733,7 @@ function findOwned(id) {
   for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] && SAVE.chars[c].eq[sl].id === id) return SAVE.chars[c].eq[sl];
   return null;
 }
-function ownerOf(it) { for (const c of CLASS_IDS) if (SAVE.chars[c].eq[it.slot] === it) return c; return null; }
+function ownerOf(it) { for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] === it) return c; return null; }
 function withOwnerHp(it, fn) { const o = ownerOf(it), b = o ? runMaxHpIf(o) : 0; const r = fn(); if (o) fixRunHp(o, b); return r; }
 function enhanceCost(it) { const p = it.plus || 0; return { gold: Math.round((20 + it.ilvl * 4) * (p + 1)), mats: p + 1, rate: Math.min(1, ENHANCE_RATE[p] + bLv('smith') * 0.03) }; }
 function enhance(it) {
@@ -879,12 +916,17 @@ function socketGem(it, key) {
 }
 const lgemHost = gid => { for (const it of allItems()) if ((it.gems || []).includes('L:' + gid)) return it; return null; };
 function allItems() { const a = [...SAVE.stash]; for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl]) a.push(SAVE.chars[c].eq[sl]); return a; }
-function socketLgem(it, gid) {
-  if (it.slot !== 'ring' && it.slot !== 'amulet') return { err: '传奇宝石只能镶嵌在戒指或护符上' };
-  if ((it.gems || []).length >= (it.sockets || 0)) return { err: '没有空的孔' };
-  if (lgemHost(gid)) return { err: '这颗宝石已经镶在别的装备上了' };
-  withOwnerHp(it, () => { it.gems.push('L:' + gid); }); return { ok: true };
+// 灵玉现在镶在灵玉匣里：全账号共用，每个角色各自挑三颗（同一颗不能放两个孔）
+function boxOf(cls) { const ch = SAVE.chars[cls]; if (!ch.lgs) ch.lgs = []; while (ch.lgs.length < BOX_SLOTS) ch.lgs.push(null); return ch.lgs; }
+function boxSet(cls, i, gid) {
+  if (!boxOpen()) return { err: '通关后才有灵玉匣' };
+  const L = boxOf(cls); if (i < 0 || i >= BOX_SLOTS) return { err: '没有这个孔' };
+  if (gid && !SAVE.lgems.some(g => g.id === gid)) return { err: '没有这颗灵玉' };
+  const before = runMaxHpIf(cls), j = gid ? L.indexOf(gid) : -1;
+  if (j >= 0 && j !== i) L[j] = L[i];   // 已经在别的孔里：两个孔对调
+  L[i] = gid || null; fixRunHp(cls, before); return { ok: true };
 }
+function socketLgem() { return { err: '灵玉现在镶在灵玉匣里' }; }
 const unsocketCost = key => key.startsWith('L:') || bLv('jewel') >= 3 ? 0 : 30 * (+key.split('_')[1] + 1);
 function unsocket(it, idx) {
   const key = it.gems[idx]; if (!key) return { err: '这里没有宝石' };
@@ -1196,6 +1238,7 @@ function riftComplete(run) {
   const N = run.riftLv, { tl, G } = riftGrade(run);
   run.timeLeft = tl; run.grade = G.n; run.jump = G.jump;
   run.capBefore = SAVE.riftCap;
+  const open0 = new Set(eqSlots());
   if (tl > 0) {
     SAVE.riftMax = Math.max(SAVE.riftMax, N); SAVE.rift[run.cls] = Math.max(SAVE.rift[run.cls] || 0, N);
     SAVE.riftCap = Math.max(SAVE.riftCap || 3, N + G.jump);
@@ -1203,6 +1246,7 @@ function riftComplete(run) {
     if (run.world) { if (!R || N > R.lv || (N === R.lv && (R.s == null || used < R.s))) { SAVE.riftRec[run.cls] = { lv: N, s: used, d: today() }; run.record = true; } }
     else if (!R || N > R.lv || (N === R.lv && used < R.t)) { SAVE.riftRec[run.cls] = { lv: N, t: used, d: today() }; run.record = true; }
   }
+  run.newSlots = eqSlots().filter(p => !open0.has(p));   // 这一局打开的新装备位
   SAVE.stats.rifts++; track('rift');
   const owned = new Set(SAVE.lgems.map(g => g.t)), un = Object.keys(LGEMS).filter(t => !owned.has(t));
   let newGem = null;
@@ -1224,7 +1268,7 @@ function upgradeLgem(run, gid) {
   run.upg--; const ok = RNG.ch(lgemChance(g, run.riftLv)); if (ok) withOwnerHpGem(gid, () => { g.lv++; });
   return ok;
 }
-function withOwnerHpGem(gid, fn) { const host = lgemHost(gid); if (host) withOwnerHp(host, fn); else fn(); }
+function withOwnerHpGem(gid, fn) { const r = SAVE.run, c = r && (SAVE.chars[r.cls].lgs || []).includes(gid) ? r.cls : null, b = c ? runMaxHpIf(c) : 0; fn(); if (c) fixRunHp(c, b); }
 
 // ---------------- 每日悬赏 ----------------
 function today() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
@@ -1393,6 +1437,7 @@ function startBattle(run, kind) {
               minionCap: 3 + s.minion + (s.fx && s.fx.has('minionArmor') ? 1 : 0), minionPct: s.minionPct, healPct: s.healPct, sk: s.sk, runes: featureOn('runes') ? { ...ch.runes } : {},
               xBoss: s.xBoss, xExec: s.xExec, xBreak: s.xBreak,
               fury: 0, furyGain: s.furyGain || 0, lian: 0, lastWx: null, lianPct: s.lianPct || 0, ki: 0, kiMax: 5 + (s.fx.has('deathMarkPlus') ? 1 : 0) + (s.fx.has('qiSha4') ? 2 : 0), kiPct: s.kiPct || 0,
+              gDr: s.gDr || 0, regenPct: s.regenPct || 0, allyPct: s.allyPct || 0, cdSkip: s.cdSkip || 0,
               counter: run.cls === 'paladin' ? 15 + (s.counter || 0) + (s.fx.has('luoHan6') ? 15 : 0) : 0, yi: yiOf(ch), fonu: 0, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
               fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: 25 };
   const encU = run.encUnits; delete run.encUnits;
@@ -1422,6 +1467,7 @@ function startBattle(run, kind) {
       maxHp: Math.round(P.maxHp * (fox ? 0.7 : 0.5) * afB), hp: Math.round(P.maxHp * (fox ? 0.7 : 0.5) * afB), atk: P.atk * (fox ? 0.85 : 0.5) * afB,
       armor: P.armor * 0.8, res: P.res, spd: fox ? 108 : 95, crit: 10, critDmg: 160, g: 30, st: {}, healCd: 0, rage: 0 });
   }
+  if (P.allyPct) for (const u of b.units) if (u.kind === 'ally') { const k = 1 + P.allyPct / 100; u.maxHp = u.hp = Math.round(u.maxHp * k); u.atk *= k; }   // 同心玉
   if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
     if (P.yi.zhizhu) f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2);
     if (P.yi.xianling && RNG.ch((16 + P.yi.xianling * 6) / 100 * (f.kind === 'boss' ? 0.5 : 1))) f.st.frozen = true;
@@ -1484,7 +1530,7 @@ function necroForm(lv, form) {
   return def.map((d, i) => form && ok(form[i]) ? form[i] : d);
 }
 function makeZombie(b, P, zt, slot, rune) {
-  const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + (P.minionPct || 0) / 100);
+  const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + (P.minionPct || 0) / 100) * (1 + (P.allyPct || 0) / 100);
   const hpM = (rune === 'b' ? 1.6 : 1) * (zt === 'tiejia' ? 1 + (P.ironPct || 0) / 100 : 1);
   const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
               maxHp: Math.round(P.maxHp * Z.hp * m * hpM), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? 4 : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd, crit: 5, critDmg: 150, g: 40, st: {},
@@ -1561,6 +1607,7 @@ function act(b, u, out) {
     if (k === 'mark') delete u.st.markB;
   }
   if (u.regen) heal(u, u.regen, out, true);
+  if (u.kind === 'hero' && u.regenPct && u.hp > 0) heal(u, u.maxHp * u.regenPct / 100, out, true);
   if (u.kind === 'hero' && u.cls === 'paladin' && u.hp > 0) heal(u, u.maxHp * sustV(u, 'b') / 100, out, true);
   if (u.kind === 'hero' && u.hp > 0 && u.fx && u.fx.has('daRi4')) u.shield = Math.min(Math.round(u.maxHp * DARI_CAP), Math.max(u.shield || 0, 0) + Math.round(u.maxHp * DARI_REGEN));
   if (u.st.renew) { heal(u, u.maxHp * 0.06, out); if (--u.st.renew <= 0) delete u.st.renew; }
@@ -1719,6 +1766,7 @@ function heroAct(b, P, out) {
   if (P.cls === 'assassin' && sk.ki) P.ki = Math.min(P.kiMax, P.ki + sk.ki);
   if (sk.cd) {
     sk.left = skillCd(P, sk);
+    if (P.cdSkip && RNG.ch(P.cdSkip / 100)) { sk.left = 0; out.pops.push(['P', '流光', 'buff']); }
     foes = aliveOf(b, 'e');
     if (P.fx.has('doubleCast') && foes.length && RNG.ch(0.2) && skillReady(b, P, sk, foes)) {
       out.lines.push('双生之戒：技能再次施放！'); cast(b, P, sk, foes, out);
@@ -2074,6 +2122,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
     if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
     if (tfx.has('duXing4') && tgt === b.P) d *= 1 - DUXING_DR * emptySlots(b, tgt);
+    if (tgt.gDr && src.side === 'e') d *= 1 - Math.min(60, tgt.gDr * (tgt.hp / tgt.maxHp < 0.3 ? 2 : 1)) / 100;
     if (tgt.yi && tgt.yi.mozun) d *= 1.08;
     if (tfx.has('stoneSkin')) d *= 0.88;
     if (tfx.has('budong2') && tgt.shield > 0) d *= 0.8;

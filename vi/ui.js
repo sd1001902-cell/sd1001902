@@ -181,11 +181,13 @@ function lootChips(items) {
 const zyChips = zy => zy && zy.length ? `<div class="loot">${zy.map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n);
   return `<span class="lchip zy">${d ? SPR.img(d.spr, 24, d.pal) : ''}<span>Tinh phách · ${n}<b>${ZY_CN[g]}</b>${old ? "<small>Lên phẩm</small>" : "<small>Mới thu phục</small>"}</span></span>`; }).join('')}</div>` : '';
 const gemChips = keys => keys && keys.length ? `<div class="loot">${keys.map(k => `<span class="lchip">${gemImg(k, 22)}${gemName(k)}</span>`).join('')}</div>` : '';
+// 现在点开的是哪个位置：点了「扳指·二」，扳指就往第二个位置比、往第二个位置穿
+const gpos = it => GSLOT && GSLOT !== 'box' && slotType(GSLOT) === it.slot ? GSLOT : undefined;
 // 每件储物箱装备换上后的战力变化（一次算好，渲染时复用）
 function deltaMap(cls) {
   const cur = power(charStats(cls)), m = new Map();
   m.inh = new Set();   // 要传承才到得了这个数的（身上那件强化过、镶了玉）
-  for (const it of SAVE.stash) { if (!canEquip(it, cls)) { m.set(it.id, null); continue; } const b = powerBest(cls, it); m.set(it.id, b.p - cur); if (b.inh) m.inh.add(it.id); }
+  for (const it of SAVE.stash) { if (!canEquip(it, cls)) { m.set(it.id, null); continue; } const b = powerBest(cls, it, gpos(it)); m.set(it.id, b.p - cur); if (b.inh) m.inh.add(it.id); }
   return m;
 }
 const deltaTag = (d, inh) => { const m = inh ? "<i class=\"inhm\">TT</i>" : ''; return d == null ? "<span class=\"delta no\">Không dùng được</span>" : d > 0 ? `<span class="delta up">${m}+${d}</span>` : d < 0 ? `<span class="delta dn">${m}${d}</span>` : `<span class="delta no">${m}±0</span>`; };
@@ -200,15 +202,22 @@ function itemRow(it, D) {
 function gearPanel(cls, inRun) {
   const eq = SAVE.chars[cls].eq, D = deltaMap(cls);
   const up = {};
-  for (const it of SAVE.stash) { const d = D.get(it.id); if (d > 0 && d > (up[it.slot] || 0)) up[it.slot] = d; }
-  const doll = SLOTS.map(sl => { const it = eq[sl.id];
+  for (const it of SAVE.stash) { const d = D.get(it.id); if (!(d > 0)) continue; const ps = posFor(cls, it, gpos(it)); if (d > (up[ps] || 0)) up[ps] = d; }
+  let doll = SLOTS.filter(sl => slotOpen(sl.id)).map(sl => { const it = eq[sl.id];
     return `<button class="gsb ${GSLOT === sl.id ? 'on' : ''} ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}" aria-pressed="${GSLOT === sl.id}">
       <span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
+  if (boxOpen() && !inRun) {   // 通关后：灵玉匣，和还没开的新位置（写明幻境打到几层开）
+    const nb = boxOf(cls).filter(Boolean).length;
+    doll += `<button class="gsb box ${GSLOT === 'box' ? 'on' : ''} ${nb ? 'b-legend' : 'empty'}" data-act="gsl" data-arg="box" aria-pressed="${GSLOT === 'box'}"><span class="gi">${SPR.img('gem', 30, { G: '#ffb02a' }, nb ? 'glow' : '')}</span><span class="gn">Hộp ngọc ${nb}/${BOX_SLOTS}</span></button>`
+      + SLOTS.filter(sl => sl.rift && !slotOpen(sl.id)).map(sl => `<div class="gsb locked"><span class="gi"><i>Khóa</i></span><span class="gn">${sl.n}</span><small>Ảo Cảnh tầng ${sl.rift}</small></div>`).join('');
+  }
+  if (GSLOT === 'box' && (!boxOpen() || inRun)) GSLOT = null;
   const nUp = Object.keys(up).length;
   const subs = inRun ? [] : [['stash', `Kho ${SAVE.stash.length}`], ...(featureOn('gems') ? [['gems', "Ngọc"]] : []), ...(featureOn('cube') ? [['cube', "Túi Càn Khôn"]] : [])];
   const sub = inRun || !subs.some(x => x[0] === GSUB) ? 'stash' : GSUB;
   let body;
-  if (sub === 'stash') body = stashBody(cls, D);
+  if (GSLOT === 'box') body = boxBody(cls);
+  else if (sub === 'stash') body = stashBody(cls, D);
   else if (sub === 'gems') body = gemsBody();
   else if (sub === 'cube') body = cubeBody(cls);
   return `<div class="ghead"><div class="gdoll">${doll}</div>
@@ -218,18 +227,29 @@ function gearPanel(cls, inRun) {
 }
 function stashBody(cls, D) {
   const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 };
-  let list = SAVE.stash.filter(it => (!GSLOT || it.slot === GSLOT) && (FILTER === 'all' || (FILTER === 'up' && D.get(it.id) > 0) || (FILTER === 'leg' && it.legend && !SAVE.cube[it.legend])));
+  let list = SAVE.stash.filter(it => (!GSLOT || it.slot === slotType(GSLOT)) && (FILTER === 'all' || (FILTER === 'up' && D.get(it.id) > 0) || (FILTER === 'leg' && it.legend && !SAVE.cube[it.legend])));
   list.sort((a, b) => GSLOT || FILTER === 'up' ? ((D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)) : (order[a.rarity] - order[b.rarity] || (b.anc || 0) - (a.anc || 0) || b.ilvl - a.ilvl));
   const cur = GSLOT && SAVE.chars[cls].eq[GSLOT];
   // 点了部位：身上那件的完整属性直接摊开（以前只有一行名字，还得再点一下才看得到）
   const curRow = GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">${SLOT_NAME[GSLOT]} đang mặc</span>${cur ? `<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">Cường hóa / Thêm</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">Tháo</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">Thu gọn</button></div>
       ${cur ? itemCard(cur, cls, '') : "<p class=\"sub\" style=\"margin:6px 0 0\">Đang trống</p>"}</div>
-      <h4 class="sub-h gcur-t">${SLOT_NAME[GSLOT]} đổi được trong kho</h4>` : '';
+      <h4 class="sub-h gcur-t">${SLOT_NAME[slotType(GSLOT)]} đổi được trong kho</h4>` : '';
   const chips = [['all', "Tất cả"], ['up', "Chỉ đồ tốt hơn"], ...(featureOn('cube') ? [['leg', "Chưa cất vào Túi"]] : [])];
   return `${curRow}<div class="chips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
       ${VIEW === 'town' ? "<button class=\"chip bulkc\" data-act=\"bulkopen\">Lọc để phân giải / bán</button>" : ''}</div>
-    <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `Trong kho không có ${SLOT_NAME[GSLOT]} nào để thay.` : "Không có trang bị nào phù hợp."}</div>`}</div>
+    <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `Trong kho không có ${SLOT_NAME[slotType(GSLOT)]} nào để thay.` : "Không có trang bị nào phù hợp."}</div>`}</div>
     <p class="sub" style="margin:8px 0 0">Số bên phải là lực chiến thay đổi sau khi mặc. Kho ${SAVE.stash.length}/${stashMax()}, dùng chung cho mọi nhân vật.</p>`;
+}
+// 灵玉匣：三个孔，灵玉全账号共用，每个角色各挑三颗
+function boxBody(cls) {
+  const L = boxOf(cls), bs = boxStat(SAVE.riftMax), inBox = new Set(L.filter(Boolean)), rest = SAVE.lgems.filter(g => !inBox.has(g.id));
+  const gemRow = (g, btn) => { const G = LGEMS[g.t]; return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${G.n}</b> cấp ${g.lv} <small>${G.d(g.lv)}</small></span>${btn}</div>`; };
+  return `<div class="gcur2"><div class="gcur-h"><span class="sub">Hộp Linh Ngọc</span><button class="btn sm ghost" data-act="gsl" data-arg="box">Thu gọn</button></div>
+      <p class="help-p">Hộp có sẵn: khí huyết tối đa +${bs}%, sát thương +${bs}% (kỷ lục Ảo Cảnh cứ qua 10 tầng, mỗi thứ thêm +1%). Ba lỗ chỉ khảm linh ngọc. Linh ngọc dùng chung cả tài khoản: mỗi nhân vật tự chọn ba viên, đổi nhân vật không cần tháo.</p>
+      <div class="gems">${L.map((gid, i) => { const g = gid && SAVE.lgems.find(x => x.id === gid);
+        return g ? gemRow(g, `<button class="btn sm ghost" data-act="boxoff" data-arg="${i}">Tháo</button>`) : `<div class="gemrow lg empty"><span class="nm"><i>Lỗ ${i + 1} · đang trống</i></span></div>`; }).join('')}</div></div>
+    <h4 class="sub-h gcur-t">Linh ngọc còn đặt vào được</h4>
+    <div class="gems">${rest.length ? rest.map(g => gemRow(g, `<button class="btn sm" data-act="boxput" data-arg="${g.id}">Đặt vào hộp</button>`)).join('') : `<div class="empty-note">${SAVE.lgems.length ? "Linh ngọc đang có đều ở trong hộp rồi." : "Chưa có linh ngọc. Hãy vào Ảo Cảnh Cửu U đánh bại yêu vương giữ ải."}</div>`}</div>`;
 }
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
@@ -237,9 +257,9 @@ function gemsBody() {
     <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
       <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">Ghép (${combineCost(k)} lượng)</button></div>`).join('')
       : "<div class=\"empty-note\">Chưa có ngọc. Tinh anh, thủ lĩnh và rương báu sẽ rơi ngọc.</div>"}</div>
-    ${SAVE.lgems.length || featureOn('rift') ? `<h4 class="sub-h">Linh ngọc <small>Yêu vương giữ ải trong Ảo Cảnh rơi ra, chỉ khảm vào nhẫn hoặc ngọc bội</small></h4>
-    <div class="gems">${SAVE.lgems.length ? SAVE.lgems.map(g => { const host = lgemHost(g.id), G = LGEMS[g.t];
-      return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${G.n}</b> cấp ${g.lv} <small>${G.d(g.lv)}</small><small>${host ? "Khảm vào:" + itemTitle(host) : "Chưa khảm"}</small></span></div>`; }).join('')
+    ${SAVE.lgems.length || featureOn('rift') ? `<h4 class="sub-h">Linh ngọc <small>yêu vương giữ ải trong Ảo Cảnh rơi ra, khảm trong Hộp Linh Ngọc (chạm “Hộp ngọc” ở ô trang bị)</small></h4>
+    <div class="gems">${SAVE.lgems.length ? SAVE.lgems.map(g => { const users = CLASS_IDS.filter(c => (SAVE.chars[c].lgs || []).includes(g.id)).map(c => CLASSES[c].n), G = LGEMS[g.t];
+      return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${G.n}</b> cấp ${g.lv} <small>${G.d(g.lv)}</small><small>${users.length ? "Đang dùng: " + users.join(", ") : "Chưa ai dùng"}</small></span></div>`; }).join('')
       : "<div class=\"empty-note\">Chưa có linh ngọc. Hãy vào Ảo Cảnh Cửu U đánh bại yêu vương giữ ải.</div>"}</div>` : ''}`;
 }
 function cubeBody(cls) {
@@ -363,7 +383,7 @@ function gambleBody() {
   const cls = SAVE.cls, p = gamblePrice(cls);
   return `<p class="help-p">Bỏ <b>${p}</b> lượng, cược một món trang bị ${CLASSES[cls].n} dùng được: vị trí bạn chọn, phẩm cấp tùy vận may — phần nhiều là Linh phẩm, Bảo phẩm, thỉnh thoảng ra Bộ, rất hiếm khi ra Thần binh.</p>
     <div class="row wallet"><span class="pill gold">Bạc ${SAVE.gold}</span></div>
-    <div class="svc-slots">${SLOTS.map(sl => `<button class="btn sm" ${SAVE.gold >= p ? '' : 'disabled'} data-act="gamb" data-arg="${sl.id}">${sl.n}</button>`).join('')}</div>
+    <div class="svc-slots">${SLOTS.filter(sl => !sl.type && slotOpen(sl.id)).map(sl => `<button class="btn sm" ${SAVE.gold >= p ? '' : 'disabled'} data-act="gamb" data-arg="${sl.id}">${sl.n}</button>`).join('')}</div>
     ${GAMBLE && SAVE.stash.includes(GAMBLE) ? `<div class="svc-res"><span class="sub">Cược được (đã cất vào kho):</span>${lootChips([GAMBLE])}</div>` : ''}`;
 }
 // 要挑一件装备才能办的事：先列装备（身上的在前），点一件，下面才是这位师傅的那一样手艺
@@ -392,6 +412,10 @@ const npcModal = () => {
   return `<div class="shead"><button class="btn sm ghost" data-act="close">Đóng</button>${fns.length > 1 ? `<div class="stabs">${fns.map(f => `<button class="${f[0] === fn ? 'on' : ''}" data-act="npcfn" data-arg="${f[0]}">${f[1]}</button>`).join('')}</div>` : ''}</div>
     <div class="svc-head">${unitIcon(Sp.spr, 56, Sp.pal, '', 'stand')}<div><b>${Sp.n}</b><p>${SVC[id].hi}</p></div></div>${body}`;
 };
+const boxNoteModal = () => `<h2 class="mh">Có thêm mấy ô trang bị</h2>
+  <p class="help-p"><b>Hộp Linh Ngọc</b>: phá đảo xong mỗi nhân vật có một cái, nằm ở ô trang bị trong trang “Nhân vật”. Hộp có sẵn một ít khí huyết và sát thương, ba lỗ chuyên khảm linh ngọc. Linh ngọc dùng chung cả tài khoản, mỗi nhân vật tự chọn ba viên. Linh ngọc trước đây khảm trên nhẫn, ngọc bội đã được chuyển vào hộp, hai lỗ đó trả lại cho ngọc thường.</p>
+  <p class="help-p"><b>Ô trang bị mới</b> mở dần theo kỷ lục Ảo Cảnh: <b>Thắt lưng</b> (tầng 10, thiên phòng thủ), <b>Tay phụ</b> (tầng 20, thiên tấn công, mỗi môn phái một món riêng), <b>Nhẫn thứ hai</b> (tầng 30). Mở rồi thì loại trang bị đó sẽ rơi trong Ảo Cảnh.</p>
+  <div class="row" style="justify-content:center"><button class="btn" data-act="close">Đã hiểu</button></div>`;
 const svcNoteModal = () => `<h2 class="mh">Lò Rèn đã được chia ra</h2>
   <p class="help-p">Việc nuôi trang bị không còn dồn hết vào thẻ “Lò Rèn” của từng món nữa. Về trang doanh trại, chạm vào người trong trấn, mỗi người một nghề:</p>
   <p class="help-p"><b>Trương Đại Chùy</b>: cường hóa, truyền thừa<br><b>Thiết Đản</b>: tôi luyện tẩy luyện, thăng giai<br><b>Chưởng quầy Ngọc</b>: đục lỗ khảm ngọc, ghép ngọc<br><b>Quản gia Khang</b>: kiểm kê nhà kho (lọc để phân giải, bán), cược đá<br><b>Lôi Lão Hổ</b>: truy nã mỗi ngày, quầy tiền thưởng</p>
@@ -2511,6 +2535,7 @@ function endHTML() {
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
       <div><p>${r.world ? `Mất <b>${fmtClock(r.clock || 0)}</b> · hương còn <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `Mất <b>${used}</b> lượt · hương còn <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · ngã ${r.deaths} lần` : ''}</p>
       <p>${tl > 0 ? `Linh ngọc được nâng <b>${r.upg}</b> lần · giờ thử thách tối đa tầng <b>${SAVE.riftCap}</b>${SAVE.riftCap > (r.capBefore || 0) ? " (đã mở lên trên)" : ''}` : "Hương tàn: tầng này không tính qua, linh ngọc chỉ nâng được 1 lần"}</p>
+      ${(r.newSlots || []).length ? `<p class="newslot">Mở ô trang bị mới: <b>${r.newSlots.map(p => SLOT_NAME[p]).join(", ")}</b>. Vào trang “Nhân vật” xem; loại trang bị này từ giờ sẽ rơi trong Ảo Cảnh.</p>` : ''}
       ${r.record ? `<p class="evres">Kỷ lục mới của ${CLASSES[r.cls].n}: tầng ${r.riftLv} · ${r.world ? "mất " + fmtClock(r.clock || 0) : used + " lượt"}</p>` : ''}</div></div>`;
     extra += `<div class="lgup"><h3>Linh ngọc</h3>${r.newGem ? `<p class="evres">Nhận linh ngọc mới: <b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${SAVE.lgems.length ? `<p class="sub">Còn nâng được <b style="color:var(--gold2)">${r.upg}</b> lần. Tỉ lệ thành công tùy tầng Ảo Cảnh và cấp linh ngọc.</p>
@@ -2568,7 +2593,7 @@ function smithHTML(it, where, W, title) {
     }
     h += '</div>';
     const free = it.sockets - it.gems.length, keys = Object.keys(SAVE.gems);
-    const lg = (it.slot === 'ring' || it.slot === 'amulet') ? SAVE.lgems.filter(g => !lgemHost(g.id)) : [];
+    const lg = [];   // 灵玉搬进灵玉匣了，装备的孔只镶普通玉
     if (free > 0) h += keys.length || lg.length ? `<div class="gpick">Chọn ngọc để khảm: ${lg.map(g => `<button class="chip lgc" data-act="lgem" data-arg="${it.id}|${g.id}">${SPR.img('gem', 16, { G: LGEMS[g.t].c })}${LGEMS[g.t].n} cấp ${g.lv}</button>`).join('')}${keys.map(k => `<button class="chip" data-act="gem" data-arg="${it.id}|${k}">${gemImg(k, 16)}${gemName(k)} ×${SAVE.gems[k]}</button>`).join('')}</div>` : "<p class=\"sub\">Bạn chưa có ngọc.</p>";
     h += '</div>';
   }
@@ -2630,7 +2655,7 @@ function itemModal(id, shopIdx) {
     let it, where;
     if (shopIdx != null) { it = curCell(SAVE.run).shop.items[shopIdx].it; where = 'shop'; }
     else { const f = findItem(id); if (!f) return "<p>Món trang bị này không còn nữa.</p><button class=\"btn\" data-act=\"close\">Đóng</button>"; it = f.it; where = f.where; }
-    const cur = SAVE.chars[cls].eq[it.slot];
+    const ipos = where === 'eq' ? (Object.keys(SAVE.chars[cls].eq).find(k => SAVE.chars[cls].eq[k] === it) || it.slot) : posFor(cls, it, gpos(it)), cur = SAVE.chars[cls].eq[ipos];
     const isMine = where === 'eq' && cur && cur.id === it.id;
     const inFight = VIEW === 'battle' && B && !B.over;
     const canSmith = false, atTown = where !== 'shop' && !inFight && VIEW === 'town';   // 铸剑坊拆给了镇上的人：这里只留「拿去找谁」的快捷按钮
@@ -2639,7 +2664,7 @@ function itemModal(id, shopIdx) {
     if (tab === 'info') {
       if (!isMine && where !== 'eq') {
         if (canEquip(it, cls)) {
-          const base = power(charStats(cls)), pb = powerBest(cls, it), d = pb.raw - base, sg = n => (n >= 0 ? '+' : '') + n;
+          const base = power(charStats(cls)), pb = powerBest(cls, it, gpos(it)), d = pb.raw - base, sg = n => (n >= 0 ? '+' : '') + n;
           if (pb.inh && where === 'stash') { const di = pb.p - base, c = inheritCost(it, cur);
             h += `<div class="pdelta2"><span>So với <b class="r-${cur.rarity}">${itemTitle(cur)}</b> đang mặc</span></div>
               <div class="pdelta3"><span>Mặc thẳng</span><b class="${d >= 0 ? 'up' : 'dn'}">Lực chiến ${sg(d)}</b></div>
@@ -2657,12 +2682,12 @@ function itemModal(id, shopIdx) {
     } else h += smithHTML(it, where);
     const acts = [];
     if (where === 'stash') {
-      const pbx = canEquip(it, cls) && !inFight ? powerBest(cls, it) : null;
+      const pbx = canEquip(it, cls) && !inFight ? powerBest(cls, it, gpos(it)) : null;
       if (pbx && pbx.inh) acts.push(`<button class="btn" data-act="inheq" data-arg="${it.id}">Truyền thừa rồi mặc</button>`);
       if (canEquip(it, cls)) acts.push(`<button class="btn ${pbx && pbx.inh ? 'ghost' : ''}" data-act="equip" data-arg="${it.id}">${pbx && pbx.inh ? "Chỉ mặc" : "Mặc"}</button>`);
       if (!inFight) acts.push(`<button class="btn ghost" data-act="sell" data-arg="${it.id}">Bán ${sellPrice(it)} lượng</button>`, `<button class="btn ghost" data-act="salv" data-arg="${it.id}">Phân giải ${salvageValue(it)} hồn tinh</button>`, `<button class="btn ghost" data-act="lock" data-arg="${it.id}">${it.lk ? "Mở khóa" : "Khóa"}</button>`);
     }
-    if (isMine) acts.push(`<button class="btn ghost" data-act="unequip" data-arg="${it.slot}">Tháo</button>`);
+    if (isMine) acts.push(`<button class="btn ghost" data-act="unequip" data-arg="${ipos}">Tháo</button>`);
     if (acts.length) h += `<div class="sheet-act">${acts.join('')}</div>`;
     return h;
   };
@@ -2802,7 +2827,7 @@ const ACT = {
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
   town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); },
-  credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
+  credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); markSeen('boxnote'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
   replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : C[part]; playDialog(lines, C.boss); },
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
   gsl: sl => { GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
@@ -2825,12 +2850,12 @@ const ACT = {
   bagtab: k => { BAGTAB = k; refresh(); },
   qeq: id => {
     const cls = ctxCls(), f = findItem(id); if (!f) return;
-    const d = powerWith(cls, f.it) - power(charStats(cls));
-    if (equipItem(cls, id)) { SFX.play('loot'); toast(`Đã mặc <b>${esc(f.it.name)}</b>, lực chiến ${d >= 0 ? '+' : ''}${d}`); refresh(); achToast(checkAch()); }
+    const d = powerWith(cls, f.it, gpos(f.it)) - power(charStats(cls));
+    if (equipItem(cls, id, gpos(f.it))) { SFX.play('loot'); toast(`Đã mặc <b>${esc(f.it.name)}</b>, lực chiến ${d >= 0 ? '+' : ''}${d}`); refresh(); achToast(checkAch()); }
   },
   sitem: i => openModal(itemModal(null, +i)),
   close: () => closeModal(),
-  equip: id => { if (equipItem(ctxCls(), id)) { SFX.play('loot'); toast("Đã trang bị"); closeModal(); refresh(); achToast(checkAch()); } },
+  equip: id => { const f0 = findItem(id); if (f0 && equipItem(ctxCls(), id, gpos(f0.it))) { SFX.play('loot'); toast("Đã trang bị"); closeModal(); refresh(); achToast(checkAch()); } },
   unequip: sl => { unequip(ctxCls(), sl); closeModal(); refresh(); },
   sell: id => { const g = sellItem(id); SFX.play('coin'); toast(`Bán được ${g} lượng`); closeModal(); refresh(); },
   salv: id => { const m = salvage(id); SFX.play('forge'); toast(`Phân giải được ${m} hồn tinh`); closeModal(); refresh(); },
@@ -2843,7 +2868,7 @@ const ACT = {
     toast(r.n ? `Đã thay ${r.n} món mạnh hơn${r.inh ? `, trong đó ${r.inh} món đã truyền thừa` : ''}${r.skip ? `; ${r.skip} món không đủ bạc hoặc hồn tinh để truyền thừa nên giữ nguyên` : ''}${left.length ? `. Món vừa thay ra “${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}” ${left.length > 1 ? ` và ${left.length} món khác` : ''}còn cường hóa hoặc ngọc, có thể tìm Trương Đại Chùy “truyền thừa” sang đồ mới` : ''}` : (r.skip ? "Không đủ bạc hoặc hồn tinh để truyền thừa" : "Nếu không truyền thừa thì đồ đang mặc đã là mạnh nhất"));
     refresh(); achToast(checkAch()); },
   inheq: id => { const cls = ctxCls(), f = findItem(id); if (!f || f.where !== 'stash' || inFightNow()) return;
-    const cur = SAVE.chars[cls].eq[f.it.slot], base = power(charStats(cls));
+    const pos = posFor(cls, f.it, gpos(f.it)), cur = SAVE.chars[cls].eq[pos], base = power(charStats(cls));
     const r = inheritFrom(f.it, cur); if (r.err) return toast(r.err);
     if (equipItem(cls, id)) { const d = power(charStats(cls)) - base; SFX.play('forge'); closeModal(); toast(`Đã truyền thừa và mặc <b>${esc(f.it.name)}</b>: giờ là +${r.plus}${r.gems ? `, mang theo ${r.gems} viên ngọc` : ''}, lực chiến ${d >= 0 ? '+' : ''}${d}`); refresh(); achToast(checkAch()); } },
   junk: () => { const r = sellJunk(); if (r.n) SFX.play('coin'); toast(r.n ? `Bán ${r.n} món, được ${r.g} lượng` : "Không có Phàm/Linh phẩm nào để bán (đồ đã cường hóa hoặc khảm ngọc sẽ không bán)"); refresh(); },
@@ -2852,7 +2877,8 @@ const ACT = {
   enh: id => { const it = findOwned(id); const r = enhance(it); if (r.err) return toast(r.err); SFX.play(r.ok ? 'forge' : 'fail'); toast(r.ok ? `Cường hóa thành công! Giờ là +${it.plus}` : "Trương Đại Chùy: “Lần này… trượt tay.” Mất nguyên liệu"); refresh(); achToast(checkAch()); },
   sock: id => { const r = addSocket(findOwned(id)); if (r.err) return toast(r.err); SFX.play('forge'); toast("Đục lỗ thành công"); refresh(); },
   gem: a => { const [id, k] = split(a); const r = socketGem(findOwned(id), k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Khảm thành công"); refresh(); },
-  lgem: a => { const [id, g] = split(a); const r = socketLgem(findOwned(id), g); if (r.err) return toast(r.err); SFX.play('legend'); toast("Khảm linh ngọc thành công"); refresh(); },
+  boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast("Ba lỗ đều đầy, tháo một viên trước đã"); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
+  boxoff: i => { const r = boxSet(ctxCls(), +i, null); if (r.err) return toast(r.err); SFX.play('click'); refresh(); },
   ungem: a => { const [id, i] = split(a); const r = unsocket(findOwned(id), +i); if (r.err) return toast(r.err); toast("Đã gỡ ngọc"); refresh(); },
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast("Tẩy luyện xong"); refresh(); },
@@ -3087,6 +3113,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }
 if (SAVE.story.ended && seen('postg') && !seen('npcsvc')) { markSeen('npcsvc'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(svcNoteModal); }, 1400); }
 if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">Dòng thuộc tính trang bị đã đổi luật</h2>
   <p class="help-p">Trước đây các dòng phần trăm như chí mạng, sát thương chí mạng, sát thương, thuật pháp cứ tăng theo cấp trang bị, bảy món cộng dồn lại khiến thủ lĩnh về sau vài chiêu là gục. Giờ đổi thành thế này:</p>
