@@ -14,6 +14,7 @@ let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null,
 loadSave(); ensureBounties();
 if (SAVE.run) VIEW = SAVE.run.world ? 'world' : 'map';
 SFX.set(SAVE.sound, false); applyFs();
+const mvolOf = () => SAVE.mvol == null ? 0.6 : SAVE.mvol; SFX.vol(mvolOf());
 let MTEST = null;   // 设置里正在试听的那一段（离开城镇/标题页就自动取消）
 
 function save() { persist(); }
@@ -541,6 +542,7 @@ function testPanel() {
 }
 const langRow = () => `<div class="row lang-row">${[['zh', "中文"], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
 const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>Âm thanh</h3><div class="row"><button class="btn ghost" data-act="snd">Hiệu ứng: ${SAVE.sound ? "Bật" : "Tắt"}</button><button class="btn ghost" data-act="mus">Nhạc cổ cầm: ${SAVE.music ? "Bật" : "Tắt"}</button></div>
+  <label class="volrow"><span>Âm lượng nhạc</span><input type="range" min="0" max="100" step="5" value="${Math.round(mvolOf() * 100)}" data-vol="m"><b id="mvolv">${Math.round(mvolOf() * 100)}%</b></label>
   <p class="help-p" style="margin:10px 0 6px">Nghe thử nhạc nền (chạm một cái là phát nhạc của nơi đó):</p>
   <div class="row mtest">${[['town', "Trấn Thanh Thạch"], ['c1', "Nghĩa địa"], ['c2', "Rừng Hắc Phong"], ['c3', "Động Bàn Tơ"], ['c4', "Hang Hỏa Diệm"], ['c5', "Đầm Vạn Độc"], ['c6', "Hang Băng Côn Lôn"], ['c7', "Chợ Ma"], ['c8', "Bạch Vân Quán"], ['c9', "Tầng Trên Cửu U"], ['c10', "Vực Sâu Cửu U"], ['sad', "Chuyện đêm bên lửa trại"], ['battle', "Đánh thường"], ['boss', "Đánh thủ lĩnh"]].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">Dừng</button></div>
   <p class="help-p" style="margin-top:6px">Loa ngoài điện thoại không nghe được âm trầm, đeo tai nghe sẽ đầy đủ hơn. Hầu hết các nơi đều rất trống, hơn chục giây mới có một câu — là cố ý.</p></section>
@@ -2709,6 +2711,10 @@ const ACT = {
   doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'town'; TT = 'go'; render(); toast("Đã chơi lại từ đầu"); playPrologue(); },
 };
 let musicStarted = false;
+// 音量滑条：拖动时马上生效，松手时存档
+document.addEventListener('input', e => { const el = e.target.closest && e.target.closest('[data-vol]'); if (!el) return; const v = (+el.value || 0) / 100; SAVE.mvol = v; SFX.vol(v); const b = document.querySelector('#mvolv'); if (b) b.textContent = Math.round(v * 100) + '%';
+  if (v > 0 && !SAVE.music) { SAVE.music = true; SFX.ensure(); SFX.set(SAVE.sound, true); } });
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('[data-vol]')) save(); });
 document.addEventListener('click', e => {
   if (!musicStarted) { musicStarted = true; SFX.ensure(); if (SAVE.music) SFX.set(SAVE.sound, true); }
   if (DLG) { if (e.target.closest('.dlg-skip')) endDlg(); else nextLine(); return; }

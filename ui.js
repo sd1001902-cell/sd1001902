@@ -14,6 +14,7 @@ let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null,
 loadSave(); ensureBounties();
 if (SAVE.run) VIEW = SAVE.run.world ? 'world' : 'map';
 SFX.set(SAVE.sound, false); applyFs();
+const mvolOf = () => SAVE.mvol == null ? 0.6 : SAVE.mvol; SFX.vol(mvolOf());
 let MTEST = null;   // 设置里正在试听的那一段（离开城镇/标题页就自动取消）
 
 function save() { persist(); }
@@ -541,6 +542,7 @@ function testPanel() {
 }
 const langRow = () => `<div class="row lang-row">${[['zh', '中文'], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
 const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>声音</h3><div class="row"><button class="btn ghost" data-act="snd">音效：${SAVE.sound ? '开' : '关'}</button><button class="btn ghost" data-act="mus">古琴背景：${SAVE.music ? '开' : '关'}</button></div>
+  <label class="volrow"><span>音乐音量</span><input type="range" min="0" max="100" step="5" value="${Math.round(mvolOf() * 100)}" data-vol="m"><b id="mvolv">${Math.round(mvolOf() * 100)}%</b></label>
   <p class="help-p" style="margin:10px 0 6px">配乐试听（点一下就放那个地方的音乐）：</p>
   <div class="row mtest">${[['town', '青石镇'], ['c1', '坟场'], ['c2', '黑风林'], ['c3', '盘丝洞'], ['c4', '火焰窟'], ['c5', '万毒沼'], ['c6', '昆仑冰窟'], ['c7', '鬼市'], ['c8', '白云观'], ['c9', '九幽上层'], ['c10', '九幽深渊'], ['sad', '篝火夜话'], ['battle', '普通打斗'], ['boss', '首领战']].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">停</button></div>
   <p class="help-p" style="margin-top:6px">手机外放听不到低音，戴耳机更完整。大多数地方都很空，隔十来秒才来一句，是故意的。</p></section>
@@ -2709,6 +2711,10 @@ const ACT = {
   doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'town'; TT = 'go'; render(); toast('已重新开始'); playPrologue(); },
 };
 let musicStarted = false;
+// 音量滑条：拖动时马上生效，松手时存档
+document.addEventListener('input', e => { const el = e.target.closest && e.target.closest('[data-vol]'); if (!el) return; const v = (+el.value || 0) / 100; SAVE.mvol = v; SFX.vol(v); const b = document.querySelector('#mvolv'); if (b) b.textContent = Math.round(v * 100) + '%';
+  if (v > 0 && !SAVE.music) { SAVE.music = true; SFX.ensure(); SFX.set(SAVE.sound, true); } });
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('[data-vol]')) save(); });
 document.addEventListener('click', e => {
   if (!musicStarted) { musicStarted = true; SFX.ensure(); if (SAVE.music) SFX.set(SAVE.sound, true); }
   if (DLG) { if (e.target.closest('.dlg-skip')) endDlg(); else nextLine(); return; }

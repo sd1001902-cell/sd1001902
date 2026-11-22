@@ -3,6 +3,7 @@
 const SFX = (() => {
   let ctx = null, master = null, musicGain = null, musicNodes = null, last = {};
   let soundOn = true, musicOn = true;
+  let mvol = 0.6;   // 音乐音量（0–1），设置里的滑条调这个
   function ensure() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return ctx; }
     try {
@@ -556,7 +557,7 @@ const SFX = (() => {
     cur = moodDef(m); cur.kind = m.kind;
     const t = ctx.currentTime;
     musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
-    musicGain.gain.linearRampToValueAtTime(0.25, t + 0.4); musicGain.gain.linearRampToValueAtTime(0.85, t + 2);
+    musicGain.gain.linearRampToValueAtTime(Math.max(0.0001, 0.25 * mvol), t + 0.4); musicGain.gain.linearRampToValueAtTime(Math.max(0.0001, 0.85 * mvol), t + 2);
     setTimeout(() => old.forEach(n => { try { n.stop(); } catch (e) {} }), 600);
     const my = gen; tm2.forEach(clearTimeout); tm2 = [];
     // 新写法（中式恐怖）：所有场景和打斗都走这里；m.old 只在测试里用来对比旧配乐
@@ -575,7 +576,8 @@ const SFX = (() => {
   }
   return {
     play, ensure, mood,
-    audition(m) { curKey = ''; mood(m); },                 // 设置里的试听：不管现在在哪儿，直接放这一段
+    audition(m) { curKey = ''; mood(m); },
+    vol(v) { mvol = Math.max(0, Math.min(1, +v || 0)); if (ctx && musicGain && cur && musicOn) { const t = ctx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setTargetAtTime(Math.max(0.0001, 0.85 * mvol), t, 0.08); } },                 // 设置里的试听：不管现在在哪儿，直接放这一段
     tap() { return { ctx, master, musicGain }; },          // 测试用：录一段出来看电平和频谱
     set(sound, music) { soundOn = sound; musicOn = music; if (music) startMusic(); else stopMusic(); },
     startMusic,
