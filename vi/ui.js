@@ -642,7 +642,8 @@ function statBlock(cls) {
   const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
   const stats = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Tỉ lệ chí mạng", s.crit + '%'], ["ST chí mạng", s.critDmg + '%'],
     ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["ST thuật pháp", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ["Phúc duyên", '+' + s.mf + '%']];
-  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p>`;
+  const mfTxt = `Phúc duyên +${s.mf}%: tỉ lệ rơi thần binh, đồ Bộ ×${mfK(s.mf).toFixed(2)}, tỉ lệ Thượng Cổ ×${mfAnc(s.mf).toFixed(2)}${s.mf > MF_CAP ? ` (chỉ tính tới +${MF_CAP}%)` : ''}.`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p><p class="help-p">${mfTxt}</p>`;
 }
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
@@ -847,7 +848,7 @@ function testPanel() {
   </section>`;
 }
 const langRow = () => `<div class="row lang-row">${[['zh', "中文"], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
-const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>Âm thanh</h3><div class="row"><button class="btn ghost" data-act="snd">Hiệu ứng: ${SAVE.sound ? "Bật" : "Tắt"}</button><button class="btn ghost" data-act="mus">Nhạc cổ cầm: ${SAVE.music ? "Bật" : "Tắt"}</button></div>
+const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>Chiến đấu</h3><div class="row"><button class="btn ghost" data-act="skiptog">Nút “Bỏ qua trận”: ${SAVE.showSkip ? "hiện" : "giấu đi"}</button></div><p class="help-p">Mặc định giấu đi, đánh từng trận mà xem mới có vị; muốn nhanh thì bật ở đây, trong trận sẽ hiện “Bỏ qua trận”.</p></section><section class="panel"><h3>Âm thanh</h3><div class="row"><button class="btn ghost" data-act="snd">Hiệu ứng: ${SAVE.sound ? "Bật" : "Tắt"}</button><button class="btn ghost" data-act="mus">Nhạc cổ cầm: ${SAVE.music ? "Bật" : "Tắt"}</button></div>
   <label class="volrow"><span>Âm lượng nhạc</span><input type="range" min="0" max="100" step="5" value="${Math.round(mvolOf() * 100)}" data-vol="m"><b id="mvolv">${Math.round(mvolOf() * 100)}%</b></label>
   <p class="help-p" style="margin:10px 0 6px">Nghe thử nhạc nền (chạm một cái là phát nhạc của nơi đó):</p>
   <div class="row mtest">${[['town', "Trấn Thanh Thạch"], ['c1', "Nghĩa địa"], ['c2', "Rừng Hắc Phong"], ['c3', "Động Bàn Tơ"], ['c4', "Hang Hỏa Diệm"], ['c5', "Đầm Vạn Độc"], ['c6', "Hang Băng Côn Lôn"], ['c7', "Chợ Ma"], ['c8', "Bạch Vân Quán"], ['c9', "Tầng Trên Cửu U"], ['c10', "Vực Sâu Cửu U"], ['sad', "Chuyện đêm bên lửa trại"], ['battle', "Đánh thường"], ['boss', "Đánh thủ lĩnh"]].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">Dừng</button></div>
@@ -1165,7 +1166,7 @@ function battleHTML() {
       <button class="ultb" id="ultb" data-act="ult"><i id="ultfill"></i><span><b>Tuyệt kỹ · ${U.n}</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">x${s}</button>`).join('')}
-      <button class="btn sm ghost" data-act="skip">Bỏ qua trận</button>
+      ${SAVE.showSkip ? "<button class=\"btn sm ghost\" data-act=\"skip\">Bỏ qua trận</button>" : ''}
       <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>Uống đan ×${run.potions}</button></div>
     <div class="blog" id="blog" data-act="logt" title="Chạm để mở/thu"></div>`;
 }
@@ -3143,6 +3144,7 @@ const ACT = {
   potion: () => { const sh = curCell(SAVE.run).shop; if (!sh.potion || SAVE.gold < sh.potion) return; SAVE.gold -= sh.potion; SAVE.run.potions++; SFX.play('coin'); refresh(); },
   leave: () => { if (SAVE.run && SAVE.run.world) return wBack(); VIEW = 'map'; refresh(); },
   rest: k => { if (k === 'heal') EV.heal(SAVE.run, 0.45); else EV.buff(SAVE.run, 'dmgPct', 10); clearCell(SAVE.run); SFX.play(k === 'heal' ? 'heal' : 'forge'); toast(k === 'heal' ? "Hồi 45% khí huyết" : "Chuyến này sát thương +10%"); VIEW = 'map'; refresh(); },
+  skiptog: () => { SAVE.showSkip = !SAVE.showSkip; save(); refresh(); },
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mtest: k => {

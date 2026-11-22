@@ -641,7 +641,8 @@ function statBlock(cls) {
   const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
   const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
     ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ['福缘', '+' + s.mf + '%']];
-  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p>`;
+  const mfTxt = `福缘 +${s.mf}%：神兵、套装掉率 ×${mfK(s.mf).toFixed(2)}，上古几率 ×${mfAnc(s.mf).toFixed(2)}${s.mf > MF_CAP ? `（只算到 +${MF_CAP}%）` : ''}。`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p><p class="help-p">${mfTxt}</p>`;
 }
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
@@ -846,7 +847,7 @@ function testPanel() {
   </section>`;
 }
 const langRow = () => `<div class="row lang-row">${[['zh', '中文'], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
-const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>声音</h3><div class="row"><button class="btn ghost" data-act="snd">音效：${SAVE.sound ? '开' : '关'}</button><button class="btn ghost" data-act="mus">古琴背景：${SAVE.music ? '开' : '关'}</button></div>
+const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>战斗</h3><div class="row"><button class="btn ghost" data-act="skiptog">「跳过战斗」按钮：${SAVE.showSkip ? '显示' : '藏起来'}</button></div><p class="help-p">默认藏起来，一场一场看着打更有味道；想快可以在这里打开，战斗里就会出现「跳过战斗」。</p></section><section class="panel"><h3>声音</h3><div class="row"><button class="btn ghost" data-act="snd">音效：${SAVE.sound ? '开' : '关'}</button><button class="btn ghost" data-act="mus">古琴背景：${SAVE.music ? '开' : '关'}</button></div>
   <label class="volrow"><span>音乐音量</span><input type="range" min="0" max="100" step="5" value="${Math.round(mvolOf() * 100)}" data-vol="m"><b id="mvolv">${Math.round(mvolOf() * 100)}%</b></label>
   <p class="help-p" style="margin:10px 0 6px">配乐试听（点一下就放那个地方的音乐）：</p>
   <div class="row mtest">${[['town', '青石镇'], ['c1', '坟场'], ['c2', '黑风林'], ['c3', '盘丝洞'], ['c4', '火焰窟'], ['c5', '万毒沼'], ['c6', '昆仑冰窟'], ['c7', '鬼市'], ['c8', '白云观'], ['c9', '九幽上层'], ['c10', '九幽深渊'], ['sad', '篝火夜话'], ['battle', '普通打斗'], ['boss', '首领战']].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">停</button></div>
@@ -1164,7 +1165,7 @@ function battleHTML() {
       <button class="ultb" id="ultb" data-act="ult"><i id="ultfill"></i><span><b>必杀·${U.n}</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">${s} 倍速</button>`).join('')}
-      <button class="btn sm ghost" data-act="skip">跳过战斗</button>
+      ${SAVE.showSkip ? '<button class="btn sm ghost" data-act="skip">跳过战斗</button>' : ''}
       <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>吃丹药 ×${run.potions}</button></div>
     <div class="blog" id="blog" data-act="logt" title="点击展开/收起"></div>`;
 }
@@ -3142,6 +3143,7 @@ const ACT = {
   potion: () => { const sh = curCell(SAVE.run).shop; if (!sh.potion || SAVE.gold < sh.potion) return; SAVE.gold -= sh.potion; SAVE.run.potions++; SFX.play('coin'); refresh(); },
   leave: () => { if (SAVE.run && SAVE.run.world) return wBack(); VIEW = 'map'; refresh(); },
   rest: k => { if (k === 'heal') EV.heal(SAVE.run, 0.45); else EV.buff(SAVE.run, 'dmgPct', 10); clearCell(SAVE.run); SFX.play(k === 'heal' ? 'heal' : 'forge'); toast(k === 'heal' ? '恢复了 45% 气血' : '本局伤害 +10%'); VIEW = 'map'; refresh(); },
+  skiptog: () => { SAVE.showSkip = !SAVE.showSkip; save(); refresh(); },
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mtest: k => {

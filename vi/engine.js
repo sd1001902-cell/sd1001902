@@ -328,11 +328,14 @@ const W_RARITY = {
   chest:  { normal: 0, magic: 60, rare: 35, set: 4, legend: 1 },
   quest:  { normal: 0, magic: 100, rare: 0, set: 0, legend: 0 },
 };
+// 福缘：只抬神兵、套装和上古（原来还抬宝品，把神兵挤掉了，精英、妖王身上几乎没用）。每 +100%：神兵、套装 ×1.5，上古 ×1.25；算到 +300% 为止
+const MF_CAP = 300, mfK = mf => 1 + Math.min(MF_CAP, Math.max(0, mf || 0)) / 200, mfAnc = mf => 1 + Math.min(MF_CAP, Math.max(0, mf || 0)) / 400;
+let DROP_MF = 0;   // 这场战斗结算掉落时的福缘（上古几率用）
 let DROP_LUCK = 0;   // 「福星」词条：这场战斗结算掉落时，神兵的权重按它加成
 function rollRarity(quality, mf, diffLoot) {
   if (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world && SAVE.run.mode !== 'rift' && W_RARITY[quality === 'cache' ? 'chest' : quality]) {
-    const w = { ...W_RARITY[quality === 'cache' ? 'chest' : quality] }, m = 1 + (mf || 0) / 200, m2 = Math.pow(1.3, diffLoot || 0);
-    w.rare *= m * m2; w.set *= (1 + (mf || 0) / 300) * m2; w.legend *= (1 + (mf || 0) / 300) * m2 * (1 + (DROP_LUCK || 0) / 100);
+    const w = { ...W_RARITY[quality === 'cache' ? 'chest' : quality] }, m2 = Math.pow(1.3, diffLoot || 0);
+    w.rare *= m2; w.set *= mfK(mf) * m2; w.legend *= mfK(mf) * m2 * (1 + (DROP_LUCK || 0) / 100);
     return RNG.w(w);
   }
   const w = { normal: 40, magic: 36, rare: 18, set: 2.5, legend: 1.05 * (1 + (DROP_LUCK || 0) / 100) };   // 神兵：幻境 30 层一局一件出头（最早是 0.12，一局难得见一件）
@@ -340,8 +343,8 @@ function rollRarity(quality, mf, diffLoot) {
   if (quality === 'boss')  { w.normal = 0; w.magic = 18; w.rare *= 3; w.set *= 6; w.legend *= 6; }
   if (quality === 'gamble'){ w.normal = 0; w.magic = 50; w.rare = 36; w.set = 7; w.legend = 2.5; }
   if (quality === 'cache') { w.normal = 0; w.magic = 0; w.rare = 60; w.set = 20; w.legend = 5; }
-  const m2 = (1 + (mf || 0) / 180) * Math.pow(1.3, diffLoot || 0);
-  w.rare *= 1 + (mf || 0) / 100; w.set *= m2; w.legend *= m2;
+  const m2 = Math.pow(1.3, diffLoot || 0);
+  w.set *= m2 * mfK(mf); w.legend *= m2 * mfK(mf);
   return RNG.w(w);
 }
 function rollSockets(slot, rarity) {
@@ -384,7 +387,7 @@ function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
   it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
   if (it.rarity === 'legend' || it.rarity === 'set') {
-    const ap = ancNow(); it.anc = primalOK() && RNG.ch(ap[1]) ? 2 : RNG.ch(ap[0]) ? 1 : 0;
+    const ap = ancNow(), ak = mfAnc(DROP_MF); it.anc = primalOK() && RNG.ch(ap[1] * ak) ? 2 : RNG.ch(ap[0] * ak) ? 1 : 0;
     if (PG_AFF() && it.anc) { const want = (it.anc === 2 ? 4 : 3) + (RNG.ch(0.5) ? 1 : 0); if (it.aff.length < want) addAffixes(it, want - it.aff.length); }   // 通关后：上古 3–4 条，太古 4–5 条
     if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]);
   }
@@ -2615,7 +2618,7 @@ function finishBattle(b) {
   const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null };
   if (!b.win) return res;
   const lv = SAVE.chars[run.cls].level, di = diffIdx(run), rw = run.mode === 'rift' && !!run.world, sw = !!run.world && !rw;   // rw：新幻境（一局要打上百只，单只的掉落和经验减半）
-  DROP_LUCK = s.xLuck || 0;
+  DROP_LUCK = s.xLuck || 0; DROP_MF = s.mf || 0;
   for (const u of b.dead) {
     const mult = u.guard ? 5 : u.kind === 'boss' ? 12 : u.kind === 'elite' ? (u.rare ? 5 : 3) : u.kind === 'mini' ? 0.3 : u.kind === 'goblin' ? 2 : 1;
     let x = (6 + u.lv * 3) * (sw && u.kind === 'elite' ? 5 : mult) * run.xpMul * (rw ? 0.5 : 1);
@@ -2655,7 +2658,7 @@ function finishBattle(b) {
   if (s.fx.has('gFast') && (b.pr || 0) <= 8) b.extraLoot++;                                                                   // 铁算盘
   if (b.midas) res.gold += Math.round(b.midas * (2 + lv * 1.2) * 10 * (1 + s.gf / 100));                                         // 点金手
   for (let i = 0; i < b.extraLoot; i++) res.items.push(dropItem(run, 'normal', cellLv(run, curCell(run)), s.mf));
-  DROP_LUCK = 0;
+  DROP_LUCK = 0; DROP_MF = 0;
   if (b.kind === 'keeper') { run.hasKey = true; res.key = true; }
   if (run.pendingReward === 'mats') { res.mats += 8; run.pendingReward = null; }
   run.kills += b.dead.length; SAVE.stats.kills += b.dead.length;
