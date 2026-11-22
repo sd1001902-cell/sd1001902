@@ -137,6 +137,7 @@ function itemCard(it, cls, label) {
        + (it.aff.length ? `<div class="iq">词条成色 <b>${Math.round(itemQ(it) * 100)}%</b>${it.sp ? '　<span class="spx">带特殊词条</span>' : ''}</div>` : '');
   if (it.plus) h += `<div class="iplus">强化 +${it.plus}：攻击、气血、护甲这些实数属性 +${it.plus * 8}%</div>`;
   if (it.lk) h += '<div class="ilock">已锁定：批量分解、出售时会跳过它</div>';
+  { const kn = kitNamesOf(it); if (kn.length) h += `<div class="ilock">在配装「${kn.map(esc).join('」「')}」里：批量分解、出售时会跳过它</div>`; }
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}：${gemDesc(g)}</span>` : '<span class="gs empty">空孔</span>'; }).join('')}</div>`;
   if (L) h += `<p class="ifx">神兵之魂：${L.d}${SAVE.cube[L.id] ? '<small>（乾坤袋已收藏）</small>' : ''}</p>`;
@@ -557,7 +558,22 @@ function bountyHTML() {
     <div class="row" style="margin-top:10px;justify-content:space-between"><span class="sub">三个全部完成，再领一个<b style="color:var(--gold2)">赏金大箱</b>（必出套装或神兵）</span>
       ${Bn.bonus ? '<span class="sub">已领取</span>' : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">领取大箱</button>`}</div></section>`;
 }
-function gearTab() { return `<section class="panel"><h3>人物属性</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+// 配装：三套，一键切换
+const kitNamesOf = it => { const L = []; for (const c of CLASS_IDS) for (const k of (SAVE.chars[c].kits || [])) if (k && Object.values(k.eq).includes(it.id)) L.push(k.n); return L; };
+function kitBar(cls) {
+  const K = kitsOf(cls), ch = SAVE.chars[cls], busy = SAVE.run && SAVE.run.cls === cls;
+  return `<section class="panel kitp"><h3>配装 <small>存下一整身：装备、乾坤袋、招式和变招、灵玉、役使、心法点。点一下整套换上（心法免费重加）</small></h3>
+    <div class="kits">${K.map((k, i) => { const on = k && kitSame(cls, i);
+      return `<div class="kit ${on ? 'on' : ''} ${k ? '' : 'empty'}">${k ? `<button class="kitb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}"><b>${esc(k.n)}</b><small>${on ? '穿着' : '点一下换上'}</small></button>`
+        : `<button class="kitb" data-act="kitedit" data-arg="${i}"><b>空位</b><small>把现在这身存进来</small></button>`}
+        ${k ? `<button class="mini" data-act="kitedit" data-arg="${i}">存</button>` : ''}</div>`; }).join('')}</div>
+    ${busy ? '<p class="sub">出门在外换不了，回城再换。</p>' : ''}</section>`;
+}
+const kitModal = i => () => { const k = kitsOf(SAVE.cls)[i];
+  return `<h2 class="mh">${k ? '覆盖' : '存成'}配装 ${i + 1}</h2><p class="help-p">把${CLASSES[SAVE.cls].n}现在这一身存进来：身上每个格子的装备、乾坤袋、带的招式和变招、灵玉匣、役使、心法点。${k ? `会覆盖原来的「${esc(k.n)}」。` : ''}</p>
+    <label class="kitn">名字 <input id="kitn" maxlength="12" value="${esc(k ? k.n : `配装 ${i + 1}`)}"></label>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn" data-act="kitsave" data-arg="${i}">存下</button>${k ? `<button class="btn ghost" data-act="kitdel" data-arg="${i}">删掉这一套</button>` : ''}<button class="btn ghost" data-act="close">取消</button></div>`; };
+function gearTab() { return `${kitBar(SAVE.cls)}<section class="panel"><h3>人物属性</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
 // 本职续航那一段（带当前数值）：「人物」页和「武学」页的本门功法卡共用
 function sustText(cls, s) {
   const ch = SAVE.chars[cls], SU = SUST[cls], lvF = sustLv(ch.level);
@@ -3186,6 +3202,11 @@ const ACT = {
   hdpx: () => { SAVE.hdOff = !SAVE.hdOff; save(); render(); },
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`这次带 ${COMPANIONS[c].n} 一起去：${COMPANIONS[c].d}`); },
   speed: s => { SAVE.speed = +s; VFX.setSpeed(+s); save(); document.querySelectorAll('#bctl [data-act=speed]').forEach(b => b.classList.toggle('ghost', b.dataset.arg !== s)); schedule(); },
+  kitedit: i => openModal(kitModal(+i)),
+  kitsave: i => { const el = document.getElementById('kitn'); const k = kitSave(SAVE.cls, +i, el && el.value.trim()); SFX.play('buff'); closeModal(); save(); refresh(); toast(`存好了：<b>${esc(k.n)}</b>`); },
+  kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast('删掉了这一套配装（装备还在）'); },
+  kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
+    const k = kitsOf(SAVE.cls)[+i]; toast(`换上了「<b>${esc(k.n)}</b>」${r.miss.length ? `。找不到：${r.miss.join('、')}（这些格子没动）` : ''}${r.away.length ? `。有装备穿在${r.away.join('、')}身上，没拿过来` : ''}`); },
   skip: () => skipBattle(),
   bstat: () => { STATOPEN = !STATOPEN; const bt = document.querySelector('[data-act=bstat]'); if (bt) bt.classList.toggle('ghost', !STATOPEN); updStat(); },
   bcont: () => battleContinue(),

@@ -750,7 +750,53 @@ function sellItem(id) {
   const it = SAVE.stash[i], p = sellPrice(it); returnGems(it);
   SAVE.gold += p; SAVE.stash.splice(i, 1); return p;
 }
-const isJunk = it => (it.rarity === 'normal' || it.rarity === 'magic') && !(it.plus > 0) && !(it.gems && it.gems.length);
+const isJunk = it => (it.rarity === 'normal' || it.rarity === 'magic') && !(it.plus > 0) && !(it.gems && it.gems.length) && !inKit(it);
+// ---------------- 配装：每个角色 3 套，存装备、乾坤袋、招式和变招、灵玉、役使、心法点；在城里一键切换 ----------------
+const KIT_N = 3;
+const kitsOf = cls => { const ch = SAVE.chars[cls]; if (!Array.isArray(ch.kits)) ch.kits = []; while (ch.kits.length < KIT_N) ch.kits.push(null); return ch.kits; };
+const jcopy = o => o == null ? o : JSON.parse(JSON.stringify(o));
+function kitSave(cls, i, name) {
+  const ch = SAVE.chars[cls], K = kitsOf(cls), eq = {};
+  for (const p of POS_IDS) eq[p] = ch.eq[p] ? ch.eq[p].id : null;
+  K[i] = { n: (name || (K[i] && K[i].n) || `配装 ${i + 1}`).slice(0, 12), eq, cube: jcopy(ch.cube || []), lgs: jcopy(ch.lgs || []), yi: jcopy(ch.yi || []), tal: jcopy(ch.tal || {}),
+    runes: jcopy(ch.runes || {}), loadout: jcopy(ch.loadout || null), loadoutManual: ch.loadoutManual || 0, unequipped: jcopy(ch.unequipped || {}), order: jcopy(ch.order || null), off: jcopy(ch.off || {}), t: Date.now() };
+  return K[i];
+}
+// 现在身上这身和第 i 套是不是一样（只比装备、乾坤袋、招式）
+function kitSame(cls, i) { const ch = SAVE.chars[cls], k = kitsOf(cls)[i]; if (!k) return false;
+  return POS_IDS.every(p => (ch.eq[p] ? ch.eq[p].id : null) === (k.eq[p] || null)) && JSON.stringify(ch.cube || []) === JSON.stringify(k.cube || []) && JSON.stringify(ch.loadout || null) === JSON.stringify(k.loadout || null) && JSON.stringify(ch.tal || {}) === JSON.stringify(k.tal || {}); }
+// 哪些装备在本角色的配装里（分解、出售时跳过）
+function kitIds() { const S = new Set(); if (!SAVE) return S; for (const c of CLASS_IDS) for (const k of (SAVE.chars[c] && SAVE.chars[c].kits) || []) if (k) for (const p in k.eq) if (k.eq[p]) S.add(k.eq[p]); return S; }
+const inKit = it => !!it && kitIds().has(it.id);
+function kitUse(cls, i) {
+  const k = kitsOf(cls)[i]; if (!k) return { err: '这一套还没存' };
+  if (SAVE.run && SAVE.run.cls === cls) return { err: '出门在外换不了，回城再换' };
+  const ch = SAVE.chars[cls], before = runMaxHpIf(cls), miss = [], away = [];
+  // 1. 装备：先把要换下的放回储物箱，再穿上这套的。找不到的那一件，格子保持原样
+  const mine = new Map(); for (const p of POS_IDS) if (ch.eq[p]) mine.set(ch.eq[p].id, p);
+  const where = id => SAVE.stash.find(x => x.id === id) || (mine.has(id) ? ch.eq[mine.get(id)] : null);
+  const plan = [];
+  for (const p of POS_IDS) {
+    const want = k.eq[p] || null, cur = ch.eq[p] ? ch.eq[p].id : null; if (want === cur) continue;
+    if (want && !where(want)) { let other = null; for (const c of CLASS_IDS) if (c !== cls) for (const q in SAVE.chars[c].eq) if (SAVE.chars[c].eq[q] && SAVE.chars[c].eq[q].id === want) other = c;
+      (other ? away : miss).push(other ? CLASSES[other].n : p); continue; }
+    if (want && !slotOpen(p) && p !== 'weapon') continue;
+    plan.push([p, want]);
+  }
+  for (const [p] of plan) if (ch.eq[p]) { SAVE.stash.push(ch.eq[p]); delete ch.eq[p]; }
+  for (const [p, want] of plan) if (want) { const j = SAVE.stash.findIndex(x => x.id === want); if (j >= 0 && canEquip(SAVE.stash[j], cls)) { ch.eq[p] = SAVE.stash[j]; SAVE.stash.splice(j, 1); } }
+  // 2. 乾坤袋、灵玉、役使：还在的才放回去
+  if (featureOn('cube')) ch.cube = [0, 1, 2].map(j => { const l = (k.cube || [])[j]; return l && SAVE.cube[l] ? l : null; });
+  if (k.lgs) ch.lgs = k.lgs.map(g => g && SAVE.lgems.some(x => x.id === g) ? g : null);
+  if (k.yi) ch.yi = k.yi.filter(id => yiGrade(id)).slice(0, 2);
+  // 3. 心法：免费按这套重新加点（点数不够就不动）
+  if (k.tal) { let n = 0; for (const t in k.tal) n += k.tal[t]; if (n <= ch.level - 1) ch.tal = jcopy(k.tal); }
+  // 4. 招式和变招
+  ch.runes = jcopy(k.runes || {}); if (k.loadout) ch.loadout = k.loadout.filter(id => CLASSES[cls].skills.some(x => x.id === id && x.lv <= ch.level));
+  ch.loadoutManual = k.loadoutManual || 0; ch.unequipped = jcopy(k.unequipped || {}); ch.order = jcopy(k.order); ch.off = jcopy(k.off || {});
+  ch.kitOn = i; fixRunHp(cls, before); checkSet4(cls);
+  return { ok: true, miss: miss.map(p => SLOT_NAME[p] || p), away: [...new Set(away)] };
+}
 function sellJunk() {
   let g = 0, n = 0;
   SAVE.stash = SAVE.stash.filter(it => { if (isJunk(it)) { g += sellPrice(it); n++; return false; } return true; });
@@ -827,7 +873,7 @@ function salvage(id) {
 // 筛选分解／出售：按品级挑，再按几条「保留」规则留下好东西。强化过、镶了玉、锁定的、淬炼洗炼到一半的，永远不动
 const BULK_DEF = { mode: 'salv', r: { normal: 1, magic: 1, rare: 1, set: 0, legend: 0 }, keepUp: 1, keepSp: 1, keepAnc: 1, keepQ: 0, keepCube: 1 };
 function bulkFilter() { const f = SAVE.bulkf || (SAVE.bulkf = JSON.parse(JSON.stringify(BULK_DEF))); for (const k in BULK_DEF) if (f[k] == null) f[k] = JSON.parse(JSON.stringify(BULK_DEF[k])); return f; }
-const bulkSafe = it => !!(it.lk || it.plus > 0 || (it.gems && it.gems.length) || busyRoll(it));
+const bulkSafe = it => !!(it.lk || it.plus > 0 || (it.gems && it.gems.length) || busyRoll(it) || inKit(it));   // 配装里用到的也不动
 function bulkPick(cls, f) {
   const cur = power(charStats(cls));
   return SAVE.stash.filter(it => {

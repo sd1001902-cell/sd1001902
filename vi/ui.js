@@ -137,6 +137,7 @@ function itemCard(it, cls, label) {
        + (it.aff.length ? `<div class="iq">Chất lượng thuộc tính <b>${Math.round(itemQ(it) * 100)}%</b>${it.sp ? " <span class=\"spx\">có thuộc tính đặc biệt</span>" : ''}</div>` : '');
   if (it.plus) h += `<div class="iplus">Cường hóa +${it.plus}: các chỉ số thực như công, khí huyết, hộ giáp +${it.plus * 8}%</div>`;
   if (it.lk) h += "<div class=\"ilock\">Đã khóa: khi phân giải, bán hàng loạt sẽ bỏ qua món này</div>";
+  { const kn = kitNamesOf(it); if (kn.length) h += `<div class="ilock">Nằm trong bộ phối đồ “${kn.map(esc).join("”“")}”: khi bán, phân giải hàng loạt sẽ bỏ qua nó</div>`; }
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}: ${gemDesc(g)}</span>` : "<span class=\"gs empty\">Lỗ trống</span>"; }).join('')}</div>`;
   if (L) h += `<p class="ifx">Hồn thần binh: ${L.d}${SAVE.cube[L.id] ? "<small> (đã cất vào Túi Càn Khôn)</small>" : ''}</p>`;
@@ -558,7 +559,22 @@ function bountyHTML() {
     <div class="row" style="margin-top:10px;justify-content:space-between"><span class="sub">Xong cả ba thì nhận thêm một <b style="color:var(--gold2)">rương thưởng lớn</b> (chắc chắn có bộ hoặc thần binh)</span>
       ${Bn.bonus ? "<span class=\"sub\">Đã nhận</span>" : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">Nhận rương lớn</button>`}</div></section>`;
 }
-function gearTab() { return `<section class="panel"><h3>Chỉ số nhân vật</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+// 配装：三套，一键切换
+const kitNamesOf = it => { const L = []; for (const c of CLASS_IDS) for (const k of (SAVE.chars[c].kits || [])) if (k && Object.values(k.eq).includes(it.id)) L.push(k.n); return L; };
+function kitBar(cls) {
+  const K = kitsOf(cls), ch = SAVE.chars[cls], busy = SAVE.run && SAVE.run.cls === cls;
+  return `<section class="panel kitp"><h3>Phối đồ <small>Lưu cả một bộ: trang bị, Túi Càn Khôn, chiêu thức và biến chiêu, linh ngọc, Dịch Sứ, điểm Tâm pháp. Chạm một lần là thay cả bộ (Tâm pháp cộng lại miễn phí)</small></h3>
+    <div class="kits">${K.map((k, i) => { const on = k && kitSame(cls, i);
+      return `<div class="kit ${on ? 'on' : ''} ${k ? '' : 'empty'}">${k ? `<button class="kitb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}"><b>${esc(k.n)}</b><small>${on ? "Đang mặc" : "Chạm để thay"}</small></button>`
+        : `<button class="kitb" data-act="kitedit" data-arg="${i}"><b>Ô trống</b><small>Lưu bộ đang mặc vào đây</small></button>`}
+        ${k ? `<button class="mini" data-act="kitedit" data-arg="${i}">Lưu</button>` : ''}</div>`; }).join('')}</div>
+    ${busy ? "<p class=\"sub\">Đang ở ngoài không thay được, về thành rồi thay.</p>" : ''}</section>`;
+}
+const kitModal = i => () => { const k = kitsOf(SAVE.cls)[i];
+  return `<h2 class="mh">${k ? "Ghi đè" : "Lưu thành"} phối đồ ${i + 1}</h2><p class="help-p">Lưu bộ đang mặc của ${CLASSES[SAVE.cls].n} vào đây: trang bị ở từng ô, Túi Càn Khôn, chiêu thức mang theo và biến chiêu, Hộp Linh Ngọc, Dịch Sứ, điểm Tâm pháp. ${k ? `Sẽ ghi đè lên “${esc(k.n)}” cũ.` : ''}</p>
+    <label class="kitn">Tên <input id="kitn" maxlength="12" value="${esc(k ? k.n : `Phối đồ ${i + 1}`)}"></label>
+    <div class="row" style="gap:8px;margin-top:10px"><button class="btn" data-act="kitsave" data-arg="${i}">Lưu</button>${k ? `<button class="btn ghost" data-act="kitdel" data-arg="${i}">Xóa bộ này</button>` : ''}<button class="btn ghost" data-act="close">Hủy</button></div>`; };
+function gearTab() { return `${kitBar(SAVE.cls)}<section class="panel"><h3>Chỉ số nhân vật</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
 // 本职续航那一段（带当前数值）：「人物」页和「武学」页的本门功法卡共用
 function sustText(cls, s) {
   const ch = SAVE.chars[cls], SU = SUST[cls], lvF = sustLv(ch.level);
@@ -3187,6 +3203,11 @@ const ACT = {
   hdpx: () => { SAVE.hdOff = !SAVE.hdOff; save(); render(); },
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`Lần này dẫn ${COMPANIONS[c].n} đi cùng: ${COMPANIONS[c].d}`); },
   speed: s => { SAVE.speed = +s; VFX.setSpeed(+s); save(); document.querySelectorAll('#bctl [data-act=speed]').forEach(b => b.classList.toggle('ghost', b.dataset.arg !== s)); schedule(); },
+  kitedit: i => openModal(kitModal(+i)),
+  kitsave: i => { const el = document.getElementById('kitn'); const k = kitSave(SAVE.cls, +i, el && el.value.trim()); SFX.play('buff'); closeModal(); save(); refresh(); toast(`Đã lưu: <b>${esc(k.n)}</b>`); },
+  kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast("Đã xóa bộ phối đồ này (trang bị vẫn còn)"); },
+  kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
+    const k = kitsOf(SAVE.cls)[+i]; toast(`Đã thay “<b>${esc(k.n)}</b>”${r.miss.length ? `. Không tìm thấy: ${r.miss.join(", ")} (các ô này giữ nguyên)` : ''}${r.away.length ? `. Có trang bị đang mặc trên người ${r.away.join(", ")}, không lấy qua` : ''}`); },
   skip: () => skipBattle(),
   bstat: () => { STATOPEN = !STATOPEN; const bt = document.querySelector('[data-act=bstat]'); if (bt) bt.classList.toggle('ghost', !STATOPEN); updStat(); },
   bcont: () => battleContinue(),
