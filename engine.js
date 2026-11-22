@@ -54,6 +54,8 @@ function migrate(s) {
   if (!(s.story && s.story.ended)) s.mods = [];
   if (!s.story.cleared) s.story = d.story;
   if (s.run && (!s.run.maze || !s.run.mode)) s.run = null;
+  if (s.run && s.run.mode === 'rift' && !(s.run.world && s.run.rw)) s.run = null;   // 旧的点格子幻境：进行到一半的那一局作废
+  if (s.run && s.run.mode === 'rift' && typeof rBuild === 'function') { try { rBuild(s.run); } catch (e) { s.run = null; } }
   // 传奇图鉴：把已经拿到的都记上；找不到定义的旧神兵降为稀有
   if (!s.codex) s.codex = {};
   s.newLeg = [];
@@ -240,7 +242,7 @@ function upgradeBuilding(id) {
 const CH_BAND = [null, [1, 7], [8, 12], [12, 15], [15, 18], [18, 21], [21, 24], [24, 27], [27, 30], [30, 33], [33, 36]];
 const TIER_N = ['', '一阶', '二阶', '三阶', '四阶', '五阶', '六阶', '七阶', '八阶', '九阶', '十阶', '十一阶'];
 function tierOf(ilvl) { for (let c = 1; c <= 10; c++) if (ilvl <= CH_BAND[c][1] + 1) return c; return 11; }
-const curChapter = () => (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world) ? SAVE.run.chapter : Math.min(10, (typeof SAVE !== 'undefined' && SAVE && SAVE.story ? storyCleared('normal') : 0) + 1);
+const curChapter = () => (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world && SAVE.run.mode === 'rift') ? 10 : (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world) ? SAVE.run.chapter : Math.min(10, (typeof SAVE !== 'undefined' && SAVE && SAVE.story ? storyCleared('normal') : 0) + 1);
 // 本章装备的等级上限（任务奖励、宝箱不会超过本章）
 function chIlvl(ch, lv) { const B = CH_BAND[Math.min(10, Math.max(1, ch))]; return Math.max(B[0], Math.min(B[1], lv)) + 1; }
 function implicitFor(slot, L) {
@@ -292,7 +294,7 @@ const W_RARITY = {
   quest:  { normal: 0, magic: 100, rare: 0, set: 0, legend: 0 },
 };
 function rollRarity(quality, mf, diffLoot) {
-  if (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world && W_RARITY[quality === 'cache' ? 'chest' : quality]) {
+  if (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAVE.run.world && SAVE.run.mode !== 'rift' && W_RARITY[quality === 'cache' ? 'chest' : quality]) {
     const w = { ...W_RARITY[quality === 'cache' ? 'chest' : quality] }, m = 1 + (mf || 0) / 200, m2 = Math.pow(1.3, diffLoot || 0);
     w.rare *= m * m2; w.set *= (1 + (mf || 0) / 300) * m2; w.legend *= (1 + (mf || 0) / 300) * m2;
     return RNG.w(w);
@@ -1010,6 +1012,7 @@ function clearCell(run) { const c = curCell(run); c.cleared = true; }
 function nextFloor(run) { run.floor++; genMaze(run); run.floorNew = true; EV.heal(run, 0.5); run.potions += hasMod(run, 'scarce') ? 0 : 1; }
 function endRun(run, outcome) {
   run.ended = outcome; run.t1 = Date.now();
+  if (run.mode === 'rift' && run.world && SAVE.world) delete SAVE.world[RCH];   // 幻境的地图只管这一局
   SAVE.stats.runs++;
   if (outcome === 'win') {
     SAVE.stats.wins++;
@@ -1124,8 +1127,9 @@ function riftComplete(run) {
   if (tl > 0) {
     SAVE.riftMax = Math.max(SAVE.riftMax, N); SAVE.rift[run.cls] = Math.max(SAVE.rift[run.cls] || 0, N);
     SAVE.riftCap = Math.max(SAVE.riftCap || 3, N + G.jump);
-    const R = SAVE.riftRec[run.cls], used = Math.round((run.clock || 0) / 100);
-    if (!R || N > R.lv || (N === R.lv && used < R.t)) { SAVE.riftRec[run.cls] = { lv: N, t: used, d: today() }; run.record = true; }
+    const R = SAVE.riftRec[run.cls], used = Math.round((run.clock || 0) / (run.world ? 1000 : 100));   // 新幻境记秒（s）；旧纪录记的是回合（t），同层数时让新的顶掉
+    if (run.world) { if (!R || N > R.lv || (N === R.lv && (R.s == null || used < R.s))) { SAVE.riftRec[run.cls] = { lv: N, s: used, d: today() }; run.record = true; } }
+    else if (!R || N > R.lv || (N === R.lv && used < R.t)) { SAVE.riftRec[run.cls] = { lv: N, t: used, d: today() }; run.record = true; }
   }
   SAVE.stats.rifts++; track('rift');
   const owned = new Set(SAVE.lgems.map(g => g.t)), un = Object.keys(LGEMS).filter(t => !owned.has(t));
@@ -1137,7 +1141,8 @@ function riftComplete(run) {
 function riftRevive(run) {
   run.deaths = (run.deaths || 0) + 1;
   const pen = Math.round(riftLimit(run.riftLv) * Math.min(0.15, 0.05 + 0.03 * (run.deaths - 1)));
-  run.clock = (run.clock || 0) + pen; run.hp = runStats(run).maxHp; run.pos = run.maze.start;
+  run.clock = (run.clock || 0) + pen; run.hp = runStats(run).maxHp;
+  if (run.world) { const S = wstate(RCH), e = wmap(RCH).pts['1'][0]; S.pos = { x: e.x, y: e.y }; wReveal(RCH); wUnstackMons(RCH); } else run.pos = run.maze.start;
   return pen;
 }
 function lgemChance(g, N) { const d = N - g.lv; return d >= 10 ? 1 : d >= 0 ? 0.6 + d * 0.04 : Math.max(0.05, 0.6 + d * 0.1); }
@@ -1321,7 +1326,9 @@ function startBattle(run, kind) {
   const encU = run.encUnits; delete run.encUnits;
   const b = { kind, P, units: [P, ...(encU || makeEncounter(run, kind, cell))], corpses: 0, turn: 0, over: false, win: false,
               dead: [], extraLoot: 0, cheated: false, phoenix: false, run, goblinEscaped: false, ultAuto: true, castAuto: true, castReq: null, ultReq: false, ults: 0, reacts: 0 };
+  if (run.encReinf) { b.reinf = run.encReinf; delete run.encReinf; }
   if (s.fx.has('startShield')) P.shield = Math.round(P.maxHp * 0.25);
+  if (run.rbuff && run.rbuff.k === 'guard') P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * 0.4));
   if (run.cls === 'mage') P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * 0.35));   // 五行道士：护身符箓
   if (run.cls === 'assassin') P.g = Math.max(P.g, 30);   // 夜行刺客：先手
   if (s.fx.has('undeadAlly')) summonSkel(b, P);
@@ -1442,7 +1449,7 @@ function battleStep(b) {
   for (const u of live) { const t = (100 - u.g) / spdOf(u); if (t < bt) { bt = t; actor = u; } }
   for (const u of live) u.g += bt * spdOf(u);
   actor.g = 0; out.actor = actor.id; out.dt = bt;
-  if (b.run && b.run.mode === 'rift' && !b.run.riftDone) b.run.clock = (b.run.clock || 0) + bt;
+  if (b.run && b.run.mode === 'rift' && !b.run.riftDone) b.run.clock = (b.run.clock || 0) + bt * (b.run.world ? R_BT_MS : 1);
   act(b, actor, out);
   resolveDeaths(b, out);
   if (++b.turn > 700 && !b.over) { b.over = true; b.win = false; out.lines.push('战斗拖得太久，你力竭倒下。'); }
@@ -1936,7 +1943,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   // 大地图第二章起：等级差直接影响伤害。比妖物低 1 级：打出 -7%、挨打 +6%（最多按 6 级算）；
   // 比妖物高：收益压低（W_LVUP），高 1 级只 +2% / -2%，最多按 4 级算——要变强得靠刷装备，不是靠练级碾压
-  if (b.run && b.run.world && b.run.chapter >= 2 && b.P) {
+  if (b.run && b.run.world && b.run.mode !== 'rift' && b.run.chapter >= 2 && b.P) {
     const heroLv = b.P.lv || 1;
     const lvMul = (gp, dn, up) => gp > 0 ? 1 + Math.min(W_LVUP[2], gp) * up : 1 + Math.max(-6, gp) * dn;
     if (src.side === 'p' && tgt.side === 'e') d *= lvMul(heroLv - (tgt.lv || heroLv), 0.07, W_LVUP[0]);
@@ -2068,7 +2075,8 @@ function resolveDeaths(b, out) {
     if (u.kind === 'elite') track('elite');
     if (u.kind === 'boss') track('boss');
     if (u.kind === 'goblin') { SAVE.stats.goblins++; track('goblin'); }
-    if (run.mode === 'rift' && u.kind !== 'boss') run.prog = Math.min(100, run.prog + 1.7 * (u.kind === 'elite' ? (u.rare ? 18 : 12) : u.kind === 'mini' ? 1.5 : u.kind === 'goblin' ? 5 : 4));
+    if (run.mode === 'rift' && run.world) { if (u.kind !== 'boss') rAddPts(run, u.kind === 'elite' ? (u.rare ? 6 : 4) : u.kind === 'mini' ? 0.3 : 1); }
+    else if (run.mode === 'rift' && u.kind !== 'boss') run.prog = Math.min(100, run.prog + 1.7 * (u.kind === 'elite' ? (u.rare ? 18 : 12) : u.kind === 'mini' ? 1.5 : u.kind === 'goblin' ? 5 : 4));
     if (P.fx.has('killHeal')) heal(P, P.maxHp * 0.1, out);
     if (P.fx.has('lootKill') && RNG.ch(0.12)) b.extraLoot++;
     if (P.fx.has('momentum') && P.mom < 6) P.mom++;
@@ -2083,6 +2091,10 @@ function resolveDeaths(b, out) {
     const W = b.ward, F = CHAPTERS[run.chapter - 1];
     while (aliveOf(b, 'e').length < W.keep) { const m = makeMonster(F.mons[RNG.pick(W.mons)], W.lv, run, 'normal'); m.maxHp = m.hp = Math.round(m.hp * W_NORM[0]); m.atk *= W_NORM[1]; m.g = RNG.i(0, 40); b.units.push(m); }
   }
+  if (b.reinf && b.reinf.length && P.hp > 0) {   // 幻境合战：台上倒下一只，后面排队的补上来
+    let n = 0; while (b.reinf.length && aliveOf(b, 'e').length < R_STAGE) { const u = b.reinf.shift(); u.g = RNG.i(0, 40); b.units.push(u); n++; }
+    if (n) out.lines.push(`又有 ${n} 只妖物围了上来（后面还有 ${b.reinf.length} 只）`);
+  }
   if (P.hp <= 0 || b.wardDown) { b.over = true; b.win = false; }
   else if (!aliveOf(b, 'e').length) { b.over = true; b.win = true; }
 }
@@ -2092,14 +2104,14 @@ function finishBattle(b) {
   run.hp = Math.max(0, Math.min(b.P.hp, s.maxHp));
   const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null };
   if (!b.win) return res;
-  const lv = SAVE.chars[run.cls].level, di = diffIdx(run);
+  const lv = SAVE.chars[run.cls].level, di = diffIdx(run), rw = run.mode === 'rift' && !!run.world, sw = !!run.world && !rw;   // rw：新幻境（一局要打上百只，单只的掉落和经验减半）
   for (const u of b.dead) {
     const mult = u.guard ? 5 : u.kind === 'boss' ? 12 : u.kind === 'elite' ? (u.rare ? 5 : 3) : u.kind === 'mini' ? 0.3 : u.kind === 'goblin' ? 2 : 1;
-    let x = (6 + u.lv * 3) * (run.world && u.kind === 'elite' ? 5 : mult) * run.xpMul; const gap = lv - u.lv;
-    if (run.world) { if (gap >= 3) x *= Math.max(0.08, 1 - (gap - 2) * 0.3); }   // 大地图：比你低 3 级以上的妖物，经验大减
+    let x = (6 + u.lv * 3) * (sw && u.kind === 'elite' ? 5 : mult) * run.xpMul * (rw ? 0.5 : 1); const gap = lv - u.lv;
+    if (sw) { if (gap >= 3) x *= Math.max(0.08, 1 - (gap - 2) * 0.3); }   // 大地图：比你低 3 级以上的妖物，经验大减
     else if (gap > 5) x *= Math.max(0.1, 1 - (gap - 5) * 0.12);
     res.xp += Math.round(x);
-    res.gold += Math.round((2 + u.lv * 1.2) * (u.kind === 'goblin' ? 25 : mult) * RNG.f(0.7, 1.3) * (1 + s.gf / 100));
+    res.gold += Math.round((2 + u.lv * 1.2) * (u.kind === 'goblin' ? 25 : mult) * RNG.f(0.7, 1.3) * (1 + s.gf / 100) * (rw ? 0.5 : 1));
     if (u.kind === 'goblin') {
       res.goblin = 'killed';
       for (let i = 0; i < 4 + di; i++) res.items.push(dropItem(run, 'elite', u.lv + 1, s.mf + 50));
@@ -2107,22 +2119,22 @@ function finishBattle(b) {
       continue;
     }
     const q = u.guard ? 'elite' : u.kind === 'boss' ? 'boss' : u.kind === 'elite' ? 'elite' : 'normal';
-    let n = run.world ? (q === 'boss' ? 2 : q === 'elite' ? 1 : (RNG.ch(u.kind === 'mini' ? 0.05 : 0.12) ? 1 : 0))
+    let n = rw ? (q === 'boss' ? 3 + di : q === 'elite' ? 1 : (RNG.ch(u.kind === 'mini' ? 0.02 : 0.06) ? 1 : 0)) : sw ? (q === 'boss' ? 2 : q === 'elite' ? 1 : (RNG.ch(u.kind === 'mini' ? 0.05 : 0.12) ? 1 : 0))
       : u.guard ? 2 : q === 'boss' ? 2 + di : q === 'elite' ? 1 + (RNG.ch(0.5) ? 1 : 0) : (RNG.ch(u.kind === 'mini' ? 0.08 : 0.2) ? 1 : 0);
     if (q !== 'normal' && s.fx.has('lucky')) n++;
     for (let i = 0; i < n; i++) res.items.push(dropItem(run, q, u.lv + (q === 'boss' ? 1 : 0), s.mf));
     if (u.rare) res.items.push(dropItem(run, 'boss', u.lv + 1, s.mf));
     if (run.mode === 'rift') {
       const g = zyGrade(run.riftLv), nm = u.def.n;
-      if (q === 'boss' || (q === 'elite' && RNG.ch(u.rare ? 1 : 0.6))) zyTake(res, nm, g);
-      else if (u.kind === 'normal' && RNG.ch(zyOf(nm) < g ? 0.05 : 0.01)) zyTake(res, nm, g);
-      if (run.riftLv >= RSET_LV && RNG.ch(q === 'boss' ? 0.7 : u.rare ? 0.15 : q === 'elite' ? 0.06 : 0)) {
+      if (q === 'boss' || (q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6))) zyTake(res, nm, g);
+      else if (u.kind === 'normal' && RNG.ch((zyOf(nm) < g ? 0.05 : 0.01) * (rw ? 0.4 : 1))) zyTake(res, nm, g);
+      if (run.riftLv >= RSET_LV && RNG.ch(q === 'boss' ? 0.7 : u.rare ? 0.15 : q === 'elite' ? (rw ? 0.03 : 0.06) : 0)) {
         const mine = SETS.find(S => S.rift && S.cls === run.cls), other = RNG.pick(SETS.filter(S => S.rift));
         res.items.push(makeItem({ ilvl: u.lv + 1, rarity: 'set', setId: (RNG.ch(0.85) ? mine : other).id, cls: run.cls }));
       }
     }
-    if (RNG.ch(q === 'boss' ? 1 : q === 'elite' ? 0.35 : 0.05)) dropGem(res, rollGem(run));
-    res.mats += q === 'boss' ? RNG.i(4, 7) : q === 'elite' ? RNG.i(1, 3) + (u.rare ? 3 : 0) : (RNG.ch(0.12) ? 1 : 0);
+    if (RNG.ch(q === 'boss' ? 1 : q === 'elite' ? 0.35 : rw ? 0.02 : 0.05)) dropGem(res, rollGem(run));
+    res.mats += q === 'boss' ? RNG.i(4, 7) : q === 'elite' ? RNG.i(1, 3) + (u.rare ? 3 : 0) : (RNG.ch(rw ? 0.05 : 0.12) ? 1 : 0);
   }
   for (let i = 0; i < b.extraLoot; i++) res.items.push(dropItem(run, 'normal', cellLv(run, curCell(run)), s.mf));
   if (b.kind === 'keeper') { run.hasKey = true; res.key = true; }

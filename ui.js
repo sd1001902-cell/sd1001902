@@ -43,7 +43,7 @@ const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== '
 const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); const v = n >= 1000000 ? Math.round(n / 10000) : Math.round(n / 1000) / 10; return `${v}万`; };
 const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
 const uK = u => u && u.side === 'p' && B && B.P ? hpK(B.P.lv) : 1;                       // 战斗里某个单位的显示倍数
-const chTitle = ch => `第${CN[ch]}章 · ${CHAPTERS[ch - 1].n}`;
+const chTitle = ch => CHAPTERS[ch - 1] ? `第${CN[ch]}章 · ${CHAPTERS[ch - 1].n}` : '九幽幻境';   // 幻境用的是假章节号
 
 // ---------- 对话 ----------
 let DLG = null;
@@ -231,17 +231,42 @@ function cubeBody(cls) {
 }
 // 幻境的香：还剩多少（0–1）
 const xiangLeft = run => run && run.mode === 'rift' ? Math.max(0, 1 - (run.clock || 0) / riftLimit(run.riftLv)) : 1;
+const fmtClock = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const xiangTxt = run => run.world ? fmtClock(xiangLeft(run) * riftLimit(run.riftLv)) : Math.round(xiangLeft(run) * 100) + '%';   // 新幻境按时间：还剩几分几秒
+const riftRecTxt = R => R ? (R.s != null ? `${R.lv} 层 · 用时 ${fmtClock(R.s * 1000)}` : `${R.lv} 层 · ${R.t} 回合（旧纪录）`) : '';
+function xiangBarTxt(run) { const L = xiangLeft(run), G = run.riftDone ? null : RIFT_GRADES.find(g => g.min >= 0 && L >= g.min);
+  return `${L > 0 ? `一炷香 · 还剩 ${xiangTxt(run)}${G ? ` · 现在打完是「${G.n}」` : ''}` : '香烧完了 · 还能打完拿东西，但不算纪录'}${run.deaths ? ` · 倒下 ${run.deaths} 次` : ''}`; }
+// 幻境的香：在地图上按真实时间烧（开着窗口、对话、切到后台时不烧）；战斗里的时间由引擎按回合折算
+let RTICK = 0, RSAVE = 0;
+setInterval(() => {
+  const run = typeof SAVE !== 'undefined' && SAVE && SAVE.run, now = performance.now();
+  if (!run || !isRift(run) || run.riftDone || VIEW !== 'world' || DLG || MODALFN || document.hidden) { RTICK = 0; return; }
+  if (RTICK) run.clock = (run.clock || 0) + Math.min(1000, now - RTICK);
+  RTICK = now;
+  const xb = document.querySelector('#xiangbar'), L = xiangLeft(run);
+  if (xb) { xb.querySelector('i').style.width = L * 100 + '%'; xb.classList.toggle('low', L > 0 && L < 0.25); xb.classList.toggle('out', L <= 0); xb.querySelector('span').textContent = xiangBarTxt(run); }
+  const xg = document.querySelector('#rbxiang'); if (xg) { xg.textContent = `香 ${xiangTxt(run)}`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
+  if (now - RSAVE > 8000) { RSAVE = now; persist(true); }
+}, 250);
+const riftHelpModal = () => `<h2 class="mh">幻境换了打法</h2>
+  <p class="help-p">不再是点格子了。现在是四层大地图，妖物成群结队，看得见、绕得开。</p>
+  <p class="help-p"><b>拉怪合战</b>：撞上一群妖物，旁边三格内的会一起卷进来，一场最多四群。群攻的招式在这里最值钱。</p>
+  <p class="help-p"><b>进度</b>：斩妖攒进度，精英给得多，倒下后还会掉一颗精魄，要走过去捡。进度满了，守关妖王就在你身边现身。</p>
+  <p class="help-p"><b>换层</b>：每层最多攒四成进度，攒够了就去远处的传送阵换下一层，不用清完；一局一般走三层，最后一层不封顶。每层还有一座塔，踩上去有三场战斗的加成。</p>
+  <p class="help-p"><b>一炷香</b>：十二分钟。在地图上按真实时间烧；战斗里按回合折算，一轮算三秒，开几倍速、跳不跳过战斗都一样。</p>
+  <p class="help-p">掉的装备都记在这一局里，打完一起看；中途不会停下来结算。</p>
+  <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`;
 function xiangBar(run) {
   const L = xiangLeft(run), G = run.riftDone ? null : RIFT_GRADES.find(g => g.min >= 0 && L >= g.min);
-  return `<div class="xiangbar ${L <= 0 ? 'out' : L < 0.25 ? 'low' : ''}"><i style="width:${L * 100}%"></i><em style="left:50%"></em><em style="left:25%"></em>
-    <span>${L > 0 ? `一炷香 · 还剩 ${Math.round(L * 100)}%${G ? ` · 现在打完是「${G.n}」` : ''}` : '香烧完了 · 还能打完拿东西，但不算纪录'}${run.deaths ? ` · 倒下 ${run.deaths} 次` : ''}</span></div>`;
+  return `<div class="xiangbar ${L <= 0 ? 'out' : L < 0.25 ? 'low' : ''}" id="xiangbar"><i style="width:${L * 100}%"></i><em style="left:50%"></em><em style="left:25%"></em>
+    <span>${xiangBarTxt(run)}</span></div>`;
 }
 function runBar(run) {
   const s = runStats(run), hp = Math.max(0, Math.min(run.hp, s.maxHp));
   const buffs = Object.entries(run.buffs).filter(([, v]) => v).map(([k, v]) => fmtStat(k, v)).join('，');
   const title = run.mode === 'rift' ? `九幽幻境 ${run.riftLv} 层 · ${themeOf(run).n}` : run.world ? chTitle(run.chapter) : `${chTitle(run.chapter)} · 第${CN[run.floor]}层`;
-  const goal = run.world ? '' : run.mode === 'rift'
-    ? `<span class="pill ${run.prog >= 100 ? 'gold' : ''}" id="rbprog">${SPR.img('portal', 18)}进度 ${Math.floor(run.prog)}%</span><span class="pill xiang ${xiangLeft(run) <= 0 ? 'out' : xiangLeft(run) < 0.25 ? 'low' : ''}" id="rbxiang">香 ${Math.round(xiangLeft(run) * 100)}%</span>`
+  const goal = run.world && run.mode !== 'rift' ? '' : run.mode === 'rift'
+    ? `<span class="pill ${run.prog >= 100 ? 'gold' : ''}" id="rbprog">${SPR.img('portal', 18)}进度 ${Math.floor(run.prog)}%</span><span class="pill xiang ${xiangLeft(run) <= 0 ? 'out' : xiangLeft(run) < 0.25 ? 'low' : ''}" id="rbxiang">香 ${xiangTxt(run)}</span>`
     : `<span class="pill ${run.hasKey ? 'gold' : 'dim'}">${SPR.img('key', 18)}${run.hasKey ? '已有钥匙' : '未找到钥匙'}</span>`;
   return `<header class="runbar"><div class="rb-hero">${heroSpr(run.cls, 44)}<div><div class="fl">${title}</div>
       <div class="sub">${CLASSES[run.cls].n} Lv ${SAVE.chars[run.cls].level} · ${run.mode === 'rift' ? '幻境' : DIFFS[run.diff].n}${run.ngoc ? ' · Ngoc 同行' : ''}${run.mods.length ? ' · ' + run.mods.map(id => DUNGEON_MODS.find(m => m.id === id).n).join('、') : ''}</div></div></div>
@@ -319,8 +344,9 @@ function goTab() {
     body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
         <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftD(SAVE.riftLv).base} 级</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
-      <p class="help-p" style="text-align:center">最多可以挑战 ${maxR} 层。限时<b>一炷香</b>（约 ${Math.round(riftLimit(SAVE.riftLv) / 100)} 回合）：斩妖填满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回入口，香烧掉一截。</p>
-      <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? `${rec.lv} 层 · ${rec.t} 回合` : '还没有'}</b></span><span>${SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
+      <p class="help-p" style="text-align:center">最多可以挑战 ${maxR} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
+      <p class="help-p" style="text-align:center">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
+      <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
         <span>精魄：<b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><span>役使：${yi.length ? yi.map(id => `<b>${YISHI[id].n}</b>`).join('、') : '<i>没带</i>'} <button class="linkbtn" data-act="zyopen">镇妖录</button></span></div>
       <button class="ngoc-toggle ${SAVE.ngocJoin ? 'on' : ''}" data-act="ngoctog">${SPR.img('ngocfox', 36)}<span><b>带上 Ngoc</b><small>${SAVE.ngocJoin ? '她会和你一起闯幻境' : '这次你一个人去'}</small></span></button>`;
   }
@@ -445,7 +471,7 @@ function colTab() {
   const replay = CHAPTERS.map((C, i) => { const k = i + 1; if (k > cl) return '';
     return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">开场</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">结尾</button>` : ''}</div>`; }).join('') + (SAVE.story.ended ? '<div class="rp"><b>终章</b><button class="btn sm" data-act="replay" data-arg="10|ending">结局</button></div>' : '');
   const rec = [...CHAPTERS.map((C, i) => { const b = SAVE.best['normal-' + (i + 1)]; return [chTitle(i + 1), b ? fmtTime(b.t) : '—']; }),
-    ['幻境最高层', SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ['幻境·' + CLASSES[c].n, `${SAVE.riftRec[c].lv} 层 · ${SAVE.riftRec[c].t} 回合`]), ['累计斩妖', SAVE.stats.kills], ['招财金蟾', SAVE.stats.goblins], ['完成悬赏', SAVE.stats.bounties]];
+    ['幻境最高层', SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ['幻境·' + CLASSES[c].n, riftRecTxt(SAVE.riftRec[c])]), ['累计斩妖', SAVE.stats.kills], ['招财金蟾', SAVE.stats.goblins], ['完成悬赏', SAVE.stats.bounties]];
   return `${bountyHTML()}${featureOn('rift') ? zyHTML() : ''}<div class="cols"><div>
     <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>
     <section class="panel"><h3>成就 <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>
@@ -717,7 +743,7 @@ function walkTo(i) {
   };
   step();
 }
-function stopAuto() { if (AUTO) { AUTO = false; const b = document.querySelector('.autob'); if (b) { b.classList.add('ghost'); b.textContent = '自动探索'; } } clearTimeout(autoT); }
+function stopAuto() { if (AUTO) { AUTO = false; const b = document.querySelector('.autob'); if (b) { b.classList.add('ghost'); b.textContent = isRift(SAVE.run) ? '自动寻妖' : '自动探索'; } } clearTimeout(autoT); }
 function autoTarget(run) {
   const cells = run.maze.cells, prev = { [run.pos]: -1 }, q = [run.pos];
   while (q.length) {
@@ -822,6 +848,16 @@ function endBattle() {
   if (BRES) return;
   BRES = finishBattle(B);
   if (BRES.win) { clearCell(SAVE.run); VFX.victory('P'); }
+  if (BRES.win && isRift(SAVE.run) && B.kind !== 'boss') {   // 幻境里的普通合战：不停下来看结算，掉的东西记在这一局里，回地图接着打
+    const run = SAVE.run, n = B.dead.length, good = BRES.items.filter(i => i.anc || i.rarity === 'legend' || i.rarity === 'set');
+    save(); flushBattleToasts(); SFX.play(good.length ? 'legend' : BRES.levels ? 'level' : 'win');
+    qtoast(`斩 ${n} 只 · 进度 ${Math.floor(run.prog)}%${BRES.items.length ? ` · 装备 ${BRES.items.length} 件` : ''}`);
+    for (const it of good) qtoast(`得到 <b class="r-${it.rarity}">${esc(itemTitle(it))}</b>`);
+    if (BRES.zy && BRES.zy.length) qtoast(`精魄 +${BRES.zy.length}`);
+    if (BRES.levels) qtoast(SAVE.chars[run.cls].level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}` : `升级！现在 ${SAVE.chars[run.cls].level} 级`);
+    achToast(BRES.ach); BRES.items.forEach(i => delete i.auto);
+    return setTimeout(() => { if (BRES && VIEW === 'battle') battleContinue(); }, 500);
+  }
   save(); showRes();
   if (!BRES.win && !(WKEY && WKEY.key && WKEY.key.scripted)) SFX.play('lose');
   else if (BRES.items.some(i => i.anc || i.rarity === 'legend' || i.rarity === 'set')) SFX.play('legend');
@@ -847,11 +883,11 @@ function showRes() {
        ${lootChips(BRES.items)}${gemChips(BRES.gems)}${zyChips(BRES.zy)}${BRES.items.length || BRES.gems.length || (BRES.zy && BRES.zy.length) ? '' : '<p class="sub">这次没有掉装备</p>'}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>撑不住了</h3><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
-      : run.mode === 'rift' ? `<div class="res lose"><h3>倒下了</h3><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。这一屋的妖物还在。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
+      : run.mode === 'rift' ? `<div class="res lose"><h3>倒下了</h3><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
       : `<div class="res lose"><h3>败</h3><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p><button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
 }
 function battleHTML() {
-  const run = SAVE.run, T0 = run.world && run.theme && SCENE_THEMES[run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
+  const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
   const wxl = T0 && T0.wx ? `<div class="wxl wx-${T0.wx}">${Array.from({ length: 14 }, () => `<i style="left:${Math.random() * 100}%;top:${Math.random() * 100}%;animation-delay:-${(Math.random() * 8).toFixed(1)}s;animation-duration:${(5 + Math.random() * 6).toFixed(1)}s"></i>`).join('')}</div>` : '';
   const deco = [0.08, 0.3, 0.55, 0.8].map((x, i) => { const D = T.d[i % T.d.length]; return `<span class="svd" style="left:${x * 100}%">${SPR.img(D[0], 44 + i * 6, D[1])}</span>`; }).join('');
   return `${runBar(run)}
@@ -1080,7 +1116,7 @@ function applyStep(o, anim) {
   const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
   { const pb = $('#potb'); if (pb) { pb.textContent = `吃丹药 ×${SAVE.run.potions}`; pb.disabled = B.over || SAVE.run.potions <= 0 || P.hp <= 0 || P.hp >= P.maxHp; } }
   const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `进度 ${Math.floor(SAVE.run.prog)}%`;
-  const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `香 ${Math.round(L * 100)}%`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
+  const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `香 ${xiangTxt(SAVE.run)}`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
 }
 function finishRunView(run, outcome) {
@@ -1128,7 +1164,25 @@ function zoneName() { const r = SAVE.run, S = wstate(r.chapter), m = wmap(r.chap
 const TQ = []; let TQon = false;
 function qtoast(msg) { TQ.push(msg); if (!TQon) nextToast(); }
 function nextToast() { const m = TQ.shift(); if (m == null) { TQon = false; return; } TQon = true; toast(m); setTimeout(nextToast, TQ.length ? 1500 : 200); }
+const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? '守关妖王已经现身——找到它，打倒它' : rCapped(run) ? '这一层的妖气吸够了（每层最多攒四成）：去传送阵，换下一层'
+  : `撞上一群妖物，旁边的会一起卷进来。精英倒下会掉精魄，走过去捡。${R.last ? '这是最后一层，进度不封顶。' : '每层最多攒四成进度。'}`; };
+// 幻境的地图界面：没有任务栏，换成进度条和香
+function riftWorldHTML() {
+  const run = SAVE.run, B = run.rbuff;   // 地图顶上只留层名：同伴的名字放这儿会和层名挤在一起
+  const hint = riftHint(run);
+  return `${runBar(run)}
+    <div class="rhud"><div class="rprog ${run.prog >= 100 ? 'full' : ''}" id="rprog"><i style="width:${run.prog}%"></i><em style="left:40%"></em><em style="left:80%"></em><span>${run.rw.boss ? '进度已满 · 守关妖王已现身' : `幻境进度 ${Math.floor(run.prog)}%`}</span></div>${xiangBar(run)}${B ? `<p class="rbuff">${R_PYLONS[B.k].n}生效中：还剩 ${B.n} 场</p>` : ''}<p class="rhint" id="rhint">${hint}</p></div>
+    <div class="wmap" id="wmap"><canvas id="wcv"></canvas><div class="wzone" id="wzone">${esc(zoneName())}</div>
+      <div class="wfol">${''}</div>
+      ${SAVE.joy ? '<div class="joy" id="joy"><i></i></div>' : ''}</div>
+    <div class="wctl"><button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? '寻妖中…' : '自动寻妖'}</button>
+      <button class="btn ghost" data-act="wmini">地图</button>
+      <button class="btn ghost" data-act="bag">人物${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button>
+      <button class="btn ghost" data-act="rquit">离开</button></div>
+`;
+}
 function worldHTML() {
+  if (isRift(SAVE.run)) return riftWorldHTML();
   const run = SAVE.run, ch = run.chapter, tr = wTracker(ch), m = tr[0];
   const sides = tr.slice(1), S = wstate(ch);
   const fol = [S.flags.ngocFollow ? 'Ngoc' : '', S.flags.zhenFollow ? '珍姑娘' : '', S.flags.escort ? SPEAKERS[S.flags.escort].n : ''].filter(Boolean);
@@ -1341,6 +1395,14 @@ function wDraw(cv, dpr, ts, t) {
       else { g.fillStyle = `rgba(255,215,140,${0.18 + 0.15 * pulse})`; g.beginPath(); g.arc(px + ts / 2, py + ts / 2, ts * 0.5, 0, 7); g.fill(); }
       if (!open) spr('lock', px + ts * 0.25, py + ts * 0.25, ts * 0.5);
     }
+    else if (P.t === 'rexit') { g.fillStyle = `rgba(150,110,255,${0.22 + 0.18 * pulse})`; g.beginPath(); g.arc(px + ts / 2, py + ts / 2, ts * (0.62 + 0.08 * pulse), 0, 7); g.fill(); spr('portal', px - ts * 0.1, py - ts * 0.25, ts * 1.2);
+      g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; g.fillStyle = '#d8c8ff'; g.fillText('下一层', px + ts / 2, py + ts * 1.18); }
+    else if (P.t === 'rpylon') { const used = S.got[wgk(S.sc, p.x, p.y)], col = { power: '#ff7a4a', guard: '#7ac8ff', haste: '#9be870', gather: '#d28cff' }[P.py] || '#fff';
+      if (!used) { g.fillStyle = col; g.globalAlpha = 0.18 + 0.14 * pulse; g.beginPath(); g.arc(px + ts / 2, py + ts * 0.45, ts * 0.75, 0, 7); g.fill(); g.globalAlpha = 1; }
+      g.fillStyle = '#2a2622'; g.fillRect(px + ts * 0.3, py + ts * 0.82, ts * 0.4, ts * 0.14); g.fillStyle = used ? '#4a4640' : '#6a665e'; g.fillRect(px + ts * 0.38, py + ts * 0.05, ts * 0.24, ts * 0.8);
+      g.fillStyle = used ? '#55504a' : col; g.beginPath(); g.arc(px + ts / 2, py + ts * 0.05, ts * (used ? 0.13 : 0.17 + 0.03 * pulse), 0, 7); g.fill();
+      g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; g.fillStyle = used ? '#8a8478' : col; g.fillText(R_PYLONS[P.py].n + (used ? '（用过了）' : ''), px + ts / 2, py + ts * 1.18); }
+    else if (P.t === 'rin') { g.strokeStyle = 'rgba(232,199,125,.35)'; g.lineWidth = 2; g.beginPath(); g.arc(px + ts / 2, py + ts / 2, ts * 0.4, 0, 7); g.stroke(); }
     else if (P.t === 'boss') { const C = CHAPTERS[ch - 1]; spr(C.boss.spr, px - ts * 0.35, py - ts * 0.8, ts * 1.7, C.boss.pal); }
     else if (P.t === 'grave') { g.fillStyle = '#0e0a08'; g.fillRect(px + ts * 0.2, py + ts * 0.3, ts * 0.6, ts * 0.5); }
     if (mk.has(wkey(p.x, p.y))) { g.strokeStyle = `rgba(255,215,90,${0.4 + 0.5 * pulse})`; g.lineWidth = 2; g.beginPath(); g.arc(px + ts / 2, py + ts / 2, ts * (0.5 + 0.1 * pulse), 0, 7); g.stroke(); }
@@ -1374,19 +1436,24 @@ function wDraw(cv, dpr, ts, t) {
   }
   // 妖物
   const bell = wkeys().zhaohun, D = wScene(ch);
+  for (const o of D.orbs || []) { const px = ox + o.x * ts, py = oy + o.y * ts, bob = Math.sin(t / 260 + o.x) * 3;   // 精魄球
+    g.fillStyle = `rgba(190,140,255,${0.25 + 0.2 * pulse})`; g.beginPath(); g.arc(px + ts / 2, py + ts * 0.5 + bob, ts * 0.36, 0, 7); g.fill();
+    g.fillStyle = '#e8d8ff'; g.beginPath(); g.arc(px + ts / 2, py + ts * 0.5 + bob, ts * 0.15, 0, 7); g.fill(); }
   for (const mn of D.mons) {
     const d2 = (mn.x - S.pos.x) ** 2 + (mn.y - S.pos.y) ** 2;
     if (!(wInSight(ch, mn.x, mn.y) || (bell && d2 <= W_BELL * W_BELL) || (mn.tag === 'walker' && bell))) continue;
     const P0 = WMONP[mn.id] || (WMONP[mn.id] = { x: mn.x, y: mn.y });
     P0.x += (mn.x - P0.x) * 0.18; P0.y += (mn.y - P0.y) * 0.18;
-    const def = (CHAPTERS[ch - 1].mons[mn.m] || {}), px = ox + P0.x * ts, py = oy + P0.y * ts;
-    const size = mn.big ? ts * 1.35 : mn.elite ? ts * 1.15 : ts * 0.95, bob = mn.beh === 'sleep' ? 0 : Math.sin(t / 220 + mn.x) * 2;
-    if (mn.elite) { g.fillStyle = 'rgba(255,120,40,.25)'; g.beginPath(); g.ellipse(px + ts / 2, py + ts * 0.85, ts * 0.5, ts * 0.18, 0, 0, 7); g.fill(); }
+    const C0 = CHAPTERS[(mn.c || ch) - 1] || CHAPTERS[0], def = mn.boss ? C0.boss : (C0.mons[mn.m] || {}), px = ox + P0.x * ts, py = oy + P0.y * ts;
+    const size = mn.boss ? ts * 1.7 : mn.big ? ts * 1.35 : mn.rare ? ts * 1.3 : mn.elite ? ts * 1.15 : ts * 0.95, bob = mn.beh === 'sleep' ? 0 : Math.sin(t / 220 + mn.x) * 2;
+    if (mn.elite || mn.boss) { g.fillStyle = mn.boss ? `rgba(255,50,40,${0.3 + 0.15 * pulse})` : mn.rare ? 'rgba(190,120,255,.35)' : 'rgba(255,120,40,.25)'; g.beginPath(); g.ellipse(px + ts / 2, py + ts * 0.85, ts * (mn.boss ? 0.8 : 0.5), ts * (mn.boss ? 0.28 : 0.18), 0, 0, 7); g.fill(); }
     g.globalAlpha = wInSight(ch, mn.x, mn.y) ? 1 : 0.55;
     spr(def.spr || 'skeleton', px + (ts - size) / 2, py + ts - size - 2 + bob, size, mn.pal || def.pal);
     g.globalAlpha = 1;
     if (mn.beh === 'sleep') { g.fillStyle = '#9ab'; g.font = `bold ${Math.round(ts * 0.3)}px sans-serif`; g.fillText('z', px + ts * 0.85, py + ts * 0.1 - (t / 400 % 1) * 6); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
     if (mn.beh === 'chase' && d2 <= 25 && wInSight(ch, mn.x, mn.y)) { g.fillStyle = '#ff5a3a'; g.font = `900 ${Math.round(ts * 0.4)}px sans-serif`; g.fillText('!', px + ts / 2, py - ts * 0.1); g.font = `bold ${Math.round(ts * 0.26)}px "Noto Serif SC",serif`; }
+    if (mn.z === 'r' && mn.elite) { g.fillStyle = mn.rare ? '#d8a8ff' : '#ffb066'; g.fillText(mn.rare ? '稀有精英' : '精英', px + ts / 2, py + ts * 1.15); }
+    if (mn.boss) { g.fillStyle = '#ff6a5a'; g.fillText('守关妖王 · ' + def.n, px + ts / 2, py + ts * 1.2); }
     if (mn.name && (mn.elite || mn.tag)) { const dl = mn.lv - SAVE.chars[SAVE.run.cls].level;
       g.fillStyle = dl >= 3 ? '#ff4a3a' : dl >= 1 ? '#ffb066' : '#d8d0b0'; g.fillText(`${mn.name}${mn.elite ? ` ${mn.lv}级` : ''}`, px + ts / 2, py + ts * 1.15); }
   }
@@ -1577,6 +1644,13 @@ function wAutoStep() {
   if (!WAUTO || VIEW !== 'world' || WALK) return;
   if (DLG || MODALFN) { AUTOT = setTimeout(wAutoStep, 400); return; }   // 正在说话或开着窗口：等它关了接着探索
   const ch = wch(), run = SAVE.run;
+  if (isRift(run)) {   // 幻境：妖王 > 精魄球 > 最近的一群妖物；这一层打空了就去传送阵
+    const S = wstate(ch), D = wScene(ch), m = wmap(ch), near = L => L.slice().sort((a, b) => wdist(a, S.pos) - wdist(b, S.pos));
+    const boss = D.mons.find(o => o.boss), cands = boss ? [boss] : (D.orbs && D.orbs.length && !rCapped(run)) ? near(D.orbs) : (D.mons.length && !rCapped(run)) ? near(D.mons).slice(0, 6) : (m.pts['2'] || []);
+    let path = null; for (const c of cands) { path = wPath(ch, c.x, c.y); if (path && path.length) break; }
+    if (!path || !path.length) { wStopAuto(); return qtoast('附近找不到妖物了，自己走走看'); }
+    WALK = { path: path.slice(0, 12), i: 0 }; return wStepLoop();
+  }
   if (run.hp < runStats(run).maxHp * 0.35 && run.potions === 0) { wStopAuto(); return qtoast('气血太低了，先回篝火歇一歇'); }
   const path = wExploreTarget(ch, WAUTOZ);
   if (!path || !path.length) { const z = WAUTOZ; wStopAuto();
@@ -1585,8 +1659,8 @@ function wAutoStep() {
     return qtoast(loose ? '路都走过了——地上发光的地方还没看，点一下试试' : z ? '这一带都找遍了，换个地方看看' : '附近都探索过了'); }
   WALK = { path: path.slice(0, 10), i: 0 }; wStepLoop();
 }
-function wStopAuto() { WAUTOZ = null; if (!WAUTO) return; WAUTO = false; const b = document.querySelector('.wauto'); if (b) { b.classList.add('ghost'); b.textContent = '自动探索'; } }
-function wStartAuto(zone) { if (wWatchBlock(wch())) return qtoast('这里有人巡逻，自动探索不管用——自己摸过去'); WAUTO = true; WAUTOZ = zone || null; const b = document.querySelector('.wauto'); if (b) { b.classList.remove('ghost'); b.textContent = '探索中…'; } wAutoStep(); }
+function wStopAuto() { WAUTOZ = null; if (!WAUTO) return; WAUTO = false; const b = document.querySelector('.wauto'); if (b) { b.classList.add('ghost'); b.textContent = isRift(SAVE.run) ? '自动寻妖' : '自动探索'; } }
+function wStartAuto(zone) { if (wWatchBlock(wch())) return qtoast('这里有人巡逻，自动探索不管用——自己摸过去'); WAUTO = true; WAUTOZ = zone || null; const b = document.querySelector('.wauto'); if (b) { b.classList.remove('ghost'); b.textContent = isRift(SAVE.run) ? '寻妖中…' : '探索中…'; } wAutoStep(); }
 // 等级和经验条：手机上副标题是收起来的，等级要单独露出来
 let XPLV = null;
 function xpInfo(cls) {
@@ -1610,6 +1684,8 @@ function updWorldHud() {
   const s = runStats(run), rb = $('#rbhp');
   if (rb) { rb.querySelector('i').style.width = Math.max(0, run.hp / s.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${hpTxt(run.hp)} / ${hpTxt(s.maxHp)}`; }
   const z = $('#wzone'); if (z) z.textContent = zoneName();
+  if (isRift(run)) { const rp = $('#rprog'), pb = $('#rbprog'); if (rp) { rp.querySelector('i').style.width = run.prog + '%'; rp.classList.toggle('full', run.prog >= 100); rp.querySelector('span').textContent = run.rw.boss ? '进度已满 · 守关妖王已现身' : `幻境进度 ${Math.floor(run.prog)}%`; }
+    if (pb) pb.lastChild.textContent = `进度 ${Math.floor(run.prog)}%`; const rh = $('#rhint'); if (rh) rh.textContent = riftHint(run); const pt = $('#rbpot'); if (pt) pt.textContent = `丹药 ${run.potions}`; }
   updXp();
 }
 // 剧情动作：对话、选择题、选择、提示、好感（地图和镇上通用）
@@ -1638,6 +1714,8 @@ function wRun(acts, i = 0) {
   if (doCommon(a, next)) return;
   if (a.enter) { WHERO = null; WMONP = {}; render(); const D = WMAPS[wch()].scenes[a.enter]; banner(D.n, '', 1100); SFX.play('door'); return setTimeout(next, 350); }
   if (a.fight) { WKEY = { key: a.key, rest: acts.slice(i + 1) }; return beginWorldBattle(a.fight); }
+  if (a.rboss) { wStopAuto(); WALK = null; render(); banner('守关妖王现身', `${a.rboss} · ${a.d || ''}`, 2200); SFX.play('gong'); return setTimeout(next, 600); }
+  if (a.rdone) { const run = SAVE.run; riftComplete(run); SFX.play('legend'); return finishRunView(run, 'win'); }
   if (a.chest) { const run = SAVE.run; run.encCell = { lv: wmap(wch()).zoneAt(wstate(wch()).pos.x, wstate(wch()).pos.y).lv };
     CHEST = openChest(run, a.q); VIEW = 'chest'; SFX.play('loot'); WKEY = { rest: acts.slice(i + 1) }; return render(); }
   if (a.event) { const run = SAVE.run; run.encCell = { lv: wmap(wch()).zoneAt(wstate(wch()).pos.x, wstate(wch()).pos.y).lv, ev: RNG.pick(EVENTS).id };
@@ -1672,14 +1750,26 @@ function wResume() {
   else if (WAUTO) setTimeout(wAutoStep, 400);
 }
 function beginWorldBattle(enc) {
-  const run = SAVE.run, kind = wPrepBattle(run, enc);
+  const run = SAVE.run; if (isRift(run)) run.sth = wmap(RCH).def.theme;
+  const kind = wPrepBattle(run, enc);
   beginBattle(kind);
+  if (enc.rift && enc.n > 1) B.logs.push(`一口气卷进来 ${enc.n} 群妖物${B.reinf && B.reinf.length ? `，后面还排着 ${B.reinf.length} 只` : ''}`);
   if (enc.first === 'p') { B.P.g = 100; B.units.forEach(u => { if (u.side === 'e') u.g = Math.min(u.g, 10); }); B.logs.push('你抢先出手！'); }
   else if (enc.first === 'e' && enc.kind !== 'boss') { B.units.forEach(u => { if (u.side === 'e') u.g = 85; }); B.logs.push('被妖物从背后偷袭了！'); }
-  if (enc.kind === 'boss') banner(CHAPTERS[run.chapter - 1].boss.n, CHAPTERS[run.chapter - 1].boss.d, 1800);
+  if (enc.kind === 'boss') { const BC = (CHAPTERS[(enc.rift ? enc.c : run.chapter) - 1] || CHAPTERS[0]).boss; banner(enc.rift ? '幻境守关 · ' + BC.n : BC.n, BC.d, 1800); }
   applyStep(null);
 }
+function riftBattleContinue() {
+  const run = SAVE.run, k = WKEY || {}; WKEY = null;
+  if (!BRES.win) {
+    const pen = riftRevive(run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; wStopAuto(); WHERO = null; save(); render();
+    banner('你倒下了', `幻境把你吐回了这一层的入口 · 香烧掉 ${fmtClock(pen)}`, 1800); return;
+  }
+  B = null; VIEW = 'world'; save(); render();
+  wRun(wFightWon(RCH, k.key || {}, run).concat(k.rest || []));
+}
 function worldBattleContinue() {
+  if (isRift(SAVE.run)) return riftBattleContinue();
   const run = SAVE.run, ch = run.chapter, k = WKEY || {}; WKEY = null;
   if (!BRES.win && k.key && k.key.scripted) {   // 剧情战：本来就打不赢，输了照样往下走
     run.hp = Math.max(1, Math.round(runStats(run).maxHp * 0.3)); B = null; VIEW = 'world'; save(); render();
@@ -2184,6 +2274,9 @@ function regionSVG(ch) {
   return svg + '</svg>';
 }
 const miniModal = () => () => {
+  if (isRift(SAVE.run)) { const S0 = wstate(RCH);
+    return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">${esc(WMAPS[RCH].scenes[S0.sc].n)}</h2><canvas id="minicv" class="minicv"></canvas>
+    <p class="sub" style="text-align:center">紫框是传送阵，青框是塔，红点是妖物，橙点是精英，亮紫点是精魄，大红块是守关妖王</p>`; }
   const ch = wch(), S = wstate(ch), vis = Object.keys(S.sd).map(sc => WMAPS[ch].scenes[sc].n);
   const tabs = `<div class="row mtabs"><button class="btn sm ${MAPTAB === 'all' ? '' : 'ghost'}" data-act="maptab" data-arg="all">全章</button><button class="btn sm ${MAPTAB === 'here' ? '' : 'ghost'}" data-act="maptab" data-arg="here">这一带</button></div>`;
   if (MAPTAB === 'all') { const blk = wTeleBlock(ch);
@@ -2206,7 +2299,9 @@ function drawMini() {
     if (P.t === 'door') { g.fillStyle = wDoorOpen(ch, P) ? '#ffd75a' : '#8a7a5a'; g.fillRect(p.x * k, p.y * k, k, k); g.fillStyle = '#ffe9c4'; g.font = `${Math.max(10, k)}px "Noto Serif SC"`; g.textAlign = 'center'; g.fillText(P.n, Math.min(cv.width - 30, Math.max(30, (p.x + 0.5) * k)), p.y === 0 ? (p.y + 2.4) * k : (p.y - 0.4) * k); } } }
   for (const q of wTracker(ch)) { let p = wMarkPos(ch, q); if (p && p.sc !== S.sc) { const d = wNextDoor(ch, S.sc, p.sc); p = d && { ...d, sc: S.sc }; }
     if (p) { g.strokeStyle = q.main ? '#ffd75a' : '#8fe89a'; g.lineWidth = 2; const r = p.area ? k * 3 : 2; g.strokeRect(p.x * k - r, p.y * k - r, k + r * 2, k + r * 2); } }
-  for (const mn of wScene(ch).mons) if (wInSight(ch, mn.x, mn.y) || (wkeys().zhaohun && wdist(mn, S.pos) <= 7)) { g.fillStyle = mn.elite ? '#ff8a3a' : '#c4291f'; g.fillRect(mn.x * k + k / 4, mn.y * k + k / 4, k / 2, k / 2); }
+  for (const mn of wScene(ch).mons) if (wInSight(ch, mn.x, mn.y) || (wkeys().zhaohun && wdist(mn, S.pos) <= 7)) { g.fillStyle = mn.boss ? '#ff2a1a' : mn.elite ? '#ff8a3a' : '#c4291f'; if (mn.boss) g.fillRect(mn.x * k - k / 2, mn.y * k - k / 2, k * 2, k * 2); else g.fillRect(mn.x * k + k / 4, mn.y * k + k / 4, k / 2, k / 2); }
+  if (m.def.rift) { for (const o of wScene(ch).orbs || []) { g.fillStyle = '#d8a8ff'; g.fillRect(o.x * k + k / 5, o.y * k + k / 5, k * 0.6, k * 0.6); }
+    for (const [c, col] of [['2', '#a07aff'], ['3', '#6ad8e8']]) for (const p of m.pts[c] || []) { if (c === '3' && S.got[wgk(S.sc, p.x, p.y)]) continue; g.strokeStyle = col; g.lineWidth = 2; g.strokeRect(p.x * k - 2, p.y * k - 2, k + 4, k + 4); } }
   g.fillStyle = '#fff'; g.fillRect(S.pos.x * k, S.pos.y * k, k, k);
 }
 // ---- 摇杆 / 方向键 ----
@@ -2287,9 +2382,9 @@ function endHTML() {
   if (rift && r.riftDone) {
     const tl = r.timeLeft || 0, used = Math.round((r.clock || 0) / 100);
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
-      <div><p>用时 <b>${used}</b> 回合 · 香还剩 <b>${Math.round(tl * 100)}%</b>${r.deaths ? ` · 倒下 ${r.deaths} 次` : ''}</p>
+      <div><p>${r.world ? `用时 <b>${fmtClock(r.clock || 0)}</b> · 香还剩 <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `用时 <b>${used}</b> 回合 · 香还剩 <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · 倒下 ${r.deaths} 次` : ''}</p>
       <p>${tl > 0 ? `灵玉可以升级 <b>${r.upg}</b> 次 · 现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : '香烧完了：这一层不算过，灵玉只能升 1 次'}</p>
-      ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${used} 回合</p>` : ''}</div></div>`;
+      ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${r.world ? '用时 ' + fmtClock(r.clock || 0) : used + ' 回合'}</p>` : ''}</div></div>`;
     extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${SAVE.lgems.length ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级。</p>
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
@@ -2299,7 +2394,7 @@ function endHTML() {
     <p class="d">${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}</p>
     ${r.record && !rift ? '<p class="evres">刷新了本章最快纪录！</p>' : ''}
     ${extra}
-    <div class="endstats"><div><small>用时</small><b>${fmtTime(t)}</b></div><div><small>斩妖</small><b>${r.kills}</b></div>
+    <div class="endstats"><div><small>${rift && r.world ? '香烧了' : '用时'}</small><b>${rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)}</b></div><div><small>斩妖</small><b>${r.kills}</b></div>
       <div><small>等级</small><b>${r.lvStart} → ${SAVE.chars[r.cls].level}</b></div><div><small>银两</small><b>+${r.goldGot}</b></div>
       <div><small>玉石</small><b>+${r.gemsGot}</b></div><div><small>魂晶</small><b>+${r.matsGot}</b></div>
       ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
@@ -2544,6 +2639,13 @@ const ACT = {
       else banner(chTitle(ch), C.sub, 2000);
       return;
     }
+    if (mode === 'rift') {   // 幻境：走路遇怪的大地图
+      SAVE.run = newRiftRun(SAVE.cls, SAVE.riftLv); RTICK = 0;
+      VIEW = 'world'; WHERO = null; WAUTO = false; WGOAL = null; WALK = null; refresh(); window.scrollTo(0, 0);
+      banner(`九幽幻境 · ${SAVE.run.riftLv} 层`, WMAPS[RCH].scenes.f0.n, 2000);
+      if (!seen('rift2')) { markSeen('rift2'); save(); setTimeout(() => openModal(riftHelpModal), 2200); }
+      return;
+    }
     SAVE.run = newRun(SAVE.cls, { mode, diff: SAVE.diff, chapter: SAVE.chapter, riftLv: SAVE.riftLv, mods: SAVE.mods.slice() });
     VIEW = 'map'; refresh(); window.scrollTo(0, 0);
     const run = SAVE.run;
@@ -2664,6 +2766,9 @@ const ACT = {
   wtalkc: () => { const ch = wch(), cc = wCompNow(ch); if (!cc) return; wStopAuto(); wRun(wTalk(ch, cc, SAVE.run)); },
   wyin: () => { WALK = null; wStopAuto(); wRun(wYinToggle(wch())); },
   wauto: () => { WGOAL = null; if (WAUTO) return wStopAuto(); wStartAuto(); },
+  rquit: () => { wStopAuto(); openModal(() => `<h2 class="mh">离开幻境？</h2><p class="help-p">这一局就到这儿：已经拿到的装备、经验都留着，但没有灵玉升级，也不算纪录。</p>
+    <div class="row" style="justify-content:center"><button class="btn" data-act="rquitgo">离开</button><button class="btn ghost" data-act="close">接着打</button></div>`); },
+  rquitgo: () => { const r = SAVE.run; BACK = null; closeModal(); WALK = null; finishRunView(r, 'retreat'); },
   wlog: () => { wStopAuto(); BACK = null; openModal(questModal()); },
   wrecap: () => { const ch = wch(); closeModal(); playDialog(recapLines(ch), null); },
   wreplay: i => { const ch = wch(), m = WQ[ch].main[+i]; if (!m) return; const L = [...(wLines(ch, m.lines) || []), ...(wLines(ch, m.after) || [])]; closeModal(); if (L.length) playDialog([['narr', `【回看 · ${m.t}】`], ...L], null); },
@@ -2793,7 +2898,7 @@ function curMood() {
   if (MTEST) { if (VIEW === 'town' || VIEW === 'title') return MTEST.m; MTEST = null; }
   if (VIEW === 'end' || VIEW === 'credits') return { key: 'sad' };
   if (!run || VIEW === 'town') return { key: 'town' };
-  const ch = run.chapter || 1, key = 'c' + Math.min(10, ch);
+  const ch = run.chapter || 1, key = 'c' + (isRift(run) && !run.ended ? wmap(RCH).def.rift.c : Math.min(10, ch));   // 幻境：这一层是从哪一章抄来的，就放哪一章的曲子
   if (VIEW === 'battle' && B) return { key, kind: 'field', fight: B.kind === 'boss' ? 'boss' : 'battle' };
   if (run.world && wHas(ch)) { const D = wmap(ch).def, T = SCENE_THEMES[D.theme] || {}; if (T.kind === 'town') return { key: 'town' }; return { key: D.music || key, kind: T.kind === 'room' ? 'room' : T.kind === 'dungeon' ? 'dungeon' : 'field' }; }
   return { key, kind: 'dungeon' };
@@ -2804,7 +2909,7 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   app.innerHTML = html;
   document.body.dataset.view = VIEW;
-  if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SAVE.run.theme && SCENE_THEMES[SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); showRes(); } else VFX.setup(null);
+  if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SCENE_THEMES[SAVE.run.sth || SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); showRes(); } else VFX.setup(null);
   if (VIEW === 'world') wSetup();
   try { SFX.mood(curMood()); } catch (e) {}
   if (VIEW === 'map' && AUTO && !WALKING) { clearTimeout(autoT); autoT = setTimeout(autoStep, 420); }

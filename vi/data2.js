@@ -133,9 +133,9 @@ const ACHIEVEMENTS = [
 ];
 
 // ============ 九幽幻境 · 大秘境 ============
-// 限时：一炷香。战斗按读条算时间（和战斗倍速无关），走一个房间也要花一点时间
+// 限时：一炷香 = 12 分钟（毫秒）。地图上按真实时间走；战斗里按读条折算（一轮 3 秒，和战斗倍速、跳不跳过无关）
 const RIFT_CLOCK = { room: 35 };
-var RIFT_LIMIT = 10000;
+var RIFT_LIMIT = 12 * 60 * 1000;
 const riftLimit = N => RIFT_LIMIT;
 // 剩下多少香 → 灵玉升级次数、下次最多能挑战高几层
 const RIFT_GRADES = [
