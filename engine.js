@@ -26,7 +26,7 @@ let onPersist = null;
 function newChar() { return { level: 1, xp: 0, tal: {}, runes: {}, order: null, off: {}, yi: [], cube: [null, null, null],
   eq: { weapon: makeItem({ slot: 'weapon', ilvl: 1, rarity: 'normal', noSocket: true }) } }; }
 function newSave() {
-  const s = { v: 4, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
+  const s = { v: 4, gv: 2, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
@@ -36,7 +36,7 @@ function newSave() {
   return s;
 }
 function migrate(s) {
-  const d = newSave();
+  const d = newSave(), gv0 = s.gv || 0;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   for (const k in d.stats) if (s.stats[k] === undefined) s.stats[k] = 0;
   for (const c of CLASS_IDS) {
@@ -63,14 +63,52 @@ function migrate(s) {
   if ((s.v || 0) < 4) { for (const c of CLASS_IDS) { const ch = s.chars[c]; ch.tal = {}; ch.loadout = null; ch.loadoutManual = 0; ch.unequipped = {}; ch.runes = {}; } s.respec4 = 1; }
   // 速度改成数值：旧鞋子的主属性速度（固定 3）按阶数补上
   for (const it of allIt) if (it && it.slot === 'boots' && it.imp) { const L = it.legend && LEGENDS.find(l => l.id === it.legend), li = (L && L.imp.spd) || 0; if (it.imp.spd === 3 + li) it.imp.spd = bootSpd(it.ilvl) + li; }
+  // 词条重做（gv 2）：旧装备的百分比词条按新规矩换算，出错部位的词条换成同档的实数词条
+  if (gv0 < 2) { let n = 0; walkItems(s, it => { if (regearItem(it)) n++; }); if (n && s.t) s.gearNote = n; s.gv = 2; }
   s.v = 4;
   return s;
 }
+function walkItems(o, fn, depth = 0) {
+  if (!o || typeof o !== 'object' || depth > 12) return;
+  if (typeof o.slot === 'string' && Array.isArray(o.aff) && o.imp && typeof o.ilvl === 'number') { fn(o); return; }
+  if (Array.isArray(o)) { for (const x of o) if (x && typeof x === 'object') walkItems(x, fn, depth + 1); return; }
+  for (const k in o) { const x = o[k]; if (x && typeof x === 'object') walkItems(x, fn, depth + 1); }
+}
+const REGEAR_TO = { o: ['atk', 'hp', 'armor', 'regen', 'thorns'], d: ['hp', 'armor', 'regen', 'thorns', 'atk'] };
+function regearItem(it) {
+  const gm = genMult(it), before = JSON.stringify(it.aff) + JSON.stringify(it.imp), first = it.aff[0] && it.aff[0][0];
+  // 每条词条先算出成色 q（在旧范围里排第几），再按新规矩落到新范围里
+  const rows = it.aff.map(([k, v]) => {
+    const A = AFFIXES.find(a => a.k === k); if (!A || A.fixed) return { k, v, keep: true };
+    const ro = A.ro || A.r, q = Math.max(0, Math.min(1, (v / (affScOld(A, it.ilvl) * gm) - ro[0]) / (ro[1] - ro[0])));
+    return { k, A, q, ok: affOK(A, it.slot) };
+  });
+  // 攻击类最多两条：先留「攻击」，再留成色最好的
+  const offs = rows.filter(r => r.A && r.ok && r.A.g === 'o').sort((a, b) => (b.k === 'atk') - (a.k === 'atk') || b.q - a.q); offs.slice(AFF_OFF_MAX).forEach(r => { r.ok = false; });
+  const have = new Set(rows.filter(r => r.keep || r.ok).map(r => r.k)); let nOff = rows.filter(r => r.A && r.ok && r.A.g === 'o').length;
+  const val = (A, q) => Math.max(1, Math.round((A.r[0] + q * (A.r[1] - A.r[0])) * affSc(A, it.ilvl) * gm));
+  it.aff = rows.map(r => {
+    if (r.keep) return [r.k, r.v];
+    if (r.ok) return [r.k, val(r.A, r.q)];
+    // 这个部位不再出这种词条（或者攻击类超了两条）：按原来的成色换成一条实数词条
+    const T = (REGEAR_TO[r.A.g] || REGEAR_TO.d).map(x => AFFIXES.find(a => a.k === x)).find(T => !have.has(T.k) && affOK(T, it.slot) && (T.g !== 'o' || nOff < AFF_OFF_MAX))
+           || AFFIXES.find(a => !a.fixed && a.w > 0 && !have.has(a.k) && affOK(a, it.slot) && a.g !== 'o');
+    if (!T) return [r.k, val(r.A, r.q)];
+    have.add(T.k); if (T.g === 'o') nOff++;
+    return [T.k, val(T, r.q)];
+  });
+  const L = legendOf(it); if (L) for (const k in L.imp) if (!FLAT_STATS.has(k) && k !== 'spd' && it.imp[k] != null) it.imp[k] = L.imp[k];
+  const changed = JSON.stringify(it.aff) + JSON.stringify(it.imp) !== before;
+  if (changed) { delete it.rfPending; delete it.wsPending; delete it.rrPending;
+    if (it.rarity === 'magic' && it.aff[0] && it.aff[0][0] !== first && it.base) { const A = AFFIXES.find(a => a.k === it.aff[0][0]); if (A) it.name = joinName(A.p, it.base); } }
+  return changed;
+}
 function loadSave() {
-  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { SAVE = migrate(JSON.parse(raw)); return SAVE; } }
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { SAVE = migrate(JSON.parse(raw)); clampRunHp(); return SAVE; } }
   catch (e) { storageOK = false; }
   SAVE = newSave(); return SAVE;
 }
+function clampRunHp() { try { if (SAVE && SAVE.run && SAVE.run.hp != null) SAVE.run.hp = Math.min(SAVE.run.hp, runStats(SAVE.run).maxHp); } catch (e) {} }
 function persist(quiet) {
   if (!quiet) SAVE.t = Date.now();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); storageOK = true; } catch (e) { storageOK = false; }
@@ -218,18 +256,29 @@ function implicitFor(slot, L) {
 const bootSpd = L => Math.round(4 + tierOf(L) * 1.2);
 const SPD_CAP = 90;   // 速度最多 100 + 90
 function scaleObj(o, m) { const r = {}; for (const k in o) r[k] = k === 'spd' ? o[k] : Math.round(o[k] * m); return r; }
-const affSc = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 0.68 + ilvl / 22;
+const affSc = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 1;   // 百分比词条不随装备等级涨（原来是 0.68 + ilvl / 22：第七章差不多翻倍）
+const affScOld = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 0.68 + ilvl / 22;   // 旧存档换算用
+const FLAT_STATS = new Set(['atk', 'hp', 'armor', 'regen', 'thorns']);   // 实数属性：随等级涨、吃强化
+const affOK = (a, slot) => !a.slots || !slot || a.slots.includes(slot);
+const OFF_SLOTS = new Set(['weapon', 'gloves', 'ring', 'amulet']);
+const AFF_OFF_MAX = 2;   // 一件装备最多两条攻击类词条（攻击、伤害、术法、暴击、暴伤、速度、吸血）
 function affixValue(a, ilvl, mult, max) {
   const sc = affSc(a, ilvl);
   return Math.max(1, Math.round((max ? a.r[1] : RNG.f(a.r[0], a.r[1])) * sc * mult));
 }
 function rollAffixes(n, ilvl, mult, exclude = [], max, slot) {
   const out = [], used = new Set(exclude);
+  let nOff = 0; for (const k of exclude) { const A = AFFIXES.find(a => a.k === k); if (A && A.g === 'o') nOff++; }
+  // 兵器、护腕、扳指、玉佩：三条以上词条的装备，一定带满两条攻击类——掉出来的宝品不会全是防御词条，普通装备和挑过的装备差距也小
+  const needOff = slot && OFF_SLOTS.has(slot) && n + exclude.length >= 3 ? AFF_OFF_MAX : 0;
   while (out.length < n) {
-    const pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && (!a.slots || !slot || a.slots.includes(slot))); if (!pool.length) break;
+    const left = n - out.length, must = needOff - nOff >= left;
+    let pool = AFFIXES.filter(a => !used.has(a.k) && a.w > 0 && (!a.slots || !slot || a.slots.includes(slot)) && (a.g !== 'o' || nOff < AFF_OFF_MAX));
+    if (must) { const p2 = pool.filter(a => a.g === 'o'); if (p2.length) pool = p2; }
+    if (!pool.length) break;
     let x = Math.random() * pool.reduce((s, a) => s + a.w, 0), pick = pool[0];
     for (const a of pool) { x -= a.w; if (x < 0) { pick = a; break; } }
-    used.add(pick.k); out.push([pick.k, affixValue(pick, ilvl, mult, max)]);
+    used.add(pick.k); if (pick.g === 'o') nOff++; out.push([pick.k, affixValue(pick, ilvl, mult, max)]);
   }
   return out;
 }
@@ -286,7 +335,7 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket }) {
       for (let i = 0; i < pool.length; i++) { r0 -= wsum[i]; if (r0 <= 0) { L = pool[i]; break; } }
       slot = L.slot;
       const imp = scaleObj(implicitFor(slot, ilvl), 1.05), lsc = 0.45 + ilvl / 20;
-      for (const k in L.imp) imp[k] = (imp[k] || 0) + (k === 'spd' ? L.imp[k] : Math.max(1, Math.round(L.imp[k] * lsc)));
+      for (const k in L.imp) imp[k] = (imp[k] || 0) + (FLAT_STATS.has(k) ? Math.max(1, Math.round(L.imp[k] * lsc)) : L.imp[k]);   // 神兵自带的百分比属性也不随等级涨
       return finishItem({ id: uid(), slot, ilvl, rarity, name: L.n, base: pickBase(slot, ilvl), legend: L.id, imp,
                           aff: rollAffixes(RNG.i(2, 3), ilvl, 1.05, Object.keys(L.imp), false, slot) }, noSocket);
     }
@@ -317,11 +366,13 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket }) {
 }
 const ancName = it => it.anc === 2 ? '太古·' : it.anc === 1 ? '上古·' : '';
 function itemMult(it) { return (1 + (it.plus || 0) * 0.08) * (it.anc ? 1.3 : 1); }
+// 强化只加实数属性（攻击、气血、护甲、回复、反震）；百分比属性不吃强化，只吃上古／太古的 +30%
+const statMult = (it, k) => k === 'spd' ? 1 : FLAT_STATS.has(k) ? itemMult(it) : (it.anc ? 1.3 : 1);
 function itemStats(it) {
-  const m = itemMult(it), s = {};
+  const s = {};
   const add = (k, v) => { s[k] = (s[k] || 0) + v; };
-  for (const k in it.imp) add(k, k === 'spd' ? it.imp[k] : Math.round(it.imp[k] * m));
-  for (const [k, v] of it.aff) add(k, Math.round(v * m));
+  for (const k in it.imp) add(k, Math.round(it.imp[k] * statMult(it, k)));
+  for (const [k, v] of it.aff) add(k, Math.round(v * statMult(it, k)));
   for (const g of it.gems || []) {
     if (g.startsWith('L:')) { const L = SAVE && SAVE.lgems.find(x => x.id === g.slice(2)); if (L) { const st = LGEMS[L.t].st(L.lv); for (const k in st) add(k, st[k]); } continue; }
     const [t, tier] = g.split('_'); const G = GEM_TYPES[t]; if (G) add(G.st, G.v[+tier]);
@@ -481,7 +532,7 @@ const SUST = {
   mage:     { n: '水行护体', d: '每接上一层「连」，身上添一层护体（最大气血的 {a}%，最多叠到 {cap}%）', a: 6.5, cap: 45 },
   necro:    { n: '替死', d: '受到的伤害 -{dr}%；场上有僵尸时，再有 {a}% 由僵尸代受；僵尸倒下时，你回复最大气血的 {b}%', a: 17, b: 6, dr: 7 },
   assassin: { n: '身法', d: '受到的伤害 -{dr}%，闪避 +{a}%；每闪开一次回复最大气血的 {b}%，击杀敌人回复 {c}%', a: 25, b: 18, c: 22, dr: 12 },
-  paladin:  { n: '金刚不坏', d: '受到的伤害 -{dr}%；每次反击回复最大气血的 {a}%；每回合再回复 {b}%', a: 6, b: 1.5, dr: 22 },
+  paladin:  { n: '金刚不坏', d: '受到的伤害 -{dr}%；每次反击回复最大气血的 {a}%；每回合再回复 {b}%', a: 6, b: 1.5, dr: 19 },
 };
 // 等级越高，气血倍数越大，吸血缩水得越厉害，所以续航也跟着等级涨：10 级约 0.75 倍，23 级 1 倍，43 级起 1.4 倍封顶
 const sustLv = lv => Math.min(1.4, 0.55 + (lv || 1) / 50);
@@ -685,7 +736,7 @@ function upTier(it, L) {
     for (const k in it.imp) {
       if (k === 'spd') imp[k] = it.imp[k] + (it.slot === 'boots' ? (b1.spd || 0) - (b0.spd || 0) : 0);
       else if (b0[k]) imp[k] = Math.round(it.imp[k] * b1[k] / b0[k]);
-      else imp[k] = Math.max(1, Math.round(it.imp[k] * (0.45 + L / 20) / (0.45 + old / 20)));
+      else imp[k] = FLAT_STATS.has(k) ? Math.max(1, Math.round(it.imp[k] * (0.45 + L / 20) / (0.45 + old / 20))) : it.imp[k];
     }
     it.imp = imp;
     it.aff = it.aff.map(([k, v]) => { const a = AFFIXES.find(x => x.k === k); return a ? [k, Math.max(1, Math.round(v * affSc(a, L) / affSc(a, old)))] : [k, v]; });
@@ -1180,6 +1231,10 @@ function resolveEvent(run, evId, ci) {
 }
 
 // ---------------- 怪物 ----------------
+let W_TUNE = [null, [.95, 1.18, 1, 1, 1, 1], [.91, 1.10, 1, 1, .9, 1.10], [.89, 1.11, .97, 1, .87, 1.10], [.89, 1.10, .94, 1, .83, 1.10], [.78, 1.07, 1.04, 1, .81, 1.10],
+              [.84, 1.05, .94, 1, .82, 1.10], [.78, 1.05, .98, 1, .78, 1.10], [.83, 1.05, .9, .97, .60, 1.10], [.76, 1.08, .96, .95, .64, 1.10], [.78, 1.08, .9, .98, .60, 1.10]];
+let W_BOSS_UP = { 6: [1.18, 1.17], 7: [1.3, 1.14] };   // 第六、七章守关原来几乎没跟着涨（第五章 5.0 万血 → 第七章 5.5 万 → 第八章 10 万），补上
+const lvTune = lv => [1 - 0.2 * Math.max(0, Math.min(1, ((lv || 1) - 9) / 12)), 1.03];   // 幻境等不分章节的地方：按等级粗调（9 级以下不动，21 级起气血 ×0.8）
 function makeMonster(def, lv, run, kind, affs) {
   const D = dOf(run);
   let hp = (25 + lv * 11.5) * (def.hp || 1) * D.hpMul * 1.25;
@@ -1189,6 +1244,9 @@ function makeMonster(def, lv, run, kind, affs) {
   if (kind === 'boss') { hp *= 6.5; atk *= 1.45; }
   if (kind === 'mini') { hp *= 0.35; atk *= 0.6; }
   if (run.mode === 'story') { const k = run.chapter - 1; if (run.world) { hp *= 1 + Math.min(k, 1) * 0.35 + k * 0.04; atk *= 1 + Math.min(k, 1) * 0.22 + k * 0.025; } else { hp *= 1 + k * 0.38; atk *= 1 + k * 0.27; } }   // 大地图的等级已经按章节涨了，不再重复乘
+  // 词条重做之后，主角的百分比加成不再越滚越大，妖物跟着调：W_TUNE[章] = [气血, 攻击, 首领气血再乘, 首领攻击再乘, 打主角的术法伤害, 精英攻击再乘]，对着「每格一件同级宝品」的普通装备，把胜率调回改之前
+  if (run.mode === 'story' && run.world) { const T = W_TUNE[run.chapter] || [1, 1, 1, 1]; hp *= T[0]; atk *= T[1]; if (kind === 'elite') atk *= T[5] || 1; if (kind === 'boss') { hp *= T[2] || 1; atk *= T[3] || 1; const U = W_BOSS_UP[run.chapter]; if (U) { hp *= U[0]; atk *= U[1]; } } }
+  else { const f = lvTune(lv); hp *= f[0]; atk *= f[1]; }
   if (hasMod(run, 'hardy')) hp *= 1.5;
   if (hasMod(run, 'brutal')) atk *= 1.3;
   if (hasMod(run, 'armored')) armor *= 1.6;
@@ -1885,6 +1943,8 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     else if (src.side === 'e' && tgt.side === 'p') d *= lvMul(heroLv - (src.lv || heroLv), -0.06, -W_LVUP[1]);
   }
   if (src.side === 'e' && tgt.kind === 'hero') d *= MON_UP * (1 - ((SUST[tgt.cls] || {}).dr || 0) / 100);   // 只加在主角身上；狂刀客皮厚，正好抵掉
+  // 全抗词条不再随等级涨（普通装备第七章从约 48 掉到约 33），妖物打主角的术法伤害按章节相应调低（W_TUNE[章][4]）
+  if (src.side === 'e' && tgt.kind === 'hero' && elem !== 'phys' && b.run && b.run.mode === 'story' && b.run.world) d *= (W_TUNE[b.run.chapter] || [])[4] || 1;
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
   if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, '护驾', 'miss']); }
   if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分

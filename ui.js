@@ -132,10 +132,10 @@ function itemCard(it, cls, label) {
     <div class="isub"><b class="tierb">${TIER_N[it.tier || tierOf(it.ilvl)]}</b> ${RARITY[it.rarity].n} · ${SLOT_NAME[it.slot]} · ${esc(it.base)} · 装备等级 ${it.ilvl}</div></div></div>`;
   if (it.anc) h += `<div class="ianc">${it.anc === 2 ? '太古：所有属性 +30%，随机词条全部满值' : '上古：所有属性 +30%'}</div>`;
   if (it.cls) h += `<div class="ireq ${canEquip(it, cls) ? '' : 'bad'}">限 ${CLASSES[it.cls].n}</div>`;
-  h += '<ul>' + Object.keys(it.imp).map(k => `<li class="imp">${fmtStat(k, k === 'spd' ? it.imp[k] : Math.round(it.imp[k] * m))}</li>`).join('')
-       + it.aff.map(([k, v]) => `<li class="aff ${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * m))}${affTag(it, k, v)}</li>`).join('') + '</ul>'
+  h += '<ul>' + Object.keys(it.imp).map(k => `<li class="imp">${fmtStat(k, Math.round(it.imp[k] * statMult(it, k)))}</li>`).join('')
+       + it.aff.map(([k, v]) => `<li class="aff ${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</li>`).join('') + '</ul>'
        + (it.aff.length ? `<div class="iq">词条成色 <b>${Math.round(itemQ(it) * 100)}%</b>${it.sp ? '　<span class="spx">带特殊词条</span>' : ''}</div>` : '');
-  if (it.plus) h += `<div class="iplus">强化 +${it.plus}：所有属性 +${it.plus * 8}%</div>`;
+  if (it.plus) h += `<div class="iplus">强化 +${it.plus}：攻击、气血、护甲这些实数属性 +${it.plus * 8}%</div>`;
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}：${gemDesc(g)}</span>` : '<span class="gs empty">空孔</span>'; }).join('')}</div>`;
   if (L) h += `<p class="ifx">神兵之魂：${L.d}${SAVE.cube[L.id] ? '<small>（乾坤袋已收藏）</small>' : ''}</p>`;
@@ -149,7 +149,8 @@ function itemCard(it, cls, label) {
 }
 // 词条后面的星级和范围：★★★☆☆ 7–18
 function affTag(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r) return ''; const q = affQ(it, k, v), st = affStars(q);
-  return ` <small class="qs q${st}">${'★'.repeat(st)}${'☆'.repeat(5 - st)}</small><small class="qr">${r[0]}–${r[1]}</small>`; }
+  const sh = x => k === 'hp' || k === 'regen' ? fmtBig(hpShow(x, heroLv())) : x;   // 气血类的范围和数值用同一个倍数显示
+  return ` <small class="qs q${st}">${'★'.repeat(st)}${'☆'.repeat(5 - st)}</small><small class="qr">${sh(r[0])}–${sh(r[1])}</small>`; }
 let WLOCK = { id: null, s: new Set() };
 const wlockOf = it => (WLOCK.id === it.id ? WLOCK.s : new Set());
 function deltaOf(it, cls) {
@@ -2300,7 +2301,7 @@ function smithHTML(it, where) {
   if (!featureOn('enhance')) h += lockNote('通关以后，张大锤的铸剑坊开炉：强化、打孔镶玉、淬炼洗炼、传承升阶');
   else h += (it.plus || 0) >= ENHANCE_MAX ? '<div class="srow">已经强化到 +10</div>'
     : (it.plus || 0) >= cap ? `<div class="srow">张大锤现在最多能强化到 +${cap}，打通后面的章节他的手艺会更好</div>`
-    : `<div class="srow"><span>强化 +${it.plus || 0} → +${(it.plus || 0) + 1}<small>成功率 ${Math.round(ec.rate * 100)}% · ${ec.gold} 两 + ${ec.mats} 魂晶（失败只损失材料）</small></span><button class="btn sm" ${SAVE.gold >= ec.gold && SAVE.mats >= ec.mats ? '' : 'disabled'} data-act="enh" data-arg="${it.id}">强化</button></div>`;
+    : `<div class="srow"><span>强化 +${it.plus || 0} → +${(it.plus || 0) + 1}<small>成功率 ${Math.round(ec.rate * 100)}% · ${ec.gold} 两 + ${ec.mats} 魂晶（失败只损失材料）· 只加攻击、气血、护甲这些实数属性</small></span><button class="btn sm" ${SAVE.gold >= ec.gold && SAVE.mats >= ec.mats ? '' : 'disabled'} data-act="enh" data-arg="${it.id}">强化</button></div>`;
   if (featureOn('sockets')) h += (it.sockets || 0) >= maxS ? `<div class="srow">孔已打满（${maxS}/${maxS}）</div>`
     : `<div class="srow"><span>打孔 ${it.sockets || 0}/${maxS}<small>${sc.gold} 两 + ${sc.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= sc.gold && SAVE.mats >= sc.mats ? '' : 'disabled'} data-act="sock" data-arg="${it.id}">打孔</button></div>`;
   if (it.sockets && featureOn('sockets')) {
@@ -2322,18 +2323,18 @@ function smithHTML(it, where) {
       return `<button class="gslot" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="inh" data-arg="${it.id}|${s.id}"><span class="r-${s.rarity}">${esc(s.name)}${s.plus ? ' +' + s.plus : ''}</span>${s.gems && s.gems.length ? `（${s.gems.length} 颗玉）` : ''}<small>→ +${Math.max(it.plus || 0, (s.plus || 0) - 1)} · ${c.gold} 两 ${c.mats} 魂晶</small></button>`; }).join('')}</div></div>`;
     const L = upTierTarget(ownerOf(it) || SAVE.cls);
     if (upTierOK(it) && L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const c = upTierCost(it, L);
-      h += `<div class="srow"><span>升阶 ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>装备等级 ${it.ilvl} → ${L}，所有词条按比例一起涨 · ${c.gold} 两 + ${c.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">升阶</button></div>`; }
+      h += `<div class="srow"><span>升阶 ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>装备等级 ${it.ilvl} → ${L}，攻击、气血、护甲这些实数属性一起涨，百分比词条不变 · ${c.gold} 两 + ${c.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">升阶</button></div>`; }
   }
   if (it.aff.length && featureOn('reroll') && !it.rrPending) {
     const m = itemMult(it);
     if (it.rfPending) { const P = it.rfPending;
-      h += `<div class="srow col"><span>淬炼结果：选一个留下</span><div class="gslots">${P.opts.map((o, i) => `<button class="gslot" data-act="rfpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * m))}${affTag(it, o[0], o[1])}<small>${i ? '（新的）' : '（原来的）'}</small></button>`).join('')}</div></div>`;
+      h += `<div class="srow col"><span>淬炼结果：选一个留下</span><div class="gslots">${P.opts.map((o, i) => `<button class="gslot" data-act="rfpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * statMult(it, o[0])))}${affTag(it, o[0], o[1])}<small>${i ? '（新的）' : '（原来的）'}</small></button>`).join('')}</div></div>`;
     } else if (it.wsPending) { const P = it.wsPending;
-      h += `<div class="srow col"><span>洗炼结果：整套二选一</span><div class="wsopts">${P.opts.map((set, i) => `<button class="gslot wsopt" data-act="wspick" data-arg="${it.id}|${i}"><b>${i ? '换成新的' : '留原样'}</b>${set.map(([k, v]) => `<div class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * m))}${affTag(it, k, v)}</div>`).join('')}</button>`).join('')}</div></div>`;
+      h += `<div class="srow col"><span>洗炼结果：整套二选一</span><div class="wsopts">${P.opts.map((set, i) => `<button class="gslot wsopt" data-act="wspick" data-arg="${it.id}|${i}"><b>${i ? '换成新的' : '留原样'}</b>${set.map(([k, v]) => `<div class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</div>`).join('')}</button>`).join('')}</div></div>`;
     } else {
       const lk = wlockOf(it), rc = refineCost(it), wc = washCost(it, lk.size), unlockedSp = it.aff.some(([k], i) => SP_AFFIXES.includes(k) && !lk.has(i));
       h += `<div class="srow col"><span>淬炼 · 洗炼 <small>淬炼：一条词条的数值重摇，新旧二选一（${rc.gold} 两 + ${rc.mats} 魂晶）。洗炼：锁住想留的，其余全部换新，洗完整套二选一；锁得越多越贵。</small></span>
-        <div class="rflist">${it.aff.map(([k, v], i) => `<div class="rfrow ${lk.has(i) ? 'lk' : ''}"><button class="lockb ${lk.has(i) ? 'on' : ''}" data-act="wlock" data-arg="${it.id}|${i}">${lk.has(i) ? '已锁' : '锁'}</button><span class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * m))}${affTag(it, k, v)}</span><button class="btn sm ghost" ${SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rf" data-arg="${it.id}|${i}">淬炼</button></div>`).join('')}</div>
+        <div class="rflist">${it.aff.map(([k, v], i) => `<div class="rfrow ${lk.has(i) ? 'lk' : ''}"><button class="lockb ${lk.has(i) ? 'on' : ''}" data-act="wlock" data-arg="${it.id}|${i}">${lk.has(i) ? '已锁' : '锁'}</button><span class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</span><button class="btn sm ghost" ${SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rf" data-arg="${it.id}|${i}">淬炼</button></div>`).join('')}</div>
         ${unlockedSp ? '<p class="sub warn">特殊词条没锁——洗炼会把它洗掉（洗不回来）。</p>' : ''}
         <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">洗炼（锁 ${lk.size} 条 · ${wc.gold} 两 + ${wc.mats} 魂晶）</button></div>`;
     }
@@ -2341,19 +2342,19 @@ function smithHTML(it, where) {
   if (it.aff.length && featureOn('reroll') && it.rrPending) {
     const rc = rerollCost(it);
     if (it.rrPending) {
-      h += `<div class="srow col"><span>洗炼结果：选一条留下</span><div class="gslots">${it.rrPending.opts.map((o, i) => `<button class="gslot" data-act="rrpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * itemMult(it)))}${i === 0 ? '<small>（原来的）</small>' : ''}</button>`).join('')}</div></div>`;
+      h += `<div class="srow col"><span>洗炼结果：选一条留下</span><div class="gslots">${it.rrPending.opts.map((o, i) => `<button class="gslot" data-act="rrpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * statMult(it, o[0])))}${i === 0 ? '<small>（原来的）</small>' : ''}</button>`).join('')}</div></div>`;
     } else {
       h += `<div class="srow col"><span>洗炼 <small>花 ${rc.gold} 两 + ${rc.mats} 魂晶，把一条词条换成随机的两个新选项之一（也可以保留原样）。一件装备只能洗同一条词条。</small></span><div class="gslots">
-        ${it.aff.map(([k, v], i) => `<button class="gslot" ${(it.rr == null || it.rr === i) && SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rr" data-arg="${it.id}|${i}">${fmtStat(k, Math.round(v * itemMult(it)))}</button>`).join('')}</div></div>`;
+        ${it.aff.map(([k, v], i) => `<button class="gslot" ${(it.rr == null || it.rr === i) && SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rr" data-arg="${it.id}|${i}">${fmtStat(k, Math.round(v * statMult(it, k)))}</button>`).join('')}</div></div>`;
     }
   }
   if (where === 'stash' && it.legend && featureOn('cube')) h += `<div class="srow"><span>收进乾坤袋<small>${SAVE.cube[it.legend] ? '乾坤袋里已经有这个特效了' : '销毁这件神兵，永久学会它的特效（需要 10 颗魂晶）'}</small></span><button class="btn sm" ${!SAVE.cube[it.legend] && SAVE.mats >= 10 ? '' : 'disabled'} data-act="extract" data-arg="${it.id}">收进去</button></div>`;
   return h + '</div>';
 }
 function statMap(it) {
-  const m = itemMult(it), o = {};
-  for (const k in it.imp) o[k] = (o[k] || 0) + (k === 'spd' ? it.imp[k] : Math.round(it.imp[k] * m));
-  for (const [k, v] of it.aff) o[k] = (o[k] || 0) + Math.round(v * m);
+  const o = {};
+  for (const k in it.imp) o[k] = (o[k] || 0) + Math.round(it.imp[k] * statMult(it, k));
+  for (const [k, v] of it.aff) o[k] = (o[k] || 0) + Math.round(v * statMult(it, k));
   return o;
 }
 function diffChips(it, cur) {
@@ -2779,6 +2780,14 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">装备词条改了规矩</h2>
+  <p class="help-p">之前暴击、暴伤、伤害、术法这些百分比词条跟着装备等级越涨越大，七件叠起来，后面的首领几下就没了。现在改成这样：</p>
+  <p class="help-p">一、百分比词条的幅度固定，不再随等级涨；后期变强靠攻击、气血、护甲这些实数。</p>
+  <p class="help-p">二、每种词条只出在固定的几个部位：攻击类出在兵器、护腕、扳指、玉佩上，防御类主要出在头冠、衣甲、鞋履上。一件装备最多两条攻击类词条。</p>
+  <p class="help-p">三、宝品的兵器、护腕、扳指、玉佩一定带两条攻击类词条；词条的下限也提高了，不容易出废件。</p>
+  <p class="help-p">四、强化只加实数属性。</p>
+  <p class="help-p">你手上的旧装备已经按新规矩换算过：百分比缩回去了，不合规的词条按原来的成色换成了攻击、气血或护甲。妖物也相应调弱了——装备普通的话，难度和原来一样；昆仑冰窟和幽冥鬼市的守关比原来硬一些。</p>
+  <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`), 900); }
 if (SAVE.respec4) { delete SAVE.respec4; persist(); setTimeout(() => toast('五个职业重做了：心法点已经全部退回，招式也重新装配。去「修炼」看看新的心法和招式，赶尸人记得排一下「尸阵」'), 1200); }
 window.__abyss = { get SAVE() { return SAVE; }, get B() { return B; }, pause: () => clearTimeout(timer), mini: (id, f) => playMini(id, f), get WHERO() { return WHERO; }, get WGOAL() { return WGOAL; }, get WAUTO() { return WAUTO; }, ACT, fightw: e => beginWorldBattle(e), wbusy: () => !!WALK, maxhp: () => runStats(SAVE.run).maxHp, wtr: () => { const ch = SAVE.run && SAVE.run.world && SAVE.run.chapter; if (!ch) return []; return wTracker(ch).map(q => ({ t: q.t, town: wMarkPos(ch, q.mark) === 'town' })); }, fight: k => beginBattle(k), get WALKING() { return WALKING; }, get B() { return B; }, get VIEW() { return VIEW; }, get DLG() { return DLG; }, endDlg, wRun: a => wRun(a), dbg: { dlg: l => playDialog(l, null, null), render: () => render(), save: () => save(), view: v => { VIEW = v; }, finish: (r, o) => finishRunView(r, o) } };
 }

@@ -132,10 +132,10 @@ function itemCard(it, cls, label) {
     <div class="isub"><b class="tierb">${TIER_N[it.tier || tierOf(it.ilvl)]}</b> ${RARITY[it.rarity].n} · ${SLOT_NAME[it.slot]} · ${esc(it.base)} · Cấp trang bị ${it.ilvl}</div></div></div>`;
   if (it.anc) h += `<div class="ianc">${it.anc === 2 ? "Thái Cổ: mọi chỉ số +30%, thuộc tính ngẫu nhiên đều tối đa" : "Thượng Cổ: mọi chỉ số +30%"}</div>`;
   if (it.cls) h += `<div class="ireq ${canEquip(it, cls) ? '' : 'bad'}">Chỉ ${CLASSES[it.cls].n}</div>`;
-  h += '<ul>' + Object.keys(it.imp).map(k => `<li class="imp">${fmtStat(k, k === 'spd' ? it.imp[k] : Math.round(it.imp[k] * m))}</li>`).join('')
-       + it.aff.map(([k, v]) => `<li class="aff ${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * m))}${affTag(it, k, v)}</li>`).join('') + '</ul>'
+  h += '<ul>' + Object.keys(it.imp).map(k => `<li class="imp">${fmtStat(k, Math.round(it.imp[k] * statMult(it, k)))}</li>`).join('')
+       + it.aff.map(([k, v]) => `<li class="aff ${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</li>`).join('') + '</ul>'
        + (it.aff.length ? `<div class="iq">Chất lượng thuộc tính <b>${Math.round(itemQ(it) * 100)}%</b>${it.sp ? " <span class=\"spx\">có thuộc tính đặc biệt</span>" : ''}</div>` : '');
-  if (it.plus) h += `<div class="iplus">Cường hóa +${it.plus}: mọi chỉ số +${it.plus * 8}%</div>`;
+  if (it.plus) h += `<div class="iplus">Cường hóa +${it.plus}: các chỉ số thực như công, khí huyết, hộ giáp +${it.plus * 8}%</div>`;
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}: ${gemDesc(g)}</span>` : "<span class=\"gs empty\">Lỗ trống</span>"; }).join('')}</div>`;
   if (L) h += `<p class="ifx">Hồn thần binh: ${L.d}${SAVE.cube[L.id] ? "<small> (đã cất vào Túi Càn Khôn)</small>" : ''}</p>`;
@@ -149,7 +149,8 @@ function itemCard(it, cls, label) {
 }
 // 词条后面的星级和范围：★★★☆☆ 7–18
 function affTag(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r) return ''; const q = affQ(it, k, v), st = affStars(q);
-  return ` <small class="qs q${st}">${'★'.repeat(st)}${'☆'.repeat(5 - st)}</small><small class="qr">${r[0]}–${r[1]}</small>`; }
+  const sh = x => k === 'hp' || k === 'regen' ? fmtBig(hpShow(x, heroLv())) : x;   // 气血类的范围和数值用同一个倍数显示
+  return ` <small class="qs q${st}">${'★'.repeat(st)}${'☆'.repeat(5 - st)}</small><small class="qr">${sh(r[0])}–${sh(r[1])}</small>`; }
 let WLOCK = { id: null, s: new Set() };
 const wlockOf = it => (WLOCK.id === it.id ? WLOCK.s : new Set());
 function deltaOf(it, cls) {
@@ -2300,7 +2301,7 @@ function smithHTML(it, where) {
   if (!featureOn('enhance')) h += lockNote("Phá đảo xong, Lò Rèn của Trương Đại Chùy mới đỏ lửa: cường hóa, đục lỗ khảm ngọc, tôi luyện tẩy luyện, truyền thừa thăng giai");
   else h += (it.plus || 0) >= ENHANCE_MAX ? "<div class=\"srow\">Đã cường hóa đến +10</div>"
     : (it.plus || 0) >= cap ? `<div class="srow">Trương Đại Chùy giờ chỉ cường hóa tối đa đến +${cap}, qua các chương sau tay nghề ông sẽ khá hơn</div>`
-    : `<div class="srow"><span>Cường hóa +${it.plus || 0} → +${(it.plus || 0) + 1}<small>tỉ lệ ${Math.round(ec.rate * 100)}% · ${ec.gold} lượng + ${ec.mats} hồn tinh (thất bại chỉ mất nguyên liệu)</small></span><button class="btn sm" ${SAVE.gold >= ec.gold && SAVE.mats >= ec.mats ? '' : 'disabled'} data-act="enh" data-arg="${it.id}">Cường hóa</button></div>`;
+    : `<div class="srow"><span>Cường hóa +${it.plus || 0} → +${(it.plus || 0) + 1}<small>tỉ lệ ${Math.round(ec.rate * 100)}% · ${ec.gold} lượng + ${ec.mats} hồn tinh (thất bại chỉ mất nguyên liệu) · chỉ cộng các chỉ số thực như công, khí huyết, hộ giáp</small></span><button class="btn sm" ${SAVE.gold >= ec.gold && SAVE.mats >= ec.mats ? '' : 'disabled'} data-act="enh" data-arg="${it.id}">Cường hóa</button></div>`;
   if (featureOn('sockets')) h += (it.sockets || 0) >= maxS ? `<div class="srow">Đã đục đủ lỗ (${maxS}/${maxS})</div>`
     : `<div class="srow"><span>Đục lỗ ${it.sockets || 0}/${maxS}<small>${sc.gold} lượng + ${sc.mats} hồn tinh</small></span><button class="btn sm" ${SAVE.gold >= sc.gold && SAVE.mats >= sc.mats ? '' : 'disabled'} data-act="sock" data-arg="${it.id}">Đục lỗ</button></div>`;
   if (it.sockets && featureOn('sockets')) {
@@ -2322,18 +2323,18 @@ function smithHTML(it, where) {
       return `<button class="gslot" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="inh" data-arg="${it.id}|${s.id}"><span class="r-${s.rarity}">${esc(s.name)}${s.plus ? ' +' + s.plus : ''}</span>${s.gems && s.gems.length ? ` (${s.gems.length} viên ngọc)` : ''}<small>→ +${Math.max(it.plus || 0, (s.plus || 0) - 1)} · ${c.gold} lượng ${c.mats} hồn tinh</small></button>`; }).join('')}</div></div>`;
     const L = upTierTarget(ownerOf(it) || SAVE.cls);
     if (upTierOK(it) && L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const c = upTierCost(it, L);
-      h += `<div class="srow"><span>Thăng giai ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>Cấp trang bị ${it.ilvl} → ${L}, mọi thuộc tính tăng theo tỉ lệ · ${c.gold} lượng + ${c.mats} hồn tinh</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">Thăng giai</button></div>`; }
+      h += `<div class="srow"><span>Thăng giai ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>Cấp trang bị ${it.ilvl} → ${L}, các chỉ số thực như công, khí huyết, hộ giáp cùng tăng, dòng phần trăm giữ nguyên · ${c.gold} lượng + ${c.mats} hồn tinh</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">Thăng giai</button></div>`; }
   }
   if (it.aff.length && featureOn('reroll') && !it.rrPending) {
     const m = itemMult(it);
     if (it.rfPending) { const P = it.rfPending;
-      h += `<div class="srow col"><span>Kết quả tôi luyện: chọn một cái để giữ</span><div class="gslots">${P.opts.map((o, i) => `<button class="gslot" data-act="rfpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * m))}${affTag(it, o[0], o[1])}<small>${i ? " (mới)" : " (cũ)"}</small></button>`).join('')}</div></div>`;
+      h += `<div class="srow col"><span>Kết quả tôi luyện: chọn một cái để giữ</span><div class="gslots">${P.opts.map((o, i) => `<button class="gslot" data-act="rfpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * statMult(it, o[0])))}${affTag(it, o[0], o[1])}<small>${i ? " (mới)" : " (cũ)"}</small></button>`).join('')}</div></div>`;
     } else if (it.wsPending) { const P = it.wsPending;
-      h += `<div class="srow col"><span>Kết quả tẩy luyện: chọn một trong hai bộ</span><div class="wsopts">${P.opts.map((set, i) => `<button class="gslot wsopt" data-act="wspick" data-arg="${it.id}|${i}"><b>${i ? "Đổi sang cái mới" : "Giữ nguyên"}</b>${set.map(([k, v]) => `<div class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * m))}${affTag(it, k, v)}</div>`).join('')}</button>`).join('')}</div></div>`;
+      h += `<div class="srow col"><span>Kết quả tẩy luyện: chọn một trong hai bộ</span><div class="wsopts">${P.opts.map((set, i) => `<button class="gslot wsopt" data-act="wspick" data-arg="${it.id}|${i}"><b>${i ? "Đổi sang cái mới" : "Giữ nguyên"}</b>${set.map(([k, v]) => `<div class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</div>`).join('')}</button>`).join('')}</div></div>`;
     } else {
       const lk = wlockOf(it), rc = refineCost(it), wc = washCost(it, lk.size), unlockedSp = it.aff.some(([k], i) => SP_AFFIXES.includes(k) && !lk.has(i));
       h += `<div class="srow col"><span>Tôi luyện · Tẩy luyện <small>Tôi luyện: tung lại trị số một thuộc tính, chọn cũ hoặc mới (${rc.gold} lượng + ${rc.mats} hồn tinh). Tẩy luyện: khóa cái muốn giữ, còn lại đổi mới hết, xong chọn một trong hai bộ; khóa càng nhiều càng đắt.</small></span>
-        <div class="rflist">${it.aff.map(([k, v], i) => `<div class="rfrow ${lk.has(i) ? 'lk' : ''}"><button class="lockb ${lk.has(i) ? 'on' : ''}" data-act="wlock" data-arg="${it.id}|${i}">${lk.has(i) ? "Đã khóa" : "Khóa"}</button><span class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * m))}${affTag(it, k, v)}</span><button class="btn sm ghost" ${SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rf" data-arg="${it.id}|${i}">Tôi luyện</button></div>`).join('')}</div>
+        <div class="rflist">${it.aff.map(([k, v], i) => `<div class="rfrow ${lk.has(i) ? 'lk' : ''}"><button class="lockb ${lk.has(i) ? 'on' : ''}" data-act="wlock" data-arg="${it.id}|${i}">${lk.has(i) ? "Đã khóa" : "Khóa"}</button><span class="${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</span><button class="btn sm ghost" ${SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rf" data-arg="${it.id}|${i}">Tôi luyện</button></div>`).join('')}</div>
         ${unlockedSp ? "<p class=\"sub warn\">Thuộc tính đặc biệt chưa khóa — tẩy luyện sẽ xóa mất nó (không lấy lại được).</p>" : ''}
         <button class="btn sm" ${lk.size < it.aff.length && SAVE.gold >= wc.gold && SAVE.mats >= wc.mats ? '' : 'disabled'} data-act="ws" data-arg="${it.id}">Tẩy luyện (khóa ${lk.size} · ${wc.gold} lượng + ${wc.mats} hồn tinh)</button></div>`;
     }
@@ -2341,19 +2342,19 @@ function smithHTML(it, where) {
   if (it.aff.length && featureOn('reroll') && it.rrPending) {
     const rc = rerollCost(it);
     if (it.rrPending) {
-      h += `<div class="srow col"><span>Kết quả tẩy luyện: chọn một dòng để giữ</span><div class="gslots">${it.rrPending.opts.map((o, i) => `<button class="gslot" data-act="rrpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * itemMult(it)))}${i === 0 ? "<small> (cũ)</small>" : ''}</button>`).join('')}</div></div>`;
+      h += `<div class="srow col"><span>Kết quả tẩy luyện: chọn một dòng để giữ</span><div class="gslots">${it.rrPending.opts.map((o, i) => `<button class="gslot" data-act="rrpick" data-arg="${it.id}|${i}">${fmtStat(o[0], Math.round(o[1] * statMult(it, o[0])))}${i === 0 ? "<small> (cũ)</small>" : ''}</button>`).join('')}</div></div>`;
     } else {
       h += `<div class="srow col"><span>Tẩy luyện <small>Tốn ${rc.gold} lượng + ${rc.mats} hồn tinh, đổi một thuộc tính thành một trong hai lựa chọn ngẫu nhiên mới (cũng có thể giữ nguyên). Mỗi món chỉ tẩy được cùng một thuộc tính.</small></span><div class="gslots">
-        ${it.aff.map(([k, v], i) => `<button class="gslot" ${(it.rr == null || it.rr === i) && SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rr" data-arg="${it.id}|${i}">${fmtStat(k, Math.round(v * itemMult(it)))}</button>`).join('')}</div></div>`;
+        ${it.aff.map(([k, v], i) => `<button class="gslot" ${(it.rr == null || it.rr === i) && SAVE.gold >= rc.gold && SAVE.mats >= rc.mats ? '' : 'disabled'} data-act="rr" data-arg="${it.id}|${i}">${fmtStat(k, Math.round(v * statMult(it, k)))}</button>`).join('')}</div></div>`;
     }
   }
   if (where === 'stash' && it.legend && featureOn('cube')) h += `<div class="srow"><span>Cất vào Túi Càn Khôn<small>${SAVE.cube[it.legend] ? "Trong Túi Càn Khôn đã có hiệu ứng này" : "Hủy món thần binh này để học vĩnh viễn hiệu ứng của nó (cần 10 hồn tinh)"}</small></span><button class="btn sm" ${!SAVE.cube[it.legend] && SAVE.mats >= 10 ? '' : 'disabled'} data-act="extract" data-arg="${it.id}">Cất vào</button></div>`;
   return h + '</div>';
 }
 function statMap(it) {
-  const m = itemMult(it), o = {};
-  for (const k in it.imp) o[k] = (o[k] || 0) + (k === 'spd' ? it.imp[k] : Math.round(it.imp[k] * m));
-  for (const [k, v] of it.aff) o[k] = (o[k] || 0) + Math.round(v * m);
+  const o = {};
+  for (const k in it.imp) o[k] = (o[k] || 0) + Math.round(it.imp[k] * statMult(it, k));
+  for (const [k, v] of it.aff) o[k] = (o[k] || 0) + Math.round(v * statMult(it, k));
   return o;
 }
 function diffChips(it, cur) {
@@ -2779,6 +2780,14 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">Dòng thuộc tính trang bị đã đổi luật</h2>
+  <p class="help-p">Trước đây các dòng phần trăm như chí mạng, sát thương chí mạng, sát thương, thuật pháp cứ tăng theo cấp trang bị, bảy món cộng dồn lại khiến thủ lĩnh về sau vài chiêu là gục. Giờ đổi thành thế này:</p>
+  <p class="help-p">Một, biên độ của dòng phần trăm cố định, không tăng theo cấp nữa; về sau mạnh lên nhờ các chỉ số thực như công, khí huyết, hộ giáp.</p>
+  <p class="help-p">Hai, mỗi loại dòng chỉ xuất hiện ở vài vị trí cố định: dòng tấn công nằm trên binh khí, hộ uyển, nhẫn, ngọc bội; dòng phòng thủ chủ yếu nằm trên mũ, áo giáp, giày. Mỗi món tối đa hai dòng tấn công.</p>
+  <p class="help-p">Ba, binh khí, hộ uyển, nhẫn, ngọc bội bậc Bảo phẩm chắc chắn có hai dòng tấn công; mức thấp nhất của các dòng cũng được nâng lên, khó ra đồ bỏ đi.</p>
+  <p class="help-p">Bốn, cường hóa chỉ cộng chỉ số thực.</p>
+  <p class="help-p">Trang bị cũ của bạn đã được quy đổi theo luật mới: dòng phần trăm thu nhỏ lại, dòng không hợp lệ được đổi thành công, khí huyết hoặc hộ giáp với cùng phẩm chất. Yêu vật cũng được giảm sức tương ứng — với trang bị bình thường, độ khó vẫn như cũ; thủ lĩnh giữ ải ở Hang Băng Côn Lôn và Chợ Ma U Minh cứng hơn trước một chút.</p>
+  <div class="row" style="justify-content:center"><button class="btn" data-act="close">Đã hiểu</button></div>`), 900); }
 if (SAVE.respec4) { delete SAVE.respec4; persist(); setTimeout(() => toast("Năm môn phái đã được làm lại: điểm tâm pháp hoàn trả hết, chiêu thức cũng được sắp lại. Vào “Tu luyện” xem tâm pháp và chiêu thức mới, Cản Thi Nhân nhớ xếp “Thi trận”"), 1200); }
 window.__abyss = { get SAVE() { return SAVE; }, get B() { return B; }, pause: () => clearTimeout(timer), mini: (id, f) => playMini(id, f), get WHERO() { return WHERO; }, get WGOAL() { return WGOAL; }, get WAUTO() { return WAUTO; }, ACT, fightw: e => beginWorldBattle(e), wbusy: () => !!WALK, maxhp: () => runStats(SAVE.run).maxHp, wtr: () => { const ch = SAVE.run && SAVE.run.world && SAVE.run.chapter; if (!ch) return []; return wTracker(ch).map(q => ({ t: q.t, town: wMarkPos(ch, q.mark) === 'town' })); }, fight: k => beginBattle(k), get WALKING() { return WALKING; }, get B() { return B; }, get VIEW() { return VIEW; }, get DLG() { return DLG; }, endDlg, wRun: a => wRun(a), dbg: { dlg: l => playDialog(l, null, null), render: () => render(), save: () => save(), view: v => { VIEW = v; }, finish: (r, o) => finishRunView(r, o) } };
 }

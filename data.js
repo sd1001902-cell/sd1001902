@@ -41,20 +41,27 @@ const BASES = {
   ring:   [['扳指', 1]],
   amulet: [['玉佩', 1]],
 };
+// 2026-11 词条重做：
+//   ① 百分比词条（暴击、暴伤、伤害、术法、吸血、全抗、最大气血、速度……）的幅度不再跟着装备等级涨，第一章是多少，第十章还是多少；
+//      后期的成长靠攻击、气血、护甲这些实数词条（flat）和装备本身的主属性。
+//   ② 每种百分比词条只出在三个部位（slots），攻击词条只出在兵器、护腕、扳指、玉佩上；一件装备最多两条攻击类词条。
+//      七件全堆同一种的路子堵上了：看到多少就是多少，没有暗地里的递减。
+//   ③ 词条的下限提高（比如攻击 2–5 改成 3–5），普通装备和极品装备的差距收窄。
 const AFFIXES = [
-  { k: 'atk',     r: [2, 5],   flat: true, w: 12, p: '锋锐的' },
-  { k: 'hp',      r: [8, 20],  flat: true, w: 12, p: '强健的' },
-  { k: 'armor',   r: [4, 10],  flat: true, w: 10, p: '坚实的' },
-  { k: 'crit',    r: [2, 6],   w: 7, p: '致命的' },
-  { k: 'critDmg', r: [10, 28], w: 7, p: '狠辣的' },
-  { k: 'spd',     r: [3, 8],   w: 9, p: '迅捷的', slots: ['boots', 'gloves', 'ring', 'amulet'] },
-  { k: 'leech',   r: [1, 3],   w: 5, p: '嗜血的' },
-  { k: 'res',     r: [4, 10],  w: 7, p: '辟邪的' },
-  { k: 'dmgPct',  r: [5, 14],  w: 8, p: '狂暴的' },
-  { k: 'elem',    r: [6, 18],  w: 5, p: '通灵的' },
-  { k: 'hpPct',   r: [4, 10],  w: 6, p: '养元的' },
-  { k: 'regen',   r: [1, 3],   flat: true, w: 5, p: '回春的' },
-  { k: 'thorns',  r: [3, 8],   flat: true, w: 4, p: '带刺的' },
+  // g：'o' 攻击类（一件装备最多两条）、'd' 防御类；ro：改之前的幅度，旧存档换算用
+  { k: 'atk',     r: [3, 5],   ro: [2, 5],   flat: true, w: 12, g: 'o', p: '锋锐的', slots: ['weapon', 'gloves', 'ring', 'amulet'] },
+  { k: 'hp',      r: [12, 20], ro: [8, 20],  flat: true, w: 12, g: 'd', p: '强健的', slots: ['weapon', 'helm', 'chest', 'boots', 'ring', 'amulet'] },
+  { k: 'armor',   r: [6, 10],  ro: [4, 10],  flat: true, w: 10, g: 'd', p: '坚实的', slots: ['helm', 'chest', 'gloves', 'boots'] },
+  { k: 'crit',    r: [3, 6],   ro: [2, 6],   w: 7, g: 'o', p: '致命的', slots: ['gloves', 'ring', 'amulet'] },
+  { k: 'critDmg', r: [15, 28], ro: [10, 28], w: 7, g: 'o', p: '狠辣的', slots: ['weapon', 'ring', 'amulet'] },
+  { k: 'spd',     r: [4, 8],   ro: [3, 8],   w: 9, g: 'o', p: '迅捷的', slots: ['boots', 'gloves', 'amulet'] },
+  { k: 'leech',   r: [2, 3],   ro: [1, 3],   w: 5, g: 'o', p: '嗜血的', slots: ['weapon', 'helm', 'gloves'] },
+  { k: 'res',     r: [6, 10],  ro: [4, 10],  w: 7, g: 'd', p: '辟邪的', slots: ['helm', 'chest', 'boots'] },
+  { k: 'dmgPct',  r: [8, 14],  ro: [5, 14],  w: 8, g: 'o', p: '狂暴的', slots: ['weapon', 'gloves', 'ring'] },
+  { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: '通灵的', slots: ['weapon', 'helm', 'amulet'] },
+  { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: '养元的', slots: ['helm', 'chest', 'amulet'] },
+  { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: '回春的' },
+  { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: '带刺的' },
   { k: 'mf',      r: [8, 20],  w: 4, p: '有福的' },
   { k: 'gf',      r: [10, 30], w: 4, p: '招财的' },
   // 特殊词条：只从悬赏、鬼市这些地方来，不会随机掉
