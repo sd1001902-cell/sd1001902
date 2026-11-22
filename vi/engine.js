@@ -1644,6 +1644,7 @@ function startBattle(run, kind) {
   if (s.fx.has('gDrum')) for (const u of b.units) if (u.kind === 'ally' || u.kind === 'minion') u.g = 100;                                                                          // 聚将鼓
   if (s.fx.has('cShiyu')) for (const u of b.units) if (u.kind === 'ally') { u.maxHp = u.hp = Math.round(u.maxHp * 1.3); u.atk *= 1.3; }   // 尸语冠
   if (P.allyPct) for (const u of b.units) if (u.kind === 'ally') { const k = 1 + P.allyPct / 100; u.maxHp = u.hp = Math.round(u.maxHp * k); u.atk *= k; }   // 同心玉
+  for (const u of b.units) { const k = stKey(u); if (k && !(b.stat && b.stat[k])) { stAddK(b, k, 'dmg', 1e-9); b.stat[k].dmg = 0; } }   // 开战就有统计框：你、每个伙伴、僵尸先各占一行
   if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
     if (P.yi.zhizhu) { f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2); (b.yiPops = b.yiPops || []).push([f.id, "Triền Ti", 'cold', 'zhizhu']); }
     if (P.yi.xianling && RNG.ch(YI_STUN(P.yi.xianling) / 100 * (f.kind === 'boss' ? 0.5 : 1))) { f.st.frozen = true; (b.yiPops = b.yiPops || []).push([f.id, "Kinh Đường Mộc", 'cold', 'xianling']); }
