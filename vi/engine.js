@@ -474,15 +474,18 @@ const hpK = lv => 1 + 0.18 * Math.pow(Math.max(0, (lv || 1) - 1), 1.22);
 const hpShow = (v, lv) => Math.round(v * hpK(lv));
 const heroLv = () => { try { return SAVE.chars[SAVE.cls].level || 1; } catch (e) { return 1; } };
 // 各职业的续航：狂刀客靠吸血；别的职业吸血只有三成（按放大后的气血算），各有各的路子。sust = 续航强度加成（%）
+// 妖物打主角一方的伤害整体上调（MON_UP），换来各职业本职续航更有分量；两边一起调，胜率对齐改之前
+let MON_UP = 1.3;   // 1 / 1.3 ≈ 0.77：狂刀客的 23% 减伤就是照这个数定的
 const SUST = {
-  mage:     { n: "Thủy hành hộ thể", d: "Mỗi lần nối thêm một tầng “Liên”, trên người thêm một lớp hộ thể ({a}% khí huyết tối đa, cộng dồn tối đa {cap}%)" , a: 2.5, cap: 22 },
-  necro:    { n: "Thế mạng", d: "Khi trên sân có cương thi, {a}% sát thương bạn phải chịu sẽ do cương thi gánh thay; cương thi ngã xuống thì bạn hồi {b}% khí huyết tối đa", a: 10, b: 2 },
-  assassin: { n: "Thân Pháp", d: "Né tránh +{a}%; mỗi lần né được hồi {b}% khí huyết tối đa, hạ gục kẻ địch hồi {c}%", a: 15, b: 12, c: 14 },
-  paladin:  { n: "Kim Cương Bất Hoại", d: "Mỗi lần phản kích hồi {a}% khí huyết tối đa; mỗi lượt hồi thêm {b}%", a: 3.2, b: 0.8 },
+  berserker:{ n: "Huyết chiến", d: "Da dày thịt chắc: sát thương phải chịu -{dr}%; hút máu có hiệu lực trọn vẹn (gây ra bao nhiêu sát thương thì hồi máu theo tỉ lệ hút máu bấy nhiêu)", dr: 23 },
+  mage:     { n: "Thủy hành hộ thể", d: "Mỗi lần nối thêm một tầng “Liên”, trên người thêm một lớp hộ thể ({a}% khí huyết tối đa, cộng dồn tối đa {cap}%)", a: 6.5, cap: 45 },
+  necro:    { n: "Thế mạng", d: "Sát thương phải chịu -{dr}%; khi trên sân có cương thi, thêm {a}% do cương thi gánh thay; cương thi ngã xuống thì bạn hồi {b}% khí huyết tối đa", a: 17, b: 6, dr: 7 },
+  assassin: { n: "Thân Pháp", d: "Sát thương phải chịu -{dr}%, né tránh +{a}%; mỗi lần né được hồi {b}% khí huyết tối đa, hạ gục kẻ địch hồi {c}%", a: 25, b: 18, c: 22, dr: 12 },
+  paladin:  { n: "Kim Cương Bất Hoại", d: "Sát thương phải chịu -{dr}%; mỗi lần phản kích hồi {a}% khí huyết tối đa; mỗi lượt hồi thêm {b}%", a: 6, b: 1.5, dr: 22 },
 };
 // 等级越高，气血倍数越大，吸血缩水得越厉害，所以续航也跟着等级涨：10 级约 0.75 倍，23 级 1 倍，43 级起 1.4 倍封顶
 const sustLv = lv => Math.min(1.4, 0.55 + (lv || 1) / 50);
-const sustV = (u, k) => SUST[u.cls][k] * (1 + (u.sust || 0) / 100) * sustLv(u.lv);
+const sustV = (u, k) => (SUST[u.cls][k] || 0) * (1 + (u.sust || 0) / 100) * sustLv(u.lv);
 function power(s) {
   const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100);
   const ehp = s.maxHp * (1 + s.armorT / 120) / (1 - s.res / 100 * 0.6) * (1 + s.dodge / 100) + s.regen * 25 + s.thorns * 8;
@@ -1876,6 +1879,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (src.side === 'p' && tgt.side === 'e') d *= lvMul(heroLv - (tgt.lv || heroLv), 0.07, W_LVUP[0]);
     else if (src.side === 'e' && tgt.side === 'p') d *= lvMul(heroLv - (src.lv || heroLv), -0.06, -W_LVUP[1]);
   }
+  if (src.side === 'e' && tgt.kind === 'hero') d *= MON_UP * (1 - ((SUST[tgt.cls] || {}).dr || 0) / 100);   // 只加在主角身上；狂刀客皮厚，正好抵掉
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
   if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, "Hộ giá", 'miss']); }
   if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分

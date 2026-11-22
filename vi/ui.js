@@ -8,7 +8,7 @@ const SPEEDS = { 1: 420, 2: 200, 4: 80 };
 const CN = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
 
 let COMBO = { n: 0, t: null }, PAUSE = 0;
-let GSLOT = null, GSUB = 'stash', ITAB = 'info', BAGTAB = 'gear', HTAB = 'stat', TBR = 0, MODSOPEN = false, AUTO = false, autoT = null, WALKING = false, FRESH = new Set();
+let GSLOT = null, GSUB = 'stash', ITAB = 'info', BAGTAB = 'stat', HTAB = 'stat', TBR = 0, MODSOPEN = false, AUTO = false, autoT = null, WALKING = false, FRESH = new Set();
 let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null, CHEST = null, LASTRUN = null, FILTER = 'all', MODALFN = null, BACK = null;
 
 loadSave(); ensureBounties();
@@ -251,7 +251,7 @@ function runBar(run) {
 const lockNote = (txt) => `<div class="locknote">${SPR.img('lock', 22)}<span>${txt}</span></div>`;
 
 // ---------- 青石镇（营地） ----------
-const TOWN_TABS = [['go', "Xuất chinh"], ['gear', "Trang bị"], ['hero', "Tu luyện"], ['col', "Giang Hồ Lục"], ['set', "Cài đặt"]];
+const TOWN_TABS = [['go', "Xuất chinh"], ['gear', "Nhân vật"], ['hero', "Tu luyện"], ['col', "Giang Hồ Lục"], ['set', "Cài đặt"]];
 function dots() {
   const d = {}, cls = SAVE.cls;
   d.col = featureOn('bounty') && SAVE.bounty && SAVE.bounty.list.some(b => b.prog >= b.need && !b.claimed);
@@ -340,7 +340,18 @@ function bountyHTML() {
     <div class="row" style="margin-top:10px;justify-content:space-between"><span class="sub">Xong cả ba thì nhận thêm một <b style="color:var(--gold2)">rương thưởng lớn</b> (chắc chắn có bộ hoặc thần binh)</span>
       ${Bn.bonus ? "<span class=\"sub\">Đã nhận</span>" : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">Nhận rương lớn</button>`}</div></section>`;
 }
-function gearTab() { return `<section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+function gearTab() { return `<section class="panel"><h3>Chỉ số nhân vật</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+// 人物属性：一排数值 + 本职续航。城镇「人物」「修炼」和游戏里的「人物」弹窗共用
+function statBlock(cls) {
+  const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
+  const stats = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Tỉ lệ chí mạng", s.crit + '%'], ["ST chí mạng", s.critDmg + '%'],
+    ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["ST thuật pháp", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ["Phúc duyên", '+' + s.mf + '%']];
+  const SU = SUST[cls], lvF = sustLv(ch.level);
+  const suV = k => k === 'dr' || k === 'cap' ? SU[k] : Math.round(Math.min(k === 'a' && cls === 'necro' ? 60 : 999, SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * lvF) * 10) / 10;
+  const desc = SU.d.replace(/\{(\w+)\}/g, (m, k) => suV(k));
+  const sustP = `<p class="help-p sustp"><b>Hồi phục bản môn · ${SU.n}</b>: ${desc}. ${cls === 'berserker' ? '' : `<br>“Hút máu” của môn phái khác trên người bạn chỉ còn ba phần; mỗi 1% hút máu còn được quy thành 4% sức hồi phục${s.sust ? ` (hiện +${s.sust}%)` : ''}.`}</p>`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}`;
+}
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
   const tabs = [['stat', "Chỉ số"], ['tal', `Tâm pháp${ti.free ? ` <b class="upn">${ti.free}</b>` : ''}`], ['skill', "Võ học"], ...(featureOn('para') ? [['para', `Tu vi${pf ? ` <b class="upn">${pf}</b>` : ''}`]] : [])];
@@ -348,16 +359,11 @@ function heroTab() {
   const bar = `<div class="gsubs htabs" style="--n:${tabs.length}">${tabs.map(([k, n]) => `<button class="${HTAB === k ? 'on' : ''}" data-act="htab" data-arg="${k}">${n}</button>`).join('')}</div>`;
   let body = '';
   if (HTAB === 'stat') {
-    const stats = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Tỉ lệ chí mạng", s.crit + '%'], ["ST chí mạng", s.critDmg + '%'],
-      ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["ST thuật pháp", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ["Phúc duyên", '+' + s.mf + '%']];
     const fxList = [...s.fx].map(f => { const L = LEGENDS.find(l => l.fx === f); if (L) return `<li><b class="r-legend">${L.n}</b>: ${L.d}</li>`;
       const S = SETS.find(x => x.b4 === f); if (S) return `<li><b class="r-set">${S.n} 4 món</b>: ${S.b4d}</li>`;
       const S6 = SETS.find(x => x.b6 === f); if (S6) return `<li><b class="r-set">${S6.n} 6 món</b>: ${S6.b6d}</li>`;
       for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<li><b style="color:var(--gold2)">Tâm pháp · ${T.n}</b>: ${T.d}</li>`; } return ''; }).join('');
-    const SU = SUST[cls], suV = k => Math.round(SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * sustLv(ch.level) * 10) / 10;
-    const sustP = SU ? `<p class="help-p sustp"><b>Hồi phục bản môn · ${SU.n}</b>: ${SU.d.replace('{a}', suV('a')).replace('{b}', suV('b')).replace('{c}', suV('c')).replace('{cap}', SU.cap)}.<br>“Hút máu” của môn phái khác trên người bạn chỉ còn ba phần; mỗi 1% hút máu còn được quy thành 4% sức hồi phục${s.sust ? ` (hiện +${s.sust}%)` : ''}.</p>`
-      : `<p class="help-p sustp"><b>Hồi phục bản môn · Hút máu</b>: gây ra bao nhiêu sát thương thì hồi máu theo tỉ lệ hút máu bấy nhiêu. Chỉ Cuồng Đao Khách mới hút máu trọn vẹn.</p>`;
-    body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}
+    body = `${statBlock(cls)}
       <h4 class="sub-h">Bộ trang bị môn phái</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
         return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>Rơi từ Ảo Cảnh tầng ${RSET_LV} trở lên</em>` : ''} (đã mặc ${n}/${S.pieces.length})<div class="${n >= 2 ? 'on' : 'off'}">2 món: ${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 món: ${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 món: ${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">Hiệu ứng đang có</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
@@ -689,7 +695,7 @@ function mapHTML() {
       <div class="walker" id="walker" style="${cellPos(M.cells[run.pos])}">${heroSpr(run.cls, 40)}</div>
     </div>
     <div class="mapctl"><button class="btn ${AUTO ? '' : 'ghost'} autob" data-act="auto">${AUTO ? "Đang tự khám phá…" : "Tự khám phá"}</button>
-      <button class="btn ghost" data-act="bag">Trang bị${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button><button class="btn ghost" data-act="retreat">Rút lui</button></div>`;
+      <button class="btn ghost" data-act="bag">Nhân vật${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button><button class="btn ghost" data-act="retreat">Rút lui</button></div>`;
 }
 const STEP_MS = 170;
 function walkTo(i) {
@@ -1135,7 +1141,7 @@ function worldHTML() {
       ${SAVE.joy ? '<div class="joy" id="joy"><i></i></div>' : ''}</div>
     <div class="wctl">${(() => { const cc = wCompNow(run.chapter); if (!cc) return ''; const mk = wNpcMark(run.chapter, cc); if (!mk) return ''; return `<button class="btn" data-act="wtalkc" title="Nói chuyện với ${esc((SPEAKERS[cc] || {}).n || cc)}">💬${esc(((SPEAKERS[cc] || {}).n || cc).slice(0, 3))}</button>`; })()}${wYinScene(ch) && wHasKey(ch, 'yinyangjing') ? `<button class="btn ${S.flags.yin ? '' : 'ghost'} wyin" data-act="wyin">Gương Âm Dương · ${S.flags.yin ? "Mặt Âm" : "Mặt Dương"}</button>` : ''}<button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? "Đang khám phá…" : "Tự khám phá"}</button>
       <button class="btn ghost" data-act="wlog">Nhiệm vụ</button><button class="btn ghost" data-act="wmini">Bản đồ</button>
-      <button class="btn ghost" data-act="bag">Trang bị${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button></div>
+      <button class="btn ghost" data-act="bag">Nhân vật${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button></div>
 `;
 }
 // ---- 绘制 ----
@@ -2392,8 +2398,8 @@ const cubeModal = slot => () => {
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Túi Càn Khôn · ô ${slot + 1}</h2><p class="sub">Chọn một hồn thần binh đã cất để đặt vào ô này (${CLASSES[cls].n}).</p>
     <div class="cubepick">${ch.cube[slot] ? `<button class="cp" data-act="cubeset" data-arg="${slot}|"><b>Bỏ trống ô này</b></button>` : ''}${learned.map(L => `<button class="cp ${ch.cube.includes(L.id) ? 'on' : ''}" data-act="cubeset" data-arg="${slot}|${L.id}"><b class="r-legend">${L.n}</b><span>${L.d}</span><small>${SLOT_NAME[L.slot]}${ch.cube.includes(L.id) ? " · đã đặt" : ''}</small></button>`).join('')}</div>`;
 };
-const bagModal = () => () => `<div class="shead"><button class="btn sm ghost" data-act="close">Đóng</button><div class="stabs"><button class="${BAGTAB === 'gear' ? 'on' : ''}" data-act="bagtab" data-arg="gear">Trang bị</button><button class="${BAGTAB === 'skill' ? 'on' : ''}" data-act="bagtab" data-arg="skill">Võ học</button><button class="${BAGTAB === 'tal' ? 'on' : ''}" data-act="bagtab" data-arg="tal">Tâm pháp${talentInfo(ctxCls()).free ? ` <b class="upn">${talentInfo(ctxCls()).free}</b>` : ''}</button></div></div>
-  ${BAGTAB === 'gear' ? `<div class="gearp inbag">${gearPanel(ctxCls(), true)}</div>` : BAGTAB === 'skill' ? skillPanel(ctxCls(), true) : `<p class="sub">Tâm pháp còn ${talentInfo(ctxCls()).free} điểm${paraFree() ? ` · tu vi còn ${paraFree()} điểm (về trấn để cộng)` : ''}</p>${talentGrid(ctxCls())}`}`;
+const bagModal = () => () => `<div class="shead"><button class="btn sm ghost" data-act="close">Đóng</button><div class="stabs"><button class="${BAGTAB === 'stat' ? 'on' : ''}" data-act="bagtab" data-arg="stat">Chỉ số</button><button class="${BAGTAB === 'gear' ? 'on' : ''}" data-act="bagtab" data-arg="gear">Trang bị</button><button class="${BAGTAB === 'skill' ? 'on' : ''}" data-act="bagtab" data-arg="skill">Võ học</button><button class="${BAGTAB === 'tal' ? 'on' : ''}" data-act="bagtab" data-arg="tal">Tâm pháp${talentInfo(ctxCls()).free ? ` <b class="upn">${talentInfo(ctxCls()).free}</b>` : ''}</button></div></div>
+  ${BAGTAB === 'stat' ? `<div class="inbag bagstat"><h3 class="bs-h">${esc(CLASSES[ctxCls()].n)} · cấp ${SAVE.chars[ctxCls()].level}</h3>${statBlock(ctxCls())}</div>` : BAGTAB === 'gear' ? `<div class="gearp inbag">${gearPanel(ctxCls(), true)}</div>` : BAGTAB === 'skill' ? skillPanel(ctxCls(), true) : `<p class="sub">Tâm pháp còn ${talentInfo(ctxCls()).free} điểm${paraFree() ? ` · tu vi còn ${paraFree()} điểm (về trấn để cộng)` : ''}</p>${talentGrid(ctxCls())}`}`;
 const retreatModal = () => () => `<h2 class="mh">Rút về trấn Thanh Thạch?</h2><p>Chuyến này dừng ở đây. Trang bị, nguyên liệu, kinh nghiệm và bạc đã nhận đều được giữ lại.</p>
   <div class="row"><button class="btn" data-act="doretreat">Xác nhận rút</button><button class="btn ghost" data-act="close">Nghĩ lại</button></div>`;
 const resetModal = () => () => `<h2 class="mh" style="color:var(--blood2)">Xóa toàn bộ bản lưu?</h2><p>Mọi nhân vật, cấp, trang bị, ngọc, công trình, tiến độ cốt truyện đều bị xóa sạch, không khôi phục được.</p>
@@ -2569,7 +2575,7 @@ const ACT = {
   bbonus: () => { const r = claimBountyBonus(); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal("Rương thưởng lớn", r)); achToast(checkAch()); },
   lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? "Nâng linh ngọc thành công!" : "Nâng thất bại"); refresh(); achToast(checkAch()); },
   cell: i => { stopAuto(); walkTo(i); },
-  bag: () => { stopAuto(); BACK = null; BAGTAB = talentInfo(ctxCls()).free && !SAVE.stash.length ? 'tal' : 'gear'; openModal(bagModal()); },
+  bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast("Nộ khí chưa đầy"); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? "Tự động<br>ra chiêu" : "Thủ công<br>ra chiêu"; }
     toast(SAVE.ultAuto ? "Tự động ra chiêu: kỹ năng và tuyệt kỹ đều tự tung" : "Thủ công ra chiêu: chạm kỹ năng phía trên, chiêu sau nhân vật sẽ tung nó; không chạm thì dùng chiêu cơ bản. Nộ khí đầy thì chạm “Tuyệt kỹ”"); if (B) applyStep(null); },

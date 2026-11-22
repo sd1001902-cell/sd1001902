@@ -8,7 +8,7 @@ const SPEEDS = { 1: 420, 2: 200, 4: 80 };
 const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
 let COMBO = { n: 0, t: null }, PAUSE = 0;
-let GSLOT = null, GSUB = 'stash', ITAB = 'info', BAGTAB = 'gear', HTAB = 'stat', TBR = 0, MODSOPEN = false, AUTO = false, autoT = null, WALKING = false, FRESH = new Set();
+let GSLOT = null, GSUB = 'stash', ITAB = 'info', BAGTAB = 'stat', HTAB = 'stat', TBR = 0, MODSOPEN = false, AUTO = false, autoT = null, WALKING = false, FRESH = new Set();
 let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null, CHEST = null, LASTRUN = null, FILTER = 'all', MODALFN = null, BACK = null;
 
 loadSave(); ensureBounties();
@@ -251,7 +251,7 @@ function runBar(run) {
 const lockNote = (txt) => `<div class="locknote">${SPR.img('lock', 22)}<span>${txt}</span></div>`;
 
 // ---------- 青石镇（营地） ----------
-const TOWN_TABS = [['go', '出征'], ['gear', '装备'], ['hero', '修炼'], ['col', '江湖录'], ['set', '设置']];
+const TOWN_TABS = [['go', '出征'], ['gear', '人物'], ['hero', '修炼'], ['col', '江湖录'], ['set', '设置']];
 function dots() {
   const d = {}, cls = SAVE.cls;
   d.col = featureOn('bounty') && SAVE.bounty && SAVE.bounty.list.some(b => b.prog >= b.need && !b.claimed);
@@ -340,7 +340,18 @@ function bountyHTML() {
     <div class="row" style="margin-top:10px;justify-content:space-between"><span class="sub">三个全部完成，再领一个<b style="color:var(--gold2)">赏金大箱</b>（必出套装或神兵）</span>
       ${Bn.bonus ? '<span class="sub">已领取</span>' : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">领取大箱</button>`}</div></section>`;
 }
-function gearTab() { return `<section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+function gearTab() { return `<section class="panel"><h3>人物属性</h3>${statBlock(SAVE.cls)}</section><section class="panel gearp">${gearPanel(SAVE.cls, false)}</section>`; }
+// 人物属性：一排数值 + 本职续航。城镇「人物」「修炼」和游戏里的「人物」弹窗共用
+function statBlock(cls) {
+  const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
+  const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
+    ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ['福缘', '+' + s.mf + '%']];
+  const SU = SUST[cls], lvF = sustLv(ch.level);
+  const suV = k => k === 'dr' || k === 'cap' ? SU[k] : Math.round(Math.min(k === 'a' && cls === 'necro' ? 60 : 999, SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * lvF) * 10) / 10;
+  const desc = SU.d.replace(/\{(\w+)\}/g, (m, k) => suV(k));
+  const sustP = `<p class="help-p sustp"><b>本职续航 · ${SU.n}</b>：${desc}。${cls === 'berserker' ? '' : `<br>别的门派的「吸血」在你身上只有三成；每 1% 吸血另外折成 4% 续航强度${s.sust ? `（现在 +${s.sust}%）` : ''}。`}</p>`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}`;
+}
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
   const tabs = [['stat', '属性'], ['tal', `心法${ti.free ? ` <b class="upn">${ti.free}</b>` : ''}`], ['skill', '武学'], ...(featureOn('para') ? [['para', `修为${pf ? ` <b class="upn">${pf}</b>` : ''}`]] : [])];
@@ -348,16 +359,11 @@ function heroTab() {
   const bar = `<div class="gsubs htabs" style="--n:${tabs.length}">${tabs.map(([k, n]) => `<button class="${HTAB === k ? 'on' : ''}" data-act="htab" data-arg="${k}">${n}</button>`).join('')}</div>`;
   let body = '';
   if (HTAB === 'stat') {
-    const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
-      ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ['福缘', '+' + s.mf + '%']];
     const fxList = [...s.fx].map(f => { const L = LEGENDS.find(l => l.fx === f); if (L) return `<li><b class="r-legend">${L.n}</b>：${L.d}</li>`;
       const S = SETS.find(x => x.b4 === f); if (S) return `<li><b class="r-set">${S.n} 4 件</b>：${S.b4d}</li>`;
       const S6 = SETS.find(x => x.b6 === f); if (S6) return `<li><b class="r-set">${S6.n} 6 件</b>：${S6.b6d}</li>`;
       for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<li><b style="color:var(--gold2)">心法·${T.n}</b>：${T.d}</li>`; } return ''; }).join('');
-    const SU = SUST[cls], suV = k => Math.round(SU[k] * ((cls === 'assassin' && k === 'a') ? 1 : 1 + s.sust / 100) * sustLv(ch.level) * 10) / 10;
-    const sustP = SU ? `<p class="help-p sustp"><b>本职续航 · ${SU.n}</b>：${SU.d.replace('{a}', suV('a')).replace('{b}', suV('b')).replace('{c}', suV('c')).replace('{cap}', SU.cap)}。<br>别的门派的「吸血」在你身上只有三成；每 1% 吸血另外折成 4% 续航强度${s.sust ? `（现在 +${s.sust}%）` : ''}。</p>`
-      : `<p class="help-p sustp"><b>本职续航 · 吸血</b>：打出多少伤害，就按吸血的比例回多少血。只有狂刀客的吸血是足额的。</p>`;
-    body = `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${sustP}
+    body = `${statBlock(cls)}
       <h4 class="sub-h">门派套装</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
         return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>幻境 ${RSET_LV} 层以上掉落</em>` : ''}（已穿 ${n}/${S.pieces.length}）<div class="${n >= 2 ? 'on' : 'off'}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 件：${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">生效中的特效</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
@@ -689,7 +695,7 @@ function mapHTML() {
       <div class="walker" id="walker" style="${cellPos(M.cells[run.pos])}">${heroSpr(run.cls, 40)}</div>
     </div>
     <div class="mapctl"><button class="btn ${AUTO ? '' : 'ghost'} autob" data-act="auto">${AUTO ? '自动探索中…' : '自动探索'}</button>
-      <button class="btn ghost" data-act="bag">装备${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button><button class="btn ghost" data-act="retreat">撤退</button></div>`;
+      <button class="btn ghost" data-act="bag">人物${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button><button class="btn ghost" data-act="retreat">撤退</button></div>`;
 }
 const STEP_MS = 170;
 function walkTo(i) {
@@ -1135,7 +1141,7 @@ function worldHTML() {
       ${SAVE.joy ? '<div class="joy" id="joy"><i></i></div>' : ''}</div>
     <div class="wctl">${(() => { const cc = wCompNow(run.chapter); if (!cc) return ''; const mk = wNpcMark(run.chapter, cc); if (!mk) return ''; return `<button class="btn" data-act="wtalkc" title="和${esc((SPEAKERS[cc] || {}).n || cc)}说话">💬${esc(((SPEAKERS[cc] || {}).n || cc).slice(0, 3))}</button>`; })()}${wYinScene(ch) && wHasKey(ch, 'yinyangjing') ? `<button class="btn ${S.flags.yin ? '' : 'ghost'} wyin" data-act="wyin">阴阳镜·${S.flags.yin ? '阴面' : '阳面'}</button>` : ''}<button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? '探索中…' : '自动探索'}</button>
       <button class="btn ghost" data-act="wlog">任务</button><button class="btn ghost" data-act="wmini">地图</button>
-      <button class="btn ghost" data-act="bag">装备${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button></div>
+      <button class="btn ghost" data-act="bag">人物${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button></div>
 `;
 }
 // ---- 绘制 ----
@@ -2392,8 +2398,8 @@ const cubeModal = slot => () => {
   return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">乾坤袋 · 格子 ${slot + 1}</h2><p class="sub">选一个已收藏的神兵之魂放进这个格子（${CLASSES[cls].n}）。</p>
     <div class="cubepick">${ch.cube[slot] ? `<button class="cp" data-act="cubeset" data-arg="${slot}|"><b>清空这个格子</b></button>` : ''}${learned.map(L => `<button class="cp ${ch.cube.includes(L.id) ? 'on' : ''}" data-act="cubeset" data-arg="${slot}|${L.id}"><b class="r-legend">${L.n}</b><span>${L.d}</span><small>${SLOT_NAME[L.slot]}${ch.cube.includes(L.id) ? ' · 已放入' : ''}</small></button>`).join('')}</div>`;
 };
-const bagModal = () => () => `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button><div class="stabs"><button class="${BAGTAB === 'gear' ? 'on' : ''}" data-act="bagtab" data-arg="gear">装备</button><button class="${BAGTAB === 'skill' ? 'on' : ''}" data-act="bagtab" data-arg="skill">武学</button><button class="${BAGTAB === 'tal' ? 'on' : ''}" data-act="bagtab" data-arg="tal">心法${talentInfo(ctxCls()).free ? ` <b class="upn">${talentInfo(ctxCls()).free}</b>` : ''}</button></div></div>
-  ${BAGTAB === 'gear' ? `<div class="gearp inbag">${gearPanel(ctxCls(), true)}</div>` : BAGTAB === 'skill' ? skillPanel(ctxCls(), true) : `<p class="sub">心法可用 ${talentInfo(ctxCls()).free} 点${paraFree() ? ` · 修为可用 ${paraFree()} 点（回镇上分配）` : ''}</p>${talentGrid(ctxCls())}`}`;
+const bagModal = () => () => `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button><div class="stabs"><button class="${BAGTAB === 'stat' ? 'on' : ''}" data-act="bagtab" data-arg="stat">属性</button><button class="${BAGTAB === 'gear' ? 'on' : ''}" data-act="bagtab" data-arg="gear">装备</button><button class="${BAGTAB === 'skill' ? 'on' : ''}" data-act="bagtab" data-arg="skill">武学</button><button class="${BAGTAB === 'tal' ? 'on' : ''}" data-act="bagtab" data-arg="tal">心法${talentInfo(ctxCls()).free ? ` <b class="upn">${talentInfo(ctxCls()).free}</b>` : ''}</button></div></div>
+  ${BAGTAB === 'stat' ? `<div class="inbag bagstat"><h3 class="bs-h">${esc(CLASSES[ctxCls()].n)} · ${SAVE.chars[ctxCls()].level} 级</h3>${statBlock(ctxCls())}</div>` : BAGTAB === 'gear' ? `<div class="gearp inbag">${gearPanel(ctxCls(), true)}</div>` : BAGTAB === 'skill' ? skillPanel(ctxCls(), true) : `<p class="sub">心法可用 ${talentInfo(ctxCls()).free} 点${paraFree() ? ` · 修为可用 ${paraFree()} 点（回镇上分配）` : ''}</p>${talentGrid(ctxCls())}`}`;
 const retreatModal = () => () => `<h2 class="mh">撤回青石镇？</h2><p>这一趟就到这里。已经得到的装备、材料、经验和银两都会保留。</p>
   <div class="row"><button class="btn" data-act="doretreat">确认撤回</button><button class="btn ghost" data-act="close">再想想</button></div>`;
 const resetModal = () => () => `<h2 class="mh" style="color:var(--blood2)">删除全部存档？</h2><p>所有角色、等级、装备、玉石、建筑、剧情进度都会清空，无法恢复。</p>
@@ -2569,7 +2575,7 @@ const ACT = {
   bbonus: () => { const r = claimBountyBonus(); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal('赏金大箱', r)); achToast(checkAch()); },
   lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? '灵玉升级成功！' : '升级失败'); refresh(); achToast(checkAch()); },
   cell: i => { stopAuto(); walkTo(i); },
-  bag: () => { stopAuto(); BACK = null; BAGTAB = talentInfo(ctxCls()).free && !SAVE.stash.length ? 'tal' : 'gear'; openModal(bagModal()); },
+  bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast('怒气还没满'); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? '自动<br>出招' : '手动<br>出招'; }
     toast(SAVE.ultAuto ? '自动出招：技能和必杀都自动放' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」'); if (B) applyStep(null); },
