@@ -5,6 +5,28 @@ PCT_STATS.add('frozenDmg');
 const MAX_LEVEL = 50;
 
 const RUNES = {
+  // 2026-11 补齐：每招两个变招，一攻一守（或一辅）。道士标「改为 X 行」的会换五行，方便凑齐一圈相生
+  liedi:      [{ n: "Băng Sơn", d: "Sát thương +60%" }, { n: "Chấn Địa", d: "40% tỉ lệ gây choáng; kẻ địch trúng đòn trong 2 lượt sát thương -20%" }],
+  lieyan:     [{ n: "Liệu Nguyên", d: "Thiêu đốt lan sang mọi kẻ địch" }, { n: "Phần Thân", d: "Sát thương lên kẻ địch đang bị thiêu đốt +80%" }],
+  hanren:     [{ n: "Toái Cốt", d: "Kẻ địch trúng đòn trong 3 lượt nhận sát thương +20%" }, { n: "Hàn Giáp", d: "Đánh trúng thì nhận hộ thể bằng 8% khí huyết tối đa" }],
+  bawang:     [{ n: "Phá Phủ", d: "Nộ ý đầy thì chắc chắn chí mạng" }, { n: "Tá Lực", d: "Hồi máu theo Nộ ý đã tiêu: mỗi điểm 0,3% khí huyết tối đa" }],
+  butui:      [{ n: "Tử Chiến", d: "Trong lúc Bất Thoái sát thương +40%" }, { n: "Thiết Bích", d: "Kéo dài thêm 1 lượt, trong lúc đó phản chấn gấp đôi" }],
+  luoshi:     [{ n: "Vẫn Thiết Quyết", d: "Đổi thành hành Kim, sát thương +30%" }, { n: "Sơn Băng", d: "30% tỉ lệ gây choáng mỗi kẻ địch" }],
+  jinguang:   [{ n: "Huyền Thủy Chú", d: "Đổi thành hành Thủy, kẻ địch trúng đòn bị đóng băng" }, { n: "Kim Quang Phá Giáp", d: "Sát thương lên kẻ địch đang phá giáp +60%" }],
+  lunzhuan:   [{ n: "Hậu Thổ Phù", d: "Đổi thành hành Thổ, kích nổ xong bản thân nhận một lớp bùa hộ thân" }, { n: "Dư Tẫn", d: "Kích nổ xong mục tiêu bị thiêu đốt lại" }],
+  wulei:      [{ n: "Thanh Mộc Lôi", d: "Đổi thành hành Mộc, “Liên” đủ 3 tầng là đánh trúng mọi kẻ địch" }, { n: "Thiên Phạt", d: "Sát thương lên kẻ địch đang choáng gấp đôi" }],
+  jihuo:      [{ n: "Thi Triều", d: "Khi tập hỏa cương thi tấn công +30%" }, { n: "Hộ Chủ", d: "Sau tập hỏa, đòn kế tiếp đánh vào bạn do cương thi chịu thay toàn bộ" }],
+  shidu:      [{ n: "Thực Cốt", d: "Sát thương +100%, và làm mọi kẻ địch phá giáp" }, { n: "Hủ Độc", d: "Kẻ địch trúng độc gây sát thương -15%" }],
+  yangshi:    [{ n: "Tá Thi Hoàn Hồn", d: "Đồng thời dựng dậy một cương thi đã ngã" }, { n: "Thi Giáp", d: "Trong 3 lượt cương thi nhận sát thương -40%, bạn -15%" }],
+  tudun:      [{ n: "Địa Liệt", d: "Sát thương +60%, 30% tỉ lệ gây choáng" }, { n: "Nhập Thổ Vi An", d: "Bản thân bạn cũng hồi 15% khí huyết tối đa" }],
+  bingpo:     [{ n: "Hàn Tinh", d: "Ba kim đều đánh cùng một mục tiêu" }, { n: "Phong Mạch", d: "Kẻ địch trúng đòn trong 2 lượt sát thương -25%" }],
+  dici:       [{ n: "Xuyên Tâm", d: "Chắc chắn chí mạng, không còn gây choáng" }, { n: "Cạm Bẫy", d: "Tỉ lệ gây choáng lên 70%, sát thương -30%" }],
+  shadowkill: [{ n: "Ảnh Phân", d: "Chuỗi đâm chia đều cho mọi kẻ địch" }, { n: "Thị Huyết Ảnh", d: "Mỗi nhát đâm hồi 2% khí huyết tối đa" }],
+  yandun:     [{ n: "Độc Yên", d: "Khi Yên Độn làm mọi kẻ địch trúng độc" }, { n: "Kim Thiền", d: "Kéo dài thêm 1 lượt, trong lúc đó mỗi lượt hồi 5% khí huyết tối đa" }],
+  ganlu:      [{ n: "Tịnh Thế", d: "Sát thương +80%" }, { n: "Cam Lâm", d: "Hồi máu gấp đôi, không còn gây sát thương" }],
+  fuhu:       [{ n: "Hàng Long", d: "Chắc chắn chí mạng lên kẻ địch đang choáng" }, { n: "Tá Kình", d: "Kẻ địch trúng đòn trong 3 lượt sát thương -30%" }],
+  budong:     [{ n: "Minh Vương Nộ", d: "Sát thương +60%" }, { n: "Kim Thân", d: "Hộ thể gấp đôi, hồi chiêu +1" }],
+  chanhou:    [{ n: "Đương Đầu Bổng Hát", d: "Khi dùng có 50% tỉ lệ gây choáng mỗi kẻ địch" }, { n: "Thiền Định", d: "Trong lúc đó mỗi lần phản kích hồi 3% khí huyết tối đa" }],
   whirl:      [{ n: "Huyết Toàn", d: "Mỗi lần đánh trúng một kẻ địch hồi 2% khí huyết tối đa" }, { n: "Phi Phong Đao", d: "Sát thương +50%, hồi chiêu +1" }],
   warcry:     [{ n: "Chấn Nhiếp", d: "Đồng thời chấn nhiếp mọi kẻ địch 3 lượt (sát thương -30%)" }, { n: "Huyết Chiến Lệnh", d: "Trong lúc Sư Tử Hống hút máu +10%" }],
   bloodlust:  [{ n: "Trảm Thủ", d: "Sát thương lên địch dưới 40% khí huyết gấp đôi" }, { n: "Kình Thôn", d: "Lượng hồi tăng lên bằng 100% sát thương" }],
@@ -44,6 +66,38 @@ const LGEMS = {
 // 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
 const BOX_SLOTS = 3;
 const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
+
+// 流派推荐：通关后每个门派两条路（对应两套幻境套装）。sk：[招式, 变招]；leg：腰带、副手上的神兵；cube：乾坤袋三格；gems：灵玉匣三颗
+const BUILDS = {
+  berserker: [
+    { set: 'xuehai', d: "Tích đầy Nộ ý, Bá Vương Giải Giáp một đao định đoạt, đánh yêu vương nhanh nhất", sk: [['liedi', 'a'], ['bawang', 'a'], ['hanren', 'a'], ['warcry', 'b'], ['bloodlust', 'b']],
+      leg: ['bawangdai', 'nutaoqiao'], cube: ['butcher', 'champion', 'yinxuejie'], gems: ['power', 'slay', 'guard'] },
+    { set: 'busi', d: "Giữ máu thấp mà xoay Toàn Phong Đao, càng tàn càng điên, dọn bầy nhanh nhất", sk: [['liedi', 'b'], ['whirl', 'a'], ['bloodlust', 'b'], ['warcry', 'a'], ['butui', 'b']],
+      leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['power', 'guard', 'life'] } ],
+  mage: [
+    { set: 'guiyuan', d: "Mộc Hỏa Thổ Kim Thủy nối hết vòng này sang vòng khác, “Liên” đầy thì mỗi chiêu gấp ba", sk: [['chain', 'b'], ['fireball', 'b'], ['luoshi', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
+      leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['power', 'flow', 'guard'] },
+    { set: 'wanfu', d: "Không cần thứ tự, treo đầy trạng thái lên cả sân rồi kích nổ", sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
+      leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['power', 'flow', 'renew'] } ],
+  necro: [
+    { set: 'yinbing', d: "Bầy xác nghiền nát: cương thi chịu đòn thay bạn, ngã xuống còn nổ", sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['corpse', 'a']],
+      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['bond', 'power', 'life'] },
+    { set: 'duxing', d: "Không mang xác, một mình chồng độc rồi kết toán một lần", sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
+      leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['pain', 'guard', 'power'] } ],
+  assassin: [
+    { set: 'qisha', d: "Tích Sát ý, đòn kết liễu hạ từng tên; giết một tên là hồi chiêu ngay", sk: [['venom', 'a'], ['shadowstep', 'a'], ['dici', 'a'], ['deathmark', 'a'], ['shadowkill', 'b']],
+      leg: ['cangfengdai', 'wuyingnang'], cube: ['duoming', 'yingsha', 'abyssEye'], gems: ['power', 'slay', 'zeal'] },
+    { set: 'qianji', d: "Hạ độc trước, rồi ám khí phủ kín cả sân", sk: [['venom', 'b'], ['fan', 'b'], ['bingpo', 'b'], ['yandun', 'a'], ['deathmark', 'b']],
+      leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['pain', 'power', 'flow'] } ],
+  paladin: [
+    { set: 'luohan', d: "Đứng chịu đòn, phản kích đánh cả sân, càng đánh càng cứng", sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
+      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['guard', 'life', 'renew'] },
+    { set: 'dari', d: "Nuôi hộ thể, chủ động ra chiêu để bồi Phật quang", sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
+      leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['power', 'renew', 'flow'] } ],
+};
+// 改五行的变招（只有道士用得上）
+const RUNE_WX = { luoshi: { a: 'jin' }, jinguang: { a: 'shui' }, lunzhuan: { a: 'tu' }, wulei: { a: 'mu' } };
+const runeWx = (k, r) => (RUNE_WX[k.id] && RUNE_WX[k.id][r]) || k.wx;
 
 const RIFT_THEMES = CHAPTERS;
 
@@ -171,7 +225,7 @@ SETS.push(
     pieces: [['helm', "Âm Binh Nón Lá"], ['chest', "Âm Binh Thọ Y"], ['gloves', "Âm Binh Chỉ Sáo"], ['boots', "Âm Binh Dép Cỏ"], ['ring', "Âm Binh Ban Chỉ"], ['amulet', "Âm Binh Chuông Đồng"]],
     b2: { minion: 1, minionPct: 20 }, b2d: "Thi vị +1, sức mạnh cương thi +20%",
     b4: 'yinBing4', b4d: "Cương thi ngã xuống thì nổ tung, đánh mọi kẻ địch bằng 50% khí huyết tối đa của nó",
-    b6: 'yinBing6', b6d: "Sát thương cương thi ×4; mỗi cương thi có mặt, sát thương bạn phải nhận -7%" },
+    b6: 'yinBing6', b6d: "Sát thương cương thi ×2,5; mỗi cương thi có mặt, sát thương bạn phải nhận -7%" },
   { id: 'qisha', n: "Thất Sát", cls: 'assassin', rift: true,
     pieces: [['helm', "Thất Sát Diện Tráo"], ['chest', "Thất Sát Dạ Hành Y"], ['gloves', "Thất Sát Chỉ Sáo"], ['boots', "Thất Sát Nhuyễn Ngoa"], ['ring', "Thất Sát Ban Chỉ"], ['amulet', "Thất Sát Ngọc Bội"]],
     b2: { crit: 8, critDmg: 30 }, b2d: "Tỉ lệ chí mạng +8%, sát thương chí mạng +30%",

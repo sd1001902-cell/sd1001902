@@ -500,12 +500,40 @@ const CLS_MECH = {
   assassin: ["Sát ý", "Tiêu Tẩm Độc, Băng Phách Châm và các chiêu như vậy khi ra đòn sẽ tích Sát ý (tối đa 5 điểm), đòn kết liễu tiêu sạch một lần: Đoạt Mệnh Ấn mỗi điểm sát thương +25%, Ảnh Sát mỗi điểm đâm thêm một nhát. Vào trận bạn ra tay trước."],
   paladin: ["Kim Cương phản kích", "Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (80% sát thương Phật quang); đang có hộ thể chân khí thì thêm +15%. Mỗi lượt tự hồi một ít khí huyết."],
 };
-const wxBadge = k => k.wx && WX[k.wx] ? `<i class="wxb" style="--c:${WX[k.wx].c}">${WX[k.wx].n}</i>` : '';
+// 招式现在算哪一行：道士有的变招会改五行
+const effWx = (cls, k) => featureOn('runes') ? runeWx(k, (SAVE.chars[cls].runes || {})[k.id]) : k.wx;
+const wxBadge = (k, cls) => { const w = cls ? effWx(cls, k) : k.wx; return w && WX[w] ? `<i class="wxb" style="--c:${WX[w].c}">${WX[w].n}</i>` : ''; };
+// 流派推荐：通关后每个门派两条路。照着配什么招、什么变招、什么套装神兵灵玉，缺的写明去哪刷
+function buildCard(cls) {
+  const L = BUILDS[cls]; if (!L || !featureOn('rift')) return '';
+  const ch = SAVE.chars[cls], s = charStats(cls), C = CLASSES[cls], load = syncLoadout(cls);
+  let bi = ch.bld; if (bi == null) bi = (s.setCount[L[1].set] || 0) > (s.setCount[L[0].set] || 0) ? 1 : 0;
+  const B = L[bi], S = SETS.find(x => x.id === B.set), owned = new Set(allItems().map(it => it.legend).filter(Boolean));
+  const ok = v => v ? '<i class="bc-ok">✓</i>' : '<i class="bc-no">✗</i>';
+  const skRow = B.sk.map(([id, rn]) => { const k = C.skills.find(x => x.id === id), R = RUNES[id] && rn ? RUNES[id][rn === 'a' ? 0 : 1] : null, on = load.includes(id) && (!R || !featureOn('runes') || ch.runes[id] === rn);
+    return `<span class="bc-bit ${on ? 'on' : ''}">${ok(on)}${k.n}${R ? '·' + R.n : ''}${k.lv > ch.level ? `<small>cấp ${k.lv}</small>` : ''}</span>`; }).join('');
+  const nSet = s.setCount[S.id] || 0;
+  const legRow = B.leg.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = owned.has(lid), open = slotOpen(X.slot);
+    return `<div class="bc-line">${ok(has)}<b class="r-legend">${X.n}</b><small>${SLOT_NAME[X.slot]} · ${has ? "đã có" : open ? "rơi trong Ảo Cảnh" : `Ảo Cảnh tầng ${SLOTS.find(z => z.id === X.slot).rift} mở ${SLOT_NAME[X.slot]} rồi mới rơi`}</small><p>${X.d}</p></div>`; }).join('');
+  const cubeRow = B.cube.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = !!SAVE.cube[lid], inb = (ch.cube || []).includes(lid);
+    return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}${X.n}<small>${has ? (inb ? '' : "đã cất, chưa đặt") : `rơi từ chương ${CN[X.ch || 1]}`}</small></span>`; }).join('');
+  const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t), inb = !!g && (ch.lgs || []).includes(g.id);
+    return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}<b style="color:${LGEMS[t].c}">${LGEMS[t].n}</b><small>${g ? (inb ? '' : "đã có, chưa đặt") : "yêu vương Ảo Cảnh rơi"}</small></span>`; }).join('');
+  return `<div class="bcard"><h4 class="sub-h">Gợi ý lối chơi <small>hai hướng sau khi phá đảo · không biết phối thế nào thì cứ theo đây</small></h4>
+    <div class="seg sm">${L.map((X, i) => `<button class="${i === bi ? 'on' : ''}" data-act="bldpick" data-arg="${i}">${SETS.find(z => z.id === X.set).n}</button>`).join('')}</div>
+    <p class="help-p">${B.d}.</p>
+    <div class="bc-sec"><span class="bc-h">Chiêu</span><div class="bc-bits">${skRow}</div></div>
+    <div class="bc-sec"><span class="bc-h">Bộ</span><div class="bc-bits"><span class="bc-bit ${nSet >= 6 ? 'on' : ''}">${ok(nSet >= 6)}<b class="r-set">${S.n}</b><small>đã mặc ${nSet}/6 · rơi từ Ảo Cảnh tầng ${S.rlv || RSET_LV}</small></span></div></div>
+    <div class="bc-sec"><span class="bc-h">Thần binh</span><div>${legRow}</div></div>
+    ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">Túi Càn Khôn</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
+    <div class="bc-sec"><span class="bc-h">Linh ngọc</span><div class="bc-bits">${gemRow}</div></div>
+    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">Phối nhanh theo gợi ý (chiêu, biến chiêu, Túi Càn Khôn, linh ngọc)</button></div>`;
+}
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);
   let extra = '';
   if (cls === 'mage') {   // 道士：现在带的招式凑不凑得齐一圈五行
-    const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => k.wx)), miss = WX_IDS.filter(w => !have.has(w));
+    const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => effWx(cls, k))), miss = WX_IDS.filter(w => !have.has(w));
     extra = `<p class="help-p wxrow">Bạn đang mang: ${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join('<span>→</span>')} ${miss.length ? `<b class="warn">Thiếu ${miss.map(w => WX[w].n).join(", ")}, không nối được trọn vòng</b>` : "<b class=\"ok\">Đủ ngũ hành, nối được hết vòng này sang vòng khác</b>"}</p>`;
   }
   return `<div class="mech"><h4 class="sub-h">Công pháp bản môn <small>bị động · không chiếm ô, luôn có hiệu lực</small></h4>
@@ -587,13 +615,13 @@ function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
   const eqIds = new Set(act.map(k => k.id));
   const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k)}${k.n}</b><small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
+    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b><small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
       <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="Lên">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="Xuống">▼</button>` : ''}
       ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? "Tháo" : "Mang"}</button>`}</span></div>
       <p>${k.d}${s.sk[k.id] ? `<span class="skb"> (tâm pháp +${s.sk[k.id]}%)</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
       ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
   const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv);
-  return `${mechCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>Phối hợp trạng thái · cách đánh liên hoàn</summary>
+  return `${mechCard(cls)}${inBag ? '' : buildCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>Phối hợp trạng thái · cách đánh liên hoàn</summary>
       <p class="help-p">Chiêu mở đòn “gây trạng thái” lên địch, chiêu kết đòn đánh vào địch đang mang trạng thái đó sẽ có thêm hiệu ứng (gấp đôi sát thương, chắc chắn chí mạng, đập vỡ, lây lan…).</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
       <p class="help-p">Đồng hành cũng gây trạng thái: Ngoc thiêu đốt, cô Trân phá giáp, Long đạo trưởng đóng băng. Dẫn đúng người, chiêu kết đòn của bạn mới có đất dụng võ.</p></details>
@@ -2901,6 +2929,9 @@ const ACT = {
   para: a => { const [k, n] = split(a); if (addPara(k, +n)) { SFX.play('buff'); refresh(); achToast(checkAch()); } },
   parareset: () => { resetPara(); toast("Đã hoàn lại điểm tu vi"); refresh(); },
   rune: a => { const [id, r] = split(a); setRune(ctxCls(), id, r); SFX.play('magic'); refresh(); },
+  bldpick: i => { SAVE.chars[ctxCls()].bld = +i; refresh(); },
+  bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');
+    toast(`Đã phối xong: mang ${r.sk} chiêu${r.miss ? ` (${r.miss} chiêu chưa học)` : ''}${r.cube ? `, Túi Càn Khôn đặt ${r.cube} món` : ''}${r.gems ? `, linh ngọc đặt ${r.gems} viên` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
   skeq: id => { const r = equipSkill(ctxCls(), id); if (r === 'full') return toast(`Mang tối đa ${LOADOUT_MAX} võ học, tháo bớt một cái trước`); SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },

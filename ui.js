@@ -499,12 +499,40 @@ const CLS_MECH = {
   assassin: ['杀意', '淬毒镖、冰魄针这些招式出手攒杀意（最多 5 点），终结技一次花光：夺命印每点伤害 +25%，影杀每点多刺一下。开战你先出手。'],
   paladin: ['金刚反击', '挨打时有 15% 几率格挡并反击（80% 佛光伤害）；身上有护体真气时再 +15%。每回合自己回一点气血。'],
 };
-const wxBadge = k => k.wx && WX[k.wx] ? `<i class="wxb" style="--c:${WX[k.wx].c}">${WX[k.wx].n}</i>` : '';
+// 招式现在算哪一行：道士有的变招会改五行
+const effWx = (cls, k) => featureOn('runes') ? runeWx(k, (SAVE.chars[cls].runes || {})[k.id]) : k.wx;
+const wxBadge = (k, cls) => { const w = cls ? effWx(cls, k) : k.wx; return w && WX[w] ? `<i class="wxb" style="--c:${WX[w].c}">${WX[w].n}</i>` : ''; };
+// 流派推荐：通关后每个门派两条路。照着配什么招、什么变招、什么套装神兵灵玉，缺的写明去哪刷
+function buildCard(cls) {
+  const L = BUILDS[cls]; if (!L || !featureOn('rift')) return '';
+  const ch = SAVE.chars[cls], s = charStats(cls), C = CLASSES[cls], load = syncLoadout(cls);
+  let bi = ch.bld; if (bi == null) bi = (s.setCount[L[1].set] || 0) > (s.setCount[L[0].set] || 0) ? 1 : 0;
+  const B = L[bi], S = SETS.find(x => x.id === B.set), owned = new Set(allItems().map(it => it.legend).filter(Boolean));
+  const ok = v => v ? '<i class="bc-ok">✓</i>' : '<i class="bc-no">✗</i>';
+  const skRow = B.sk.map(([id, rn]) => { const k = C.skills.find(x => x.id === id), R = RUNES[id] && rn ? RUNES[id][rn === 'a' ? 0 : 1] : null, on = load.includes(id) && (!R || !featureOn('runes') || ch.runes[id] === rn);
+    return `<span class="bc-bit ${on ? 'on' : ''}">${ok(on)}${k.n}${R ? '·' + R.n : ''}${k.lv > ch.level ? `<small>${k.lv} 级</small>` : ''}</span>`; }).join('');
+  const nSet = s.setCount[S.id] || 0;
+  const legRow = B.leg.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = owned.has(lid), open = slotOpen(X.slot);
+    return `<div class="bc-line">${ok(has)}<b class="r-legend">${X.n}</b><small>${SLOT_NAME[X.slot]} · ${has ? '已有' : open ? '幻境里掉' : `幻境 ${SLOTS.find(z => z.id === X.slot).rift} 层开${SLOT_NAME[X.slot]}后掉`}</small><p>${X.d}</p></div>`; }).join('');
+  const cubeRow = B.cube.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = !!SAVE.cube[lid], inb = (ch.cube || []).includes(lid);
+    return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}${X.n}<small>${has ? (inb ? '' : '已收，没放上') : `第${CN[X.ch || 1]}章起掉`}</small></span>`; }).join('');
+  const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t), inb = !!g && (ch.lgs || []).includes(g.id);
+    return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}<b style="color:${LGEMS[t].c}">${LGEMS[t].n}</b><small>${g ? (inb ? '' : '已有，没放上') : '幻境妖王掉'}</small></span>`; }).join('');
+  return `<div class="bcard"><h4 class="sub-h">流派推荐 <small>通关后的两条路 · 不知道怎么配就照这个来</small></h4>
+    <div class="seg sm">${L.map((X, i) => `<button class="${i === bi ? 'on' : ''}" data-act="bldpick" data-arg="${i}">${SETS.find(z => z.id === X.set).n}</button>`).join('')}</div>
+    <p class="help-p">${B.d}。</p>
+    <div class="bc-sec"><span class="bc-h">招式</span><div class="bc-bits">${skRow}</div></div>
+    <div class="bc-sec"><span class="bc-h">套装</span><div class="bc-bits"><span class="bc-bit ${nSet >= 6 ? 'on' : ''}">${ok(nSet >= 6)}<b class="r-set">${S.n}</b><small>已穿 ${nSet}/6 · 幻境 ${S.rlv || RSET_LV} 层起掉</small></span></div></div>
+    <div class="bc-sec"><span class="bc-h">神兵</span><div>${legRow}</div></div>
+    ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">乾坤袋</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
+    <div class="bc-sec"><span class="bc-h">灵玉</span><div class="bc-bits">${gemRow}</div></div>
+    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">一键照配（招式、变招、乾坤袋、灵玉）</button></div>`;
+}
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);
   let extra = '';
   if (cls === 'mage') {   // 道士：现在带的招式凑不凑得齐一圈五行
-    const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => k.wx)), miss = WX_IDS.filter(w => !have.has(w));
+    const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => effWx(cls, k))), miss = WX_IDS.filter(w => !have.has(w));
     extra = `<p class="help-p wxrow">你现在带的：${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join('<span>→</span>')}　${miss.length ? `<b class="warn">缺${miss.map(w => WX[w].n).join('、')}，一圈接不上</b>` : '<b class="ok">五行齐了，可以一圈一圈接下去</b>'}</p>`;
   }
   return `<div class="mech"><h4 class="sub-h">本门功法 <small>被动 · 不占格子，一直生效</small></h4>
@@ -586,13 +614,13 @@ function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
   const eqIds = new Set(act.map(k => k.id));
   const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k)}${k.n}</b><small>${lock ? k.lv + ' 级领悟' : '冷却 ' + k.cd}</small>
+    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b><small>${lock ? k.lv + ' 级领悟' : '冷却 ' + k.cd}</small>
       <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="上移">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="下移">▼</button>` : ''}
       ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? '卸下' : '装配'}</button>`}</span></div>
       <p>${k.d}${s.sk[k.id] ? `<span class="skb">（心法 +${s.sk[k.id]}%）</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
       ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
   const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv);
-  return `${mechCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>状态配合 · 怎么打连招</summary>
+  return `${mechCard(cls)}${inBag ? '' : buildCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>状态配合 · 怎么打连招</summary>
       <p class="help-p">起手技能给敌人「挂状态」，收招技能打带这个状态的敌人，会有额外效果（伤害翻倍、必定暴击、打碎、传染……）。</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
       <p class="help-p">同伴也会挂状态：Ngoc 灼烧，珍姑娘破甲，龙道长冰冻。带对了同伴，你的收招就有得打。</p></details>
@@ -2900,6 +2928,9 @@ const ACT = {
   para: a => { const [k, n] = split(a); if (addPara(k, +n)) { SFX.play('buff'); refresh(); achToast(checkAch()); } },
   parareset: () => { resetPara(); toast('修为点已退回'); refresh(); },
   rune: a => { const [id, r] = split(a); setRune(ctxCls(), id, r); SFX.play('magic'); refresh(); },
+  bldpick: i => { SAVE.chars[ctxCls()].bld = +i; refresh(); },
+  bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');
+    toast(`照配好了：带上 ${r.sk} 招${r.miss ? `（${r.miss} 招还没学会）` : ''}${r.cube ? `，乾坤袋放了 ${r.cube} 个` : ''}${r.gems ? `，灵玉放了 ${r.gems} 颗` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
   skeq: id => { const r = equipSkill(ctxCls(), id); if (r === 'full') return toast(`最多带 ${LOADOUT_MAX} 个武学，先卸下一个`); SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },

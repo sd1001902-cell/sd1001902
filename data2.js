@@ -5,6 +5,28 @@ PCT_STATS.add('frozenDmg');
 const MAX_LEVEL = 50;
 
 const RUNES = {
+  // 2026-11 补齐：每招两个变招，一攻一守（或一辅）。道士标「改为 X 行」的会换五行，方便凑齐一圈相生
+  liedi:      [{ n: '崩山', d: '伤害 +60%' }, { n: '震地', d: '40% 几率眩晕；打中的敌人 2 回合内伤害 -20%' }],
+  lieyan:     [{ n: '燎原', d: '灼烧蔓延给所有敌人' }, { n: '焚身', d: '对已经灼烧的敌人伤害 +80%' }],
+  hanren:     [{ n: '碎骨', d: '打中的敌人 3 回合内受到的伤害 +20%' }, { n: '寒甲', d: '打中后获得 8% 最大气血的护体' }],
+  bawang:     [{ n: '破釜', d: '怒意满时必定暴击' }, { n: '卸力', d: '按吃掉的怒意回血：每点 0.3% 最大气血' }],
+  butui:      [{ n: '死战', d: '不退期间伤害 +40%' }, { n: '铁壁', d: '多持续 1 回合，期间反震翻倍' }],
+  luoshi:     [{ n: '陨铁诀', d: '改为金行，伤害 +30%' }, { n: '山崩', d: '30% 几率眩晕每个敌人' }],
+  jinguang:   [{ n: '玄水咒', d: '改为水行，打中的敌人冰冻' }, { n: '破甲金光', d: '对破甲的敌人伤害 +60%' }],
+  lunzhuan:   [{ n: '厚土符', d: '改为土行，引爆后自己得一层护身符箓' }, { n: '余烬', d: '引爆后目标重新灼烧' }],
+  wulei:      [{ n: '青木雷', d: '改为木行，「连」满 3 层就劈中所有敌人' }, { n: '天罚', d: '对眩晕的敌人伤害翻倍' }],
+  jihuo:      [{ n: '尸潮', d: '集火时僵尸攻击 +30%' }, { n: '护主', d: '集火后，下一次打向你的攻击由僵尸全数代受' }],
+  shidu:      [{ n: '蚀骨', d: '伤害 +100%，并让所有敌人破甲' }, { n: '腐毒', d: '中毒的敌人造成的伤害 -15%' }],
+  yangshi:    [{ n: '借尸还魂', d: '同时扶起一具倒下的僵尸' }, { n: '尸甲', d: '3 回合内僵尸受到的伤害 -40%，你 -15%' }],
+  tudun:      [{ n: '地裂', d: '伤害 +60%，30% 几率眩晕' }, { n: '入土为安', d: '你自己也恢复 15% 最大气血' }],
+  bingpo:     [{ n: '寒星', d: '三针全打同一个目标' }, { n: '封脉', d: '打中的敌人 2 回合内伤害 -25%' }],
+  dici:       [{ n: '穿心', d: '必定暴击，不再眩晕' }, { n: '陷阱', d: '眩晕几率提高到 70%，伤害 -30%' }],
+  shadowkill: [{ n: '影分', d: '连刺分给所有敌人' }, { n: '嗜血影', d: '每刺一下恢复 2% 最大气血' }],
+  yandun:     [{ n: '毒烟', d: '烟遁时让所有敌人中毒' }, { n: '金蝉', d: '多持续 1 回合，期间每回合恢复 5% 最大气血' }],
+  ganlu:      [{ n: '净世', d: '伤害 +80%' }, { n: '甘霖', d: '回血翻倍，不再伤敌' }],
+  fuhu:       [{ n: '降龙', d: '对眩晕的敌人必定暴击' }, { n: '卸劲', d: '打中的敌人 3 回合内伤害 -30%' }],
+  budong:     [{ n: '明王怒', d: '伤害 +60%' }, { n: '金身', d: '护体翻倍，冷却 +1' }],
+  chanhou:    [{ n: '当头棒喝', d: '施放时 50% 几率眩晕每个敌人' }, { n: '禅定', d: '期间每次反击恢复 3% 最大气血' }],
   whirl:      [{ n: '血旋', d: '每击中一个敌人恢复 2% 最大气血' }, { n: '飓风刀', d: '伤害 +50%，冷却 +1' }],
   warcry:     [{ n: '震慑', d: '同时震慑所有敌人 3 回合（伤害 -30%）' }, { n: '血战令', d: '狮子吼期间吸血 +10%' }],
   bloodlust:  [{ n: '斩首', d: '对气血低于 40% 的敌人伤害翻倍' }, { n: '鲸吞', d: '恢复量提高到伤害的 100%' }],
@@ -44,6 +66,38 @@ const LGEMS = {
 // 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
 const BOX_SLOTS = 3;
 const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
+
+// 流派推荐：通关后每个门派两条路（对应两套幻境套装）。sk：[招式, 变招]；leg：腰带、副手上的神兵；cube：乾坤袋三格；gems：灵玉匣三颗
+const BUILDS = {
+  berserker: [
+    { set: 'xuehai', d: '攒满怒意，霸王卸甲一刀定音，打妖王最快', sk: [['liedi', 'a'], ['bawang', 'a'], ['hanren', 'a'], ['warcry', 'b'], ['bloodlust', 'b']],
+      leg: ['bawangdai', 'nutaoqiao'], cube: ['butcher', 'champion', 'yinxuejie'], gems: ['power', 'slay', 'guard'] },
+    { set: 'busi', d: '压着血线转旋风刀，越残越疯，清群怪最快', sk: [['liedi', 'b'], ['whirl', 'a'], ['bloodlust', 'b'], ['warcry', 'a'], ['butui', 'b']],
+      leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['power', 'guard', 'life'] } ],
+  mage: [
+    { set: 'guiyuan', d: '木火土金水一圈圈接下去，「连」满了每招三倍', sk: [['chain', 'b'], ['fireball', 'b'], ['luoshi', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
+      leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['power', 'flow', 'guard'] },
+    { set: 'wanfu', d: '不管顺序，把状态挂满全场再引爆', sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
+      leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['power', 'flow', 'renew'] } ],
+  necro: [
+    { set: 'yinbing', d: '尸群碾压：僵尸替你挨打，倒下还会炸', sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['corpse', 'a']],
+      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['bond', 'power', 'life'] },
+    { set: 'duxing', d: '不带尸，一个人叠毒，再一次结算', sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
+      leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['pain', 'guard', 'power'] } ],
+  assassin: [
+    { set: 'qisha', d: '攒杀意，终结技点杀；杀一个，刷新一次', sk: [['venom', 'a'], ['shadowstep', 'a'], ['dici', 'a'], ['deathmark', 'a'], ['shadowkill', 'b']],
+      leg: ['cangfengdai', 'wuyingnang'], cube: ['duoming', 'yingsha', 'abyssEye'], gems: ['power', 'slay', 'zeal'] },
+    { set: 'qianji', d: '先上毒，暗器铺满全场', sk: [['venom', 'b'], ['fan', 'b'], ['bingpo', 'b'], ['yandun', 'a'], ['deathmark', 'b']],
+      leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['pain', 'power', 'flow'] } ],
+  paladin: [
+    { set: 'luohan', d: '站着挨打，反击打全场，越打越硬', sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
+      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['guard', 'life', 'renew'] },
+    { set: 'dari', d: '护体养着，主动出招追佛光', sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
+      leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['power', 'renew', 'flow'] } ],
+};
+// 改五行的变招（只有道士用得上）
+const RUNE_WX = { luoshi: { a: 'jin' }, jinguang: { a: 'shui' }, lunzhuan: { a: 'tu' }, wulei: { a: 'mu' } };
+const runeWx = (k, r) => (RUNE_WX[k.id] && RUNE_WX[k.id][r]) || k.wx;
 
 const RIFT_THEMES = CHAPTERS;
 
@@ -171,7 +225,7 @@ SETS.push(
     pieces: [['helm', '阴兵斗笠'], ['chest', '阴兵寿衣'], ['gloves', '阴兵指套'], ['boots', '阴兵草鞋'], ['ring', '阴兵扳指'], ['amulet', '阴兵铜铃']],
     b2: { minion: 1, minionPct: 20 }, b2d: '尸位 +1，僵尸强度 +20%',
     b4: 'yinBing4', b4d: '僵尸倒下时炸开，按它最大气血的 50% 打所有敌人',
-    b6: 'yinBing6', b6d: '僵尸的伤害 ×4；每有一具僵尸在场，你受到的伤害 -7%' },
+    b6: 'yinBing6', b6d: '僵尸的伤害 ×2.5；每有一具僵尸在场，你受到的伤害 -7%' },
   { id: 'qisha', n: '七杀', cls: 'assassin', rift: true,
     pieces: [['helm', '七杀面罩'], ['chest', '七杀夜行衣'], ['gloves', '七杀指套'], ['boots', '七杀软靴'], ['ring', '七杀扳指'], ['amulet', '七杀玉佩']],
     b2: { crit: 8, critDmg: 30 }, b2d: '暴击率 +8%，暴击伤害 +30%',

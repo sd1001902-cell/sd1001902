@@ -133,6 +133,27 @@ const LEGENDS = [
   { id: 'budongxiang',n: "Tượng Bất Động Minh Vương",slot: 'amulet', cls: 'paladin',  ch: 4, imp: { armorPct: 15 }, fx: 'budong2',   d: "Hộ thể của Bất Động Minh Vương gấp đôi; còn hộ thể thì sát thương phải nhận -20%" },
   { id: 'ganluping',n: "Bình Cam Lộ",     slot: 'ring',   cls: 'paladin',   ch: 6, imp: { healPct: 15 },fx: 'ganlu2',      d: "Cam Lộ hồi máu gấp đôi, đồng thời xóa trúng độc và choáng trên người bạn" },
   { id: 'fuhutao',  n: "Găng Phục Hổ",   slot: 'gloves', cls: 'paladin',   ch: 8, imp: { crit: 5 },    fx: 'fuhu2',       d: "Phục Hổ Quyền vừa phá giáp vừa gây choáng địch (30%)" },
+  // 2026-11：腰带、副手上的神兵（通关后才掉）。每条幻境套装路线两件，点名招式；攻、防、辅都有
+  { id: 'bawangdai',  n: "Bá Vương Đai",   slot: 'belt',    cls: 'berserker', ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'bawangBelt',  d: "Bá Vương Giải Giáp đánh trúng thì chiêu kế tiếp sát thương +50%" },
+  { id: 'nutaoqiao',  n: "Vỏ Đao Nộ Đào", slot: 'offhand', cls: 'berserker', ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'nutao',       d: "Nộ ý quá nửa thì mỗi lượt hồi 4% khí huyết tối đa; Bất Thoái hồi chiêu -2" },
+  { id: 'xiuluodai',  n: "Tu La Đai",   slot: 'belt',    cls: 'berserker', ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'xiuluoBelt',  d: "Khí huyết dưới 30% thì sát thương phải nhận -30%" },
+  { id: 'liediqiao',  n: "Vỏ Đao Liệt Địa", slot: 'offhand', cls: 'berserker', ch: 9, x: 1, imp: { crit: 5 },    fx: 'liediOff',    d: "Liệt Địa Trảm có 50% tỉ lệ gây choáng; Toàn Phong Đao mỗi lần trúng một kẻ địch đang phá giáp, Nộ ý +5" },
+  { id: 'wuxingtao',  n: "Ngũ Hành Thao",   slot: 'belt',    cls: 'mage',      ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'wuxingBelt',  d: "Khi “Liên” đủ 5 tầng, mỗi lần ra chiêu làm các chiêu còn lại hồi chiêu -1" },
+  { id: 'taijixia',   n: "Hộp Bùa Thái Cực", slot: 'offhand', cls: 'mage',      ch: 9, x: 1, imp: { elem: 12 },   fx: 'taijiOff',    d: "Giới hạn bùa hộ thân +20%; đang có bùa thì sát thương thuật pháp phải nhận -30%" },
+  { id: 'baifudai',   n: "Bách Phù Đai",   slot: 'belt',    cls: 'mage',      ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baifuBelt',   d: "Trạng thái bạn gây ra kéo dài thêm 2 lượt" },
+  { id: 'zhenxiexia', n: "Hộp Bùa Trấn Tà", slot: 'offhand', cls: 'mage',      ch: 9, x: 1, imp: { elem: 12 },   fx: 'zhenxieOff',  d: "Kẻ địch mỗi có một loại trạng thái thì sát thương nó gây lên bạn -8%" },
+  { id: 'ganshisuo',  n: "Dây Cản Thi",   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'ganshiBelt',  d: "Cương thi ngã 3 lượt sau tự bò dậy (mỗi thi vị mỗi trận một lần)" },
+  { id: 'shehunling', n: "Chuông Nhiếp Hồn",   slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { minionPct: 15 }, fx: 'shehunOff', d: "Sau Rung Chuông · Tập Hỏa, cương thi có 30% tỉ lệ mỗi con ra tay thêm một lần" },
+  { id: 'baigunang',  n: "Túi Bách Cổ",   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baiguBelt',   d: "Giới hạn cộng dồn trúng độc từ 5 tầng lên 8 tầng (cần Ngũ Độc Độc Hành 6 món)" },
+  { id: 'caoren',     n: "Hình Nhân Thế Mạng", slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { elem: 12 },   fx: 'caorenOff',   d: "Mỗi trận một lần: đòn chí tử do hình nhân chịu thay, bạn còn 25% khí huyết, và mọi kẻ địch trúng độc" },
+  { id: 'cangfengdai', n: "Tàng Phong Đai",  slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'cangfengBelt', d: "Vào trận có sẵn 3 điểm Sát ý; đòn kết liễu không bị né, không đánh hụt" },
+  { id: 'wuyingnang', n: "Túi Vô Ảnh",   slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { spd: 6 },     fx: 'wuyingOff',   d: "Né được một đòn thì hồi 4% khí huyết tối đa, chiêu đang hồi lâu nhất hồi chiêu -1" },
+  { id: 'qianjidai',  n: "Thiên Cơ Đai",   slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'qianjiBelt',  d: "Chiêu ám khí (Tiêu Tẩm Độc, Băng Phách Châm, Mạn Thiên Hoa Vũ) cứ trúng 5 lần thì mọi chiêu hồi chiêu -1" },
+  { id: 'baidunang',  n: "Túi Tiêu Bách Độc", slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { crit: 5 },    fx: 'baiduOff',    d: "Kẻ địch trúng độc gây sát thương lên bạn -20%; kẻ địch mang độc chết thì độc truyền sang một kẻ địch khác" },
+  { id: 'fumodai',    n: "Phục Ma Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'fumoBelt',    d: "Phản kích có 30% tỉ lệ làm đối phương choáng; giới hạn “Phật nộ” từ 10 tầng lên 15 tầng" },
+  { id: 'muyu',       n: "Mõ Trấn Tâm", slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: "Mỗi lần phản kích hồi 2% khí huyết tối đa, và hồi cho đồng hành 5%" },
+  { id: 'daridai',    n: "Đại Nhật Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'dariBelt',    d: "Giới hạn hộ thể chân khí từ 50% lên 80% khí huyết tối đa (cần Đại Nhật Như Lai 4 món)" },
+  { id: 'zijinbo',    n: "Bát Tử Kim",   slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'zijinOff',    d: "Khi dùng Bát Nhã Tâm Kinh, Cam Lộ thì gây 150% sát thương Phật quang lên mọi kẻ địch" },
 ];
 
 const SETS = [

@@ -133,6 +133,27 @@ const LEGENDS = [
   { id: 'budongxiang',n: '不动明王像',slot: 'amulet', cls: 'paladin',  ch: 4, imp: { armorPct: 15 }, fx: 'budong2',   d: '不动明王的护体翻倍；护体还在时，受到的伤害 -20%' },
   { id: 'ganluping',n: '甘露瓶',     slot: 'ring',   cls: 'paladin',   ch: 6, imp: { healPct: 15 },fx: 'ganlu2',      d: '甘露回血翻倍，并清掉你身上的中毒和眩晕' },
   { id: 'fuhutao',  n: '伏虎拳套',   slot: 'gloves', cls: 'paladin',   ch: 8, imp: { crit: 5 },    fx: 'fuhu2',       d: '伏虎拳同时让敌人破甲和眩晕（30%）' },
+  // 2026-11：腰带、副手上的神兵（通关后才掉）。每条幻境套装路线两件，点名招式；攻、防、辅都有
+  { id: 'bawangdai',  n: '霸王带',   slot: 'belt',    cls: 'berserker', ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'bawangBelt',  d: '霸王卸甲打中后，下一招伤害 +50%' },
+  { id: 'nutaoqiao',  n: '怒涛刀鞘', slot: 'offhand', cls: 'berserker', ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'nutao',       d: '怒意过半时每回合恢复 4% 最大气血；不退冷却 -2' },
+  { id: 'xiuluodai',  n: '修罗带',   slot: 'belt',    cls: 'berserker', ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'xiuluoBelt',  d: '气血低于 30% 时，受到的伤害 -30%' },
+  { id: 'liediqiao',  n: '裂地刀鞘', slot: 'offhand', cls: 'berserker', ch: 9, x: 1, imp: { crit: 5 },    fx: 'liediOff',    d: '裂地斩有 50% 几率眩晕；旋风刀每打中一个破甲的敌人，怒意 +5' },
+  { id: 'wuxingtao',  n: '五行绦',   slot: 'belt',    cls: 'mage',      ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'wuxingBelt',  d: '「连」满 5 层时，每次出招让其余招式冷却 -1' },
+  { id: 'taijixia',   n: '太极符匣', slot: 'offhand', cls: 'mage',      ch: 9, x: 1, imp: { elem: 12 },   fx: 'taijiOff',    d: '护身符箓上限 +20%；身上有符箓时，受到的术法伤害 -30%' },
+  { id: 'baifudai',   n: '百符带',   slot: 'belt',    cls: 'mage',      ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baifuBelt',   d: '你挂上的状态多持续 2 回合' },
+  { id: 'zhenxiexia', n: '镇邪符匣', slot: 'offhand', cls: 'mage',      ch: 9, x: 1, imp: { elem: 12 },   fx: 'zhenxieOff',  d: '敌人身上每有一种状态，它对你造成的伤害 -8%' },
+  { id: 'ganshisuo',  n: '赶尸索',   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'ganshiBelt',  d: '僵尸倒下 3 回合后自己爬起来（每个尸位每场一次）' },
+  { id: 'shehunling', n: '摄魂铃',   slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { minionPct: 15 }, fx: 'shehunOff', d: '摇铃·集火之后，僵尸有 30% 几率再各出手一次' },
+  { id: 'baigunang',  n: '百蛊囊',   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baiguBelt',   d: '中毒叠加的上限从 5 层提高到 8 层（要配五毒独行 6 件）' },
+  { id: 'caoren',     n: '替身草人', slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { elem: 12 },   fx: 'caorenOff',   d: '每场战斗一次：致命的一击由草人代受，你留 25% 气血，并让所有敌人中毒' },
+  { id: 'cangfengdai', n: '藏锋带',  slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'cangfengBelt', d: '开战自带 3 点杀意；终结技不会被闪开、不会落空' },
+  { id: 'wuyingnang', n: '无影囊',   slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { spd: 6 },     fx: 'wuyingOff',   d: '闪开一次攻击后恢复 4% 最大气血，冷却最长的那一招冷却 -1' },
+  { id: 'qianjidai',  n: '千机带',   slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'qianjiBelt',  d: '暗器招式（淬毒镖、冰魄针、漫天花雨）每打中 5 次，所有招式冷却 -1' },
+  { id: 'baidunang',  n: '百毒镖囊', slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { crit: 5 },    fx: 'baiduOff',    d: '中毒的敌人对你造成的伤害 -20%；带毒的敌人死去时，毒传给另一个敌人' },
+  { id: 'fumodai',    n: '伏魔带',   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'fumoBelt',    d: '反击有 30% 几率眩晕对方；「佛怒」上限从 10 层提高到 15 层' },
+  { id: 'muyu',       n: '镇心木鱼', slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: '每次反击恢复 2% 最大气血，并给同伴恢复 5%' },
+  { id: 'daridai',    n: '大日带',   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'dariBelt',    d: '护体真气的上限从最大气血的 50% 提高到 80%（要配大日如来 4 件）' },
+  { id: 'zijinbo',    n: '紫金钵',   slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'zijinOff',    d: '施放般若心经、甘露时，对所有敌人造成 150% 佛光伤害' },
 ];
 
 const SETS = [
