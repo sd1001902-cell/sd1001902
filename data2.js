@@ -60,7 +60,7 @@ const LGEMS = {
   guard: { n: '金钟玉', c: '#e8c13a', d: lv => `受到的伤害 -${(6 + lv * 0.3).toFixed(1)}%；气血低于 30% 时效果翻倍`, st: lv => ({ gDr: 6 + lv * 0.3 }) },
   renew: { n: '回春玉', c: '#7fe0b0', d: lv => `每回合回复 ${(1.5 + lv * 0.05).toFixed(2)}% 气血；治疗效果 +${10 + lv}%`, st: lv => ({ regenPct: 1.5 + lv * 0.05, healPct: 10 + lv }) },
   bond:  { n: '同心玉', c: '#ff9ad0', d: lv => `同伴、Ngoc、僵尸的伤害和气血 +${15 + lv}%`, st: lv => ({ allyPct: 15 + lv }) },
-  flow:  { n: '流光玉', c: '#9ae8ff', d: lv => `有冷却的招式放出后，${(10 + lv * 0.4).toFixed(1)}% 几率不进冷却`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
+  flow:  { n: '流光玉', c: '#9ae8ff', d: lv => `有冷却的招式放出后，${Math.min(CDSKIP_CAP, 10 + lv * 0.4).toFixed(1)}% 几率不进冷却（各处加起来最多 ${CDSKIP_CAP}%）`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
   slay:  { n: '破军玉', c: '#ff7a3a', d: lv => `对精英和妖王伤害 +${(12 + lv * 0.5).toFixed(1)}%`, st: lv => ({ xBoss: 12 + lv * 0.5 }) },
 };
 // 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
@@ -223,7 +223,7 @@ SETS.push(
   { id: 'guiyuan', n: '五行归元', cls: 'mage', rift: true,
     pieces: [['helm', '归元道冠'], ['chest', '归元法衣'], ['gloves', '归元护腕'], ['boots', '归元云履'], ['ring', '归元扳指'], ['amulet', '归元玉佩']],
     b2: { lianPct: 4, elem: 20 }, b2d: '每层「连」的伤害加成再 +4%，术法伤害 +20%',
-    b4: 'guiYuan4', b4d: '出招断了相生，「连」不清零，只退 2 层',
+    b4: 'guiYuan4', b4d: '按相生顺序出招，「连」一次 +2；同一种五行连着放，「连」也不掉',
     b6: 'guiYuan6', b6d: '「连」叠满时，这一招伤害 ×3，并以 60% 的伤害波及其余所有敌人' },
   { id: 'yinbing', n: '阴兵借道', cls: 'necro', rift: true,
     pieces: [['helm', '阴兵斗笠'], ['chest', '阴兵寿衣'], ['gloves', '阴兵指套'], ['boots', '阴兵草鞋'], ['ring', '阴兵扳指'], ['amulet', '阴兵铜铃']],

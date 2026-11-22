@@ -566,7 +566,7 @@ function sustText(cls, s) {
 // 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
 const CLS_MECH = {
   berserker: ["Nộ ý", "Ra đòn tích 5 điểm, trúng một đòn tích 8 điểm, tối đa 100 điểm. Nộ ý quá nửa: sát thương +15%. Khí huyết mỗi thiếu một phần mười: sát thương thêm +3%. Bá Vương Giải Giáp đổi hết Nộ ý thành sát thương (mỗi điểm +2%)."],
-  mage: ["Ngũ hành tương sinh", "Ra chiêu theo thứ tự Mộc→Hỏa→Thổ→Kim→Thủy→Mộc, mỗi lần nối đúng thì chồng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%; nối sai thì về không. Chiêu nào thuộc hành nào ghi ngay cạnh tên chiêu; Linh Phù là Mộc."],
+  mage: ["Ngũ hành lưu chuyển", "Mỗi lần đổi sang một hành khác để ra chiêu, cộng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%; nếu đúng thứ tự tương sinh Mộc→Hỏa→Thổ→Kim→Thủy→Mộc, chiêu đó sát thương thêm +20%; cùng một hành ra liền nhau thì mất một tầng, không về số không. Mỗi chiêu thuộc hành nào ghi bên cạnh tên chiêu; Linh Phù là Mộc."],
   necro: ["Thi trận", "Vào trận cương thi đã xếp sẵn theo Thi trận (thi vị cơ bản 3), công và khí huyết của chúng tính theo chỉ số của bạn. Kẻ địch bị Trấn Hồn Đinh đóng trúng sẽ bị cương thi ưu tiên cắn. Cương thi ngã thì dùng Rung Chuông Gọi Xác gọi lại."],
   assassin: ["Sát ý", "Tiêu Tẩm Độc, Băng Phách Châm và các chiêu như vậy khi ra đòn sẽ tích Sát ý (tối đa 5 điểm), đòn kết liễu tiêu sạch một lần: Đoạt Mệnh Ấn mỗi điểm sát thương +25%, Ảnh Sát mỗi điểm đâm thêm một nhát. Vào trận bạn ra tay trước."],
   paladin: ["Kim Cương phản kích", "Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (80% sát thương Phật quang); đang có hộ thể chân khí thì thêm +15%. Mỗi lượt tự hồi một ít khí huyết."],
@@ -877,7 +877,7 @@ const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}<
       <button class="btn ghost" data-act="guide">Chỉ dẫn nhiệm vụ: ${SAVE.guide === 'full' ? "Chi tiết" : "Manh mối"}</button></div>
       <p class="help-p">Chỉ dẫn “Manh mối”: chỉ cho biết đại khái ở vùng nào, đồ phải tự tìm; “Chi tiết”: đánh dấu thẳng vị trí.</p>
       </section><section class="panel"><h3>Hình ảnh</h3><div class="row"><button class="btn ghost" data-act="gfxq">Hiệu ứng: ${["Thấp", "Vừa", "Cao"][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
-      <button class="btn ghost" data-act="cine">Cảnh tuyệt kỹ: ${SAVE.cineOff ? "Tắt" : "Bật"}</button>
+      <button class="btn ghost" data-act="cine">Hoạt cảnh tất sát: ${SAVE.cineOff ? "tắt" : "gọn"}</button>
       <button class="btn ghost" data-act="hdpx">Điểm ảnh: ${SAVE.hdOff ? "Cổ điển" : "Sắc nét"}</button></div>
       <p class="help-p">Nếu điện thoại nóng hoặc giật, chỉnh hiệu ứng xuống “Thấp”: ít hạt hơn, bỏ khựng hình và quay chậm.</p></section>`;
 // ---------- 存档备份 ----------
@@ -1113,18 +1113,19 @@ const spdF = () => ({ 1: 1, 2: 0.5, 4: 0.25 }[SAVE.speed] || 1);
 function schedule(o) {
   clearTimeout(timer); if (!B || B.over) return;
   let ms = o ? Math.min(800, Math.max(120, (o.dt || 8) * 18)) * spdF() : 500;
-  if (o && (o.ult || (o.cast && (o.cast.id === 'phase' || o.cast.id === 'enrage')))) ms += CUT_MS();
+  if (o && o.ult) ms += ULT_MS(); else if (o && o.cast && (o.cast.id === 'phase' || o.cast.id === 'enrage')) ms += CUT_MS();
   if (o && o.foilKey) ms += 950 * spdF();
   timer = setTimeout(tick, ms);
 }
 const CUT_MS = () => SAVE.speed === 4 ? 650 : SAVE.speed === 2 ? 900 : 1150;
+const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed === 4 ? 300 : 500;   // 必杀：顶上一条细横幅，不压暗、不挡人
 function tick() {
   if (!B || VIEW !== 'battle') return;
   // 手动出招：轮到你时停下来等你点
   if (!B.castAuto && !B.over) { const nx = turnOrder(B, 1)[0]; if (nx === B.P && !B.P.st.frozen && !B.castReq && !B.ultReq) { B.waiting = true; applyStep(null); return; } }
   B.waiting = false;
   const o = battleStep(B); const nl = narrate(o); if (nl && !(o.lines.length && !o.pops.some(p => /^\d+$/.test(p[1])))) B.logs.push(nl); B.logs.push(...o.lines); updBattle(o, true);
-  if (B.over) setTimeout(endBattle, o.ult ? CUT_MS() + 300 : 250); else schedule(o);
+  if (B.over) setTimeout(endBattle, o.ult ? ULT_MS() + 300 : 250); else schedule(o);
 }
 function skipBattle() {
   clearTimeout(timer); let n = 0; B.ultAuto = true; B.castAuto = true;
@@ -1222,12 +1223,13 @@ function sayBubble(id, text) {
 function showCutin(kind, data) {
   const el = $('#cutin'); if (!el) return;
   let h;
-  if (kind === 'ult') {
-    const run = SAVE.run;
-    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, data.sprs && data.sprs.length > 1 ? 84 : 104, null, '', 'full')).join('') : ''}</div>
-      <div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
-    el.className = 'cutin on' + (data.combo ? ' combo' : '');
-    SFX.play('gong'); if (typeof GFX !== 'undefined') GFX.ult(data.combo ? '#ff9ac0' : '#ffb04a');
+  if (kind === 'ult') {   // 必杀：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
+    const run = SAVE.run, sm = SAVE.speed === 4, ms = ULT_MS();
+    const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
+    el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
+    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');
+    SFX.play('gong');
+    clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, ms); return;
   } else {
     h = `<div class="ci-band boss"><div class="ci-art">${SPR.img(data.spr, 120, data.pal)}</div><div class="ci-txt"><b class="ci-g">${kind === 'phase' ? "BIẾN" : "NỘ"}</b><span>${esc(data.name)}</span></div></div>`;
     el.className = 'cutin on boss';
@@ -1248,7 +1250,7 @@ function updBattle(o, anim) {
     if (o.ult) showCutin('ult', o.ult);
     else { const u = B.units.find(x => x.id === o.actor); if (u) showCutin(o.cast.id, u); }
     const b = B;
-    setTimeout(() => { if (B !== b) return; const d = VFX.play(o, B); setTimeout(() => { if (B === b) applyStep(o, anim); }, d); }, CUT_MS() * 0.8);
+    setTimeout(() => { if (B !== b) return; const d = VFX.play(o, B); setTimeout(() => { if (B === b) applyStep(o, anim); }, d); }, (o.ult ? ULT_MS() : CUT_MS()) * 0.8);
     return;
   }
   if (o && anim) {

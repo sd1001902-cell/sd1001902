@@ -1656,7 +1656,7 @@ const mageCap = P => SUST.mage.cap + (P.fx && P.fx.has('taijiOff') ? 20 : 0);
 const dariCap = u => u.fx && u.fx.has('dariBelt') ? 0.8 : DARI_CAP;
 const stExt = u => u && u.fx && u.fx.has('baifuBelt') ? 2 : 0;   // 百符带：状态多挂两回合
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, "Kiệt lực", 'curse', 1]); } };
-let THORN_CAP = 0.15;
+let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
 let YINBING_MUL = 2;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
@@ -1974,7 +1974,10 @@ function heroAct(b, P, out) {
   // 五行道士：按相生顺序出招叠「连」
   if (P.cls === 'mage' && sk.wx) { const cap = (P.fx.has('tianshi') ? 7 : 5) + (P.fx.has('wTaiyi') ? 2 : 0);
     const lian0 = P.lian;
-    P.lian = P.lastWx && WX_SHENG[P.lastWx] === sk.wx ? Math.min(cap, P.lian + 1) : P.fx.has('guiYuan4') ? Math.max(0, P.lian - 2) : 0; P.lastWx = sk.wx;
+    // 五行流转：换一种五行 +1；正好按相生顺序也是 +1，这一招伤害 +20%（五行归元 4 件：相生 +2）；同一种五行连着放 -1（归元 4 件不掉）。不再清零
+    const sheng = !!P.lastWx && WX_SHENG[P.lastWx] === sk.wx, same = P.lastWx === sk.wx;
+    P.lian = same ? (P.fx.has('guiYuan4') ? P.lian : Math.max(0, P.lian - 1)) : Math.min(cap, P.lian + (sheng && P.fx.has('guiYuan4') ? 2 : 1));
+    b.shengCast = sheng; if (sheng) out.pops.push(['P', "Tương Sinh", 'buff']); P.lastWx = sk.wx;
     if (P.fx.has('cLianFloor')) P.lian = Math.max(P.lian, 2);   // 太乙道袍
     if (P.cls === 'mage' && (P.lian > lian0 || (P.lian === cap && lian0 === cap))) { const capS = Math.round(P.maxHp * mageCap(P) / 100), add = Math.round(P.maxHp * sustV(P, 'a') / 100); if ((P.shield || 0) < capS) { P.shield = Math.min(capS, (P.shield || 0) + add); out.pops.push(['P', "Hộ Thể", 'buff']); } }
     if (P.fx.has('wanFu4') && sk.ap && !(P.lian > lian0)) { const capS = Math.round(P.maxHp * mageCap(P) / 100), add = Math.round(P.maxHp * sustV(P, 'a') / 100); if ((P.shield || 0) < capS) { P.shield = Math.min(capS, (P.shield || 0) + add); out.pops.push(['P', "Hộ Thể", 'buff']); } }
@@ -1985,7 +1988,7 @@ function heroAct(b, P, out) {
   const nFoe0 = aliveOf(b, 'e').length;
   const bw0 = !!P.st.bwNext;
   const ki0 = P.ki || 0, dz = sk.id === 'dici' && P.fx.has('cDici') && foes[0] && foes[0].st.frozen; b.kiSnap = sk.fin ? ki0 : null;
-  cast(b, P, sk, foes, out); b.kiSnap = null;
+  cast(b, P, sk, foes, out); b.kiSnap = null; b.shengCast = false;
   if (sk.id === 'lieyan' && P.fx.has('cLieyan')) P.fury = Math.min(100, (P.fury || 0) + 10);                              // 焚天靴
   if (dz) P.ki = Math.min(P.kiMax, P.ki + 1);
   if (sk.cd && BASIC_FX.some(k => P.fx.has(k))) basicFollow(b, P, out);                                                                               // 地煞衣
@@ -1995,7 +1998,7 @@ function heroAct(b, P, out) {
   if (P.cls === 'assassin' && sk.ki) P.ki = Math.min(P.kiMax, P.ki + sk.ki);
   if (sk.cd) {
     sk.left = skillCd(P, sk);
-    if (P.cdSkip && RNG.ch(P.cdSkip / 100)) { sk.left = 0; out.pops.push(['P', "Lưu quang", 'buff']); }
+    if (P.cdSkip && RNG.ch(Math.min(CDSKIP_CAP, P.cdSkip) / 100)) { sk.left = 0; out.pops.push(['P', "Lưu quang", 'buff']); }   // 所有来源合计最多 40%
     if (P.fx.has('gBlink') && !b.blink) { b.blink = true; sk.left = 0; out.pops.push(['P', "Súc địa", 'buff']); }   // 缩地靴
     foes = aliveOf(b, 'e');
     if (P.fx.has('doubleCast') && foes.length && RNG.ch(0.2) && skillReady(b, P, sk, foes)) {
@@ -2041,10 +2044,12 @@ function autoPick(b, P, foes) {
   if (P.cls === 'paladin' && P.hp / P.maxHp < 0.5 && (pick('prayer') || pick('aegis'))) return pick('prayer') || pick('aegis');
   if (P.cls === 'berserker' && P.fury >= 80 && pick('bawang')) return pick('bawang');
   if (P.cls === 'assassin' && P.ki >= P.kiMax - 1) { const f = ready.find(k => k.fin && k.pay && has(k.pay.s)) || ready.find(k => k.fin); if (f) return f; }
-  if (P.cls === 'mage') {   // 五行道士：先顾着相生不断（灵符是木，可以接水）
-    const nx = P.lastWx ? WX_SHENG[P.lastWx] : null, cont = ready.filter(k => !nx || k.wx === nx);
-    const c = cont.find(k => k.pay && has(k.pay.s)) || cont.find(k => k.ap && !has(k.ap)) || cont[0];
-    if (c && nx) return c; if (nx && basic.wx === nx) return basic; }
+  if (P.cls === 'mage') {   // 五行道士：先接相生（+20%），接不上就换一种五行，尽量别同一种连着放
+    const nx = P.lastWx ? WX_SHENG[P.lastWx] : null, cont = nx ? ready.filter(k => k.wx === nx) : [];
+    const pk = L => L.find(k => k.pay && has(k.pay.s)) || L.find(k => k.ap && !has(k.ap)) || L.find(k => !k.fin);
+    const c = cont.length && pk(cont); if (c) return c; if (nx && basic.wx === nx) return basic;
+    const dif = ready.filter(k => k.wx !== P.lastWx), c2 = dif.length && pk(dif); if (c2) return c2;
+    if (P.lastWx && basic.wx !== P.lastWx && !ready.length) return basic; }
   const pay = ready.find(k => k.pay && !k.fin && has(k.pay.s)); if (pay) return pay;
   const start = ready.find(k => k.ap && !has(k.ap)); if (start) return start;
   if (P.cls === 'mage' && P.lastWx) { const nx = WX_SHENG[P.lastWx]; const c = ready.find(k => k.wx === nx) || (basic.wx === nx ? basic : null); if (c) return c; }
@@ -2367,6 +2372,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (src.evOn && !opt.proc) d *= 1.5;                                                                        // 逍遥履
   }
   if (tgt.st.lamp) d *= 1.25;                                                                                   // 引魂灯
+  if (src === b.P && b.shengCast && b.castSk && !opt.proc) d *= 1.2;                                            // 相生：这一招 +20%
   if (src === b.P && tgt.side === 'e') {   // 职业神兵（通关后那批）
     if (fx.has('cLieyan') && b.castSk && b.castSk.id === 'lieyan' && tgt.st.burn) d *= 2;                       // 焚天靴
     if (fx.has('cMeltFury') && (src.fury || 0) >= 100) d *= 1.2;                                                 // 嗜战刀鞘

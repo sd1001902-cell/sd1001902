@@ -307,7 +307,7 @@ const CLASSES = {
       { id: 'bloodUp', n: "Ẩm Huyết Đao Ý", d: "Sát thương Ẩm Huyết Trảm +15%", max: 5, st: { sk_bloodlust: 15 } },
       { id: 'undying', n: "Bất Tử",     d: "Mỗi trận một lần: khi nhận đòn chí tử thì giữ lại 1 điểm khí huyết, chống qua lượt kế tiếp", max: 1, fx: 'lastBreath' } ] } },
   mage: {
-    n: "Đạo Sĩ Ngũ Hành", d: "Vẽ bùa niệm chú, giỏi nhất là gây trạng thái và kích nổ trạng thái, thân thể mỏng nhất. Ra chiêu theo thứ tự tương sinh Mộc → Hỏa → Thổ → Kim → Thủy, mỗi lần nối được một chiêu thì cộng một tầng “Liên” (mỗi tầng sát thương +8%), đứt mạch thì về không. Mỗi trận mở đầu sẵn một lớp bùa hộ thân (hộ thể bằng 35% khí huyết).", spr: 'taoist',
+    n: "Đạo Sĩ Ngũ Hành", d: "Vẽ bùa niệm chú, giỏi treo trạng thái và kích nổ trạng thái nhất, thân thể mỏng nhất. Mỗi lần đổi sang một hành khác để ra chiêu thì cộng một tầng “Liên” (mỗi tầng sát thương +8%); đúng thứ tự tương sinh Mộc→Hỏa→Thổ→Kim→Thủy thì chiêu đó thêm +20%; cùng một hành ra liền nhau sẽ mất một tầng. Mỗi trận mở màn có sẵn một lớp hộ thân phù lục (hộ thể 35% khí huyết).", spr: 'taoist',
     base: { hp: 140, atk: 12, armor: 9, crit: 8, critDmg: 160, res: 14 }, per: { hp: 19.5, atk: 3.3, armor: 2.3 },
     res: { n: "Liên", max: 5 },
     skills: [

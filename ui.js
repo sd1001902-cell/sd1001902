@@ -565,7 +565,7 @@ function sustText(cls, s) {
 // 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
 const CLS_MECH = {
   berserker: ['怒意', '出手攒 5 点，挨一下攒 8 点，最多 100 点。怒意过半：伤害 +15%。气血每少一成：伤害再 +3%。霸王卸甲把怒意一口气换成伤害（每点 +2%）。'],
-  mage: ['五行相生', '按 木→火→土→金→水→木 的顺序出招，每接上一招叠一层「连」（最多 5 层），每层伤害 +8%；接错了清零。每招是哪一行，招式名旁边写着；灵符是木。'],
+  mage: ['五行流转', '每换一种五行出招，叠一层「连」（最多 5 层），每层伤害 +8%；正好按 木→火→土→金→水→木 的相生顺序接上，这一招伤害再 +20%；同一种五行连着放，掉一层，不会清零。每招是哪一行，招式名旁边写着；灵符是木。'],
   necro: ['尸阵', '开战时僵尸已经按尸阵列好（基础尸位 3），它们的攻击和气血按你的属性算。镇魂钉钉中的敌人，僵尸优先去咬。僵尸倒了，用摇铃唤尸补回来。'],
   assassin: ['杀意', '淬毒镖、冰魄针这些招式出手攒杀意（最多 5 点），终结技一次花光：夺命印每点伤害 +25%，影杀每点多刺一下。开战你先出手。'],
   paladin: ['金刚反击', '挨打时有 15% 几率格挡并反击（80% 佛光伤害）；身上有护体真气时再 +15%。每回合自己回一点气血。'],
@@ -876,7 +876,7 @@ const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${l
       <button class="btn ghost" data-act="guide">任务指引：${SAVE.guide === 'full' ? '详细' : '线索'}</button></div>
       <p class="help-p">任务指引「线索」：只告诉你大概在哪一带，东西要自己找；「详细」：直接标出位置。</p>
       </section><section class="panel"><h3>画面</h3><div class="row"><button class="btn ghost" data-act="gfxq">特效：${['低', '中', '高'][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
-      <button class="btn ghost" data-act="cine">大招演出：${SAVE.cineOff ? '关' : '开'}</button>
+      <button class="btn ghost" data-act="cine">必杀动画：${SAVE.cineOff ? '关闭' : '简洁'}</button>
       <button class="btn ghost" data-act="hdpx">像素：${SAVE.hdOff ? '经典' : '高清'}</button></div>
       <p class="help-p">手机发烫或卡顿时把特效调到「低」：粒子减少，不再顿帧、慢镜。</p></section>`;
 // ---------- 存档备份 ----------
@@ -1112,18 +1112,19 @@ const spdF = () => ({ 1: 1, 2: 0.5, 4: 0.25 }[SAVE.speed] || 1);
 function schedule(o) {
   clearTimeout(timer); if (!B || B.over) return;
   let ms = o ? Math.min(800, Math.max(120, (o.dt || 8) * 18)) * spdF() : 500;
-  if (o && (o.ult || (o.cast && (o.cast.id === 'phase' || o.cast.id === 'enrage')))) ms += CUT_MS();
+  if (o && o.ult) ms += ULT_MS(); else if (o && o.cast && (o.cast.id === 'phase' || o.cast.id === 'enrage')) ms += CUT_MS();
   if (o && o.foilKey) ms += 950 * spdF();
   timer = setTimeout(tick, ms);
 }
 const CUT_MS = () => SAVE.speed === 4 ? 650 : SAVE.speed === 2 ? 900 : 1150;
+const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed === 4 ? 300 : 500;   // 必杀：顶上一条细横幅，不压暗、不挡人
 function tick() {
   if (!B || VIEW !== 'battle') return;
   // 手动出招：轮到你时停下来等你点
   if (!B.castAuto && !B.over) { const nx = turnOrder(B, 1)[0]; if (nx === B.P && !B.P.st.frozen && !B.castReq && !B.ultReq) { B.waiting = true; applyStep(null); return; } }
   B.waiting = false;
   const o = battleStep(B); const nl = narrate(o); if (nl && !(o.lines.length && !o.pops.some(p => /^\d+$/.test(p[1])))) B.logs.push(nl); B.logs.push(...o.lines); updBattle(o, true);
-  if (B.over) setTimeout(endBattle, o.ult ? CUT_MS() + 300 : 250); else schedule(o);
+  if (B.over) setTimeout(endBattle, o.ult ? ULT_MS() + 300 : 250); else schedule(o);
 }
 function skipBattle() {
   clearTimeout(timer); let n = 0; B.ultAuto = true; B.castAuto = true;
@@ -1221,12 +1222,13 @@ function sayBubble(id, text) {
 function showCutin(kind, data) {
   const el = $('#cutin'); if (!el) return;
   let h;
-  if (kind === 'ult') {
-    const run = SAVE.run;
-    h = `<div class="ci-band"><div class="ci-art">${heroSpr(run.cls, 120)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, data.sprs && data.sprs.length > 1 ? 84 : 104, null, '', 'full')).join('') : ''}</div>
-      <div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
-    el.className = 'cutin on' + (data.combo ? ' combo' : '');
-    SFX.play('gong'); if (typeof GFX !== 'undefined') GFX.ult(data.combo ? '#ff9ac0' : '#ffb04a');
+  if (kind === 'ult') {   // 必杀：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
+    const run = SAVE.run, sm = SAVE.speed === 4, ms = ULT_MS();
+    const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
+    el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
+    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');
+    SFX.play('gong');
+    clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, ms); return;
   } else {
     h = `<div class="ci-band boss"><div class="ci-art">${SPR.img(data.spr, 120, data.pal)}</div><div class="ci-txt"><b class="ci-g">${kind === 'phase' ? '变' : '怒'}</b><span>${esc(data.name)}</span></div></div>`;
     el.className = 'cutin on boss';
@@ -1247,7 +1249,7 @@ function updBattle(o, anim) {
     if (o.ult) showCutin('ult', o.ult);
     else { const u = B.units.find(x => x.id === o.actor); if (u) showCutin(o.cast.id, u); }
     const b = B;
-    setTimeout(() => { if (B !== b) return; const d = VFX.play(o, B); setTimeout(() => { if (B === b) applyStep(o, anim); }, d); }, CUT_MS() * 0.8);
+    setTimeout(() => { if (B !== b) return; const d = VFX.play(o, B); setTimeout(() => { if (B === b) applyStep(o, anim); }, d); }, (o.ult ? ULT_MS() : CUT_MS()) * 0.8);
     return;
   }
   if (o && anim) {

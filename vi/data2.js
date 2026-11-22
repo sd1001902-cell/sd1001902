@@ -60,7 +60,7 @@ const LGEMS = {
   guard: { n: "Kim Chung Ngọc", c: '#e8c13a', d: lv => `Sát thương phải nhận -${(6 + lv * 0.3).toFixed(1)}%; khí huyết dưới 30% thì hiệu quả gấp đôi`, st: lv => ({ gDr: 6 + lv * 0.3 }) },
   renew: { n: "Hồi Xuân Ngọc", c: '#7fe0b0', d: lv => `Mỗi lượt hồi ${(1.5 + lv * 0.05).toFixed(2)}% khí huyết; hiệu quả trị liệu +${10 + lv}%`, st: lv => ({ regenPct: 1.5 + lv * 0.05, healPct: 10 + lv }) },
   bond:  { n: "Đồng Tâm Ngọc", c: '#ff9ad0', d: lv => `Sát thương và khí huyết của đồng hành, Ngoc, cương thi +${15 + lv}%`, st: lv => ({ allyPct: 15 + lv }) },
-  flow:  { n: "Lưu Quang Ngọc", c: '#9ae8ff', d: lv => `Chiêu có hồi chiêu sau khi dùng có ${(10 + lv * 0.4).toFixed(1)}% tỉ lệ không vào hồi chiêu`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
+  flow:  { n: "Lưu Quang Ngọc", c: '#9ae8ff', d: lv => `Chiêu có hồi chiêu sau khi tung ra có ${Math.min(CDSKIP_CAP, 10 + lv * 0.4).toFixed(1)}% tỉ lệ không vào hồi chiêu (cộng mọi nguồn tối đa ${CDSKIP_CAP}%)`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
   slay:  { n: "Phá Quân Ngọc", c: '#ff7a3a', d: lv => `Sát thương lên tinh anh và yêu vương +${(12 + lv * 0.5).toFixed(1)}%`, st: lv => ({ xBoss: 12 + lv * 0.5 }) },
 };
 // 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
@@ -223,7 +223,7 @@ SETS.push(
   { id: 'guiyuan', n: "Ngũ Hành Quy Nguyên", cls: 'mage', rift: true,
     pieces: [['helm', "Quy Nguyên Đạo Quan"], ['chest', "Quy Nguyên Pháp Y"], ['gloves', "Quy Nguyên Hộ Uyển"], ['boots', "Quy Nguyên Vân Lý"], ['ring', "Quy Nguyên Ban Chỉ"], ['amulet', "Quy Nguyên Ngọc Bội"]],
     b2: { lianPct: 4, elem: 20 }, b2d: "Mỗi tầng “Liên” cộng thêm +4% sát thương, sát thương thuật pháp +20%",
-    b4: 'guiYuan4', b4d: "Ra chiêu đứt tương sinh, “Liên” không về không, chỉ lùi 2 tầng",
+    b4: 'guiYuan4', b4d: "Ra chiêu theo thứ tự tương sinh thì “Liên” +2 một lần; cùng một hành ra liền nhau, “Liên” cũng không mất",
     b6: 'guiYuan6', b6d: "Khi “Liên” đầy, chiêu đó sát thương ×3, và lan 60% sát thương sang mọi kẻ địch còn lại" },
   { id: 'yinbing', n: "Âm Binh Mượn Đường", cls: 'necro', rift: true,
     pieces: [['helm', "Âm Binh Nón Lá"], ['chest', "Âm Binh Thọ Y"], ['gloves', "Âm Binh Chỉ Sáo"], ['boots', "Âm Binh Dép Cỏ"], ['ring', "Âm Binh Ban Chỉ"], ['amulet', "Âm Binh Chuông Đồng"]],
