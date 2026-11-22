@@ -3243,6 +3243,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`修为升级快了二十倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级，多出来的点在「修炼 · 修为」里加`, 6000), 1200); }
 if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }
 if (SAVE.story.ended && seen('postg') && !seen('npcsvc')) { markSeen('npcsvc'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(svcNoteModal); }, 1400); }
 if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">装备词条改了规矩</h2>

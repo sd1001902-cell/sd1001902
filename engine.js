@@ -26,7 +26,7 @@ let onPersist = null;
 function newChar() { return { level: 1, xp: 0, tal: {}, runes: {}, order: null, off: {}, yi: [], cube: [null, null, null],
   eq: { weapon: makeItem({ slot: 'weapon', ilvl: 1, rarity: 'normal', noSocket: true }) } }; }
 function newSave() {
-  const s = { v: 4, gv: 2, boxv: 1, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
+  const s = { v: 4, gv: 2, boxv: 1, pv: 1, t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
@@ -36,7 +36,7 @@ function newSave() {
   return s;
 }
 function migrate(s) {
-  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0;
+  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0, pv0 = s.pv || 0;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   for (const k in d.stats) if (s.stats[k] === undefined) s.stats[k] = 0;
   for (const c of CLASS_IDS) {
@@ -53,8 +53,12 @@ function migrate(s) {
     (s.stash || []).forEach(strip); for (const c of CLASS_IDS) for (const sl in s.chars[c].eq) strip(s.chars[c].eq[sl]);
     s.boxv = 1;
   }
-  if (s.para) { let g = 0; while (s.para.xp >= paraNeed(s.para.lv) && g++ < 5000) { s.para.xp -= paraNeed(s.para.lv); s.para.lv++; }   // 修为升级所需降到原来的二十分之一：存着的半截经验当场折成等级
+  if (s.para && !pv0) {   // 修为升级所需降到二十分之一之后，把以前刷的经验按新标准补上：已有的等级按老标准（30000 + 1500×级）折回总经验，再按新标准重新算等级。只做一次
+    const L0 = s.para.lv || 0; let T = (s.para.xp || 0) + 30000 * L0 + 750 * L0 * (L0 - 1), L = 0;
+    while (T >= paraNeed(L) && L < 9999) { T -= paraNeed(L); L++; }
+    if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp = [L0, L]; }
   }
+  s.pv = 1;
   s.disp = {};
   if (s.riftCap == null || s.riftCap < s.riftMax + 1) s.riftCap = Math.max(3, s.riftMax + 3);   // 老存档：保持原来「最高纪录 +3」的上限
   if (!s.comps) s.comps = { ngoc: 1 };
@@ -1036,7 +1040,8 @@ function setRune(cls, id, r) { const rs = SAVE.chars[cls].runes; if (rs[id] === 
 
 // ---------------- 一局地下城（迷宫） ----------------
 const MW = 5, MH = 6;
-function riftD(N) { return { n: '秘境 ' + N + ' 层', base: 6 + Math.round(N * 1.4), res: Math.min(60, Math.round(N * 1.2)), hpMul: Math.pow(1.075, N), atkMul: Math.pow(1.055, N), loot: Math.min(4, 0.5 + N / 15) }; }
+// 怪的全抗：原来 N×1.2、60 封顶，50 层起术法只剩 40%，而物理打在护甲上还剩 64%——道士凭空少三成多。改成跟着护甲的减伤走（30 层 24%、50 层 34%、69 层 43%）
+function riftD(N) { return { n: '秘境 ' + N + ' 层', base: 6 + Math.round(N * 1.4), res: Math.round(Math.min(N * 1.2, 10 + N * 0.48, 55)), hpMul: Math.pow(1.075, N), atkMul: Math.pow(1.055, N), loot: Math.min(4, 0.5 + N / 15) }; }
 const dOf = run => run.mode === 'rift' ? riftD(run.riftLv) : DIFFS[run.diff];
 const themeOf = run => run.mode === 'rift' ? RIFT_THEMES[run.theme] : CHAPTERS[run.chapter - 1];
 const diffIdx = run => run.mode === 'rift' ? Math.min(2, Math.floor(run.riftLv / 15)) : DIFF_IDS.indexOf(run.diff);

@@ -3244,6 +3244,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`Tu vi lên cấp nhanh gấp hai mươi lần, kinh nghiệm cày trước đây đã được bù theo chuẩn mới: cấp <b>${a0}</b> → cấp <b>${a1}</b>, điểm dư cộng ở “Tu luyện · Tu vi”`, 6000), 1200); }
 if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }
 if (SAVE.story.ended && seen('postg') && !seen('npcsvc')) { markSeen('npcsvc'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(svcNoteModal); }, 1400); }
 if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">Dòng thuộc tính trang bị đã đổi luật</h2>
