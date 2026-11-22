@@ -239,6 +239,183 @@ const SFX = (() => {
     });
     return nodes;
   }
+  // ================= 配乐 v2：中式恐怖 =================
+  // 思路：留白。平时只有一层很低的底音 + 一件独奏乐器，隔很久才响一句；每个地方有一种「不对劲」。
+  // 先做三段试听：坟场（c1）、鬼市（c7）、首领战。其余章节仍用上面的旧写法。
+  let rev = null, wetIn = null, tm2 = [];
+  function bus2() {
+    if (rev) return; rev = ctx.createConvolver();
+    const sr = ctx.sampleRate, n = Math.floor(sr * 3.2), b = ctx.createBuffer(2, n, sr);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.8) * Math.min(1, i / (sr * 0.015)); }
+    rev.buffer = b; wetIn = ctx.createGain(); const lp = ctx.createBiquadFilter(), wo = ctx.createGain(); lp.type = 'lowpass'; lp.frequency.value = 3200; wo.gain.value = 0.5;
+    wetIn.connect(rev); rev.connect(lp); lp.connect(wo); wo.connect(musicGain);
+  }
+  function out2(node, dry, wet) { if (dry) { const d = ctx.createGain(); d.gain.value = dry; node.connect(d); d.connect(musicGain); } if (wet) { const w = ctx.createGain(); w.gain.value = wet; node.connect(w); w.connect(wetIn); } }
+  const adsr = (g, t, a, peak, hold, r) => { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.setValueAtTime(peak, t + a + hold); g.gain.exponentialRampToValueAtTime(0.0001, t + a + hold + r); };
+  // 拨弦（筝、琵琶）：Karplus-Strong 算出来的一根弦，有真的余韵
+  let ksC = {}, ksN = 0;
+  function ksBuf(f, bright, dur) {
+    const key = Math.round(f * 4) + '|' + bright + '|' + dur; if (ksC[key]) return ksC[key];
+    if (ksN > 40) { ksC = {}; ksN = 0; }
+    const sr = ctx.sampleRate, N = Math.max(2, Math.round(sr / f)), len = Math.floor(sr * dur), b = ctx.createBuffer(1, len, sr), d = b.getChannelData(0), ring = new Float32Array(N);
+    let p = 0, mx = 0; for (let i = 0; i < N; i++) { p += ((Math.random() * 2 - 1) - p) * bright; ring[i] = p; }
+    const damp = Math.pow(10, -3 / (f * dur * 0.75)); let i = 0;
+    for (let n = 0; n < len; n++) { const j = i + 1 === N ? 0 : i + 1, y = damp * 0.5 * (ring[i] + ring[j]); d[n] = ring[i]; if (Math.abs(d[n]) > mx) mx = Math.abs(d[n]); ring[i] = y; i = j; }
+    const fade = Math.floor(sr * 0.04); for (let n = 0; n < len; n++) d[n] = d[n] / (mx || 1) * (n > len - fade ? (len - n) / fade : 1);
+    ksN++; return ksC[key] = b;
+  }
+  function pluck(f, t, vol, o = {}) {
+    const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = ksBuf(f, o.bright || 0.45, o.dur || 2.2);
+    if (o.bend) { s.playbackRate.setValueAtTime(o.bend, t); s.playbackRate.exponentialRampToValueAtTime(1, t + (o.bendT || 0.16)); }
+    if (o.vib) { const l = ctx.createOscillator(), lg = ctx.createGain(); l.frequency.value = 5.2; lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + 0.18); lg.gain.linearRampToValueAtTime(0.011 * o.vib, t + 0.6); l.connect(lg); lg.connect(s.playbackRate); l.start(t); l.stop(t + 2.4); }
+    g.gain.value = vol; s.connect(g); out2(g, 1, o.wet == null ? 0.5 : o.wet); s.start(t);
+  }
+  // 箫：气声起音，从下面滑上来，颤音晚一点才出来，句尾往下掉
+  function xiao2(f, t, dur, vol, o = {}) {
+    const a = ctx.createOscillator(), b = ctx.createOscillator(), g = ctx.createGain(), gb = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+    for (const [osc, m] of [[a, 1], [b, 2]]) { osc.type = 'sine'; osc.frequency.setValueAtTime(f * m * (o.from || 0.972), t); osc.frequency.exponentialRampToValueAtTime(f * m, t + 0.24);
+      if (o.fall) { osc.frequency.setValueAtTime(f * m, t + dur * 0.72); osc.frequency.exponentialRampToValueAtTime(f * m * o.fall, t + dur + 0.3); } }
+    l.frequency.value = 4.4; lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + Math.min(0.6, dur * 0.4)); lg.gain.linearRampToValueAtTime(f * 0.007, t + Math.min(1.3, dur * 0.85)); l.connect(lg); lg.connect(a.frequency);
+    gb.gain.value = 0.16; b.connect(gb); gb.connect(g); a.connect(g); adsr(g, t, 0.2, vol, Math.max(0.05, dur - 0.2), 0.5);
+    const s = ctx.createBufferSource(), bf = ctx.createBiquadFilter(), bg = ctx.createGain(); s.buffer = noiseBuf(dur + 1); bf.type = 'bandpass'; bf.frequency.value = f * 2.3; bf.Q.value = 0.9;
+    bg.gain.setValueAtTime(0.0001, t); bg.gain.linearRampToValueAtTime(vol * 0.5, t + 0.07); bg.gain.exponentialRampToValueAtTime(vol * 0.1, t + 0.4); bg.gain.setValueAtTime(vol * 0.1, t + dur); bg.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.4);
+    s.connect(bf); bf.connect(bg); bg.connect(g); out2(g, 0.75, o.wet == null ? 0.8 : o.wet);
+    const end = t + dur + 0.8; a.start(t); b.start(t); l.start(t); s.start(t); a.stop(end); b.stop(end); l.stop(end); s.stop(end);
+  }
+  // 二胡：一定带滑音；cents 是故意拉不准的量
+  function erhu(f, t, dur, vol, o = {}) {
+    const osc = ctx.createOscillator(), f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), g = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+    osc.type = 'sawtooth'; osc.detune.value = o.cents || 0; osc.frequency.setValueAtTime(o.from || f * 0.945, t); osc.frequency.exponentialRampToValueAtTime(f, t + (o.gl || 0.12));
+    l.frequency.value = 5.6; lg.gain.setValueAtTime(0, t); lg.gain.setValueAtTime(0, t + Math.min(0.25, dur * 0.5)); lg.gain.linearRampToValueAtTime(f * 0.011, t + Math.min(0.7, dur)); l.connect(lg); lg.connect(osc.frequency);
+    f1.type = 'peaking'; f1.frequency.value = 950; f1.Q.value = 2; f1.gain.value = 9; f2.type = 'peaking'; f2.frequency.value = 2300; f2.Q.value = 3; f2.gain.value = 6; lp.type = 'lowpass'; lp.frequency.value = 3600;
+    adsr(g, t, 0.06, vol * 0.5, Math.max(0.02, dur - 0.12), 0.14); osc.connect(f1); f1.connect(f2); f2.connect(lp); lp.connect(g); out2(g, 0.8, o.wet == null ? 0.45 : o.wet);
+    osc.start(t); l.start(t); osc.stop(t + dur + 0.3); l.stop(t + dur + 0.3);
+  }
+  // 唢呐：鼻音、急颤、前面带个上滑的装饰音。far = 很远的地方传过来的
+  function suona2(f, t, dur, vol, o = {}) {
+    const a = ctx.createOscillator(), b = ctx.createOscillator(), bp = ctx.createBiquadFilter(), hp = ctx.createBiquadFilter(), g = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+    a.type = 'square'; b.type = 'sawtooth'; for (const osc of [a, b]) { osc.detune.value = o.cents || 0; osc.frequency.setValueAtTime(f * 0.89, t); osc.frequency.exponentialRampToValueAtTime(f, t + 0.05); if (o.fall) { osc.frequency.setValueAtTime(f, t + dur * 0.6); osc.frequency.exponentialRampToValueAtTime(f * o.fall, t + dur); } }
+    l.frequency.value = 6.4; lg.gain.value = f * 0.013; l.connect(lg); lg.connect(a.frequency); lg.connect(b.frequency);
+    bp.type = 'bandpass'; bp.frequency.value = o.far ? 1300 : 1900; bp.Q.value = o.far ? 1.4 : 1.1; hp.type = 'highpass'; hp.frequency.value = 500;
+    adsr(g, t, 0.025, vol * (o.far ? 0.5 : 0.42), Math.max(0.02, dur - 0.08), 0.09); a.connect(bp); b.connect(bp); bp.connect(hp); hp.connect(g); out2(g, o.far ? 0.25 : 0.9, o.far ? 1 : 0.35);
+    const end = t + dur + 0.25; a.start(t); b.start(t); l.start(t); a.stop(end); b.stop(end); l.stop(end);
+  }
+  // 打击：木鱼、小锣（音往上翘）、大锣（音往下沉）、钹、板鼓、堂鼓、磬
+  function hit(type, f, dur, vol, t, to, toT) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + toT);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g); o.start(t); o.stop(t + dur + 0.05); return g; }
+  function nz(dur, type, freq, q, vol, t) { const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = noiseBuf(dur + 0.05); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(f); f.connect(g); s.start(t); s.stop(t + dur + 0.05); return g; }
+  function muyu2(t, vol, p = 1) { out2(hit('sine', 760 * p, 0.11, vol, t), 0.9, 0.5); out2(hit('sine', 1840 * p, 0.045, vol * 0.4, t), 0.9, 0.3); out2(nz(0.02, 'bandpass', 2200, 2, vol * 0.5, t), 0.8, 0.2); }
+  function luo(t, vol, big) {
+    const base = big ? 190 : 640, dur = big ? 2.8 : 0.75;
+    [[1, 1], [1.51, 0.6], [2.02, 0.45], [2.74, 0.3], [3.9, 0.16]].forEach(([m, v]) => out2(hit('sine', base * m, dur / Math.sqrt(m), vol * v, t, base * m * (big ? 0.93 : 1.1), big ? 0.6 : 0.13), 0.85, big ? 0.7 : 0.4));
+    out2(nz(big ? 0.5 : 0.09, 'bandpass', base * 5, 0.8, vol * (big ? 0.5 : 0.35), t), 0.8, 0.4);
+  }
+  function bo(t, vol) { out2(nz(0.17, 'bandpass', 5200, 0.8, vol, t), 0.9, 0.35); out2(nz(0.07, 'highpass', 8000, 0.7, vol * 0.6, t), 0.9, 0.2); }
+  function bangu(t, vol) { out2(nz(0.03, 'highpass', 2600, 0.7, vol, t), 1, 0.12); out2(hit('sine', 1500, 0.025, vol * 0.5, t), 1, 0.1); }
+  function tanggu(t, vol) { out2(hit('sine', 112, 0.42, vol, t, 52, 0.32), 1, 0.3); out2(hit('triangle', 236, 0.2, vol * 0.55, t, 150, 0.16), 1, 0.3); out2(nz(0.1, 'bandpass', 420, 0.8, vol * 0.7, t), 1, 0.25); }   // 手机喇叭放不出 100Hz 以下，所以加一层 200Hz 上下的鼓皮声
+  function qing(f, t, vol) { [[1, 1, 5], [1.004, 0.6, 5], [2.71, 0.35, 2.6], [4.95, 0.18, 1.3]].forEach(([m, v, d]) => out2(hit('sine', f * m, d, vol * v, t), 0.6, 0.9)); }
+  // 远处的戏腔：一个女声似的长音，慢慢滑上去又掉下来
+  function ghost(f, t, dur, vol) {
+    const o = ctx.createOscillator(), b1 = ctx.createBiquadFilter(), b2 = ctx.createBiquadFilter(), g = ctx.createGain(), l = ctx.createOscillator(), lg = ctx.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.94, t); o.frequency.linearRampToValueAtTime(f, t + dur * 0.25); o.frequency.setValueAtTime(f, t + dur * 0.55); o.frequency.linearRampToValueAtTime(f * 1.122, t + dur * 0.7); o.frequency.linearRampToValueAtTime(f * 0.89, t + dur);
+    l.frequency.value = 5; lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.012, t + dur * 0.6); l.connect(lg); lg.connect(o.frequency);
+    b1.type = 'bandpass'; b1.frequency.value = 850; b1.Q.value = 5; b2.type = 'bandpass'; b2.frequency.value = 1250; b2.Q.value = 6;
+    adsr(g, t, dur * 0.3, vol, dur * 0.4, dur * 0.3); o.connect(b1); o.connect(b2); b1.connect(g); b2.connect(g); out2(g, 0.1, 1.2); o.start(t); l.start(t); o.stop(t + dur + 0.1); l.stop(t + dur + 0.1);
+  }
+  // 一直响着的东西（风、人声、底音）：返回节点，换氛围时由 mood() 统一停掉
+  function bedNoise(freq, q, vol, sweep, rate) {
+    const t = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), l = ctx.createOscillator(), lf = ctx.createGain(), lg = ctx.createGain();
+    s.buffer = noiseBuf(4); s.loop = true; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q; g.gain.value = vol; l.frequency.value = rate || 0.07; lf.gain.value = sweep || 0; lg.gain.value = vol * 0.6;
+    l.connect(lf); lf.connect(f.frequency); l.connect(lg); lg.connect(g.gain); s.connect(f); f.connect(g); out2(g, 1, 0.3); s.start(t); l.start(t); return [s, l];
+  }
+  function bedTone(f, vol, type = 'sine', cut = 400) {
+    const t = ctx.currentTime, o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); o.type = type; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.value = cut;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 3); o.connect(lp); lp.connect(g); g.connect(musicGain); o.start(t); return { node: o, gain: g };
+  }
+  // 定时：fn 返回「过多少秒再来一次」；换了氛围（gen 变了）就自己停
+  function every(my, first, fn) { const tick = () => { if (my !== gen || !ctx) return; let d = 1; if (ctx.state === 'running' && !document.hidden) { d = 2; try { d = fn(ctx.currentTime + 0.08); } catch (e) {} }   // 切到后台、声音被系统暂停时不排音，免得回来时一股脑全响
+      if (tm2.length > 200) tm2 = tm2.slice(-50); tm2.push(setTimeout(tick, Math.max(0.03, d) * 1000)); }; tm2.push(setTimeout(tick, first * 1000)); }
+  const rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
+
+  // ---- 坟场 · 义庄：风、木鱼、隔很久才来一句的箫、远处断断续续的送葬唢呐 ----
+  function graveV2(my, kind) {
+    const sc = SCALE(146.8, 'yu'), nodes = [], room = kind === 'room', deep = kind === 'dungeon';   // D 羽：D F G A C；sc[10] = D4
+    if (!room && !deep) nodes.push(...bedNoise(420, 0.7, 0.042, 160, 0.05), ...bedNoise(1500, 1.5, 0.008, 500, 0.11));
+    if (room) nodes.push(...bedNoise(500, 0.5, 0.012, 0, 0.2));
+    const d1 = bedTone(deep ? 55 : 73.4, 0.022), d2 = bedTone(deep ? 55.4 : 73.9, 0.02), d3 = bedTone(deep ? 82.4 : 110, 0.01); nodes.push(d1.node, d2.node, d3.node);
+    let n = 0;
+    every(my, 2.5, t => { n++; if (n % 11 === 0) return rnd(5, 8); muyu2(t, 0.08, deep ? 0.8 : 1); if (Math.random() < 0.2) muyu2(t + 0.33, 0.05, deep ? 0.8 : 1); return (deep ? 3.6 : 2.6) + rnd(-0.15, 0.15); });
+    const PH = [[[13, 2.4], [12, 1.2], [11, 1.0], [10, 3.2]], [[10, 1.6], [11, 1.0], [12, 2.8]], [[14, 1.8], [13, 1.2], [12, 0.9], [13, 0.7], [11, 3.0]], [[10, 3.6]], [[8, 2.0], [9, 1.2], [10, 3.2]], [[12, 1.4], [13, 2.2], [10, 3.0]]];
+    if (!deep) every(my, 6, t => { const ph = pick(PH); let x = 0; ph.forEach(([i, d], k) => { xiao2(sc[i], t + x, d * 0.92, 0.095, { fall: k === ph.length - 1 ? 0.965 : 0, from: k ? 0.985 : 0.955 }); x += d; }); return x + rnd(room ? 14 : 9, room ? 24 : 16); });
+    if (deep) { every(my, 3, t => { out2(hit('sine', rnd(1100, 1900), 0.14, 0.03, t), 0.6, 1); return rnd(1.5, 5); }); every(my, 9, t => { ghost(sc[pick([8, 10])], t, rnd(4, 6), 0.012); return rnd(28, 45); }); }
+    every(my, 14, t => { qing(sc[pick([5, 8])], t, 0.06); return rnd(22, 34); });
+    if (!room && !deep) {
+      const F = [[13, 0.5], [12, 0.5], [13, 0.5], [14, 0.9], [13, 0.5], [12, 0.45], [11, 0.5], [10, 1.4]];   // 送葬调，从很远的地方飘过来，缺字漏句
+      every(my, 20, t => { let x = 0, k0 = Math.floor(rnd(0, 3)); F.slice(k0).forEach(([i, d]) => { if (Math.random() < 0.8) suona2(sc[i] * 2, t + x, d * 0.9, 0.075, { far: 1, cents: -28, fall: Math.random() < 0.3 ? 0.97 : 0 }); x += d; }); return x + rnd(38, 65); });
+      every(my, 48, t => { ghost(sc[pick([12, 13])], t, rnd(4.5, 6.5), 0.014); return rnd(70, 110); });
+    }
+    return nodes;
+  }
+  // ---- 鬼市：热闹的小锣和二胡，但拍子会飘、音拉不准，隔一阵子全场突然静下来 ----
+  function marketV2(my, kind) {
+    const sc = SCALE(233.1, 'zhi'), nodes = [...bedNoise(700, 0.8, 0.022, 200, 0.3), ...bedNoise(260, 0.6, 0.012, 60, 0.13)];   // 降 B 徵：Bb C Eb F G；sc[5] = Bb3
+    const dr = bedTone(58.3, 0.015); nodes.push(dr.node);
+    const BARS = { A: 'T.c.T.cc', B: 'T.c.TTc.', C: 'kkT.c.T.', D: 'T.......' }, SEQ = 'ABACABAD';
+    const MEL = [[[8, .5], [9, .5], [10, 1], [9, .5], [8, .5], [7, 1], [8, .5], [9, .5], [8, .5], [7, .5], [6, 2]],
+      [[10, 1], [11, .5], [10, .5], [9, 1], [8, 1], [9, .5], [10, .5], [9, .5], [8, .5], [7, 2]],
+      [[11, 1.5], [10, .5], [9, 1], [10, 1], [9, .5], [8, .5], [7, .5], [8, .5], [9, 2]],
+      [[5, 4, { from: 233.1 * 0.5, gl: 1.3 }], [-1, 4]]];   // 最后一句是一声拖长的「吆喝」
+    let bar = 0, hush = Math.floor(rnd(9, 13)), mrest = 2;
+    every(my, 1.2, t => {
+      const spb = 60 / 96 * (1 + 0.055 * Math.sin(bar * 0.9)), st = spb / 2;
+      if (bar >= hush) {   // 全场忽然静下来：只剩一声磬，然后小锣一敲，又热闹起来
+        const gap = rnd(2.6, 4.2); bar = 0; hush = Math.floor(rnd(9, 13)); mrest = 1;
+        nodes.slice(0, 4).forEach(nd => { /* 底噪不动，靠旋律和锣鼓全停制造空白 */ }); qing(sc[5], t + gap * 0.35, 0.06); return gap;
+      }
+      const pat = BARS[SEQ[bar % 8]];
+      for (let i = 0; i < 8; i++) { if (Math.random() < 0.1) continue; const c = pat[i], tt = t + i * st + rnd(-0.012, 0.012); if (c === 'T') luo(tt, 0.07, false); else if (c === 'c') bo(tt, 0.045); else if (c === 'k') bangu(tt, 0.08); }
+      if (mrest > 0) mrest--; else if (bar % 2 === 0) {
+        const m = pick(MEL); let x = 0;
+        m.forEach(([i, b, o]) => { if (i >= 0) { const f = sc[i], cents = rnd(-38, 22), late = rnd(0, 0.03);
+          erhu(f, t + x * spb + late, b * spb * 0.92, 0.125, { cents, ...(o || (Math.random() < 0.15 ? { from: f * 1.08, gl: 0.2 } : {})) });
+          if (!o && Math.random() < 0.4) pluck(f * 2, t + x * spb + rnd(0.03, 0.07), 0.05, { bright: 0.8, dur: 0.9, wet: 0.3 }); } x += b; });
+        mrest = Math.random() < 0.45 ? 3 : 1;
+      }
+      bar++; return spb * 4;
+    });
+    return nodes;
+  }
+  // ---- 打斗：戏曲锣鼓点推着走。首领战再加大锣和唢呐 ----
+  function fightV2(my, d, boss) {
+    const sc = SCALE(d.root, 'yu'), bpm = boss ? 152 : 128, st = 60 / bpm / 4, nodes = [];
+    const lowf = d.root / (d.root > 200 ? 4 : 2), pulse = bedTone(lowf, 0.0001, 'sawtooth', 420); nodes.push(pulse.node); pulse.gain.gain.cancelScheduledValues(0); pulse.gain.gain.value = 0.0001;
+    const SU = [[[15, 1.5], [14, .5], [13, 1], [15, 1], [16, 2], [15, .5], [14, .5], [13, 1]],
+      [[13, .5], [14, .5], [15, 1], [13, .5], [12, .5], [11, 1], [12, .5], [13, .5], [12, .5], [11, .5], [10, 2]],
+      [[10, .5], [12, .5], [13, .5], [15, .5], [16, 2], [15, .25], [15, .25], [15, .25], [15, .25], [13, 1], [15, 2]],
+      [[15, 3, { fall: 0.94 }], [13, 1], [12, 1], [13, 1], [10, 2]]];
+    const OST = [5, 8, 7, 8, 5, 8, 9, 8];   // 琵琶在下面来回拨的几个音
+    let bar = 0;
+    every(my, 0.25, t => {
+      const brk = bar % 8 === 7;   // 每八小节留一小节：只剩一声大锣和越敲越密的板鼓
+      for (let i = 0; i < 16; i++) { const tt = t + i * st;
+        if (brk) { if (i === 0) luo(tt, boss ? 0.09 : 0.05, boss); if (i >= 4) { bangu(tt, 0.03 + i * 0.004); if (i >= 10) bangu(tt + st / 2, 0.03 + i * 0.004); } continue; }
+        const acc = [0, 3, 6, 10, 12].includes(i);
+        if (boss || i % 2 === 0) bangu(tt, acc ? (boss ? 0.075 : 0.1) : (boss ? 0.035 : 0.05));
+        if (i === 0 || i === 8 || (boss && bar % 2 === 1 && (i === 6 || i === 14))) tanggu(tt, boss ? 0.2 : 0.15);
+        if (i === 4 || i === 12) luo(tt, boss ? 0.04 : 0.06, false);
+        if (boss && (i === 2 || i === 6 || i === 10 || i === 14)) bo(tt, 0.028);
+        if (boss && i === 0 && bar % 2 === 0) luo(tt, 0.1, true);
+        if (i % 2 === 0) { pulse.gain.gain.setValueAtTime(boss ? 0.05 : 0.035, tt); pulse.gain.gain.exponentialRampToValueAtTime(0.004, tt + st * 1.8); }
+        if (!boss && i % 2 === 0) pluck(sc[OST[i / 2]] * 2, tt, i % 8 === 0 ? 0.11 : 0.075, { bright: 0.75, dur: 0.8, wet: 0.25 });
+      }
+      if (boss && !brk && bar % 4 === 0) { const m = SU[(bar / 4) % SU.length | 0]; let x = 0; m.forEach(([i, b, o]) => { suona2(sc[i], t + x * st * 4, b * st * 4 * 0.9, 0.135, o || {}); x += b; }); }
+      if (!boss && !brk && bar % 4 === 2) { let x = 0; [[13, 1], [12, .5], [11, .5], [10, 2]].forEach(([i, b]) => { erhu(sc[i], t + x * st * 4, b * st * 4 * 0.9, 0.1, {}); x += b; }); }
+      bar++; return st * 16;
+    });
+    return nodes;
+  }
+  const V2 = { c1: graveV2, c7: marketV2 };
   // 切换氛围：{ key: 'c1'…'c10'|'town'|'sad', kind, fight }
   function mood(m) {
     if (!m) return;
@@ -253,21 +430,26 @@ const SFX = (() => {
     musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(Math.max(0.0001, musicGain.gain.value), t);
     musicGain.gain.linearRampToValueAtTime(0.25, t + 0.4); musicGain.gain.linearRampToValueAtTime(0.85, t + 2);
     setTimeout(() => old.forEach(n => { try { n.stop(); } catch (e) {} }), 600);
+    const my = gen; tm2.forEach(clearTimeout); tm2 = [];
+    // 新写法：首领战（所有章节）、坟场和鬼市（含这两章的普通打斗）
+    const v2 = m.fight === 'boss' || (V2[m.key] && !m.old);
+    if (v2) { bus2(); ambNodes = m.fight ? fightV2(my, cur, m.fight === 'boss') : V2[m.key](my, m.kind); droneNodes = []; return; }
     ambNodes = ambient(cur); droneNodes = m.fight ? [] : drone(cur);
-    const my = gen;
     phraseT = setTimeout(() => phrase(my), 700);
     if (cur.perc) percT = setTimeout(() => perc(my), 300);
   }
   function startMusic() { if (!musicOn || !ensure()) return; const k = curKey; curKey = ''; if (k) { const [key, kind, fight] = k.split('|'); mood({ key, kind, fight }); } else mood({ key: 'town' }); }
   function stopMusic() {
     if (!ctx) return;
-    gen++; clearTimeout(phraseT); clearTimeout(percT); cur = null;
+    gen++; clearTimeout(phraseT); clearTimeout(percT); tm2.forEach(clearTimeout); tm2 = []; cur = null;
     const t = ctx.currentTime, old = [...ambNodes, ...droneNodes]; ambNodes = []; droneNodes = [];
     musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(musicGain.gain.value, t); musicGain.gain.linearRampToValueAtTime(0, t + 0.8);
     setTimeout(() => old.forEach(n => { try { n.stop(); } catch (e) {} }), 1000);
   }
   return {
     play, ensure, mood,
+    audition(m) { curKey = ''; mood(m); },                 // 设置里的试听：不管现在在哪儿，直接放这一段
+    tap() { return { ctx, master, musicGain }; },          // 测试用：录一段出来看电平和频谱
     set(sound, music) { soundOn = sound; musicOn = music; if (music) startMusic(); else stopMusic(); },
     startMusic,
   };

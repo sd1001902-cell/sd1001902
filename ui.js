@@ -14,6 +14,7 @@ let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null,
 loadSave(); ensureBounties();
 if (SAVE.run) VIEW = SAVE.run.world ? 'world' : 'map';
 SFX.set(SAVE.sound, false); applyFs();
+let MTEST = null;   // 设置里正在试听的那一段（离开城镇/标题页就自动取消）
 
 function save() { persist(); }
 function applyFs() { document.documentElement.style.setProperty('--fs', SAVE.fs || 1); }
@@ -539,7 +540,10 @@ function testPanel() {
   </section>`;
 }
 const langRow = () => `<div class="row lang-row">${[['zh', '中文'], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
-const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>声音</h3><div class="row"><button class="btn ghost" data-act="snd">音效：${SAVE.sound ? '开' : '关'}</button><button class="btn ghost" data-act="mus">古琴背景：${SAVE.music ? '开' : '关'}</button></div></section>
+const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>声音</h3><div class="row"><button class="btn ghost" data-act="snd">音效：${SAVE.sound ? '开' : '关'}</button><button class="btn ghost" data-act="mus">古琴背景：${SAVE.music ? '开' : '关'}</button></div>
+  <p class="help-p" style="margin:10px 0 6px">新配乐试听（先做了三段，听听味道对不对）：</p>
+  <div class="row mtest">${[['c1', '坟场'], ['c7', '鬼市'], ['boss', '首领战'], ['battle', '普通打斗']].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">停</button></div>
+  <p class="help-p" style="margin-top:6px">手机外放听不到低音，戴耳机更完整。坟场那段很空，隔十来秒才来一句箫，是故意的。</p></section>
     <section class="panel"><h3>操作</h3><p class="help-p">大地图上：点哪走哪；点上方的任务栏自动前往；电脑上可以用方向键或 WASD。</p><div class="row"><button class="btn ghost" data-act="joy">虚拟摇杆：${SAVE.joy ? '开' : '关'}</button>
       <button class="btn ghost" data-act="fs">字号：${({ 0.9: '小', 1: '标准', 1.15: '大', 1.3: '特大' })[SAVE.fs || 1] || '标准'}</button>
       <button class="btn ghost" data-act="guide">任务指引：${SAVE.guide === 'full' ? '详细' : '线索'}</button></div>
@@ -2651,6 +2655,12 @@ const ACT = {
   rest: k => { if (k === 'heal') EV.heal(SAVE.run, 0.45); else EV.buff(SAVE.run, 'dmgPct', 10); clearCell(SAVE.run); SFX.play(k === 'heal' ? 'heal' : 'forge'); toast(k === 'heal' ? '恢复了 45% 气血' : '本局伤害 +10%'); VIEW = 'map'; refresh(); },
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
+  mtest: k => {
+    const M = { c1: { key: 'c1', kind: 'field' }, c7: { key: 'c7', kind: 'field' }, boss: { key: 'c1', kind: 'field', fight: 'boss' }, battle: { key: 'c1', kind: 'field', fight: 'battle' } }[k];
+    if (!M) { MTEST = null; SFX.audition(curMood()); return refresh(); }
+    if (!SAVE.music) { SAVE.music = true; save(); toast('已把背景音乐打开'); }
+    SFX.ensure(); SFX.set(SAVE.sound, true); MTEST = { id: k, m: M }; SFX.audition(M); refresh();
+  },
   export: async () => {
     markBackup(); persist(true); const code = ZCODE || exportSave();
     const done = () => { toast(`存档码已复制（${code.length} 个字符），找个地方粘贴存好`); const m = document.querySelector('.bk-now small'); if (m) m.textContent = `上次备份：${fmtDay(SAVE.bk.t)}`; document.querySelectorAll('.bk-nudge').forEach(x => x.remove()); };
@@ -2724,6 +2734,7 @@ document.addEventListener('keydown', e => {
 // 当前该放什么配乐
 function curMood() {
   const run = SAVE.run;
+  if (MTEST) { if (VIEW === 'town' || VIEW === 'title') return MTEST.m; MTEST = null; }
   if (VIEW === 'end' || VIEW === 'credits') return { key: 'sad' };
   if (!run || VIEW === 'town') return { key: 'town' };
   const ch = run.chapter || 1, key = 'c' + Math.min(10, ch);

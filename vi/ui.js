@@ -14,6 +14,7 @@ let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null,
 loadSave(); ensureBounties();
 if (SAVE.run) VIEW = SAVE.run.world ? 'world' : 'map';
 SFX.set(SAVE.sound, false); applyFs();
+let MTEST = null;   // 设置里正在试听的那一段（离开城镇/标题页就自动取消）
 
 function save() { persist(); }
 function applyFs() { document.documentElement.style.setProperty('--fs', SAVE.fs || 1); }
@@ -539,7 +540,10 @@ function testPanel() {
   </section>`;
 }
 const langRow = () => `<div class="row lang-row">${[['zh', "中文"], ['vi', 'Tiếng Việt']].map(([k, n]) => `<button class="btn sm ${(window.LANG || 'zh') === k ? '' : 'ghost'}" data-act="lang" data-arg="${k}">${n}</button>`).join('')}</div>`;
-const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>Âm thanh</h3><div class="row"><button class="btn ghost" data-act="snd">Hiệu ứng: ${SAVE.sound ? "Bật" : "Tắt"}</button><button class="btn ghost" data-act="mus">Nhạc cổ cầm: ${SAVE.music ? "Bật" : "Tắt"}</button></div></section>
+const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}</section><section class="panel"><h3>Âm thanh</h3><div class="row"><button class="btn ghost" data-act="snd">Hiệu ứng: ${SAVE.sound ? "Bật" : "Tắt"}</button><button class="btn ghost" data-act="mus">Nhạc cổ cầm: ${SAVE.music ? "Bật" : "Tắt"}</button></div>
+  <p class="help-p" style="margin:10px 0 6px">Nghe thử nhạc mới (mới làm ba đoạn, nghe xem có đúng vị không):</p>
+  <div class="row mtest">${[['c1', "Nghĩa địa"], ['c7', "Chợ Ma"], ['boss', "Đánh thủ lĩnh"], ['battle', "Đánh thường"]].map(([k, n]) => `<button class="btn sm ${MTEST && MTEST.id === k ? '' : 'ghost'}" data-act="mtest" data-arg="${k}">${n}</button>`).join('')}<button class="btn sm ghost" data-act="mtest" data-arg="">Dừng</button></div>
+  <p class="help-p" style="margin-top:6px">Loa ngoài điện thoại không nghe được âm trầm, đeo tai nghe sẽ đầy đủ hơn. Đoạn nghĩa địa rất trống, hơn chục giây mới có một câu tiêu — là cố ý.</p></section>
     <section class="panel"><h3>Điều khiển</h3><p class="help-p">Trên bản đồ lớn: chạm đâu đi đó; chạm thanh nhiệm vụ phía trên để tự đi tới; trên máy tính dùng phím mũi tên hoặc WASD.</p><div class="row"><button class="btn ghost" data-act="joy">Cần điều khiển ảo: ${SAVE.joy ? "Bật" : "Tắt"}</button>
       <button class="btn ghost" data-act="fs">Cỡ chữ: ${({ 0.9: "Nhỏ", 1: "Vừa", 1.15: "Lớn", 1.3: "Rất lớn" })[SAVE.fs || 1] || "Vừa"}</button>
       <button class="btn ghost" data-act="guide">Chỉ dẫn nhiệm vụ: ${SAVE.guide === 'full' ? "Chi tiết" : "Manh mối"}</button></div>
@@ -2651,6 +2655,12 @@ const ACT = {
   rest: k => { if (k === 'heal') EV.heal(SAVE.run, 0.45); else EV.buff(SAVE.run, 'dmgPct', 10); clearCell(SAVE.run); SFX.play(k === 'heal' ? 'heal' : 'forge'); toast(k === 'heal' ? "Hồi 45% khí huyết" : "Chuyến này sát thương +10%"); VIEW = 'map'; refresh(); },
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
+  mtest: k => {
+    const M = { c1: { key: 'c1', kind: 'field' }, c7: { key: 'c7', kind: 'field' }, boss: { key: 'c1', kind: 'field', fight: 'boss' }, battle: { key: 'c1', kind: 'field', fight: 'battle' } }[k];
+    if (!M) { MTEST = null; SFX.audition(curMood()); return refresh(); }
+    if (!SAVE.music) { SAVE.music = true; save(); toast("Đã bật nhạc nền"); }
+    SFX.ensure(); SFX.set(SAVE.sound, true); MTEST = { id: k, m: M }; SFX.audition(M); refresh();
+  },
   export: async () => {
     markBackup(); persist(true); const code = ZCODE || exportSave();
     const done = () => { toast(`Đã sao chép mã lưu (${code.length} ký tự), hãy dán vào chỗ nào đó để cất`); const m = document.querySelector('.bk-now small'); if (m) m.textContent = `Sao lưu lần trước: ${fmtDay(SAVE.bk.t)}`; document.querySelectorAll('.bk-nudge').forEach(x => x.remove()); };
@@ -2724,6 +2734,7 @@ document.addEventListener('keydown', e => {
 // 当前该放什么配乐
 function curMood() {
   const run = SAVE.run;
+  if (MTEST) { if (VIEW === 'town' || VIEW === 'title') return MTEST.m; MTEST = null; }
   if (VIEW === 'end' || VIEW === 'credits') return { key: 'sad' };
   if (!run || VIEW === 'town') return { key: 'town' };
   const ch = run.chapter || 1, key = 'c' + Math.min(10, ch);
