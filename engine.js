@@ -112,7 +112,48 @@ function lzUnpack(txt) {
 function sum32(s) { let a = 1, b = 0; for (let i = 0; i < s.length; i++) { a = (a + s.charCodeAt(i)) % 65521; b = (b + a) % 65521; } return ((b << 16) | a) >>> 0; }
 const SAVE_TAG = 'JY1';
 function packSaveObj(obj) { const raw = unescape(encodeURIComponent(JSON.stringify(obj))); return SAVE_TAG + '.' + raw.length.toString(36) + '.' + sum32(raw).toString(36) + '.' + lzPack(raw); }
-function exportSave() { return packSaveObj(SAVE); }
+// 存档码瘦身（只影响导出的码，本机存档不动）：
+//   1. 每张地图的迷雾原来是一格一个字符，改成「连续多少格」的游程；
+//   2. 不在打的章节，普通小怪不进码——回去歇一次脚就会按原数补齐；精英、悬赏、带标记的照留。
+const rleSeen = s => { if (typeof s !== 'string' || !/^[01]*$/.test(s) || !s) return s; const out = []; let c = s[0], n = 0; for (const ch of s) { if (ch === c) n++; else { out.push(n.toString(36)); c = ch; n = 1; } } out.push(n.toString(36)); return 'R' + s[0] + out.join('.'); };
+const unrleSeen = s => { if (typeof s !== 'string' || s[0] !== 'R') return s; let c = s[1], out = ''; for (const n of s.slice(2).split('.')) { out += c.repeat(parseInt(n, 36) || 0); c = c === '0' ? '1' : '0'; } return out; };
+const MON_PLAIN = ['id', 'x', 'y', 'z', 'm', 'lv', 'beh', 'hx', 'hy'];
+function slimSave(S) {
+  const o = JSON.parse(JSON.stringify(S)), cur = o.run && o.run.world ? o.run.chapter : null;
+  for (const k in o.world || {}) { const W = o.world[k]; if (!W || !W.sd) continue;
+    for (const sc in W.sd) { const D = W.sd[sc]; D.seen = rleSeen(D.seen);
+      if (W.ch !== cur && Array.isArray(D.mons)) D.mons = D.mons.filter(mn => Object.keys(mn).some(q => !MON_PLAIN.includes(q))); } }
+  o._slim = 1; return o;
+}
+function fatSave(o) {
+  if (!o || !o._slim) return o;
+  for (const k in o.world || {}) { const W = o.world[k]; if (!W || !W.sd) continue; for (const sc in W.sd) W.sd[sc].seen = unrleSeen(W.sd[sc].seen); }
+  delete o._slim; return o;
+}
+function exportSave() { return packSaveObj(slimSave(SAVE)); }
+// 更短的存档码（JY2）：浏览器自带的 deflate，比上面的 LZW 再短四成多。老浏览器没有这个功能，就继续用 JY1。
+const SAVE_TAG2 = 'JY2';
+const sum32b = u8 => { let a = 1, b = 0; for (let i = 0; i < u8.length; i++) { a = (a + u8[i]) % 65521; b = (b + a) % 65521; } return ((b << 16) | a) >>> 0; };
+const b64u = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 3) { const a = u8[i], b = i + 1 < u8.length ? u8[i + 1] : 0, c = i + 2 < u8.length ? u8[i + 2] : 0;
+  s += B64U[a >> 2] + B64U[((a & 3) << 4) | (b >> 4)]; if (i + 1 < u8.length) s += B64U[((b & 15) << 2) | (c >> 6)]; if (i + 2 < u8.length) s += B64U[c & 63]; } return s; };
+const unb64u = str => { const out = new Uint8Array(Math.floor(str.length * 3 / 4)); let acc = 0, bits = 0, j = 0;
+  for (let i = 0; i < str.length; i++) { const v = B64U.indexOf(str[i]); if (v < 0) throw new Error('cut'); acc = ((acc << 6) | v) & 0xffff; bits += 6; if (bits >= 8) { bits -= 8; out[j++] = (acc >> bits) & 255; } } return out.subarray(0, j); };
+const canDeflate = () => typeof CompressionStream === 'function' && typeof DecompressionStream === 'function' && typeof Response === 'function' && typeof TextEncoder === 'function';
+async function pipeBytes(u8, stream) { const w = stream.writable.getWriter(); w.write(u8).catch(() => {}); w.close().catch(() => {}); return new Uint8Array(await new Response(stream.readable).arrayBuffer()); }
+async function exportSaveZ() {
+  if (!canDeflate()) return exportSave();
+  try { const raw = new TextEncoder().encode(JSON.stringify(slimSave(SAVE))), z = await pipeBytes(raw, new CompressionStream('deflate'));
+    return SAVE_TAG2 + '.' + raw.length.toString(36) + '.' + sum32b(raw).toString(36) + '.' + b64u(z); } catch (e) { return exportSave(); }
+}
+// 两种存档码都认。message：'cut' 不完整 / 'bad' 不是存档码 / 'old' 浏览器太旧读不了 JY2
+async function decodeSaveAny(str) {
+  const s = String(str || '').replace(/\s+/g, ''), m = s.match(/JY2\.([0-9a-z]+)\.([0-9a-z]+)\.([A-Za-z0-9_-]+)/);
+  if (!m) { if (/JY2\./.test(s)) throw new Error('cut'); return decodeSave(str); }
+  if (!canDeflate()) throw new Error('old');
+  let raw; try { raw = await pipeBytes(unb64u(m[3]), new DecompressionStream('deflate')); } catch (e) { throw new Error('cut'); }
+  if (raw.length !== parseInt(m[1], 36) || sum32b(raw) !== parseInt(m[2], 36)) throw new Error('cut');
+  return parseSave(fatSave(JSON.parse(new TextDecoder().decode(raw))));
+}
 // 存档码 → 存档对象（不动当前进度）。出错时抛出 Error，message：'cut' 被截断 / 'bad' 不是存档码
 function decodeSave(str) {
   str = String(str || '').replace(/\s+/g, '');
@@ -120,7 +161,7 @@ function decodeSave(str) {
   if (m) {
     let raw; try { raw = lzUnpack(m[3]); } catch (e) { throw new Error('cut'); }
     if (raw.length !== parseInt(m[1], 36) || sum32(raw) !== parseInt(m[2], 36)) throw new Error('cut');
-    return parseSave(JSON.parse(decodeURIComponent(escape(raw))));
+    return parseSave(fatSave(JSON.parse(decodeURIComponent(escape(raw)))));
   }
   if (/^JY1\./.test(str)) throw new Error('cut');
   let obj; try { obj = JSON.parse(decodeURIComponent(escape(atob(str)))); } catch (e) { throw new Error('bad'); }   // 旧版存档码

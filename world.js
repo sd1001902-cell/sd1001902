@@ -546,7 +546,10 @@ function wCompleteMain(ch, run) {
   if (typeof m.final === 'function' ? m.final(S) : m.final) { S.flags.done = 1; acts.push({ final: true }); }
   const nx = wMain(ch);
   if (nx && /^i/.test(nx.id) && !/^i/.test(m.id)) acts.push({ intro: 'inter' });   // 进入幕间：开场小动画
-  if (nx && nx.auto) acts.push(...wTalk(ch, nx.goal.talk, run));
+  if (nx && nx.auto && nx.goal.fight) {   // 接着就开打（开场第一场架）：不用先走到那个点上
+    const e = wIndex(ch)[nx.goal.fight];
+    if (e && e.P && e.P.enc) acts.push({ dlg: wLines(ch, nx.lines) || [] }, { fight: { ...e.P.enc, first: e.P.enc.first || 'p' }, key: { main: nx.id, pt: wgk(e.sc, e.at[0].x, e.at[0].y), boss: null, scripted: !!e.P.enc.scripted } });
+  } else if (nx && nx.auto) acts.push(...wTalk(ch, nx.goal.talk, run));
   return acts;
 }
 function wAdvanceSide(ch, q, run) {
@@ -1145,13 +1148,22 @@ function wNextLamp(ch, grp) {
     for (const c in m.pts) { const P = m.def.pts[c]; if (P.t === 'lamp' && P.grp === grp && P.wx === want) { const p = m.pts[c][0]; return { sc, x: p.x, y: p.y }; } } }
   return null;
 }
+// 「要紧」的支线：奖励是克制首领狠招的东西，而且手里还没有
+const wSideKey = q => (q.rw && q.rw.key) || ((q.steps || []).map(st => st.rw && st.rw.key).find(Boolean)) || null;
+function wFoilSet() { const out = new Set(); if (typeof DOSSIER === 'undefined') return out; for (const id in DOSSIER) for (const it of DOSSIER[id].items || []) if (it.key) out.add(it.key); return out; }
+function wSideFoil(q) { const k = wSideKey(q); return !!k && !wkeys()[k] && wFoilSet().has(k); }
 // 任务追踪：主线 + 进行中的支线
 function wTracker(ch) {
   const S = wstate(ch), out = [], m = wMain(ch), full = SAVE.guide === 'full';
   const ent = (main, id, t, st, n, giver) => { const g = st.goal;
     return { main, id, t, d: ((full || !st.hint) ? st.d : st.hint).replace('{n}', n), mark: st.mark || g.talk || (g.waves ? giver : null), area: st.area, escort: st.escort, find: !!(g.get || g.clue || g.herb || g.puzzle || g.rub) }; };
   if (m) { const e = ent(true, m.id, m.t, m, S.kc); if (m.goal.talks) e.mark = m.goal.talks.find(n => !S.pz['tk_' + m.id + '_' + n]) || e.mark; out.push(e); }
-  for (const q of WQ[ch].side) { const s = S.side[q.id]; if (!s || s.st !== 'on') continue; out.push(ent(false, q.id, q.t, q.steps[s.step], s.n, q.giver)); }
+  for (const q of WQ[ch].side) { const s = S.side[q.id]; if (!s || s.st !== 'on') continue; const e = ent(false, q.id, q.t, q.steps[s.step], s.n, q.giver); if (wSideFoil(q)) e.key = true; out.push(e); }
+  // 被首领打倒两次以后：还没接的「要紧」支线也列出来，指向发任务的人
+  if ((S.pz.bl || 0) >= 2) for (const q of WQ[ch].side) {
+    if (S.side[q.id] || q.auto || !wSideFoil(q) || (q.when && !q.when(S, S.side))) continue;
+    out.push({ main: false, id: q.id, offer: true, key: true, t: q.t, d: `去找${(SPEAKERS[q.giver] || {}).n || '发任务的人'}，接下这条支线`, mark: q.giver });
+  }
   for (const id in (S.bty && S.bty.on) || {}) { const D = wBtyDef(ch, id); if (D) out.push({ main: false, bty: true, id: 'bty_' + id, t: `悬赏·${D.n}`, d: `${BTY_TIER[D.tier].n}　${wBtyWhere(ch, D)}`, mark: 'mon:bty_' + id }); }
   return out;
 }

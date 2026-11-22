@@ -173,12 +173,22 @@ const WQ = {
   1: {
     // ---------- 主线 ----------
     main: [
+      // 开场：四句话就开打，剩下的话打完再说（第一场战斗要在一分钟内）
       { id: 'm1', t: "Tỉnh dậy", d: "Nói chuyện với cô gái bên cạnh", goal: { talk: 'ngoc' }, auto: true,
         lines: [
           ['narr', "Lạnh. Rất lạnh. Bạn bị một tràng tiếng bới đất đánh thức, phát hiện mình đang nằm trong một cỗ quan tài mỏng, nắp quan tài đã bị ai đó lật ra một nửa."],
           ['ngoc', "…Này. Này! Đừng giả chết."],
           ['me', "Tôi… đây là đâu?"],
           ['ngoc', "Bãi Tha Ma. Mộ của ngươi. Ta đi ngang qua, nghe trong này có người gõ ván quan tài, nửa đêm canh ba, gõ còn to hơn người đánh mõ cầm canh."],
+        ], set: { ngocFollow: 1 } },
+      { id: 'm2', t: "Trận đánh đầu tiên", d: "Đánh lui lũ thây ma bò ra từ sau các nấm mồ (ở phía bắc lối nhỏ trong nghĩa địa)", goal: { fight: 'q1' }, mark: 'q1', auto: true,
+        lines: [
+          ['narr', "Chưa nói dứt lời, ba cái thây ma đã lảo đảo đứng dậy từ sau các nấm mồ, vây hai người vào giữa."],
+          ['ngoc', "Tới rồi đấy. Đừng đứng ngây ra — thanh đao trong tay ngươi để làm cảnh à?"],
+          ['narr', "(Mặc định chiến đấu tự động. Có kỹ năng gây thiêu đốt, đóng băng, phá giáp, choáng lên địch, có kỹ năng chuyên đánh địch mang các trạng thái đó — gây trước rồi đánh, đó là liên chiêu. Trong trận có thể chuyển sang thủ công ra chiêu.)"],
+        ],
+        after: [
+          ['ngoc', "Cũng được, không làm ta mất mặt."],
           ['me', "Tôi là ai?"],
           ['ngoc', "Sao ta biết được? Bia mộ không có một chữ, còn trống trơn hơn cả đầu óc ngươi."],
           ['narr', "Cô cúi xuống, nhặt từ hố mộ lên một đoạn đinh gãy phát ánh sáng mờ, nhìn một cái, tay run lên, vội vàng nhét vào tay áo."],
@@ -186,17 +196,8 @@ const WQ = {
           ['ngoc', "Không có gì. Mảnh sắt vụn, mang về kê chân bàn."],
           ['ngoc', "Ta tên Ngoc, mở tiệm thuốc trong trấn. Vừa rồi đổ cho ngươi một bát canh hồi hồn — tiền thuốc ghi sổ, đừng hòng quỵt."],
           ['ngoc', "Rời khỏi đây trước khi trời sáng. Dạo này Bãi Tha Ma không yên, người chết còn siêng năng hơn người sống."],
-          ['narr', "(Chạm vào một chỗ trên bản đồ, nhân vật sẽ đi tới. Chạm thanh nhiệm vụ phía trên để tự đi tới.)"],
-        ], set: { ngocFollow: 1 } },
-      { id: 'm2', t: "Trận đánh đầu tiên", d: "Đi theo lối nhỏ trong nghĩa địa về phía bắc", goal: { fight: 'q1' }, mark: 'q1',
-        lines: [
-          ['narr', "Ba cái thây ma lảo đảo đứng dậy từ sau các nấm mồ, chặn lối đi."],
-          ['ngoc', "Tới rồi đấy. Đừng đứng ngây ra — thanh đao trong tay ngươi để làm cảnh à?"],
-          ['narr', "(Mặc định chiến đấu tự động. Có kỹ năng gây thiêu đốt, đóng băng, phá giáp, choáng lên địch, có kỹ năng chuyên đánh địch mang các trạng thái đó — gây trước rồi đánh, đó là liên chiêu. Trong trận có thể chuyển sang thủ công ra chiêu.)"],
-        ],
-        after: [
-          ['ngoc', "Cũng được, không làm ta mất mặt."],
           ['ngoc', "Đi về phía đông có một nhà quàn, sư phụ Lưu giữ nhà quàn là một lão già kỳ quặc, nhưng không xấu. Tối nay cứ đến chỗ ông ấy nghỉ chân trước."],
+          ['narr', "(Chạm vào một chỗ trên bản đồ, nhân vật sẽ đi tới. Chạm thanh nhiệm vụ phía trên để tự đi tới.)"],
         ], rw: { xp: 0.3 } },
       { id: 'm3', t: "Đến nhà quàn", d: "Theo Ngoc đến nhà quàn phía đông nghĩa địa", goal: { reach: 'yzfire' }, mark: 'yzfire',
         lines: [
@@ -570,7 +571,7 @@ const WQ = {
           { d: "Chuẩn bị xong thì nói chuyện với sư phụ Lưu ở nhà quàn, giữ vững đêm nay (ba đợt)", goal: { waves: [
               { kind: 'battle', mon: 0, n: 3, lv: 2 },
               { kind: 'battle', mon: 0, n: 4, lv: 3, mix: [0, 3] },
-              { kind: 'elite', mon: 0, lv: 4, name: "Lão thây ma đầu đàn" }] },
+              { kind: 'elite', mon: 0, lv: 3, name: "Lão thây ma đầu đàn" }] },   // 第一章碰到的第一只精英：比后面的低一级
             lines: [['liu', "Tới rồi. Nghe này —"], ['narr', "Cửa nhà quàn bị đập ầm ầm."]],
             between: [[['liu', "Đợt đầu qua rồi. Thở một hơi đi, đợt hai tới ngay."], ['narr', "Ngoài cửa vọng vào tiếng cánh vỗ phành phạch."]], [['liu', "Đợt cuối! Con dẫn đầu ấy, lúc sống là đồ tể, khỏe lắm."]]] },
           { d: "Trời sáng rồi, nói chuyện với sư phụ Lưu", goal: { talk: 'liu' },

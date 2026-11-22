@@ -26,7 +26,7 @@ function legBeam() {
 setInterval(() => { if (!document.querySelector('.legbeam')) legBeam(); }, 500);
 let BTOAST = [];
 function toast(msg) { if (VIEW === 'battle' && B && !B.over) { if (!BTOAST.includes(msg)) BTOAST.push(msg); return; } const t = $('#toast'); t.innerHTML = msg;
-  { const mp = VIEW === 'world' && innerWidth <= 700 && document.querySelector('.wmapbox, #wmap, .wmap'); t.style.top = mp ? Math.round(mp.getBoundingClientRect().top + 30) + 'px' : ''; }   // 手机上地图界面的提示落在地图上沿，不盖住气血条和任务栏
+  { const mp = VIEW === 'world' && !MODALFN && innerWidth <= 700 && document.querySelector('.wmapbox, #wmap, .wmap'); t.style.top = mp ? Math.round(mp.getBoundingClientRect().top + 30) + 'px' : ''; }   // 手机上地图界面的提示落在地图上沿，不盖住气血条和任务栏
   t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
 function achToast(list) { if (list && list.length) { SFX.play('legend'); setTimeout(() => toast('成就达成：' + list.map(a => `<b>${a.n}</b>`).join('、')), 600); } }
 const ctxCls = () => SAVE.run ? SAVE.run.cls : SAVE.cls;
@@ -553,7 +553,7 @@ const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0')
 const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} ${b.lv} 级 · ${b.ended ? '已通关全部十章' : `已通关 ${b.cleared} 章`} · 银两 ${b.gold}`;
 const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
 function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
-const setSave = () => `<section class="panel bkp"><h3>存档备份</h3>
+const setSave = () => (prepZ(), '') + `<section class="panel bkp"><h3>存档备份</h3>
       <p class="help-p">进度只存在这台设备的这个浏览器里：清理缓存、换手机、换浏览器打开，进度都会丢。建议每打完一章备份一次。</p>
       <p class="bk-now"><b>现在的进度</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `上次备份：${fmtDay(SAVE.bk.t)}` : '还没有备份过'}</small></p>
       <div class="row"><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bkfile">保存成文件</button></div>
@@ -569,8 +569,10 @@ const importModal = () => () => { const a = saveBrief(IMPORTING), b = saveBrief(
     ${hasProgress() ? `<div><small>这台设备上现在的进度（会被覆盖）</small><b>${briefLine(b)}</b>${b.t ? `<small>保存于 ${fmtDay(b.t)}</small>` : ''}</div>` : ''}</div>
     ${older ? '<p class="bk-warn">注意：存档码里的进度比现在的还少。确认要用旧的覆盖新的吗？</p>' : ''}
     <div class="row"><button class="btn" data-act="doimport">恢复这份存档</button><button class="btn ghost" data-act="imcancel">取消</button></div>`; };
-function tryImport(str) {
-  try { IMPORTING = decodeSave(str); } catch (e) { IMPORTING = null; return toast(e.message === 'cut' ? '存档码不完整：可能复制时被截断了，请重新完整复制一次' : '这不是存档码，请检查一下'); }
+let ZCODE = null;   // 提前压好的短存档码（JY2）。点「复制」那一下必须同步完成，所以面板一打开就先压好
+function prepZ() { ZCODE = null; exportSaveZ().then(c => { ZCODE = c; }).catch(() => {}); }
+async function tryImport(str) {
+  try { IMPORTING = await decodeSaveAny(str); } catch (e) { IMPORTING = null; return toast(e.message === 'cut' ? '存档码不完整：可能复制时被截断了，请重新完整复制一次' : e.message === 'old' ? '这个浏览器太旧，读不了这份存档码——换一个浏览器打开游戏再恢复' : '这不是存档码，请检查一下'); }
   BACK = MODALFN; openModal(importModal());
 }
 // 选章试玩：测试用，平时折起来，不打扰正常游玩
@@ -1113,8 +1115,8 @@ function worldHTML() {
   return `${runBar(run)}
     <div class="wtrack ${WTRK ? 'open' : ''}">
       ${m ? `<button class="wt-main" data-act="wgo" data-arg="${m.id}"><span class="wt-tag">主线</span>${trkTD(m)}<em>前往 ▸</em></button>` : '<div class="wt-main"><b>本章主线已完成</b><small>可以继续探索、做支线、刷妖物</small></div>'}
-      ${sides.length ? `<button class="wt-more" data-act="wtrk">支线${sides.some(q => q.bty) ? '·悬赏' : ''} ${sides.length} ${WTRK ? '▲' : '▼'}</button>` : ''}
-      ${WTRK ? `<div class="wt-list">${sides.map(q => `<button class="wt-side" data-act="wgo" data-arg="${q.id}"><span class="wt-tag s ${q.bty ? 'b' : ''}">${q.bty ? '悬赏' : '支线'}</span>${trkTD(q)}<em>前往 ▸</em></button>`).join('')}</div>` : ''}
+      ${sides.length ? `<button class="wt-more ${sides.some(q => q.key) ? 'k' : ''}" data-act="wtrk">支线${sides.some(q => q.bty) ? '·悬赏' : ''} ${sides.length}${sides.some(q => q.key) ? ' · 有要紧的' : ''} ${WTRK ? '▲' : '▼'}</button>` : ''}
+      ${WTRK ? `<div class="wt-list">${sides.map(q => `<button class="wt-side" data-act="wgo" data-arg="${q.id}"><span class="wt-tag s ${q.key ? 'k' : q.bty ? 'b' : ''}">${q.key ? '要紧' : q.bty ? '悬赏' : '支线'}</span>${trkTD(q)}<em>前往 ▸</em></button>`).join('')}</div>` : ''}
     </div>
     <div class="wmap" id="wmap"><canvas id="wcv"></canvas><div class="wzone" id="wzone">${esc(zoneName())}</div>
       <div class="wfol">${fol.length ? `同行：${fol.map(esc).join('、')}` : comp ? `同伴：${esc(COMPANIONS[comp].n)}` : ''}${run.food ? `${fol.length || comp ? ' · ' : ''}饱腹：${esc((FOODS.find(f => f.id === run.food) || {}).n || '')}` : ''}</div>
@@ -1600,6 +1602,15 @@ const dossierModal = id => () => {
     <p class="help-p">已经带了 ${have}/${tot} 件克制的东西。${have < tot ? '没带齐也能打，只是会难很多——可以先回去找，或者多练几级再来。' : '准备得很充分。'}</p>
     <div class="row"><button class="btn" data-act="dgo">开打</button><button class="btn ghost" data-act="dback">先回去准备</button></div></div>`;
 };
+// 连输之后的提示：哪招要用什么克、那样东西从哪条支线来
+const bossHelpModal = id => () => {
+  const D = DOSSIER[id], ch = wch(), S = wstate(ch), tr = wTracker(ch);
+  const miss = D.items.filter(it => it.key && !wkeys()[it.key]);
+  return `<div class="doss"><div class="doss-h"><div><small>已经输给它 ${S.pz.bl || 2} 次</small><h2 class="mh">${esc(D.n)}</h2><p class="sub">它有 ${miss.length} 招得用东西克。光靠多练几级很难硬扛——先把克它的东西拿到手。</p></div></div>
+    <ul class="dossl">${miss.map(it => { const q = WQ[ch].side.find(q => wSideKey(q) === it.key), on = q && tr.some(t => t.id === q.id);
+      return `<li class="no"><b>${esc(it.n)}</b><span>${esc(it.d)}</span><small>克制它：${esc(it.how)}</small>${on ? `<button class="btn sm bh-go" data-act="bhgo" data-arg="${q.id}">${S.side[q.id] ? '去做这条支线' : '去接这条支线'} ▸</button>` : ''}</li>`; }).join('')}</ul>
+    <div class="row"><button class="btn ghost" data-act="close">知道了</button></div></div>`;
+};
 // 一键前往跨场景时：进门之后接着走
 function wResume() {
   if (WGOAL && !DLG && !MODALFN && VIEW === 'world') { const id = WGOAL.id; if (++WGOAL.hops > 10) { WGOAL = null; return; } setTimeout(() => { if (WGOAL && WGOAL.id === id && !WALK && !DLG && !MODALFN) ACT.wgo(id, null, true); }, 350); }
@@ -1620,8 +1631,11 @@ function worldBattleContinue() {
     wRun(wFightWon(ch, k.key, run).concat(k.rest || [])); return;
   }
   if (!BRES.win) {
+    const bid = k.key && k.key.boss, S0 = wstate(ch); if (bid) S0.pz.bl = (S0.pz.bl || 0) + 1;
     const r = wDefeat(ch, run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; wStopAuto(); WHERO = null; save(); render();
-    playDialog([['narr', `你倒下了……迷迷糊糊中，有人把你拖回了篝火边。${r.lost ? `钱袋轻了 ${r.lost} 两。` : ''}`], ...(r.msg ? [['narr', r.msg]] : [])], null);
+    // 同一个首领输到第二次（以后每隔一次）：直接说清它哪招要用什么克，并给一个「前往」
+    const help = bid && S0.pz.bl >= 2 && S0.pz.bl % 2 === 0 && DOSSIER[bid] && DOSSIER[bid].items.some(it => it.key && !wkeys()[it.key]);
+    playDialog([['narr', `你倒下了……迷迷糊糊中，有人把你拖回了篝火边。${r.lost ? `钱袋轻了 ${r.lost} 两。` : ''}`], ...(r.msg ? [['narr', r.msg]] : [])], null, help ? () => openModal(bossHelpModal(bid)) : undefined);
     return;
   }
   B = null; VIEW = 'world'; save(); render();
@@ -1642,6 +1656,107 @@ function showOpts(lastQ, labels, onPick) {
   box.hidden = false;
   box.onclick = e => { const b = e.target.closest('[data-qi]'); if (!b) return; e.stopPropagation(); box.hidden = true; box.onclick = null; onPick(+b.dataset.qi); };
 }
+// ================= 机关示范 =================
+// 每种机关第一次出现在眼前时，放一段十秒左右的小动画：先看一遍怎么过，再自己走。
+const DKF = (keys, T) => { let a = keys[0]; for (const k of keys) { if (k[0] > T) { const u = (T - a[0]) / Math.max(0.001, k[0] - a[0]); return [a[1] + (k[1] - a[1]) * u, a[2] + (k[2] - a[2]) * u]; } a = k; } return [a[1], a[2]]; };
+const DPUT = (rows, x, y, c) => { rows[y] = rows[y].slice(0, x) + c + rows[y].slice(x + 1); };
+const DEMOS = {
+  lava: { n: '岩浆', len: 7.8, at: [1.2, 2.7], cap: ['岩浆一明一暗，隔一会儿换一次', '亮着的时候踩上去会烫伤——先在边上等', '暗下去了，一口气走过去'],
+    step: T => { const hot = Math.floor(T / 2.6) % 2 === 0, R = ['##########', '....LL....', '....LL....', '....LL....', '##########'].map(r => hot ? r : r.replace(/L/g, 'l'));
+      return { rows: R, hero: DKF([[0, 0.5, 2], [1.2, 3, 2], [2.8, 3, 2], [4.5, 7, 2], [5.1, 8.5, 2], [7.8, 8.5, 2]], T), wait: T > 1.2 && T < 2.8 }; } },
+  web: { n: '蛛网', len: 9, at: [2, 5.6], cap: ['蛛网把路封死了，硬闯过不去', '身上带着火把，走进去，火一燎就开', '还没有火把？先跟着任务把它拿到手'],
+    step: T => { const R = ['##########', '.....W....', '.....W....', '.....W....', '##########']; if (T > 4.2) DPUT(R, 5, 2, T < 4.9 ? 'F' : '.');
+      return { rows: R, hero: DKF([[0, 0.5, 2], [2, 4, 2], [4.2, 4, 2], [5.4, 5, 2], [7, 8.5, 2], [9, 8.5, 2]], T), torch: true }; } },
+  bridge: { n: '网桥', len: 10, at: [1.5, 6.5], cap: ['网桥：踩过的那一格会塌', '别回头、别兜圈——认准一条线走到头', '塌掉的网，过一会儿会重新结好'],
+    step: T => { const R = ['##########', '...GGGG...', '...BBBB...', '...GGGG...', '##########'], h = DKF([[0, 0.5, 2], [1.5, 2, 2], [5.5, 7, 2], [6.5, 8.5, 2], [10, 8.5, 2]], T);
+      for (let x = 3; x <= 6; x++) { const tx = 1.5 + (x - 2) * 0.8 + 0.5; if (T > tx && T < tx + 3.4) DPUT(R, x, 2, 'G'); }
+      return { rows: R, hero: h }; } },
+  swamp: { n: '毒沼', len: 9, at: [1.2, 6.8], cap: ['毒水会一步一步掉气血', '能绕就绕着走', '拿到克它的东西以后，就可以直接蹚过去'],
+    step: T => ({ rows: ['..........', '...SSSS...', '...SSSS...', '...SSSS...', '..........'], hero: DKF([[0, 0.5, 2], [1.2, 2, 2], [2.4, 2, 4], [5.6, 7, 4], [6.8, 7, 2], [7.6, 8.5, 2], [9, 8.5, 2]], T) }) },
+  plate: { n: '踏板和栅栏', len: 10, at: [3, 8], cap: ['栅栏挡路的时候，附近一定有踏板', '踩上去：红栅栏沉下去，青栅栏升起来', '再踩一次就换回来——想好先后再踩'],
+    step: T => { const on = T > 3, R = ['######R###', '......R...', '..P...R...', '......R...', '######R###'].map(r => on ? r.replace(/R/g, 'r') : r); DPUT(R, 8, 4, on ? 'C' : 'c');
+      return { rows: R, hero: DKF([[0, 0.5, 1], [1.4, 2, 1], [3, 2, 2], [4.2, 2, 2], [5.2, 3, 2], [8, 8.5, 2], [10, 8.5, 2]], T) }; } },
+  watch: { n: '巡逻的视线', len: 10.5, at: [1.6, 5], cap: ['黄色的格子，是他看得见的地方', '他会转头——等视线挪开', '趁空当走过去；被看见会被赶回去，或者招来一场架'],
+    step: T => { const down = T < 4.6 || T > 9.4, R = ['..........', '.....E....', '..........', '..........', '..........'];
+      const cone = down ? [[5, 2], [5, 3], [5, 4], [4, 3], [6, 3], [4, 4], [6, 4]] : [[6, 1], [7, 1], [8, 1], [7, 0], [8, 0], [7, 2], [8, 2]];
+      return { rows: R, cone, face: down ? 's' : 'e', hero: DKF([[0, 0.5, 3], [1.6, 3, 3], [5, 3, 3], [8, 8.5, 3], [10.5, 8.5, 3]], T), wait: T > 1.6 && T < 5 }; } },
+  ice: { n: '冰面', len: 9, at: [2.4, 4.8], cap: ['冰面：一踩上去就一滑到底', '撞到石头或者墙，才停得下来', '先看好要停在哪儿，再决定从哪边踩上去'],
+    step: T => ({ rows: ['##########', '..IIIIII..', '..IIIIK...', '..IIIIII..', '##########'], hero: DKF([[0, 0.5, 2], [1.6, 1, 2], [2.4, 1, 2], [3.6, 5, 2], [4.8, 5, 2], [5.6, 5, 3], [6.4, 7, 3], [7.2, 8.5, 3], [9, 8.5, 3]], T) }) },
+  box: { n: '冰块和冰眼', len: 10, at: [3, 6.8], cap: ['冰块：站到它旁边，朝要推的方向点它', '把它推上发光的冰眼，冰门就开了', '推歪了也不怕——点旁边的水晶，冰块回到原位'],
+    step: T => { const bx = T < 3 ? 3 : Math.min(6, 3 + (T - 3) * 2.2), R = ['##########', '..........', '......O..D', '..........', '##########']; if (bx >= 6) DPUT(R, 9, 2, 'd');
+      return { rows: R, box: [bx, 2], hero: DKF([[0, 0.5, 2], [2, 2, 2], [6, 2, 2], [6.8, 2, 3], [9, 8.5, 3], [10, 8.5, 3]], T) }; } },
+  xintu: { n: '被迷住的信徒', len: 9, at: [2.6, 4.4], cap: ['被迷住的信徒会堵在路口', '走到跟前，点他一下', '手里有醒魂香就能叫醒；没有，就先打晕再过去'],
+    step: T => { const R = ['#####.####', '#####.####', '.....V....', '#####.####', '#####.####']; if (T > 4.4) DPUT(R, 5, 2, 'v');
+      return { rows: R, tap: T > 3.2 && T < 4.4 ? [5, 2] : null, hero: DKF([[0, 0.5, 2], [2.6, 4, 2], [5.2, 4, 2], [7.6, 8.5, 2], [9, 8.5, 2]], T) }; } },
+  yy: { n: '阴阳两面', len: 10, at: [2, 5], cap: ['有些路在阳面是断的', '点「阴阳镜」照到阴面，断的路就接上了', '过去以后，还可以再照回阳面'],
+    step: T => { const yin = T > 4, R = ['....~~....', '....~~....', '....yy....', '....~~....', '....~~....'].map(r => yin ? r.replace(/y/g, 'Y') : r);
+      return { rows: R, tint: yin, hero: DKF([[0, 0.5, 2], [2, 3, 2], [5, 3, 2], [7.5, 8.5, 2], [10, 8.5, 2]], T), wait: T > 2 && T < 4 }; } },
+};
+function demoDraw(key, g, W, H, t) {
+  const D = DEMOS[key], T = (t / 1000) % D.len, st = D.step(T), ts = W / 10, fl = 0.5 + 0.5 * Math.sin(t / 240);
+  g.clearRect(0, 0, W, H);
+  const cone = new Set((st.cone || []).map(p => p[0] + ',' + p[1]));
+  st.rows.forEach((row, y) => { for (let x = 0; x < 10; x++) { const c = row[x], px = x * ts, py = y * ts, cx = px + ts / 2, cy = py + ts / 2;
+    g.fillStyle = (x + y) % 2 ? '#2b2420' : '#27211d'; g.fillRect(px, py, ts + 1, ts + 1);
+    if (c === '#') { g.fillStyle = '#120e0c'; g.fillRect(px, py, ts + 1, ts + 1); g.fillStyle = '#1e1815'; g.fillRect(px + 3, py + 3, ts - 8, ts / 2 - 4); }
+    else if (c === 'L' || c === 'l') { g.fillStyle = c === 'L' ? `rgb(${210 + 40 * fl},${80 + 50 * fl},24)` : '#3a1a12'; g.fillRect(px, py, ts + 1, ts + 1); g.fillStyle = c === 'L' ? 'rgba(255,235,130,.7)' : 'rgba(255,110,40,.3)'; g.fillRect(px + ts * 0.2, py + ts * (0.3 + 0.3 * ((x * 7 + y * 3) % 3) / 3), ts * 0.4, 3); }
+    else if (c === 'W' || c === 'F') { if (c === 'F') { g.fillStyle = `rgba(255,${150 + 80 * fl},40,.9)`; g.beginPath(); g.arc(cx, cy, ts * 0.42, 0, 7); g.fill(); }
+      else { g.strokeStyle = 'rgba(240,240,250,.85)'; g.lineWidth = 1; g.beginPath(); for (let a = 0; a < 8; a++) { g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a * 0.785) * ts * 0.55, cy + Math.sin(a * 0.785) * ts * 0.55); } for (let r = 1; r <= 2; r++) { g.moveTo(cx + r * ts / 5, cy); for (let a = 1; a <= 8; a++) g.lineTo(cx + Math.cos(a * 0.785) * r * ts / 5, cy + Math.sin(a * 0.785) * r * ts / 5); } g.stroke(); } }
+    else if (c === 'G') { g.fillStyle = '#060404'; g.fillRect(px, py, ts + 1, ts + 1); }
+    else if (c === 'B') { g.fillStyle = '#060404'; g.fillRect(px, py, ts + 1, ts + 1); g.strokeStyle = 'rgba(235,235,245,.9)'; g.lineWidth = 1.5; g.beginPath(); for (let i = 0; i <= 3; i++) { g.moveTo(px, py + ts * (0.15 + i * 0.23)); g.lineTo(px + ts, py + ts * (0.15 + i * 0.23)); g.moveTo(px + ts * (0.1 + i * 0.27), py + ts * 0.1); g.lineTo(px + ts * (0.1 + i * 0.27), py + ts * 0.9); } g.stroke(); }
+    else if (c === 'S') { g.fillStyle = '#2a3a1a'; g.fillRect(px, py, ts + 1, ts + 1); const b = (t / 900 + x * 0.37 + y * 0.61) % 1; g.fillStyle = `rgba(150,220,80,${0.6 * (1 - b)})`; g.beginPath(); g.arc(px + ts * 0.3 + (x * 5 % 9), py + ts * (0.8 - b * 0.4), 2 + b * 3, 0, 7); g.fill(); }
+    else if (c === 'I') { g.fillStyle = '#9fd0e8'; g.fillRect(px, py, ts + 1, ts + 1); g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(px + ts * 0.2, py + ts * 0.7); g.lineTo(px + ts * 0.6, py + ts * 0.3); g.stroke(); }
+    else if (c === 'K') { g.fillStyle = '#9fd0e8'; g.fillRect(px, py, ts + 1, ts + 1); g.fillStyle = '#4a4440'; g.beginPath(); g.arc(cx, cy + 2, ts * 0.36, 0, 7); g.fill(); g.fillStyle = '#6a625c'; g.beginPath(); g.arc(cx - 3, cy - 2, ts * 0.18, 0, 7); g.fill(); }
+    else if (c === 'O') { g.fillStyle = `rgba(140,225,255,${0.3 + 0.3 * fl})`; g.beginPath(); g.ellipse(cx, cy, ts * 0.4, ts * 0.3, 0, 0, 7); g.fill(); }
+    else if (c === 'D' || c === 'd') { g.fillStyle = c === 'D' ? '#7ab8d8' : '#1c2a30'; g.fillRect(px + 2, py, ts - 3, ts + 1); if (c === 'D') { g.fillStyle = '#e8f8ff'; g.fillRect(px + ts * 0.4, py + ts * 0.4, ts * 0.2, ts * 0.2); } }
+    else if (c === 'P') { g.fillStyle = '#6a5a3a'; g.fillRect(px + 4, py + 4, ts - 8, ts - 8); g.fillStyle = `rgba(255,220,120,${0.4 + 0.4 * fl})`; g.fillRect(px + 8, py + 8, ts - 16, ts - 16); }
+    else if ('RrCc'.includes(c)) { const up = c === 'R' || c === 'C', col = c === 'R' || c === 'r' ? '#c4291f' : '#2ab8b0'; g.fillStyle = col; g.globalAlpha = up ? 1 : 0.25;
+      for (let i = 0; i < 3; i++) g.fillRect(px + ts * (0.18 + i * 0.27), py + (up ? 2 : ts * 0.7), ts * 0.14, up ? ts - 4 : ts * 0.25); g.globalAlpha = 1; }
+    else if (c === '~') { g.fillStyle = st.tint ? '#2a1a4a' : '#16303a'; g.fillRect(px, py, ts + 1, ts + 1); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(px + ((t / 60 + y * 9) % ts), py + ts * 0.5, 6, 2); }
+    else if (c === 'y' || c === 'Y') { g.fillStyle = st.tint ? '#2a1a4a' : '#16303a'; g.fillRect(px, py, ts + 1, ts + 1); g.fillStyle = c === 'Y' ? '#c8b8f0' : 'rgba(200,184,240,.22)'; g.fillRect(px, py + ts * 0.2, ts + 1, ts * 0.6); if (c === 'y') { g.strokeStyle = 'rgba(200,184,240,.6)'; g.setLineDash([3, 3]); g.strokeRect(px + 1, py + ts * 0.2, ts - 2, ts * 0.6); g.setLineDash([]); } }
+    if (cone.has(x + ',' + y)) { g.fillStyle = `rgba(255,215,70,${0.32 + 0.12 * fl})`; g.fillRect(px, py, ts + 1, ts + 1); }
+  } });
+  if (st.tint) { g.fillStyle = 'rgba(110,70,200,.16)'; g.fillRect(0, 0, W, H); }
+  const who = (x, y, col, hat) => { const cx = x * ts + ts / 2, cy = y * ts + ts / 2; g.fillStyle = 'rgba(0,0,0,.4)'; g.beginPath(); g.ellipse(cx, cy + ts * 0.36, ts * 0.28, ts * 0.1, 0, 0, 7); g.fill();
+    g.fillStyle = col; g.fillRect(cx - ts * 0.17, cy - ts * 0.08, ts * 0.34, ts * 0.42); g.fillStyle = '#e8c8a0'; g.beginPath(); g.arc(cx, cy - ts * 0.2, ts * 0.15, 0, 7); g.fill(); if (hat) { g.fillStyle = hat; g.fillRect(cx - ts * 0.2, cy - ts * 0.36, ts * 0.4, ts * 0.09); } };
+  st.rows.forEach((row, y) => { for (let x = 0; x < 10; x++) { const c = row[x];
+    if (c === 'E') { who(x, y, '#d8d0c0', '#3a3a4a'); const d = { s: [0, 1], e: [1, 0], w: [-1, 0], n: [0, -1] }[st.face || 's']; g.fillStyle = '#ffd24a'; g.beginPath(); g.arc(x * ts + ts / 2 + d[0] * ts * 0.34, y * ts + ts / 2 + d[1] * ts * 0.34, 3, 0, 7); g.fill(); }
+    if (c === 'V') who(x, y, '#d0c8b8', null);
+    if (c === 'v') { g.fillStyle = '#d0c8b8'; g.fillRect(x * ts + ts * 0.15, y * ts + ts * 0.62, ts * 0.7, ts * 0.2); g.fillStyle = '#c8c0ff'; g.font = `bold ${Math.round(ts * 0.36)}px sans-serif`; g.textAlign = 'center'; g.fillText('z', x * ts + ts * 0.75, y * ts + ts * 0.4 - 3 * fl); }
+  } });
+  if (st.box) { const px = st.box[0] * ts, py = st.box[1] * ts; g.fillStyle = '#bfe8ff'; g.fillRect(px + 3, py + 3, ts - 6, ts - 6); g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.strokeRect(px + 3.5, py + 3.5, ts - 7, ts - 7); }
+  const [hx, hy] = st.hero; who(hx, hy, '#8a1a12', '#1a1412');
+  if (st.torch) { g.fillStyle = `rgba(255,${170 + 60 * fl},60,1)`; g.beginPath(); g.arc(hx * ts + ts * 0.82, hy * ts + ts * 0.3, 3.5 + fl, 0, 7); g.fill(); }
+  if (st.wait) { g.fillStyle = '#ffe9c4'; g.font = `bold ${Math.round(ts * 0.42)}px sans-serif`; g.textAlign = 'center'; g.fillText('…', hx * ts + ts / 2, hy * ts - 2); }
+  if (st.tap) { g.strokeStyle = '#ffe9c4'; g.lineWidth = 2; g.beginPath(); g.arc(st.tap[0] * ts + ts / 2, st.tap[1] * ts + ts / 2, ts * (0.3 + 0.25 * fl), 0, 7); g.stroke(); }
+  return T < D.at[0] ? 0 : T < D.at[1] ? 1 : 2;
+}
+let DEMOK = null;
+const demoModal = key => () => {
+  const D = DEMOS[key];
+  setTimeout(() => { const cv = document.querySelector('#democv'); if (!cv || cv._on) return; cv._on = 1; const g = cv.getContext('2d'), t0 = performance.now();
+    const loop = () => { if (!cv.isConnected) return; const i = demoDraw(key, g, cv.width, cv.height, performance.now() - t0); const el = document.querySelector('#democap'); if (el && el.dataset.i !== String(i)) { el.dataset.i = i; el.textContent = D.cap[i]; } requestAnimationFrame(loop); }; loop(); }, 0);
+  return `<div class="demo"><small>新机关</small><h2 class="mh">${esc(D.n)}</h2><canvas id="democv" width="300" height="150"></canvas><p id="democap" class="demo-cap">${esc(D.cap[0])}</p>
+    <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div></div>`;
+};
+// 眼前第一次出现某种机关：停下来放示范（每种只放一次）
+function wDemoKey(ch) {
+  const S = wstate(ch), m = wmap(ch), seen = SAVE.demos || {}, p = S.pos, T = { '%': 'web', '~': 'bridge', '*': 'lava', '"': 'swamp', '_': 'ice', '(': 'yy', ')': 'yy' };
+  if (!seen.watch && wWatchActive(ch) && Object.keys(m.pts).some(c => m.def.pts[c].t === 'watch' && (!m.def.pts[c].when || m.def.pts[c].when(S)) && m.pts[c].some(q => Math.abs(q.x - p.x) <= 7 && Math.abs(q.y - p.y) <= 7 && wSeen(ch, q.x, q.y)))) return 'watch';
+  if (!seen.box && wBoxes(ch).some(b => Math.abs(b.x - p.x) <= 4 && Math.abs(b.y - p.y) <= 4 && wSeen(ch, b.x, b.y))) return 'box';
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const x = p.x + dx, y = p.y + dy; if (!wSeen(ch, x, y)) continue;
+    const c = wTile(m, x, y), P = m.def.pts[c]; let k = T[c] || (P && (P.t === 'plate' || P.t === 'xintu') ? P.t : null);
+    if (k === 'web' && S.got[wgk(S.sc, x, y)]) k = null; if (k === 'xintu' && S.got[wgk(S.sc, x, y)]) k = null;
+    if (k && !seen[k] && DEMOS[k]) return k; }
+  return null;
+}
+function wDemoCheck() {
+  if (VIEW !== 'world' || DLG || MODALFN || WKEY || !SAVE.run || !SAVE.run.world) return; const qz = document.querySelector('#quiz'); if (qz && !qz.hidden) return;
+  let k = null; try { k = wDemoKey(wch()); } catch (e) { return; } if (!k) return;
+  SAVE.demos = SAVE.demos || {}; SAVE.demos[k] = 1; save();
+  wStopAuto(); if (WALK) { clearTimeout(WALK.h); WALK = null; } WGOAL = null; SFX.play('click'); openModal(demoModal(k));
+}
+setInterval(wDemoCheck, 600);
 // ================= 小游戏 =================
 // 拉风箱：火候走到橘黄那一段时点「拉」，五下里中四下就成
 function playMini(id, done) {
@@ -2151,7 +2266,7 @@ function creditsHTML() {
 }
 
 // ---------- 弹窗 ----------
-function openModal(fn) { MODALFN = fn; sheet.innerHTML = fn(); modal.hidden = false; }
+function openModal(fn) { MODALFN = fn; sheet.innerHTML = fn(); modal.hidden = false; const t = document.querySelector('#toast'); if (t) t.style.top = ''; }   // 弹窗打开时，提示条回到顶上，不压着弹窗里的字
 function closeModal() { if (BACK) { MODALFN = BACK; BACK = null; sheet.innerHTML = MODALFN(); return; } MODALFN = null; modal.hidden = true; }
 function findItem(id) {
   const s = SAVE.stash.find(x => x.id === id); if (s) return { it: s, where: 'stash' };
@@ -2482,6 +2597,7 @@ const ACT = {
     WALK = { path: R.path, i: 0, onArrive: done }; wStepLoop();
   },
   wtrk: () => { WTRK = !WTRK; render(); },
+  bhgo: id => { BACK = null; closeModal(); WTRK = true; render(); ACT.wgo(id); },
   shoptab: k => { SHOPTAB = k; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); },
   shopsel: i => { SHOPSEL = SHOPSEL === +i ? -1 : +i; openModal(shopModal); },
   shopbuy: i => { const r = wShopBuy(wch(), SHOPID, +i, SAVE.run); SHOPMSG = r.err ? `<span class="bad">${esc(r.err)}</span>` : esc(r.ok); SFX.play(r.err ? 'fail' : r.item && (r.item.rarity === 'legend' || r.item.rarity === 'set') ? 'legend' : 'coin'); save();
@@ -2536,7 +2652,7 @@ const ACT = {
   snd: () => { SAVE.sound = !SAVE.sound; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   mus: () => { SAVE.music = !SAVE.music; SFX.set(SAVE.sound, SAVE.music); refresh(); },
   export: async () => {
-    markBackup(); persist(true); const code = exportSave();
+    markBackup(); persist(true); const code = ZCODE || exportSave();
     const done = () => { toast(`存档码已复制（${code.length} 个字符），找个地方粘贴存好`); const m = document.querySelector('.bk-now small'); if (m) m.textContent = `上次备份：${fmtDay(SAVE.bk.t)}`; document.querySelectorAll('.bk-nudge').forEach(x => x.remove()); };
     try { await navigator.clipboard.writeText(code); done(); }
     catch (e) { const t = $('#imp'); if (!t) return ACT.tsave(), setTimeout(ACT.export, 50);
@@ -2544,7 +2660,7 @@ const ACT = {
       if (ok) done(); else toast('没法自动复制：存档码已放进下面的输入框，请长按全选后手动复制'); }
   },
   bkfile: async () => {
-    markBackup(); persist(true); const code = exportSave(), b = saveBrief(SAVE), d = new Date(), z = n => String(n).padStart(2, '0');
+    markBackup(); persist(true); const code = ZCODE || exportSave(), b = saveBrief(SAVE), d = new Date(), z = n => String(n).padStart(2, '0');
     const name = `jiuyou-save-${b.cls}-lv${b.lv}-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}.txt`;
     try { const file = new File([code], name, { type: 'text/plain' });
       if (navigator.canShare && navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file], title: '九幽回廊存档' }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
