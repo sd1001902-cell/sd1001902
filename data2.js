@@ -116,6 +116,10 @@ const DUNGEON_MODS = [
 
 // 修为（原巅峰等级）：满级后所有角色共享
 const PARAGON_STATS = [
+  // 根基（root）：乘在最终的攻击／护甲／气血上，不和套装、灵玉那一堆百分比加在一起稀释。每项 50 点封顶（+100%）
+  { k: 'pAtk', n: '攻击', v: 2, cap: 100, root: 1 },
+  { k: 'pArmor', n: '护甲', v: 2, cap: 100, root: 1 },
+  { k: 'pHp', n: '气血', v: 2, cap: 100, root: 1 },
   { k: 'dmgPct', n: '伤害', v: 1 },
   { k: 'hpPct', n: '最大气血', v: 1 },
   { k: 'armorPct', n: '护甲', v: 2 },

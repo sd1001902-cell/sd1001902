@@ -663,9 +663,11 @@ function heroTab() {
   } else if (HTAB === 'skill') {
     body = skillPanel(cls);
   } else {
-    body = `<p class="help-p">Dùng chung cho mọi nhân vật. Đạt cấp ${MAX_LV} rồi thì kinh nghiệm chuyển thành tu vi, mỗi lần đột phá được 1 điểm: Luyện Khí, Trúc Cơ, Kim Đan, Nguyên Anh…${SAVE.para.lv ? ` Hiện tại: <b>${realmName(SAVE.para.lv)}</b>` : ''}</p>
-      <div class="para">${PARAGON_STATS.map(P => { const n = SAVE.para.pts[P.k] || 0; return `<div class="prow"><span>${P.n}<small>mỗi điểm +${P.v}${PCT_STATS.has(P.k) ? '%' : ''}${P.cap ? " · tối đa " + P.cap + '%' : ''}</small></span><b>+${num(n * P.v)}${PCT_STATS.has(P.k) ? '%' : ''}</b>
-        <button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|1">+1</button><button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|10">+10</button></div>`; }).join('')}</div>
+    body = `<p class="help-p">Dùng chung cho mọi nhân vật. Đạt cấp ${MAX_LV} rồi thì kinh nghiệm chuyển thành tu vi, mỗi lần đột phá được 1 điểm: Luyện Khí, Trúc Cơ, Kim Đan, Nguyên Anh… Còn <b style="color:var(--gold2)">${pf}</b> điểm.${SAVE.para.lv ? ` Hiện tại: <b>${realmName(SAVE.para.lv)}</b>` : ''}</p>
+      ${[1, 0].map(rt => `<h4 class="sub-h">${rt ? "Căn cơ <small>nhân thẳng vào Công, Hộ giáp, Khí huyết cuối cùng · mỗi mục tối đa 50 điểm</small>" : "Khác <small>cộng chung với các mức tăng của Bộ, linh ngọc</small>"}</h4>
+      <div class="para">${PARAGON_STATS.filter(P => !!P.root === !!rt).map(P => { const n = SAVE.para.pts[P.k] || 0, pc = P.root || PCT_STATS.has(P.k), full = P.cap && (n + 1) * P.v > P.cap;
+        return `<div class="prow ${P.root ? 'root' : ''}"><span>${P.n}<small>mỗi điểm +${P.v}${pc ? '%' : ''}${P.cap ? " · tối đa " + P.cap + '%' : ''}</small></span><b>${full ? "<i>đầy</i> " : ''}+${num(n * P.v)}${pc ? '%' : ''}</b>
+        ${[1, 10, 50].map(k => `<button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|${k}">+${k}</button>`).join('')}</div>`; }).join('')}</div>`).join('')}
       ${SAVE.para.lv ? "<button class=\"btn sm ghost\" style=\"margin-top:8px\" data-act=\"parareset\">Phân lại tu vi (miễn phí)</button>" : ''}`;
   }
   return `<section class="panel herop">${bar}<div class="hbody">${body}</div></section>`;

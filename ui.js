@@ -662,9 +662,11 @@ function heroTab() {
   } else if (HTAB === 'skill') {
     body = skillPanel(cls);
   } else {
-    body = `<p class="help-p">所有角色共享。满 ${MAX_LV} 级后的经验转成修为，每突破一层得 1 点：炼气、筑基、金丹、元婴……${SAVE.para.lv ? ` 现在：<b>${realmName(SAVE.para.lv)}</b>` : ''}</p>
-      <div class="para">${PARAGON_STATS.map(P => { const n = SAVE.para.pts[P.k] || 0; return `<div class="prow"><span>${P.n}<small>每点 +${P.v}${PCT_STATS.has(P.k) ? '%' : ''}${P.cap ? ' · 上限 ' + P.cap + '%' : ''}</small></span><b>+${num(n * P.v)}${PCT_STATS.has(P.k) ? '%' : ''}</b>
-        <button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|1">+1</button><button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|10">+10</button></div>`; }).join('')}</div>
+    body = `<p class="help-p">所有角色共享。满 ${MAX_LV} 级后的经验转成修为，每突破一层得 1 点：炼气、筑基、金丹、元婴……可用 <b style="color:var(--gold2)">${pf}</b> 点。${SAVE.para.lv ? ` 现在：<b>${realmName(SAVE.para.lv)}</b>` : ''}</p>
+      ${[1, 0].map(rt => `<h4 class="sub-h">${rt ? '根基 <small>实打实乘在最终的攻击、护甲、气血上 · 每项 50 点封顶</small>' : '其他 <small>和套装、灵玉的加成加在一起算</small>'}</h4>
+      <div class="para">${PARAGON_STATS.filter(P => !!P.root === !!rt).map(P => { const n = SAVE.para.pts[P.k] || 0, pc = P.root || PCT_STATS.has(P.k), full = P.cap && (n + 1) * P.v > P.cap;
+        return `<div class="prow ${P.root ? 'root' : ''}"><span>${P.n}<small>每点 +${P.v}${pc ? '%' : ''}${P.cap ? ' · 上限 ' + P.cap + '%' : ''}</small></span><b>${full ? '<i>满</i> ' : ''}+${num(n * P.v)}${pc ? '%' : ''}</b>
+        ${[1, 10, 50].map(k => `<button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|${k}">+${k}</button>`).join('')}</div>`; }).join('')}</div>`).join('')}
       ${SAVE.para.lv ? '<button class="btn sm ghost" style="margin-top:8px" data-act="parareset">重新分配修为（免费）</button>' : ''}`;
   }
   return `<section class="panel herop">${bar}<div class="hbody">${body}</div></section>`;

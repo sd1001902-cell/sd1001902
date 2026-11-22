@@ -53,6 +53,8 @@ function migrate(s) {
     (s.stash || []).forEach(strip); for (const c of CLASS_IDS) for (const sl in s.chars[c].eq) strip(s.chars[c].eq[sl]);
     s.boxv = 1;
   }
+  if (s.para) { let g = 0; while (s.para.xp >= paraNeed(s.para.lv) && g++ < 5000) { s.para.xp -= paraNeed(s.para.lv); s.para.lv++; }   // 修为升级所需降到原来的二十分之一：存着的半截经验当场折成等级
+  }
   s.disp = {};
   if (s.riftCap == null || s.riftCap < s.riftMax + 1) s.riftCap = Math.max(3, s.riftMax + 3);   // 老存档：保持原来「最高纪录 +3」的上限
   if (!s.comps) s.comps = { ngoc: 1 };
@@ -447,7 +449,7 @@ function resetTalents(cls) {
 }
 
 // ---------------- 巅峰等级 ----------------
-const paraNeed = p => 30000 + p * 1500;
+const paraNeed = p => 1500 + p * 75;   // 原来 30000 + 1500p：修为 100 级时十来局才升一级。除以 20：69 层一局约 2.5 万经验，100 级时一局升 3 级，200 级时一局一级多
 function paraFree() { let n = 0; for (const k in SAVE.para.pts) n += SAVE.para.pts[k]; return SAVE.para.lv - n; }
 function paraCanAdd(k) { const P = PARAGON_STATS.find(x => x.k === k); const cur = SAVE.para.pts[k] || 0; return paraFree() > 0 && (!P.cap || (cur + 1) * P.v <= P.cap); }
 function addPara(k, n = 1) { let done = 0; while (done < n && paraCanAdd(k)) { SAVE.para.pts[k] = (SAVE.para.pts[k] || 0) + 1; done++; } return done; }
@@ -550,10 +552,10 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.sanN = sanK && !Object.keys(setCount).some(id => setCount[id] >= 2) ? sanK * nLeg : 0;
   if (SAVE) { const g = globalStats(); for (const k in g) add(k, g[k]); }
   if (buffs) for (const k in buffs) add(k, buffs[k]);
-  s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100) * (fx.has('gGlass') ? 0.8 : 1)));
+  s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100) * (fx.has('gGlass') ? 0.8 : 1) * (1 + (s.pHp || 0) / 100)));   // pHp／pArmor／pAtk：修为的「根基」，乘在最终数值上
   s.cls = clsId; s.sust = clsId === 'berserker' ? 0 : Math.round(s.leech * 4);   // 别的职业：每 1% 吸血折成 4% 续航强度（本职的护体／替死／身法／金刚）
-  s.armorT = Math.round(s.armor * (1 + s.armorPct / 100));
-  s.atk = Math.round(s.atk);
+  s.armorT = Math.round(s.armor * (1 + s.armorPct / 100) * (1 + (s.pArmor || 0) / 100));
+  s.atk = Math.round(s.atk * (1 + (s.pAtk || 0) / 100));
   s.crit = Math.min(75, Math.round(s.crit * 10) / 10); s.res = Math.min(75, Math.round(s.res * 10) / 10);
   s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10;
   s.dodge = Math.min(45, s.dodge + (fx.has('dodge') ? 15 : 0));

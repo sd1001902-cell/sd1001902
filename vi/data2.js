@@ -116,6 +116,10 @@ const DUNGEON_MODS = [
 
 // 修为（原巅峰等级）：满级后所有角色共享
 const PARAGON_STATS = [
+  // 根基（root）：乘在最终的攻击／护甲／气血上，不和套装、灵玉那一堆百分比加在一起稀释。每项 50 点封顶（+100%）
+  { k: 'pAtk', n: "Công", v: 2, cap: 100, root: 1 },
+  { k: 'pArmor', n: "Hộ giáp", v: 2, cap: 100, root: 1 },
+  { k: 'pHp', n: "Khí huyết", v: 2, cap: 100, root: 1 },
   { k: 'dmgPct', n: "Sát thương", v: 1 },
   { k: 'hpPct', n: "Khí huyết tối đa", v: 1 },
   { k: 'armorPct', n: "Hộ giáp", v: 2 },
