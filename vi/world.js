@@ -1344,24 +1344,36 @@ function rFight(ch, mn, first) {
   const ids = [mn.id, ...near.map(e => e.o.id)];
   return { fight: { kind: 'rift', rift: 1, ids, lv: mn.lv, first, n: ids.length }, key: { rmons: ids } };
 }
+// 组队时妖物变强：[每个伙伴加多少血, 首领护法的血量（按精英算的倍数）]
+let R_TEAM = [0.1, 0.5, 0.5, 5, 0.35, 0.04];   // [每个伙伴小怪精英加血, 护法血量倍数（按精英）, 首领横扫伤害, 横扫间隔, 护法攻击倍数, 每个伙伴首领加血]
 function rPrep(run, enc) {
   const ch = RCH, D = wScene(ch), R = rFloorOf(ch);
   run.encCell = { lv: enc.lv };
   run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
   if (SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
+  const nT = (run.team || []).length, tK = 1 + R_TEAM[0] * nT, tKB = 1 + R_TEAM[5] * nT;   // 组队：每带一个伙伴，小怪精英血量 +10%，首领 +4%（首领另外带护法）
   if (enc.kind === 'boss') {
     run.theme = enc.c - 1;
-    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0]); u.atk *= R_BOSS[1]; });
+    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB); u.atk *= R_BOSS[1]; });
+    if (nT) {   // 首领也带帮手：伙伴几个，护法几个（本章妖物的精英，各带一条精英词缀）；半血时再喊一波小妖
+      const F0 = CHAPTERS[enc.c - 1], B0 = units.find(u => u.kind === 'boss') || units[0], ez = rEliteEase(run.riftLv), lv = enc.lv;
+      const okA = ['fiery', 'cold', 'vamp', 'enraged', 'tough', 'fast', 'shielded', 'venom'];   // 不给分身、反震
+      const hufa = []; for (let i = 0; i < nT; i++) { const def = RNG.pick(F0.mons), e = makeMonster(def, lv, run, 'elite', [RNG.pick(okA)]);
+        e.name = "Hộ pháp · " + def.n; e.hufa = true; e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * R_TEAM[1]); e.atk *= R_ELITE[1] * ez[1] * R_TEAM[4]; if (e.shield) e.shield = Math.round(e.maxHp * 0.3); hufa.push(e); }
+      B0.callU = []; for (let i = 0; i < 1 + Math.ceil(nT / 2); i++) { const u = makeMonster(RNG.pick(F0.mons), lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; B0.callU.push(u); }
+      B0.sweep = true;
+      run.encUnits = [...hufa, ...units]; return 'boss';
+    }
     run.encUnits = units; return 'boss';
   }
   run.theme = R.c - 1;
   const F = CHAPTERS[R.c - 1], Z = rSanitize(R.c, R.sc), nAff = 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= 45 ? 1 : 0), el = [], no = [];
-  const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0]); u.atk *= R_NORM[1]; return u; };
+  const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; return u; };
   for (const id of enc.ids) { const mn = D.mons.find(o => o.id === id); if (!mn) continue; const def = F.mons[mn.m] || F.mons[0];
     if (mn.elite) {
       const affs = eliteAffsOf(run, mn), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);
       e.name = mn.rare ? RNG.pick(RARE_ELITE_NAMES) : joinName(RNG.pick(ELITE_TITLES), def.n);
-      const ez = rEliteEase(run.riftLv); e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * (mn.rare ? 1.3 : 1)); e.atk *= R_ELITE[1] * ez[1]; if (mn.rare) e.rare = true; if (e.shield) e.shield = Math.round(e.maxHp * 0.3);
+      const ez = rEliteEase(run.riftLv); e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * (mn.rare ? 1.3 : 1) * tK); e.atk *= R_ELITE[1] * ez[1]; if (mn.rare) e.rare = true; if (e.shield) e.shield = Math.round(e.maxHp * 0.3);
       el.push(e); if (RNG.ch(0.6)) no.push(norm(def, mn.lv));
     } else { const n = riftNewbie(run) ? 1 : Math.min(3, +RNG.w({ 1: 35, 2: 45, 3: 20 }) + (def.pack ? 1 : 0)); for (let i = 0; i < n; i++) no.push(norm(i === 0 || RNG.ch(0.6) ? def : F.mons[RNG.pick(Z.mons)] || def, mn.lv)); }
   }

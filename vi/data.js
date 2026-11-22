@@ -314,7 +314,7 @@ const CLASSES = {
       { id: 'bloodUp', n: "Ẩm Huyết Đao Ý", d: "Sát thương Ẩm Huyết Trảm +15%", max: 5, st: { sk_bloodlust: 15 } },
       { id: 'undying', n: "Bất Tử",     d: "Mỗi trận một lần: khi nhận đòn chí tử thì giữ lại 1 điểm khí huyết, chống qua lượt kế tiếp", max: 1, fx: 'lastBreath' } ] } },
   mage: {
-    n: "Đạo Sĩ Ngũ Hành", d: "Vẽ bùa niệm chú, giỏi treo trạng thái và kích nổ trạng thái nhất, thân thể mỏng nhất. Mỗi lần đổi sang một hành khác để ra chiêu thì cộng một tầng “Liên” (mỗi tầng sát thương +8%); đúng thứ tự tương sinh Mộc→Hỏa→Thổ→Kim→Thủy thì chiêu đó thêm +20%; cùng một hành ra liền nhau sẽ mất một tầng. Mỗi trận mở màn có sẵn một lớp hộ thân phù lục (hộ thể 35% khí huyết).", spr: 'taoist',
+    n: "Đạo Sĩ Ngũ Hành", d: "Vẽ bùa niệm chú, giỏi nhất là treo trạng thái và kích nổ trạng thái, thân thể mỏng nhất. Mỗi lần đổi sang một hành khác để ra chiêu thì chồng một tầng “Liên” (mỗi tầng sát thương +8%), không cần theo thứ tự; cùng một hành ra liên tiếp thì không tăng cũng không mất (đòn thường Linh Phù tính là Mộc). Mỗi trận mở đầu tự có một lớp bùa hộ thân (hộ thể bằng 35% khí huyết).", spr: 'taoist',
     base: { hp: 140, atk: 12, armor: 9, crit: 8, critDmg: 160, res: 14 }, per: { hp: 19.5, atk: 3.3, armor: 2.3 },
     res: { n: "Liên", max: 5 },
     skills: [
@@ -331,7 +331,7 @@ const CLASSES = {
     tree: { n: "Ngũ Hành", t: [
       { id: 'fireUp',  n: "Hỏa Hành", d: "Sát thương Chân Hỏa Phù và Thiên Giáng Hỏa Vũ +12%", max: 5, st: { sk_fireball: 12, sk_meteor: 12 } },
       { id: 'frostUp', n: "Thủy Hành", d: "Sát thương Hàn Băng Quyết +15%, tỉ lệ bất động +2%", max: 5, st: { sk_frostnova: 15, freeze: 2 } },
-      { id: 'lianUp',  n: "Tương Sinh", d: "Mỗi tầng “Liên” cộng thêm +1% sát thương", max: 5, st: { lianPct: 1 } },
+      { id: 'lianUp',  n: "Lưu Chuyển", d: "Mỗi tầng “Liên” cộng thêm +1% sát thương", max: 5, st: { lianPct: 1 } },
       { id: 'archmage', n: "Thiên Sư", d: "Giới hạn “Liên” 5 → 7; chiêu làm đầy sẽ chắc chắn chí mạng, rồi “Liên” về không tích lại", max: 1, fx: 'tianshi' } ] } },
   necro: {
     n: "Cản Thi Nhân", d: "Một nhánh cản thi Tương Tây, bản thân yếu ớt, dựa vào rung chuông sai khiến cương thi chiến đấu. Ở trang “Võ học” xếp sẵn “Thi trận”: khiêu thi đánh nhanh, thiết giáp thi chắn phía trước, độc thi và âm hỏa thi ở hàng sau gây trạng thái.", spr: 'corpseman',
@@ -590,7 +590,7 @@ const COMPANIONS = {
     up: ["Hảo cảm 10: tỉ lệ xích sắt gây choáng từ năm phần lên tám phần", "Hảo cảm 20: xích sắt quăng vào mọi kẻ địch"] },
   long: { n: "Long đạo trưởng", spr: 'scholar', wx: 'mu', ap: 'chill', hp: 0.45, atk: 0.55, spd: 98, d: "Chính khí quyết làm địch đóng băng, thỉnh thoảng ngâm một đoạn tăng công cho bạn", row: 'back', role: "Tăng công · Đóng băng",
     up: ["Hảo cảm 10: Chính Khí Quyết từ bốn chiêu một lần thành ba chiêu một lần", "Hảo cảm 20: Chính Khí Quyết tăng công cho cả đội"] },
-  kang: { n: "Quản gia Khang", spr: 'merchant', wx: 'tu', ap: 'stun', apc: 0.2, hp: 1.2, atk: 0.35, spd: 85, d: "Tiền tuyến chịu đòn: biết khiêu khích; cứ ba chiêu thì “Đỡ đao” hai lượt, đỡ thay bạn ba phần sát thương", row: 'front', role: "Khiêu khích · Đỡ đao", pg: 1,
+  kang: { n: "Quản gia Khang", spr: 'merchant', wx: 'tu', ap: 'stun', apc: 0.2, hp: 1.6, atk: 0.35, spd: 85, d: "Tiền tuyến chịu đòn: biết khiêu khích; cứ ba chiêu thì “Đỡ đao” hai lượt, đỡ thay bạn ba phần sát thương", row: 'front', role: "Khiêu khích · Đỡ đao", pg: 1,
     up: ["Hảo cảm 10: Đỡ đao đỡ thay bạn bốn phần", "Hảo cảm 20: khiêu khích dữ hơn, kéo thêm một nửa số đòn"] },
   // 2026-11 新伙伴：通关后达成条件认识（lock：认识的条件，界面上显示）
   lei: { n: "Lôi Lão Hổ", spr: 'blade', wx: 'jin', ap: 'armor', hp: 0.9, atk: 0.65, spd: 100, d: "Thợ săn già tiền tuyến: chuyên chém kẻ ít máu nhất; Chém làm địch phá giáp, mỗi ba chiêu một nhát “Đoạn Đầu Đao”, gây sát thương gấp đôi lên địch tàn máu", row: 'front', role: "Kết liễu · Phá giáp", pg: 1,

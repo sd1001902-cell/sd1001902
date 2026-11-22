@@ -588,12 +588,14 @@ const VFX = (() => {
 
     // ---- Ngoc ----
     switch (c.id) {
-      case 'ngocHeal':
-        if (ap && heroP) { proj('potion', ap, heroP, T, '#ff9ac0'); later(() => { ring(heroP, '#ff9ac0', 90, D, 3); parts(heroP, 8, '#ffb3c8', 30, D * 1.3, { cls: 'heart', rise: -50, size: 9 }); }, T); return T; }
-        return 0;
-      case 'foxHeal':
-        if (heroP) { ring(heroP, '#ffe0f0', 120, D, 3); flames(heroP, 10, '#ffd0e8', 40, D * 1.4); parts(heroP, 6, '#fff', 30, D * 1.3, { cls: 'heart', rise: -50, size: 8 }); }
-        return 0;
+      case 'ngocHeal': {
+        const hp2 = tp || heroP;
+        if (ap && hp2) { proj('potion', ap, hp2, T, '#ff9ac0'); later(() => { ring(hp2, '#ff9ac0', 90, D, 3); parts(hp2, 8, '#ffb3c8', 30, D * 1.3, { cls: 'heart', rise: -50, size: 9 }); }, T); return T; }
+        return 0; }
+      case 'foxHeal': {
+        const hp3 = tp || heroP;
+        if (hp3) { ring(hp3, '#ffe0f0', 120, D, 3); flames(hp3, 10, '#ffd0e8', 40, D * 1.4); parts(hp3, 6, '#fff', 30, D * 1.3, { cls: 'heart', rise: -50, size: 8 }); }
+        return 0; }
       case 'foxfire':
         if (ap && tp) { proj('foxfire', ap, tp, T, '#9ad8ff'); later(() => { boom(tp, '#9ad8ff', 60, D * 0.8); flames(tp, 6, '#cfe8ff', 26, D); }, T); return T; }
         return 0;

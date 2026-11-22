@@ -569,7 +569,7 @@ function sustText(cls, s) {
 // 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
 const CLS_MECH = {
   berserker: ["Nộ ý", "Ra đòn tích 5 điểm, trúng một đòn tích 8 điểm, tối đa 100 điểm. Nộ ý quá nửa: sát thương +15%. Khí huyết mỗi thiếu một phần mười: sát thương thêm +3%. Bá Vương Giải Giáp đổi hết Nộ ý thành sát thương (mỗi điểm +2%)."],
-  mage: ["Ngũ hành lưu chuyển", "Mỗi lần đổi sang một hành khác để ra chiêu, cộng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%; nếu đúng thứ tự tương sinh Mộc→Hỏa→Thổ→Kim→Thủy→Mộc, chiêu đó sát thương thêm +20%; cùng một hành ra liền nhau thì mất một tầng, không về số không. Mỗi chiêu thuộc hành nào ghi bên cạnh tên chiêu; Linh Phù là Mộc."],
+  mage: ["Ngũ hành lưu chuyển", "Mỗi lần đổi sang một hành khác để ra chiêu, chồng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%, không cần theo thứ tự; cùng một hành ra liên tiếp thì không tăng cũng không mất. Mỗi chiêu thuộc hành nào được ghi cạnh tên chiêu; đòn thường Linh Phù là Mộc."],
   necro: ["Thi trận", "Vào trận cương thi đã xếp sẵn theo Thi trận (thi vị cơ bản 3), công và khí huyết của chúng tính theo chỉ số của bạn. Kẻ địch bị Trấn Hồn Đinh đóng trúng sẽ bị cương thi ưu tiên cắn. Cương thi ngã thì dùng Rung Chuông Gọi Xác gọi lại."],
   assassin: ["Sát ý", "Tiêu Tẩm Độc, Băng Phách Châm và các chiêu như vậy khi ra đòn sẽ tích Sát ý (tối đa 5 điểm), đòn kết liễu tiêu sạch một lần: Đoạt Mệnh Ấn mỗi điểm sát thương +25%, Ảnh Sát mỗi điểm đâm thêm một nhát. Vào trận bạn ra tay trước."],
   paladin: ["Kim Cương phản kích", "Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (80% sát thương Phật quang); đang có hộ thể chân khí thì thêm +15%. Mỗi lượt tự hồi một ít khí huyết."],
@@ -1291,7 +1291,7 @@ function updBattle(o, anim) {
 function resChip(P) {
   const R = CLASSES[P.cls].res; if (!R) return '';
   if (P.cls === 'berserker') return `<span class="rchip fury ${P.fury >= 50 ? 'hot' : ''}">Nộ ý <i style="--w:${Math.round(P.fury || 0)}%"></i><b>${Math.round(P.fury || 0)}</b></span>`;
-  if (P.cls === 'mage') { const nx = P.lastWx ? WX_SHENG[P.lastWx] : null; return `<span class="rchip lian">Liên <b>${P.lian || 0}</b>${nx ? `<small>chiêu sau nối <em style="color:${WX[nx].c}">${WX[nx].n}</em></small>` : ''}</span>`; }
+  if (P.cls === 'mage') { const lw = P.lastWx; return `<span class="rchip lian">Liên <b>${P.lian || 0}</b>${lw ? `<small>Chiêu trước <em style="color:${WX[lw].c}">${WX[lw].n}</em> · đổi hành khác +1</small>` : ''}</span>`; }
   if (P.cls === 'assassin') return `<span class="rchip ki">Sát ý ${Array.from({ length: P.kiMax }, (_, i) => `<i class="${i < P.ki ? 'on' : ''}"></i>`).join('')}</span>`;
   if (P.cls === 'necro') return `<span class="rchip">Thi vị <b>${zombiesOf(B).filter(z => !ZOMBIES[z.zt].ult).length}/${P.minionCap}</b></span>`;
   if (P.cls === 'paladin') return `<span class="rchip">Phản kích <b>${Math.min(85, P.counter + (P.shield > 0 ? 15 : 0) + (P.st.chan ? 40 : 0))}%</b></span>`;

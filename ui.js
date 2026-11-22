@@ -568,7 +568,7 @@ function sustText(cls, s) {
 // 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
 const CLS_MECH = {
   berserker: ['怒意', '出手攒 5 点，挨一下攒 8 点，最多 100 点。怒意过半：伤害 +15%。气血每少一成：伤害再 +3%。霸王卸甲把怒意一口气换成伤害（每点 +2%）。'],
-  mage: ['五行流转', '每换一种五行出招，叠一层「连」（最多 5 层），每层伤害 +8%；正好按 木→火→土→金→水→木 的相生顺序接上，这一招伤害再 +20%；同一种五行连着放，掉一层，不会清零。每招是哪一行，招式名旁边写着；灵符是木。'],
+  mage: ['五行流转', '每换一种五行出招，叠一层「连」（最多 5 层），每层伤害 +8%，不用管顺序；同一种五行连着放，不加也不掉。每招是哪一行，招式名旁边写着；普攻灵符是木。'],
   necro: ['尸阵', '开战时僵尸已经按尸阵列好（基础尸位 3），它们的攻击和气血按你的属性算。镇魂钉钉中的敌人，僵尸优先去咬。僵尸倒了，用摇铃唤尸补回来。'],
   assassin: ['杀意', '淬毒镖、冰魄针这些招式出手攒杀意（最多 5 点），终结技一次花光：夺命印每点伤害 +25%，影杀每点多刺一下。开战你先出手。'],
   paladin: ['金刚反击', '挨打时有 15% 几率格挡并反击（80% 佛光伤害）；身上有护体真气时再 +15%。每回合自己回一点气血。'],
@@ -1290,7 +1290,7 @@ function updBattle(o, anim) {
 function resChip(P) {
   const R = CLASSES[P.cls].res; if (!R) return '';
   if (P.cls === 'berserker') return `<span class="rchip fury ${P.fury >= 50 ? 'hot' : ''}">怒意 <i style="--w:${Math.round(P.fury || 0)}%"></i><b>${Math.round(P.fury || 0)}</b></span>`;
-  if (P.cls === 'mage') { const nx = P.lastWx ? WX_SHENG[P.lastWx] : null; return `<span class="rchip lian">连 <b>${P.lian || 0}</b>${nx ? `<small>下一招接<em style="color:${WX[nx].c}">${WX[nx].n}</em></small>` : ''}</span>`; }
+  if (P.cls === 'mage') { const lw = P.lastWx; return `<span class="rchip lian">连 <b>${P.lian || 0}</b>${lw ? `<small>上一招<em style="color:${WX[lw].c}">${WX[lw].n}</em> · 换别的 +1</small>` : ''}</span>`; }
   if (P.cls === 'assassin') return `<span class="rchip ki">杀意 ${Array.from({ length: P.kiMax }, (_, i) => `<i class="${i < P.ki ? 'on' : ''}"></i>`).join('')}</span>`;
   if (P.cls === 'necro') return `<span class="rchip">尸位 <b>${zombiesOf(B).filter(z => !ZOMBIES[z.zt].ult).length}/${P.minionCap}</b></span>`;
   if (P.cls === 'paladin') return `<span class="rchip">反击 <b>${Math.min(85, P.counter + (P.shield > 0 ? 15 : 0) + (P.st.chan ? 40 : 0))}%</b></span>`;
