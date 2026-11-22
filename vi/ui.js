@@ -1317,7 +1317,7 @@ function unitEl(u) {
     if (Object.values(E).filter(it => it && it.rarity === 'set').length >= 2) el.classList.add('gear-set'); }
   el.innerHTML = `<div class="aura"><i class="a-rage"></i><i class="a-fire"></i><i class="a-tox"></i><i class="a-ice"></i><i class="a-shd"></i><i class="a-cur"></i><i class="a-stun"><b>✦</b><b>✦</b><b>✦</b></i></div><div class="sp">${VFX.rigHTML(u, img, size, spr)}</div>
     <div class="un">${esc(u.name)}</div>
-    ${(u.aff && u.aff.length) || u.trait ? `<div class="tags">${u.trait ? `<span class="tr" data-act="stinfo" data-arg="${u.id}|trait">${TRAITS[u.trait].n}</span>` : ''}${(u.aff || []).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return `<span data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>`; }).join('')}</div>` : ''}
+    ${(u.aff && u.aff.length) || u.trait ? `<div class="tags">${u.trait ? `<span class="tr" data-act="stinfo" data-arg="${u.id}|trait">${TRAITS[u.trait].n}</span>` : ''}${(u.aff || []).slice(0, (u.aff || []).length > 3 ? 2 : 3).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return `<span data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>`; }).join('')}${(u.aff || []).length > 3 ? `<span data-act="stinfo" data-arg="${u.id}|all">+${u.aff.length - 2}</span>` : ''}</div>` : ''}
     <div class="hpbar"><i></i><b class="sh"></b><span></span></div><div class="sts"></div>${u.kind === 'hero' && u.yi && Object.keys(u.yi).length ? yiFolHTML(u.yi) : ''}`;
   setTimeout(() => el.classList.remove('spawn'), u.kind === 'boss' ? 650 : 400);
   if (u.kind === 'boss' && !u.guard) setTimeout(() => VFX.onLand(u.id), 560);
@@ -1445,7 +1445,9 @@ function applyStep(o, anim) {
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">Giữ lấy ông ấy!</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} lượt nữa chuồn</span>`);
     if (u.fleeDef && u.flee && u.hp > 0) st.push(`<span style="color:#f1c94a">${Math.max(0, (u.fleeDef.n || 3) - u.flee + 1)} lượt nữa bỏ chạy</span>`);
-    for (const x of unitSts(u)) if (!x.aff) st.push(`<span style="color:${x.c}" data-act="stinfo" data-arg="${u.id}|${x.k}">${x.n}</span>`);
+    { const L = unitSts(u).filter(x => x.k !== 'hufa' && x.k !== 'call'), N = 2;   // 战场上最多显示两个，多的折成 +N（状态栏里能看全）
+      L.slice(0, L.length > N + 1 ? N : N + 1).forEach(x => st.push(`<span style="color:${x.c}" data-act="stinfo" data-arg="${u.id}|${x.k}">${x.n}</span>`));
+      if (L.length > N + 1) st.push(`<span class="stm" data-act="stinfo" data-arg="${u.id}|all">+${L.length - N}</span>`); }
     el.classList.toggle('frozen', !!u.st.frozen);
     // 状态挂在身上：火、毒、冰壳、金星、护盾、狂暴
     const alive = u.hp > 0 && !u.dead;
