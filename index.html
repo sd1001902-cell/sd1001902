@@ -1482,6 +1482,14 @@ body[data-view=title] .wrap{max-width:none;padding:0}
 .stpop{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);width:min(82%,360px);z-index:9;background:rgba(16,11,9,.93);border:1px solid #c8a05a;border-radius:8px;padding:7px 10px;font-size:calc(12px * var(--fs,1));cursor:pointer}
 .stpop .stx{float:right;color:var(--dim)}.stpop p{margin:3px 0 0;color:#e8dcc8;line-height:1.5}
 .unit .sts span[data-act],.unit .tags span[data-act]{cursor:pointer}
+/* 招式条固定两行：上面一行计数，下面一行招式（等宽、不换行），宽度不随冷却数字变化，画面不跳 */
+.hud{align-items:stretch}
+.hud-sk{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:3px}
+.hs-top{display:flex;align-items:center;gap:6px;height:22px;min-height:22px;overflow:hidden;white-space:nowrap}
+.hs-grid{display:flex;flex-wrap:nowrap;gap:3px}
+.hs-grid .skb2{flex:1 1 0;min-width:0;padding:0 14px 0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.hs-grid .skb2 i{position:absolute;right:2px;top:50%;transform:translateY(-50%);margin:0;padding:0 3px}
+.ultb{align-self:stretch}
 </style>
 </head>
 <body>
