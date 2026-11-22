@@ -140,6 +140,7 @@ function itemCard(it, cls, label) {
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}: ${gemDesc(g)}</span>` : "<span class=\"gs empty\">Lỗ trống</span>"; }).join('')}</div>`;
   if (L) h += `<p class="ifx">Hồn thần binh: ${L.d}${SAVE.cube[L.id] ? "<small> (đã cất vào Túi Càn Khôn)</small>" : ''}</p>`;
+  if (L && (L.fx === 'sanA' || L.fx === 'sanB')) h += `<p class="san-st">${sanState(ctxCls())}</p>`;
   if (S) {
     const n = setCountFor(S.cls, S.id), eq = SAVE.chars[S.cls].eq;
     h += `<div class="iset ${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? "<em>Bộ Ảo Cảnh</em> ·" : ''} (${CLASSES[S.cls].n}đã mặc ${n}/${S.pieces.length})
@@ -572,6 +573,20 @@ const CLS_MECH = {
 const effWx = (cls, k) => featureOn('runes') ? runeWx(k, (SAVE.chars[cls].runes || {})[k.id]) : k.wx;
 const wxBadge = (k, cls) => { const w = cls ? effWx(cls, k) : k.wx; return w && WX[w] ? `<i class="wxb" style="--c:${WX[w].c}">${WX[w].n}</i>` : ''; };
 // 流派推荐：通关后每个门派两条路。照着配什么招、什么变招、什么套装神兵灵玉，缺的写明去哪刷
+// 散件流现在的状态：穿了几件神兵、有没有套装效果挡着、合计多少
+function sanState(cls) {
+  const eq = SAVE.chars[cls].eq, s = charStats(cls), n = POS_IDS.filter(p => eq[p] && eq[p].legend).length, C = CLASSES[cls];
+  if (Object.keys(s.setCount).some(id => s.setCount[id] >= 2)) return `${C.n} đang có hiệu ứng Bộ, hiện <b class="lo">không có tác dụng</b>.`;
+  if (!s.sanN) return `${C.n} đang mặc ${n} món thần binh, trên người và trong Túi Càn Khôn đều chưa có Vô Tướng Hoàn hay Vô Danh Giới.`;
+  return `${C.n} đang mặc ${n} món thần binh: sát thương <b>+${Math.round(s.sanN * SAN_DMG * 100)}%</b>, sát thương phải nhận <b>-${Math.round(Math.min(SAN_DR_CAP, s.sanN * SAN_DR) * 1000) / 10}%</b>.`;
+}
+function sanCard(cls) {
+  const owned = new Set(allItems().map(it => it.legend).filter(Boolean)), R = ['wuxiang', 'wuming'].map(id => LEGENDS.find(l => l.id === id));
+  return `<details class="wxinfo"><summary>Con đường thứ ba: đồ lẻ (không mặc Bộ)</summary>
+    <p class="help-p">Không mặc món Bộ nào, toàn thân đổi sang thần binh. Sống nhờ một cặp nhẫn: mỗi món thần binh đang mặc, mỗi chiếc nhẫn cho sát thương +${Math.round(SAN_DMG * 100)}%, sát thương phải nhận -${SAN_DR * 100}%. Mười món thần binh, hai chiếc nhẫn = sát thương +${Math.round(SAN_DMG * 2000)}%, chịu đòn -${SAN_DR * 2000}%. Yếu hơn Bộ 6 món một chút, đổi lại mười ô tùy bạn phối.</p>
+    ${R.map(X => `<div class="bc-line"><i class="${owned.has(X.id) || SAVE.cube[X.id] ? 'bc-ok' : 'bc-no'}">${owned.has(X.id) || SAVE.cube[X.id] ? '✓' : '✗'}</i><b class="r-legend">${X.n}</b><small>Nhẫn · ${owned.has(X.id) || SAVE.cube[X.id] ? "đã có" : "qua ải rồi thì đâu cũng rơi"}</small></div>`).join('')}
+    <p class="san-st">${sanState(cls)}</p></details>`;
+}
 function buildCard(cls) {
   const L = BUILDS[cls]; if (!L || !featureOn('rift')) return '';
   const ch = SAVE.chars[cls], s = charStats(cls), C = CLASSES[cls], load = syncLoadout(cls);
@@ -598,7 +613,7 @@ function buildCard(cls) {
     <div class="bc-sec"><span class="bc-h">Thần binh</span><div>${legRow}</div></div>
     ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">Túi Càn Khôn</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
     <div class="bc-sec"><span class="bc-h">Linh ngọc</span><div class="bc-bits">${gemRow}</div></div>
-    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">Phối nhanh theo gợi ý (chiêu, biến chiêu, Túi Càn Khôn, linh ngọc)</button></div>`;
+    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">Phối nhanh theo gợi ý (chiêu, biến chiêu, Túi Càn Khôn, linh ngọc)</button>${sanCard(cls)}</div>`;
 }
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);

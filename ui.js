@@ -140,6 +140,7 @@ function itemCard(it, cls, label) {
   if (it.sockets) h += `<div class="isock">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i];
     return g ? `<span class="gs">${gemImg(g, 18)}${gemName(g)}：${gemDesc(g)}</span>` : '<span class="gs empty">空孔</span>'; }).join('')}</div>`;
   if (L) h += `<p class="ifx">神兵之魂：${L.d}${SAVE.cube[L.id] ? '<small>（乾坤袋已收藏）</small>' : ''}</p>`;
+  if (L && (L.fx === 'sanA' || L.fx === 'sanB')) h += `<p class="san-st">${sanState(ctxCls())}</p>`;
   if (S) {
     const n = setCountFor(S.cls, S.id), eq = SAVE.chars[S.cls].eq;
     h += `<div class="iset ${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? '<em>幻境套装</em>' : ''}（${CLASSES[S.cls].n}已穿 ${n}/${S.pieces.length}）
@@ -571,6 +572,20 @@ const CLS_MECH = {
 const effWx = (cls, k) => featureOn('runes') ? runeWx(k, (SAVE.chars[cls].runes || {})[k.id]) : k.wx;
 const wxBadge = (k, cls) => { const w = cls ? effWx(cls, k) : k.wx; return w && WX[w] ? `<i class="wxb" style="--c:${WX[w].c}">${WX[w].n}</i>` : ''; };
 // 流派推荐：通关后每个门派两条路。照着配什么招、什么变招、什么套装神兵灵玉，缺的写明去哪刷
+// 散件流现在的状态：穿了几件神兵、有没有套装效果挡着、合计多少
+function sanState(cls) {
+  const eq = SAVE.chars[cls].eq, s = charStats(cls), n = POS_IDS.filter(p => eq[p] && eq[p].legend).length, C = CLASSES[cls];
+  if (Object.keys(s.setCount).some(id => s.setCount[id] >= 2)) return `${C.n}身上有套装效果，现在<b class="lo">不生效</b>。`;
+  if (!s.sanN) return `${C.n}现在穿着 ${n} 件神兵，身上、乾坤袋里都还没有无相环或无名戒。`;
+  return `${C.n}现在穿着 ${n} 件神兵：伤害 <b>+${Math.round(s.sanN * SAN_DMG * 100)}%</b>，受到的伤害 <b>-${Math.round(Math.min(SAN_DR_CAP, s.sanN * SAN_DR) * 1000) / 10}%</b>。`;
+}
+function sanCard(cls) {
+  const owned = new Set(allItems().map(it => it.legend).filter(Boolean)), R = ['wuxiang', 'wuming'].map(id => LEGENDS.find(l => l.id === id));
+  return `<details class="wxinfo"><summary>第三条路：散件流（不穿套装）</summary>
+    <p class="help-p">一件套装都不穿，全身换成神兵。靠一对扳指吃饭：每穿一件神兵，每枚扳指给伤害 +${Math.round(SAN_DMG * 100)}%、受到的伤害 -${SAN_DR * 100}%。十件神兵、两枚扳指 = 伤害 +${Math.round(SAN_DMG * 2000)}%、受伤 -${SAN_DR * 2000}%。比 6 件套略弱一点，换来的是十个格子随你配。</p>
+    ${R.map(X => `<div class="bc-line"><i class="${owned.has(X.id) || SAVE.cube[X.id] ? 'bc-ok' : 'bc-no'}">${owned.has(X.id) || SAVE.cube[X.id] ? '✓' : '✗'}</i><b class="r-legend">${X.n}</b><small>扳指 · ${owned.has(X.id) || SAVE.cube[X.id] ? '已有' : '通关后各处都掉'}</small></div>`).join('')}
+    <p class="san-st">${sanState(cls)}</p></details>`;
+}
 function buildCard(cls) {
   const L = BUILDS[cls]; if (!L || !featureOn('rift')) return '';
   const ch = SAVE.chars[cls], s = charStats(cls), C = CLASSES[cls], load = syncLoadout(cls);
@@ -597,7 +612,7 @@ function buildCard(cls) {
     <div class="bc-sec"><span class="bc-h">神兵</span><div>${legRow}</div></div>
     ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">乾坤袋</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
     <div class="bc-sec"><span class="bc-h">灵玉</span><div class="bc-bits">${gemRow}</div></div>
-    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">一键照配（招式、变招、乾坤袋、灵玉）</button></div>`;
+    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">一键照配（招式、变招、乾坤袋、灵玉）</button>${sanCard(cls)}</div>`;
 }
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);
