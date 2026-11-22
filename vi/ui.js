@@ -427,7 +427,7 @@ const npcModal = () => {
 // 顶上一排身上的装备，点一下选中；下面一排页签切手艺，选中的装备不变；第一页「一览」直接列出现在能做的事。镇上的三位师傅只是入口
 let WS = { tab: 'ov', item: null, stash: false };
 const WS_TABS = [['ov', "Tổng quan", () => true, null], ['enh', "Cường hóa", () => featureOn('enhance'), 'smith'], ['inh', "Truyền thừa", () => featureOn('enhance'), 'smith'], ['refine', "Tôi luyện, tẩy luyện", () => featureOn('reroll'), 'tiedan'],
-  ['up', "Thăng giai", () => featureOn('enhance'), 'tiedan'], ['sock', "Khảm ngọc", () => featureOn('sockets'), 'yujiang'], ['forge', "Đúc binh", () => featureOn('rift'), 'smith']];
+  ['up', "Thăng giai, điểm hóa", () => featureOn('enhance'), 'tiedan'], ['sock', "Khảm ngọc", () => featureOn('sockets'), 'yujiang'], ['forge', "Đúc binh", () => featureOn('rift'), 'smith']];
 const wsTabs = () => WS_TABS.filter(t => t[2]());
 const WS_NPC = { smith: 'enh', tiedan: 'refine', yujiang: 'sock' };
 // 这件装备现在能做什么（一览和页签红点共用）
@@ -439,6 +439,7 @@ function wsCan(it, where) {
     else if ((it.sockets || 0) < MAX_SOCKETS[it.slot] && SAVE.gold >= sc.gold && SAVE.mats >= sc.mats) c.sock = "Đục thêm được một lỗ"; }
   if (featureOn('reroll') && it.aff.length) { const q = itemQ(it); if (busyRoll(it)) c.refine = "Còn một kết quả tẩy luyện / tôi luyện chưa chọn"; else if (q != null && q < 0.5) c.refine = `Phẩm chất dòng chỉ ${Math.round(q * 100)}%, nên tôi luyện tẩy luyện`; }
   if (featureOn('enhance') && upTierOK(it)) { const L = upTierTarget(cls); if (L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const u = upTierCost(it, L); if (SAVE.gold >= u.gold && SAVE.mats >= u.mats) c.up = `Thăng được lên ${TIER_N[tierOf(L)]}`; } }
+  if (featureOn('enhance') && !c.up && ancOK(it) && SAVE.mats >= ANC_COST) c.up = `Điểm hóa được thành Thượng Cổ (${ANC_COST} hồn tinh)`;
   if (featureOn('enhance') && where === 'eq' && SAVE.stash.some(x => canInherit(it, x))) c.inh = "Trong kho có đồ cũ, cường hóa / ngọc truyền sang được";
   return c;
 }
@@ -530,6 +531,7 @@ function goTab() {
         <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <p class="help-p" style="text-align:center">Thử thách tối đa tầng ${maxR}. Giới hạn <b>một nén hương</b> (${Math.round(riftLimit(SAVE.riftLv) / 60000)} phút). Một ván bốn tầng bản đồ lớn, yêu vật đi thành bầy: đụng một bầy, các bầy bên cạnh bị cuốn vào cùng. Diệt yêu tích đầy tiến độ thì yêu vương giữ ải hiện thân; hạ nó trước khi hương tàn, hương còn càng nhiều thì linh ngọc càng được nâng nhiều lần, lần sau càng nhảy được nhiều tầng. Ngã xuống không tính thua: bạn bị ném về lối vào của tầng này, hương cháy mất một đoạn.</p>
+      <p class="help-p" style="text-align:center">Thần binh, đồ Bộ rơi ở tầng này: <b>${(ancRate(SAVE.riftLv)[0] * 100).toFixed(1)}%</b> là Thượng Cổ, <b>${(ancRate(SAVE.riftLv)[1] * 100).toFixed(2)}%</b> là Thái Cổ. Từ tầng ${ANC_FROM} trở lên, tầng càng cao càng dễ ra.</p>
       <p class="help-p" style="text-align:center">Trên bản đồ hương cháy theo thời gian thật; trong trận tính theo lượt (một vòng tính 3 giây), mở tốc độ mấy hay bỏ qua trận đều như nhau.</p>
       ${cu > 1 ? `<p class="cu-note">Đang đuổi cấp: ${CLASSES[cls].n} thấp hơn nhân vật cấp cao nhất của bạn <b>${topLevel() - SAVE.chars[cls].level}</b> cấp, kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (chênh càng nhiều càng nhanh, đuổi kịp thì hết). ${SAVE.riftLv <= R_EASY ? `Yêu vật ở ${R_EASY} tầng đầu nhường theo cấp của bạn (cao hơn tối đa 2 cấp; trước cấp 10 thì không cao hơn bạn, kéo tới cũng ít hơn), cứ yên tâm vào.` : `Yêu vật ở ${R_EASY} tầng đầu sẽ nhường theo cấp của bạn.`}</p>` : ''}
       <div class="riftinfo"><span>Kỷ lục ${CLASSES[cls].n}: <b>${rec ? riftRecTxt(rec) : "Chưa có"}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `Tầng này rơi cả hai <b class="r-set">Bộ Ảo Cảnh</b>` : SAVE.riftLv >= RSET_LV ? `Tầng này rơi <b class="r-set">Bộ Ảo Cảnh</b> (từ tầng ${RSET2_LV} có thêm một bộ)` : `Từ tầng ${RSET_LV} rơi <b class="r-set">Bộ Ảo Cảnh</b>`}</span>
@@ -2729,6 +2731,8 @@ function smithHTML(it, where, W, title) {
     if (upTierOK(it) && L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const c = upTierCost(it, L);
       h += `<div class="srow"><span>Thăng giai ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>Cấp trang bị ${it.ilvl} → ${L}, các chỉ số thực như công, khí huyết, hộ giáp cùng tăng, dòng phần trăm giữ nguyên · ${c.gold} lượng + ${c.mats} hồn tinh</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">Thăng giai</button></div>`; }
     else h += `<div class="srow">${upTierOK(it) ? "Món này đã ở giai cao nhất hiện có thể đạt." : "Chỉ Bảo phẩm, Bộ, Thần binh mới thăng giai được."}</div>`;
+    if (it.rarity === 'legend' || it.rarity === 'set') h += it.anc ? `<div class="srow">${it.anc === 2 ? "Món này là Thái Cổ: mọi chỉ số +30%, các dòng đều đạt trị số tối đa." : "Món này đã là Thượng Cổ: mọi chỉ số +30%. Thái Cổ chỉ có thể nhặt được."}</div>`
+      : `<div class="srow"><span>Điểm hóa thành Thượng Cổ<small>mọi chỉ số +30%, cường hóa, ngọc, các dòng đều giữ nguyên · ${ANC_COST} hồn tinh (bạn có ${fmtBig(SAVE.mats)}). Thái Cổ không điểm hóa ra được, chỉ có thể nhặt.</small></span><button class="btn sm" ${SAVE.mats >= ANC_COST ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">Điểm hóa</button></div>`;
   }
   if (W.has('refine') && it.aff.length && featureOn('reroll') && !it.rrPending) {
     const m = itemMult(it);
@@ -2796,7 +2800,7 @@ function itemModal(id, shopIdx) {
       h += itemCard(it, cls, isMine ? "Đang mặc" : where === 'eq' ? "Nhân vật khác đang dùng" : '');
       if (cur && !isMine && where !== 'eq') h += `<details class="curd"><summary>Xem đầy đủ thuộc tính món đang mặc</summary>${itemCard(cur, cls, "Đang mặc")}</details>`;
       if (atTown) {
-        const go = [['smith', 'enh', "Cường hóa"], ['smith', 'inh', "Truyền thừa"], ['tiedan', 'refine', "Tôi luyện, tẩy luyện"], ['tiedan', 'up', "Thăng giai"], ['yujiang', 'sock', "Đục lỗ khảm ngọc"]].filter(([n, fn]) => svcFns(n).some(f => f[0] === fn) && (fn !== 'refine' || it.aff.length) && (fn !== 'up' || upTierOK(it)));
+        const go = [['smith', 'enh', "Cường hóa"], ['smith', 'inh', "Truyền thừa"], ['tiedan', 'refine', "Tôi luyện, tẩy luyện"], ['tiedan', 'up', "Thăng giai, điểm hóa"], ['yujiang', 'sock', "Đục lỗ khảm ngọc"]].filter(([n, fn]) => svcFns(n).some(f => f[0] === fn) && (fn !== 'refine' || it.aff.length) && (fn !== 'up' || upTierOK(it)));
         if (go.length) h += `<div class="svc-go"><span class="sub">Đem tới:</span>${go.map(([n, fn, t]) => `<button class="chip" data-act="npcgo" data-arg="${n}|${fn}|${it.id}">${SPEAKERS[n].n} · ${t}</button>`).join('')}</div>`;
         if (where === 'stash' && it.legend && featureOn('cube')) h += smithHTML(it, where, new Set(['cube']), "Túi Càn Khôn");
       }
@@ -3019,6 +3023,7 @@ const ACT = {
   ws: id => { const it = findOwned(id); const r = washStart(it, [...wlockOf(it)]); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   wspick: a => { const [id, i] = split(a); washPick(findOwned(id), +i); SFX.play('forge'); toast(+i ? "Tẩy luyện xong: đã đổi thuộc tính mới" : "Giữ nguyên"); refresh(); },
   inh: a => { const [d, s] = split(a); const r = inheritFrom(findOwned(d), findOwned(s)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`Truyền thừa xong: giờ là +${r.plus}${r.gems ? `, mang theo ${r.gems} viên ngọc` : ''}`); refresh(); },
+  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); toast(`Điểm hóa xong: <b>${esc(itemTitle(it))}</b>`); save(); refresh(); achToast(checkAch()); },
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`Thăng giai xong: giờ là ${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast("Hồn thần binh đã vào Túi Càn Khôn, sang trang “Trang bị” đặt nó vào ô"); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),

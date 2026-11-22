@@ -426,7 +426,7 @@ const npcModal = () => {
 // 顶上一排身上的装备，点一下选中；下面一排页签切手艺，选中的装备不变；第一页「一览」直接列出现在能做的事。镇上的三位师傅只是入口
 let WS = { tab: 'ov', item: null, stash: false };
 const WS_TABS = [['ov', '一览', () => true, null], ['enh', '强化', () => featureOn('enhance'), 'smith'], ['inh', '传承', () => featureOn('enhance'), 'smith'], ['refine', '淬炼洗炼', () => featureOn('reroll'), 'tiedan'],
-  ['up', '升阶', () => featureOn('enhance'), 'tiedan'], ['sock', '镶玉', () => featureOn('sockets'), 'yujiang'], ['forge', '铸兵', () => featureOn('rift'), 'smith']];
+  ['up', '升阶点化', () => featureOn('enhance'), 'tiedan'], ['sock', '镶玉', () => featureOn('sockets'), 'yujiang'], ['forge', '铸兵', () => featureOn('rift'), 'smith']];
 const wsTabs = () => WS_TABS.filter(t => t[2]());
 const WS_NPC = { smith: 'enh', tiedan: 'refine', yujiang: 'sock' };
 // 这件装备现在能做什么（一览和页签红点共用）
@@ -438,6 +438,7 @@ function wsCan(it, where) {
     else if ((it.sockets || 0) < MAX_SOCKETS[it.slot] && SAVE.gold >= sc.gold && SAVE.mats >= sc.mats) c.sock = '可以再打一个孔'; }
   if (featureOn('reroll') && it.aff.length) { const q = itemQ(it); if (busyRoll(it)) c.refine = '有一次洗炼／淬炼的结果还没选'; else if (q != null && q < 0.5) c.refine = `词条成色只有 ${Math.round(q * 100)}%，可以淬炼洗炼`; }
   if (featureOn('enhance') && upTierOK(it)) { const L = upTierTarget(cls); if (L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const u = upTierCost(it, L); if (SAVE.gold >= u.gold && SAVE.mats >= u.mats) c.up = `可以升到${TIER_N[tierOf(L)]}`; } }
+  if (featureOn('enhance') && !c.up && ancOK(it) && SAVE.mats >= ANC_COST) c.up = `可以点化成上古（${ANC_COST} 魂晶）`;
   if (featureOn('enhance') && where === 'eq' && SAVE.stash.some(x => canInherit(it, x))) c.inh = '储物箱里有旧装备的强化／玉可以传过来';
   return c;
 }
@@ -529,6 +530,7 @@ function goTab() {
         <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <p class="help-p" style="text-align:center">最多可以挑战 ${maxR} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
+      <p class="help-p" style="text-align:center">这一层掉的神兵、套装：<b>${(ancRate(SAVE.riftLv)[0] * 100).toFixed(1)}%</b> 是上古，<b>${(ancRate(SAVE.riftLv)[1] * 100).toFixed(2)}%</b> 是太古。${ANC_FROM} 层往上，层数越高越容易出。</p>
       <p class="help-p" style="text-align:center">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
       ${cu > 1 ? `<p class="cu-note">追赶中：${CLASSES[cls].n}比你等级最高的角色低 <b>${topLevel() - SAVE.chars[cls].level}</b> 级，战斗经验 <b>×${cuTxt(cu)}</b>（差得越多越快，追平为止）。${SAVE.riftLv <= R_EASY ? `前 ${R_EASY} 层的妖物迁就你的等级（最多高 2 级；10 级以前不比你高，来得也少），放心进。` : `前 ${R_EASY} 层的妖物会迁就你的等级。`}</p>` : ''}
       <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `这一层两套<b class="r-set">幻境套装</b>都会掉` : SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>（${RSET2_LV} 层起多一套）` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
@@ -2728,6 +2730,8 @@ function smithHTML(it, where, W, title) {
     if (upTierOK(it) && L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const c = upTierCost(it, L);
       h += `<div class="srow"><span>升阶 ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>装备等级 ${it.ilvl} → ${L}，攻击、气血、护甲这些实数属性一起涨，百分比词条不变 · ${c.gold} 两 + ${c.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">升阶</button></div>`; }
     else h += `<div class="srow">${upTierOK(it) ? '这件已经是眼下能到的最高阶了。' : '只有宝品、套装、神兵能升阶。'}</div>`;
+    if (it.rarity === 'legend' || it.rarity === 'set') h += it.anc ? `<div class="srow">${it.anc === 2 ? '这件是太古：全属性 +30%，词条全是满值。' : '这件已经是上古：全属性 +30%。太古只能靠掉。'}</div>`
+      : `<div class="srow"><span>点化成上古<small>全属性 +30%，强化、玉、词条都不动 · ${ANC_COST} 魂晶（你有 ${fmtBig(SAVE.mats)}）。太古点不出来，只能靠掉。</small></span><button class="btn sm" ${SAVE.mats >= ANC_COST ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`;
   }
   if (W.has('refine') && it.aff.length && featureOn('reroll') && !it.rrPending) {
     const m = itemMult(it);
@@ -2795,7 +2799,7 @@ function itemModal(id, shopIdx) {
       h += itemCard(it, cls, isMine ? '当前装备' : where === 'eq' ? '别的角色正在用' : '');
       if (cur && !isMine && where !== 'eq') h += `<details class="curd"><summary>展开身上那件的完整属性</summary>${itemCard(cur, cls, '身上穿的')}</details>`;
       if (atTown) {
-        const go = [['smith', 'enh', '强化'], ['smith', 'inh', '传承'], ['tiedan', 'refine', '淬炼洗炼'], ['tiedan', 'up', '升阶'], ['yujiang', 'sock', '打孔镶玉']].filter(([n, fn]) => svcFns(n).some(f => f[0] === fn) && (fn !== 'refine' || it.aff.length) && (fn !== 'up' || upTierOK(it)));
+        const go = [['smith', 'enh', '强化'], ['smith', 'inh', '传承'], ['tiedan', 'refine', '淬炼洗炼'], ['tiedan', 'up', '升阶点化'], ['yujiang', 'sock', '打孔镶玉']].filter(([n, fn]) => svcFns(n).some(f => f[0] === fn) && (fn !== 'refine' || it.aff.length) && (fn !== 'up' || upTierOK(it)));
         if (go.length) h += `<div class="svc-go"><span class="sub">拿去找：</span>${go.map(([n, fn, t]) => `<button class="chip" data-act="npcgo" data-arg="${n}|${fn}|${it.id}">${SPEAKERS[n].n} · ${t}</button>`).join('')}</div>`;
         if (where === 'stash' && it.legend && featureOn('cube')) h += smithHTML(it, where, new Set(['cube']), '乾坤袋');
       }
@@ -3018,6 +3022,7 @@ const ACT = {
   ws: id => { const it = findOwned(id); const r = washStart(it, [...wlockOf(it)]); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   wspick: a => { const [id, i] = split(a); washPick(findOwned(id), +i); SFX.play('forge'); toast(+i ? '洗炼完成：换上了新词条' : '留下了原样'); refresh(); },
   inh: a => { const [d, s] = split(a); const r = inheritFrom(findOwned(d), findOwned(s)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`传承完成：现在 +${r.plus}${r.gems ? `，带过来 ${r.gems} 颗玉` : ''}`); refresh(); },
+  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); toast(`点化成了：<b>${esc(itemTitle(it))}</b>`); save(); refresh(); achToast(checkAch()); },
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`升阶完成：现在是${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),

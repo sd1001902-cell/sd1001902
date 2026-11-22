@@ -351,12 +351,24 @@ function rollSockets(slot, rarity) {
 }
 const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
 const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%：神兵掉得多了，这两档收一收才显得珍贵）
+// 上古、太古跟着幻境层数走：30 层以内 5% / 0.3%，往上每层 +0.25% / +0.03%（69 层约 14.8% / 1.5%），封顶 20% / 2%。幻境以外（主线、赌装备、铸兵）按底数
+const ANC_STEP = [0.0025, 0.0003], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 800;
+const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), Math.min(ANC_CAP[1], ANC_P[1] + d * ANC_STEP[1])]; };
+const ancNow = () => ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0);
+// 点化：花魂晶把一件神兵／套装变成上古（保底的路；太古只能靠掉）
+const ancOK = it => !!it && (it.rarity === 'legend' || it.rarity === 'set') && !it.anc;
+function ancientize(it) {
+  if (!it || !(it.rarity === 'legend' || it.rarity === 'set')) return { err: '只有神兵和套装能点化' };
+  if (it.anc) return { err: it.anc === 2 ? '这件已经是太古了' : '这件已经是上古了' };
+  if (SAVE.mats < ANC_COST) return { err: '魂晶不够' };
+  SAVE.mats -= ANC_COST; it.anc = 1; SAVE.flags.ancient = true; return { ok: true };
+}
 const primalOK = () => SAVE && (SAVE.unlocked.hell || SAVE.riftMax >= 10);
 function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
   it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
   if (it.rarity === 'legend' || it.rarity === 'set') {
-    it.anc = primalOK() && RNG.ch(ANC_P[1]) ? 2 : RNG.ch(ANC_P[0]) ? 1 : 0;
+    const ap = ancNow(); it.anc = primalOK() && RNG.ch(ap[1]) ? 2 : RNG.ch(ap[0]) ? 1 : 0;
     if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]);
   }
   return it;
