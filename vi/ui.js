@@ -144,7 +144,7 @@ function itemCard(it, cls, label) {
     const n = setCountFor(S.cls, S.id), eq = SAVE.chars[S.cls].eq;
     h += `<div class="iset ${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? "<em>Bộ Ảo Cảnh</em> ·" : ''} (${CLASSES[S.cls].n}đã mặc ${n}/${S.pieces.length})
       <div class="${n >= 2 ? 'on' : ''}">2 món: ${S.b2d}</div><div class="${n >= 4 ? 'on' : ''}">4 món: ${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : ''}">6 món: ${S.b6d}</div>` : ''}
-      <div>${S.pieces.map(p => `<span class="${eq[p[0]] && eq[p[0]].set === S.id ? 'on' : ''}">${p[1]}</span>`).join(" ")}</div></div>`;
+      ${setTip(S, n)}<div>${S.pieces.map(p => `<span class="${eq[p[0]] && eq[p[0]].set === S.id ? 'on' : ''}">${p[1]}</span>`).join(" ")}</div></div>`;
   }
   return h + `<div class="ipr">Bán ${sellPrice(it)} lượng · Phân giải được ${salvageValue(it)} hồn tinh</div></div>`;
 }
@@ -153,6 +153,19 @@ function affTag(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r)
   const sh = x => k === 'hp' || k === 'regen' ? fmtBig(hpShow(x, heroLv())) : x;   // 气血类的范围和数值用同一个倍数显示
   return ` <small class="qs q${st}">${'★'.repeat(st)}${'☆'.repeat(5 - st)}</small><small class="qr">${sh(r[0])}–${sh(r[1])}</small>`; }
 let WLOCK = { id: null, s: new Set() };
+// 第二套幻境套装要配招式才打得出来：写明搭配，穿到 4 件还没带上的招式点出来
+function setTip(S, n) {
+  if (!S.tip) return '';
+  const L = syncLoadout(S.cls), miss = n >= 4 ? (S.need || []).filter(id => !L.includes(id)).map(id => (CLASSES[S.cls].skills.find(k => k.id === id) || {}).n).filter(Boolean) : [];
+  return `<div class="settip">Phối hợp: ${S.tip}${miss.length ? `<b class="warn"> Chưa mang: ${miss.join(", ")} (vào trang “Võ học” để đổi)</b>` : ''}</div>`;
+}
+function bestModal(cls, plan) {
+  const ni = plan.filter(e => e.inh), g = ni.reduce((a, e) => a + e.cost.gold, 0), m = ni.reduce((a, e) => a + e.cost.mats, 0), plain = plan.length - ni.length;
+  return `<h2 class="mh">Thay nhanh bộ mạnh nhất</h2>
+    <p class="help-p">Có <b>${ni.length}</b> món phải “truyền thừa” trước mới mạnh hơn món đang mặc: dời cường hóa và ngọc của món đang mặc sang món mới, cường hóa tụt một cấp. Tổng cộng <b>${g}</b> lượng, <b>${m}</b> hồn tinh (bạn có ${fmtBig(SAVE.gold)} lượng, ${fmtBig(SAVE.mats)} viên).</p>
+    <div class="bulk-list">${plan.map(e => `<span class="lchip ${ancCls(e.it)}">${SPR.item(e.it, 22)}<span class="r-${e.it.rarity}">${itemTitle(e.it)}</span>${e.inh ? "<i class=\"inhm\">TT</i>" : ''}</span>`).join('')}</div>
+    <div class="sheet-act"><button class="btn" data-act="bestgo" data-arg="1">Truyền thừa rồi mặc</button><button class="btn ghost" data-act="bestgo" data-arg="0">${plain ? `Chỉ thay ${plain} món không cần truyền thừa` : "Chưa thay vội"}</button></div>`;
+}
 const wlockOf = it => (WLOCK.id === it.id ? WLOCK.s : new Set());
 function deltaOf(it, cls) {
   if (!canEquip(it, cls)) return "<span class=\"delta no\">Không dùng được</span>";
@@ -161,7 +174,9 @@ function deltaOf(it, cls) {
 }
 function lootChips(items) {
   if (!items || !items.length) return '';
-  return `<div class="loot">${items.map(it => `<button class="lchip ${ancCls(it)}" data-act="item" data-arg="${it.id}">${SPR.item(it, 24)}<span class="r-${it.rarity}">${itemTitle(it)}</span></button>`).join('')}</div>`;
+  const cls = ctxCls(), cur = power(charStats(cls));
+  const up = it => SAVE.stash.includes(it) && canEquip(it, cls) && powerBest(cls, it).p > cur;   // 传承后更强的也标出来
+  return `<div class="loot">${items.map(it => { const u = up(it); return `<button class="lchip ${ancCls(it)} ${u ? 'isup' : ''}" data-act="item" data-arg="${it.id}">${SPR.item(it, 24)}<span class="r-${it.rarity}">${itemTitle(it)}</span>${u ? '<em class="upm">↑</em>' : ''}</button>`; }).join('')}</div>`;
 }
 const zyChips = zy => zy && zy.length ? `<div class="loot">${zy.map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n);
   return `<span class="lchip zy">${d ? SPR.img(d.spr, 24, d.pal) : ''}<span>Tinh phách · ${n}<b>${ZY_CN[g]}</b>${old ? "<small>Lên phẩm</small>" : "<small>Mới thu phục</small>"}</span></span>`; }).join('')}</div>` : '';
@@ -169,14 +184,17 @@ const gemChips = keys => keys && keys.length ? `<div class="loot">${keys.map(k =
 // 每件储物箱装备换上后的战力变化（一次算好，渲染时复用）
 function deltaMap(cls) {
   const cur = power(charStats(cls)), m = new Map();
-  for (const it of SAVE.stash) m.set(it.id, canEquip(it, cls) ? powerWith(cls, it) - cur : null);
+  m.inh = new Set();   // 要传承才到得了这个数的（身上那件强化过、镶了玉）
+  for (const it of SAVE.stash) { if (!canEquip(it, cls)) { m.set(it.id, null); continue; } const b = powerBest(cls, it); m.set(it.id, b.p - cur); if (b.inh) m.inh.add(it.id); }
   return m;
 }
-const deltaTag = d => d == null ? "<span class=\"delta no\">Không dùng được</span>" : d > 0 ? `<span class="delta up">+${d}</span>` : d < 0 ? `<span class="delta dn">${d}</span>` : '<span class="delta no">±0</span>';
+const deltaTag = (d, inh) => { const m = inh ? "<i class=\"inhm\">TT</i>" : ''; return d == null ? "<span class=\"delta no\">Không dùng được</span>" : d > 0 ? `<span class="delta up">${m}+${d}</span>` : d < 0 ? `<span class="delta dn">${m}${d}</span>` : `<span class="delta no">${m}±0</span>`; };
+const cuTxt = m => String(Math.round(m * 10) / 10);
+const inFightNow = () => VIEW === 'battle' && !!B && !B.over;
 function itemRow(it, D) {
-  const d = D.get(it.id);
+  const d = D.get(it.id), inh = D.inh && D.inh.has(it.id), qi = inh && d > 0 && !inFightNow();
   return `<div class="irow2 ${ancCls(it)} ${d > 0 ? 'isup' : ''}"><button class="ir-main" data-act="item" data-arg="${it.id}">${SPR.item(it, 30)}<span class="nm r-${it.rarity}">${itemTitle(it)}<small>${SLOT_NAME[it.slot]} · giai ${it.ilvl} ${socketDots(it)}</small></span></button>
-    ${deltaTag(d)}${d != null ? `<button class="btn sm qeq ${d > 0 ? '' : 'ghost'}" data-act="qeq" data-arg="${it.id}">Mặc</button>` : '<span class="qeq-ph"></span>'}</div>`;
+    ${deltaTag(d, inh)}${d != null ? (qi ? `<button class="btn sm qeq" data-act="inheq" data-arg="${it.id}">TT + mặc</button>` : `<button class="btn sm qeq ${d > 0 && !inh ? '' : 'ghost'}" data-act="qeq" data-arg="${it.id}">Mặc</button>`) : '<span class="qeq-ph"></span>'}</div>`;
 }
 // 装备面板：上面是身上 7 个位置，点一个位置，下面只列这个位置能换的装备
 function gearPanel(cls, inRun) {
@@ -253,7 +271,7 @@ const riftHelpModal = () => `<h2 class="mh">Ảo Cảnh đổi cách đánh</h2>
   <p class="help-p">Không còn là bấm ô nữa. Giờ là bốn tầng bản đồ lớn, yêu vật đi thành từng bầy, nhìn thấy được, vòng qua được.</p>
   <p class="help-p"><b>Kéo quái hợp chiến</b>: đụng một bầy yêu vật, các bầy trong vòng ba ô sẽ bị cuốn vào cùng, một trận tối đa bốn bầy. Chiêu đánh lan ở đây đáng giá nhất.</p>
   <p class="help-p"><b>Tiến độ</b>: diệt yêu tích tiến độ, tinh anh cho nhiều hơn, ngã xuống còn rơi một viên tinh phách, phải đi tới nhặt. Tiến độ đầy thì yêu vương giữ ải hiện thân ngay cạnh bạn.</p>
-  <p class="help-p"><b>Đổi tầng</b>: mỗi tầng tối đa tích bốn phần tiến độ, đủ rồi thì tới trận truyền tống ở xa để sang tầng kế, không cần dọn sạch; một ván thường đi ba tầng, tầng cuối không giới hạn. Mỗi tầng còn có một ngọn tháp, giẫm lên được cộng sức trong ba trận.</p>
+  <p class="help-p"><b>Đổi tầng</b>: tiến độ mỗi tầng không giới hạn; muốn đánh tới cùng ở tầng này hay tới trận truyền tống ở xa để sang tầng kế là tùy bạn. Càng xuống sâu càng béo: yêu vật cao hơn một cấp, mỗi con cho nhiều tiến độ hơn (tầng hai +15%, tầng ba +30%, tầng bốn +50%), tinh anh cũng thêm một con. Mỗi tầng còn có một ngọn tháp, giẫm lên được cộng sức trong ba trận.</p>
   <p class="help-p"><b>Một nén hương</b>: mười hai phút. Trên bản đồ cháy theo thời gian thật; trong trận tính theo lượt, một vòng tính ba giây, mở tốc độ mấy hay bỏ qua trận đều như nhau.</p>
   <p class="help-p">Trang bị rơi ra đều ghi vào ván này, đánh xong xem một thể; giữa chừng không dừng lại tổng kết.</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">Đã hiểu</button></div>`;
@@ -411,13 +429,14 @@ function goTab() {
       <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>`;
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
-    const rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id));
+    const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id));
     body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
-        <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftD(SAVE.riftLv).base}</small></div>
+        <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <p class="help-p" style="text-align:center">Thử thách tối đa tầng ${maxR}. Giới hạn <b>một nén hương</b> (${Math.round(riftLimit(SAVE.riftLv) / 60000)} phút). Một ván bốn tầng bản đồ lớn, yêu vật đi thành bầy: đụng một bầy, các bầy bên cạnh bị cuốn vào cùng. Diệt yêu tích đầy tiến độ thì yêu vương giữ ải hiện thân; hạ nó trước khi hương tàn, hương còn càng nhiều thì linh ngọc càng được nâng nhiều lần, lần sau càng nhảy được nhiều tầng. Ngã xuống không tính thua: bạn bị ném về lối vào của tầng này, hương cháy mất một đoạn.</p>
       <p class="help-p" style="text-align:center">Trên bản đồ hương cháy theo thời gian thật; trong trận tính theo lượt (một vòng tính 3 giây), mở tốc độ mấy hay bỏ qua trận đều như nhau.</p>
-      <div class="riftinfo"><span>Kỷ lục ${CLASSES[cls].n}: <b>${rec ? riftRecTxt(rec) : "Chưa có"}</b></span><span>${SAVE.riftLv >= RSET_LV ? `Tầng này rơi <b class="r-set">Bộ Ảo Cảnh</b>` : `Từ tầng ${RSET_LV} rơi <b class="r-set">Bộ Ảo Cảnh</b>`}</span>
+      ${cu > 1 ? `<p class="cu-note">Đang đuổi cấp: ${CLASSES[cls].n} thấp hơn nhân vật cấp cao nhất của bạn <b>${topLevel() - SAVE.chars[cls].level}</b> cấp, kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (chênh càng nhiều càng nhanh, đuổi kịp thì hết). ${SAVE.riftLv <= R_EASY ? `Yêu vật ở ${R_EASY} tầng đầu nhường theo cấp của bạn (cao hơn tối đa 2 cấp; trước cấp 10 thì không cao hơn bạn, kéo tới cũng ít hơn), cứ yên tâm vào.` : `Yêu vật ở ${R_EASY} tầng đầu sẽ nhường theo cấp của bạn.`}</p>` : ''}
+      <div class="riftinfo"><span>Kỷ lục ${CLASSES[cls].n}: <b>${rec ? riftRecTxt(rec) : "Chưa có"}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `Tầng này rơi cả hai <b class="r-set">Bộ Ảo Cảnh</b>` : SAVE.riftLv >= RSET_LV ? `Tầng này rơi <b class="r-set">Bộ Ảo Cảnh</b> (từ tầng ${RSET2_LV} có thêm một bộ)` : `Từ tầng ${RSET_LV} rơi <b class="r-set">Bộ Ảo Cảnh</b>`}</span>
         <span>Tinh phách: <b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><span>Dịch Sứ: ${yi.length ? yi.map(id => `<b>${YISHI[id].n}</b>`).join(", ") : "<i>Chưa mang</i>"} <button class="linkbtn" data-act="zyopen">Trấn Yêu Lục</button></span></div>
       <button class="ngoc-toggle ${SAVE.ngocJoin ? 'on' : ''}" data-act="ngoctog">${SPR.img('ngocfox', 36)}<span><b>Dẫn Ngoc theo</b><small>${SAVE.ngocJoin ? "Cô ấy sẽ cùng bạn xông Ảo Cảnh" : "Lần này bạn đi một mình"}</small></span></button>`;
   }
@@ -463,7 +482,7 @@ function heroTab() {
       for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<li><b style="color:var(--gold2)">Tâm pháp · ${T.n}</b>: ${T.d}</li>`; } return ''; }).join('');
     body = `${statBlock(cls)}
       <h4 class="sub-h">Bộ trang bị môn phái</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
-        return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>Rơi từ Ảo Cảnh tầng ${RSET_LV} trở lên</em>` : ''} (đã mặc ${n}/${S.pieces.length})<div class="${n >= 2 ? 'on' : 'off'}">2 món: ${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 món: ${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 món: ${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
+        return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>Rơi từ Ảo Cảnh tầng ${S.rlv || RSET_LV} trở lên</em>` : ''} (đã mặc ${n}/${S.pieces.length})<div class="${n >= 2 ? 'on' : 'off'}">2 món: ${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 món: ${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 món: ${S.b6d}</div>` : ''}${setTip(S, n)}</li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">Hiệu ứng đang có</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
   } else if (HTAB === 'tal') {
     body = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="sub">Mỗi cấp được 1 điểm · còn <b style="color:var(--gold2)">${ti.free}</b> điểm</span>
@@ -950,7 +969,7 @@ function showRes() {
   const autoEq = BRES.items.filter(i => i.auto);
   if (autoEq.length) { toast("Ô trống đã tự mặc:" + autoEq.map(i => `<b>${esc(i.name)}</b>`).join(", ")); autoEq.forEach(i => delete i.auto); }
   el.innerHTML = BRES.win
-    ? `<div class="res win"><h3>Thắng</h3><p>Kinh nghiệm +${BRES.xp}${lvText} · Bạc +${BRES.gold}${extra ? " · " + extra : ''}</p>
+    ? `<div class="res win"><h3>Thắng</h3><p>Kinh nghiệm +${BRES.xp}${BRES.cu ? `<small class="cu"> (đuổi cấp ×${cuTxt(BRES.cu)})</small>` : ''}${lvText} · Bạc +${BRES.gold}${extra ? " · " + extra : ''}</p>
        ${lootChips(BRES.items)}${gemChips(BRES.gems)}${zyChips(BRES.zy)}${BRES.items.length || BRES.gems.length || (BRES.zy && BRES.zy.length) ? '' : "<p class=\"sub\">Lần này không rơi trang bị</p>"}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>Không trụ nổi</h3><p>Nó mạnh quá. Bàn tay cầm đao của bạn run lên —</p><button class="btn big" data-act="bcont">……</button></div>`
@@ -1235,8 +1254,8 @@ function zoneName() { const r = SAVE.run, S = wstate(r.chapter), m = wmap(r.chap
 const TQ = []; let TQon = false;
 function qtoast(msg) { TQ.push(msg); if (!TQon) nextToast(); }
 function nextToast() { const m = TQ.shift(); if (m == null) { TQon = false; return; } TQon = true; toast(m); setTimeout(nextToast, TQ.length ? 1500 : 200); }
-const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? "Yêu vương giữ ải đã hiện thân — tìm nó, hạ nó" : rCapped(run) ? "Yêu khí tầng này hút đủ rồi (mỗi tầng tối đa bốn phần): tới trận truyền tống, sang tầng kế"
-  : `Đụng một bầy yêu vật, các bầy bên cạnh bị cuốn vào cùng. Tinh anh ngã xuống rơi tinh phách, đi tới nhặt. ${R.last ? "Đây là tầng cuối, tiến độ không giới hạn." : "Mỗi tầng tối đa tích bốn phần tiến độ."}`; };
+const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? "Yêu vương giữ ải đã hiện thân — tìm nó, hạ nó"
+  : `Đụng một bầy yêu vật, các bầy bên cạnh bị cuốn vào cùng. Tinh anh ngã xuống rơi tinh phách, đi tới nhặt. ${R.last ? "Đây là tầng cuối, yêu vật béo nhất." : R.fi ? `Tầng này mỗi con yêu vật cho tiến độ +${Math.round((R_DEEP[R.fi] - 1) * 100)}%, càng xuống sâu càng béo.` : "Càng xuống sâu càng béo: tầng kế mỗi con yêu vật cho nhiều tiến độ hơn."}`; };
 // 幻境的地图界面：没有任务栏，换成进度条和香
 function riftWorldHTML() {
   const run = SAVE.run, B = run.rbuff;   // 地图顶上只留层名：同伴的名字放这儿会和层名挤在一起
@@ -2585,8 +2604,12 @@ function itemModal(id, shopIdx) {
     if (tab === 'info') {
       if (!isMine && where !== 'eq') {
         if (canEquip(it, cls)) {
-          const d = powerWith(cls, it) - power(charStats(cls));
-          h += `<div class="pdelta2"><span>${cur ? `So với <b class="r-${cur.rarity}">${itemTitle(cur)}</b> đang mặc` : `${SLOT_NAME[it.slot]} đang trống`}</span><b class="${d >= 0 ? 'up' : 'dn'}">Lực chiến ${d >= 0 ? '+' : ''}${d}</b></div>${diffChips(it, cur)}`;
+          const base = power(charStats(cls)), pb = powerBest(cls, it), d = pb.raw - base, sg = n => (n >= 0 ? '+' : '') + n;
+          if (pb.inh && where === 'stash') { const di = pb.p - base, c = inheritCost(it, cur);
+            h += `<div class="pdelta2"><span>So với <b class="r-${cur.rarity}">${itemTitle(cur)}</b> đang mặc</span></div>
+              <div class="pdelta3"><span>Mặc thẳng</span><b class="${d >= 0 ? 'up' : 'dn'}">Lực chiến ${sg(d)}</b></div>
+              <div class="pdelta3 hl"><span>Truyền thừa rồi mặc<small>dời cường hóa${cur.gems && cur.gems.length ? " và ngọc" : ''} của món đang mặc sang, cường hóa tụt một cấp · ${c.gold} lượng ${c.mats} hồn tinh</small></span><b class="${di >= 0 ? 'up' : 'dn'}">Lực chiến ${sg(di)}</b></div>${diffChips(it, cur)}`;
+          } else h += `<div class="pdelta2"><span>${cur ? `So với <b class="r-${cur.rarity}">${itemTitle(cur)}</b> đang mặc` : `${SLOT_NAME[it.slot]} đang trống`}</span><b class="${d >= 0 ? 'up' : 'dn'}">Lực chiến ${sg(d)}</b></div>${diffChips(it, cur)}`;
         } else h += `<p class="pdelta warn">${CLASSES[cls].n} không dùng được bộ môn phái này</p>`;
       }
       h += itemCard(it, cls, isMine ? "Đang mặc" : where === 'eq' ? "Nhân vật khác đang dùng" : '');
@@ -2599,7 +2622,9 @@ function itemModal(id, shopIdx) {
     } else h += smithHTML(it, where);
     const acts = [];
     if (where === 'stash') {
-      if (canEquip(it, cls)) acts.push(`<button class="btn" data-act="equip" data-arg="${it.id}">Mặc</button>`);
+      const pbx = canEquip(it, cls) && !inFight ? powerBest(cls, it) : null;
+      if (pbx && pbx.inh) acts.push(`<button class="btn" data-act="inheq" data-arg="${it.id}">Truyền thừa rồi mặc</button>`);
+      if (canEquip(it, cls)) acts.push(`<button class="btn ${pbx && pbx.inh ? 'ghost' : ''}" data-act="equip" data-arg="${it.id}">${pbx && pbx.inh ? "Chỉ mặc" : "Mặc"}</button>`);
       if (!inFight) acts.push(`<button class="btn ghost" data-act="sell" data-arg="${it.id}">Bán ${sellPrice(it)} lượng</button>`, `<button class="btn ghost" data-act="salv" data-arg="${it.id}">Phân giải ${salvageValue(it)} hồn tinh</button>`, `<button class="btn ghost" data-act="lock" data-arg="${it.id}">${it.lk ? "Mở khóa" : "Khóa"}</button>`);
     }
     if (isMine) acts.push(`<button class="btn ghost" data-act="unequip" data-arg="${it.slot}">Tháo</button>`);
@@ -2774,7 +2799,18 @@ const ACT = {
   unequip: sl => { unequip(ctxCls(), sl); closeModal(); refresh(); },
   sell: id => { const g = sellItem(id); SFX.play('coin'); toast(`Bán được ${g} lượng`); closeModal(); refresh(); },
   salv: id => { const m = salvage(id); SFX.play('forge'); toast(`Phân giải được ${m} hồn tinh`); closeModal(); refresh(); },
-  best: () => { bestGear.left = []; const n = bestGear(ctxCls()), left = bestGear.left.filter(x => SAVE.stash.includes(x)); toast(n ? `Đã mặc ${n} món mạnh hơn${left.length ? `. Món “${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}”${left.length > 1 ? ` và ${left.length} món khác` : ''} vừa thay ra có cường hóa hoặc ngọc, có thể “Truyền thừa” sang đồ mới ở Lò Rèn` : ''}` : "Đã là bộ mạnh nhất rồi"); refresh(); achToast(checkAch()); },
+  best: () => { const cls = ctxCls(), plan = bestPlan(cls), ni = plan.filter(e => e.inh);
+    if (!plan.length) return toast("Đã là bộ mạnh nhất rồi");
+    if (ni.length && !inFightNow()) return openModal(() => bestModal(cls, plan));
+    ACT.bestgo('0'); },
+  bestgo: a => { const cls = ctxCls(); bestGear.left = []; const r = bestApply(cls, a === '1'), left = (bestGear.left || []).filter(x => SAVE.stash.includes(x));
+    closeModal(); if (r.n) SFX.play(r.inh ? 'forge' : 'loot');
+    toast(r.n ? `Đã thay ${r.n} món mạnh hơn${r.inh ? `, trong đó ${r.inh} món đã truyền thừa` : ''}${r.skip ? `; ${r.skip} món không đủ bạc hoặc hồn tinh để truyền thừa nên giữ nguyên` : ''}${left.length ? `. Món vừa thay ra “${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}” ${left.length > 1 ? ` và ${left.length} món khác` : ''}còn cường hóa hoặc ngọc, có thể tìm Trương Đại Chùy “truyền thừa” sang đồ mới` : ''}` : (r.skip ? "Không đủ bạc hoặc hồn tinh để truyền thừa" : "Nếu không truyền thừa thì đồ đang mặc đã là mạnh nhất"));
+    refresh(); achToast(checkAch()); },
+  inheq: id => { const cls = ctxCls(), f = findItem(id); if (!f || f.where !== 'stash' || inFightNow()) return;
+    const cur = SAVE.chars[cls].eq[f.it.slot], base = power(charStats(cls));
+    const r = inheritFrom(f.it, cur); if (r.err) return toast(r.err);
+    if (equipItem(cls, id)) { const d = power(charStats(cls)) - base; SFX.play('forge'); closeModal(); toast(`Đã truyền thừa và mặc <b>${esc(f.it.name)}</b>: giờ là +${r.plus}${r.gems ? `, mang theo ${r.gems} viên ngọc` : ''}, lực chiến ${d >= 0 ? '+' : ''}${d}`); refresh(); achToast(checkAch()); } },
   junk: () => { const r = sellJunk(); if (r.n) SFX.play('coin'); toast(r.n ? `Bán ${r.n} món, được ${r.g} lượng` : "Không có Phàm/Linh phẩm nào để bán (đồ đã cường hóa hoặc khảm ngọc sẽ không bán)"); refresh(); },
   salvjunk: () => { const r = salvageJunk(); if (r.n) SFX.play('forge'); toast(r.n ? `Phân giải ${r.n} món, được ${r.m} hồn tinh` : "Không có Phàm/Linh phẩm nào để phân giải"); refresh(); },
   filter: f => { FILTER = f; refresh(); },

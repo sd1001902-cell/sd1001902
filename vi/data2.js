@@ -174,6 +174,40 @@ SETS.push(
     b4: 'luoHan4', b4d: "Phản kích đánh mọi kẻ địch, sát thương từ 80% lên 200%; đòn bị hộ thể đỡ cũng phản kích",
     b6: 'luoHan6', b6d: "Tỉ lệ phản kích thêm +15%; mỗi lần phản kích cộng một tầng “Phật nộ” (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải nhận -4%" },
 );
+// 第二套幻境套装：RSET2_LV 层起掉。上面那五套是把本门的招牌机制推到头；这五套换一种打法，用的是上面不碰的招式
+const RSET2_LV = 30;
+SETS.push(
+  { id: 'busi', n: "Tu La Bất Tử", cls: 'berserker', rift: true, rlv: RSET2_LV,
+    pieces: [['helm', "Bất Tử Chiến Khôi"], ['chest', "Bất Tử Chiến Giáp"], ['gloves', "Bất Tử Hộ Uyển"], ['boots', "Bất Tử Chiến Ngoa"], ['ring', "Bất Tử Ban Chỉ"], ['amulet', "Bất Tử Hộ Tâm Kính"]],
+    b2: { leech: 5, hpPct: 12 }, b2d: "Hút máu +5%, khí huyết tối đa +12%",
+    b4: 'buSi4', b4d: "Toàn Phong Đao, Liệt Địa Trảm hồi chiêu -1, mỗi kẻ địch trúng đòn hồi 3% khí huyết; chỉ còn một kẻ địch vẫn dùng được Toàn Phong Đao",
+    b6: 'buSi6', b6d: "Khí huyết mỗi thiếu 1%, sát thương +3%; sát thương Toàn Phong Đao, Liệt Địa Trảm ×5; mỗi trận một lần: trúng đòn chí tử không ngã, còn 1 điểm khí huyết và vào 3 lượt “Bất Thoái”",
+    need: ['liedi', 'whirl'], tip: "Dọn bầy bằng Toàn Phong Đao, Liệt Địa Trảm, phải mang cả hai chiêu" },
+  { id: 'wanfu', n: "Vạn Phù Quy Tông", cls: 'mage', rift: true, rlv: RSET2_LV,
+    pieces: [['helm', "Vạn Phù Đạo Quan"], ['chest', "Vạn Phù Pháp Y"], ['gloves', "Vạn Phù Hộ Uyển"], ['boots', "Vạn Phù Vân Lý"], ['ring', "Vạn Phù Ban Chỉ"], ['amulet', "Vạn Phù Ngọc Bội"]],
+    b2: { elem: 25, hpPct: 8 }, b2d: "Sát thương thuật pháp +25%, khí huyết tối đa +8%",
+    b4: 'wanFu4', b4d: "Khi chiêu của bạn gây trạng thái lên một kẻ địch, trạng thái đó lan sang mọi kẻ địch; kẻ địch mỗi có một loại trạng thái thì nhận sát thương từ bạn +20%; chiêu gây trạng thái khi ra tay được bù một lớp bùa hộ thân",
+    b6: 'wanFu6', b6d: "Dẫn Bạo Phù không còn xóa trạng thái, phần cộng thêm của mỗi loại trạng thái từ +120% lên +170%, và lan 80% sát thương sang mọi kẻ địch còn lại; Dẫn Bạo Phù hồi chiêu -1",
+    need: ['lunzhuan'], tip: "Không cần theo thứ tự tương sinh. Mang Dẫn Bạo Phù, thêm hai ba chiêu gây trạng thái (Chân Hỏa Phù, Hàn Băng Quyết, Lạc Thạch Quyết)" },
+  { id: 'duxing', n: "Ngũ Độc Độc Hành", cls: 'necro', rift: true, rlv: RSET2_LV,
+    pieces: [['helm', "Độc Hành Nón Lá"], ['chest', "Độc Hành Cổ Y"], ['gloves', "Độc Hành Chỉ Sáo"], ['boots', "Độc Hành Dép Cỏ"], ['ring', "Độc Hành Ban Chỉ"], ['amulet', "Độc Hành Cổ Đàn"]],
+    b2: { poisonPct: 60, hpPct: 15 }, b2d: "Sát thương trúng độc +60%, khí huyết tối đa +15%",
+    b4: 'duXing4', b4d: "Thi vị mỗi trống một ô (tính tối đa 4 ô): sát thương của bạn +60%, sát thương phải nhận -13%; Trấn Hồn Đinh kèm trúng độc; không có cương thi vẫn dùng được Bách Quỷ Dạ Hành",
+    b6: 'duXing6', b6d: "Trúng độc có thể cộng dồn (tối đa 5 tầng); Thi Độc Lan, Thổ Độn Táng đánh trúng kẻ địch đang trúng độc thì kết toán ngay phần độc còn lại trên nó với mức gấp đôi (độc không mất)",
+    need: ['shidu', 'tudun'], tip: "Không gọi cương thi, một mình hạ độc. Mang Thi Độc Lan, Thổ Độn Táng; tháo Rung Chuông Gọi Xác xuống" },
+  { id: 'qianji', n: "Thiên Cơ", cls: 'assassin', rift: true, rlv: RSET2_LV,
+    pieces: [['helm', "Thiên Cơ Diện Tráo"], ['chest', "Thiên Cơ Dạ Hành Y"], ['gloves', "Thiên Cơ Chỉ Sáo"], ['boots', "Thiên Cơ Nhuyễn Ngoa"], ['ring', "Thiên Cơ Ban Chỉ"], ['amulet', "Thiên Cơ Hạp"]],
+    b2: { crit: 6, poisonPct: 50 }, b2d: "Tỉ lệ chí mạng +6%, sát thương trúng độc +50%",
+    b4: 'qianJi4', b4d: "Chiêu ám khí (Tiêu Tẩm Độc, Băng Phách Châm, Mạn Thiên Hoa Vũ) hồi chiêu -1; độc của Tiêu Tẩm Độc dính sang mọi kẻ địch; chỉ còn một kẻ địch vẫn dùng được Mạn Thiên Hoa Vũ",
+    b6: 'qianJi6', b6d: "Chiêu ám khí đánh trúng kẻ địch đang trúng độc: chắc chắn chí mạng, sát thương ×3; Mạn Thiên Hoa Vũ mỗi kẻ địch trúng đòn, Sát ý +1",
+    need: ['venom', 'fan'], tip: "Mang Tiêu Tẩm Độc, Mạn Thiên Hoa Vũ, tốt nhất thêm Băng Phách Châm; giữ một đòn kết liễu để tiêu Sát ý" },
+  { id: 'dari', n: "Đại Nhật Như Lai", cls: 'paladin', rift: true, rlv: RSET2_LV,
+    pieces: [['helm', "Đại Nhật Tăng Mạo"], ['chest', "Đại Nhật Cà Sa"], ['gloves', "Đại Nhật Hộ Uyển"], ['boots', "Đại Nhật Tăng Hài"], ['ring', "Đại Nhật Ban Chỉ"], ['amulet', "Đại Nhật Niệm Châu"]],
+    b2: { healPct: 25, hpPct: 10 }, b2d: "Hiệu quả trị liệu +25%, khí huyết tối đa +10%",
+    b4: 'daRi4', b4d: "Mỗi lượt nhận hộ thể chân khí bằng 12% khí huyết tối đa; phần hồi máu dư cũng thành hộ thể (tích tối đa 50% khí huyết tối đa)",
+    b6: 'daRi6', b6d: "Khi đang có hộ thể chân khí: sát thương +100%; mỗi lần dùng chiêu có hồi chiêu, bồi thêm một luồng Phật quang, gây 200% sát thương lên mọi kẻ địch",
+    tip: "Mang chiêu nào cũng được; càng nhiều chiêu hồi chiêu ngắn, Phật quang càng bồi dày" },
+);
 STAT_NAMES.furyGain = STAT_NAMES.furyGain || "Nộ ý nhận được";
 STAT_NAMES.lianPct = STAT_NAMES.lianPct || "Sát thương mỗi tầng “Liên”";
 STAT_NAMES.counter = STAT_NAMES.counter || "Tỉ lệ phản kích";

@@ -144,7 +144,7 @@ function itemCard(it, cls, label) {
     const n = setCountFor(S.cls, S.id), eq = SAVE.chars[S.cls].eq;
     h += `<div class="iset ${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? '<em>幻境套装</em>' : ''}（${CLASSES[S.cls].n}已穿 ${n}/${S.pieces.length}）
       <div class="${n >= 2 ? 'on' : ''}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : ''}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : ''}">6 件：${S.b6d}</div>` : ''}
-      <div>${S.pieces.map(p => `<span class="${eq[p[0]] && eq[p[0]].set === S.id ? 'on' : ''}">${p[1]}</span>`).join('　')}</div></div>`;
+      ${setTip(S, n)}<div>${S.pieces.map(p => `<span class="${eq[p[0]] && eq[p[0]].set === S.id ? 'on' : ''}">${p[1]}</span>`).join('　')}</div></div>`;
   }
   return h + `<div class="ipr">卖 ${sellPrice(it)} 两 · 分解得 ${salvageValue(it)} 魂晶</div></div>`;
 }
@@ -153,6 +153,19 @@ function affTag(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r)
   const sh = x => k === 'hp' || k === 'regen' ? fmtBig(hpShow(x, heroLv())) : x;   // 气血类的范围和数值用同一个倍数显示
   return ` <small class="qs q${st}">${'★'.repeat(st)}${'☆'.repeat(5 - st)}</small><small class="qr">${sh(r[0])}–${sh(r[1])}</small>`; }
 let WLOCK = { id: null, s: new Set() };
+// 第二套幻境套装要配招式才打得出来：写明搭配，穿到 4 件还没带上的招式点出来
+function setTip(S, n) {
+  if (!S.tip) return '';
+  const L = syncLoadout(S.cls), miss = n >= 4 ? (S.need || []).filter(id => !L.includes(id)).map(id => (CLASSES[S.cls].skills.find(k => k.id === id) || {}).n).filter(Boolean) : [];
+  return `<div class="settip">搭配：${S.tip}${miss.length ? `<b class="warn">　还没带上：${miss.join('、')}（去「武学」页换）</b>` : ''}</div>`;
+}
+function bestModal(cls, plan) {
+  const ni = plan.filter(e => e.inh), g = ni.reduce((a, e) => a + e.cost.gold, 0), m = ni.reduce((a, e) => a + e.cost.mats, 0), plain = plan.length - ni.length;
+  return `<h2 class="mh">一键换上最强</h2>
+    <p class="help-p">有 <b>${ni.length}</b> 件要先做「传承」才比身上的强：把身上那件的强化和玉搬到新装备上，强化降一级。一共 <b>${g}</b> 两、<b>${m}</b> 颗魂晶（你有 ${fmtBig(SAVE.gold)} 两、${fmtBig(SAVE.mats)} 颗）。</p>
+    <div class="bulk-list">${plan.map(e => `<span class="lchip ${ancCls(e.it)}">${SPR.item(e.it, 22)}<span class="r-${e.it.rarity}">${itemTitle(e.it)}</span>${e.inh ? '<i class="inhm">承</i>' : ''}</span>`).join('')}</div>
+    <div class="sheet-act"><button class="btn" data-act="bestgo" data-arg="1">传承并换上</button><button class="btn ghost" data-act="bestgo" data-arg="0">${plain ? `只换不用传承的 ${plain} 件` : '先不换'}</button></div>`;
+}
 const wlockOf = it => (WLOCK.id === it.id ? WLOCK.s : new Set());
 function deltaOf(it, cls) {
   if (!canEquip(it, cls)) return '<span class="delta no">不可用</span>';
@@ -161,7 +174,9 @@ function deltaOf(it, cls) {
 }
 function lootChips(items) {
   if (!items || !items.length) return '';
-  return `<div class="loot">${items.map(it => `<button class="lchip ${ancCls(it)}" data-act="item" data-arg="${it.id}">${SPR.item(it, 24)}<span class="r-${it.rarity}">${itemTitle(it)}</span></button>`).join('')}</div>`;
+  const cls = ctxCls(), cur = power(charStats(cls));
+  const up = it => SAVE.stash.includes(it) && canEquip(it, cls) && powerBest(cls, it).p > cur;   // 传承后更强的也标出来
+  return `<div class="loot">${items.map(it => { const u = up(it); return `<button class="lchip ${ancCls(it)} ${u ? 'isup' : ''}" data-act="item" data-arg="${it.id}">${SPR.item(it, 24)}<span class="r-${it.rarity}">${itemTitle(it)}</span>${u ? '<em class="upm">↑</em>' : ''}</button>`; }).join('')}</div>`;
 }
 const zyChips = zy => zy && zy.length ? `<div class="loot">${zy.map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n);
   return `<span class="lchip zy">${d ? SPR.img(d.spr, 24, d.pal) : ''}<span>精魄·${n}<b>${ZY_CN[g]}</b>${old ? '<small>升品</small>' : '<small>新收服</small>'}</span></span>`; }).join('')}</div>` : '';
@@ -169,14 +184,17 @@ const gemChips = keys => keys && keys.length ? `<div class="loot">${keys.map(k =
 // 每件储物箱装备换上后的战力变化（一次算好，渲染时复用）
 function deltaMap(cls) {
   const cur = power(charStats(cls)), m = new Map();
-  for (const it of SAVE.stash) m.set(it.id, canEquip(it, cls) ? powerWith(cls, it) - cur : null);
+  m.inh = new Set();   // 要传承才到得了这个数的（身上那件强化过、镶了玉）
+  for (const it of SAVE.stash) { if (!canEquip(it, cls)) { m.set(it.id, null); continue; } const b = powerBest(cls, it); m.set(it.id, b.p - cur); if (b.inh) m.inh.add(it.id); }
   return m;
 }
-const deltaTag = d => d == null ? '<span class="delta no">不可用</span>' : d > 0 ? `<span class="delta up">+${d}</span>` : d < 0 ? `<span class="delta dn">${d}</span>` : '<span class="delta no">±0</span>';
+const deltaTag = (d, inh) => { const m = inh ? '<i class="inhm">承</i>' : ''; return d == null ? '<span class="delta no">不可用</span>' : d > 0 ? `<span class="delta up">${m}+${d}</span>` : d < 0 ? `<span class="delta dn">${m}${d}</span>` : `<span class="delta no">${m}±0</span>`; };
+const cuTxt = m => String(Math.round(m * 10) / 10);
+const inFightNow = () => VIEW === 'battle' && !!B && !B.over;
 function itemRow(it, D) {
-  const d = D.get(it.id);
+  const d = D.get(it.id), inh = D.inh && D.inh.has(it.id), qi = inh && d > 0 && !inFightNow();
   return `<div class="irow2 ${ancCls(it)} ${d > 0 ? 'isup' : ''}"><button class="ir-main" data-act="item" data-arg="${it.id}">${SPR.item(it, 30)}<span class="nm r-${it.rarity}">${itemTitle(it)}<small>${SLOT_NAME[it.slot]} · ${it.ilvl} 阶 ${socketDots(it)}</small></span></button>
-    ${deltaTag(d)}${d != null ? `<button class="btn sm qeq ${d > 0 ? '' : 'ghost'}" data-act="qeq" data-arg="${it.id}">穿上</button>` : '<span class="qeq-ph"></span>'}</div>`;
+    ${deltaTag(d, inh)}${d != null ? (qi ? `<button class="btn sm qeq" data-act="inheq" data-arg="${it.id}">传承穿上</button>` : `<button class="btn sm qeq ${d > 0 && !inh ? '' : 'ghost'}" data-act="qeq" data-arg="${it.id}">穿上</button>`) : '<span class="qeq-ph"></span>'}</div>`;
 }
 // 装备面板：上面是身上 7 个位置，点一个位置，下面只列这个位置能换的装备
 function gearPanel(cls, inRun) {
@@ -253,7 +271,7 @@ const riftHelpModal = () => `<h2 class="mh">幻境换了打法</h2>
   <p class="help-p">不再是点格子了。现在是四层大地图，妖物成群结队，看得见、绕得开。</p>
   <p class="help-p"><b>拉怪合战</b>：撞上一群妖物，旁边三格内的会一起卷进来，一场最多四群。群攻的招式在这里最值钱。</p>
   <p class="help-p"><b>进度</b>：斩妖攒进度，精英给得多，倒下后还会掉一颗精魄，要走过去捡。进度满了，守关妖王就在你身边现身。</p>
-  <p class="help-p"><b>换层</b>：每层最多攒四成进度，攒够了就去远处的传送阵换下一层，不用清完；一局一般走三层，最后一层不封顶。每层还有一座塔，踩上去有三场战斗的加成。</p>
+  <p class="help-p"><b>换层</b>：每层进度不封顶，想在这一层打到底、还是去远处的传送阵换下一层，你自己定。越往下越肥：妖物高一级，每只给的进度更多（第二层 +15%，第三层 +30%，第四层 +50%），精英也多一只。每层还有一座塔，踩上去有三场战斗的加成。</p>
   <p class="help-p"><b>一炷香</b>：十二分钟。在地图上按真实时间烧；战斗里按回合折算，一轮算三秒，开几倍速、跳不跳过战斗都一样。</p>
   <p class="help-p">掉的装备都记在这一局里，打完一起看；中途不会停下来结算。</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`;
@@ -411,13 +429,14 @@ function goTab() {
       <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>`;
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
-    const rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id));
+    const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id));
     body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
-        <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftD(SAVE.riftLv).base} 级</small></div>
+        <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <p class="help-p" style="text-align:center">最多可以挑战 ${maxR} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
       <p class="help-p" style="text-align:center">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
-      <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
+      ${cu > 1 ? `<p class="cu-note">追赶中：${CLASSES[cls].n}比你等级最高的角色低 <b>${topLevel() - SAVE.chars[cls].level}</b> 级，战斗经验 <b>×${cuTxt(cu)}</b>（差得越多越快，追平为止）。${SAVE.riftLv <= R_EASY ? `前 ${R_EASY} 层的妖物迁就你的等级（最多高 2 级；10 级以前不比你高，来得也少），放心进。` : `前 ${R_EASY} 层的妖物会迁就你的等级。`}</p>` : ''}
+      <div class="riftinfo"><span>${CLASSES[cls].n}的纪录：<b>${rec ? riftRecTxt(rec) : '还没有'}</b></span><span>${SAVE.riftLv >= RSET2_LV ? `这一层两套<b class="r-set">幻境套装</b>都会掉` : SAVE.riftLv >= RSET_LV ? `这一层会掉<b class="r-set">幻境套装</b>（${RSET2_LV} 层起多一套）` : `${RSET_LV} 层起掉<b class="r-set">幻境套装</b>`}</span>
         <span>精魄：<b>${ZY_CN[zyGrade(SAVE.riftLv)]}</b></span><span>役使：${yi.length ? yi.map(id => `<b>${YISHI[id].n}</b>`).join('、') : '<i>没带</i>'} <button class="linkbtn" data-act="zyopen">镇妖录</button></span></div>
       <button class="ngoc-toggle ${SAVE.ngocJoin ? 'on' : ''}" data-act="ngoctog">${SPR.img('ngocfox', 36)}<span><b>带上 Ngoc</b><small>${SAVE.ngocJoin ? '她会和你一起闯幻境' : '这次你一个人去'}</small></span></button>`;
   }
@@ -463,7 +482,7 @@ function heroTab() {
       for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<li><b style="color:var(--gold2)">心法·${T.n}</b>：${T.d}</li>`; } return ''; }).join('');
     body = `${statBlock(cls)}
       <h4 class="sub-h">门派套装</h4><ul class="setlist">${SETS.filter(S => S.cls === cls && (!S.rift || featureOn('rift'))).map(S => { const n = s.setCount[S.id] || 0;
-        return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>幻境 ${RSET_LV} 层以上掉落</em>` : ''}（已穿 ${n}/${S.pieces.length}）<div class="${n >= 2 ? 'on' : 'off'}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 件：${S.b6d}</div>` : ''}</li>`; }).join('')}</ul>
+        return `<li class="${S.rift ? 'rset' : ''}"><b>${S.n}</b>${S.rift ? `<em>幻境 ${S.rlv || RSET_LV} 层以上掉落</em>` : ''}（已穿 ${n}/${S.pieces.length}）<div class="${n >= 2 ? 'on' : 'off'}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 件：${S.b6d}</div>` : ''}${setTip(S, n)}</li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">生效中的特效</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
   } else if (HTAB === 'tal') {
     body = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="sub">每升一级得 1 点 · 可用 <b style="color:var(--gold2)">${ti.free}</b> 点</span>
@@ -950,7 +969,7 @@ function showRes() {
   const autoEq = BRES.items.filter(i => i.auto);
   if (autoEq.length) { toast('空着的位置自动穿上了：' + autoEq.map(i => `<b>${esc(i.name)}</b>`).join('、')); autoEq.forEach(i => delete i.auto); }
   el.innerHTML = BRES.win
-    ? `<div class="res win"><h3>胜</h3><p>经验 +${BRES.xp}${lvText}　·　银两 +${BRES.gold}${extra ? '　·　' + extra : ''}</p>
+    ? `<div class="res win"><h3>胜</h3><p>经验 +${BRES.xp}${BRES.cu ? `<small class="cu">（追赶 ×${cuTxt(BRES.cu)}）</small>` : ''}${lvText}　·　银两 +${BRES.gold}${extra ? '　·　' + extra : ''}</p>
        ${lootChips(BRES.items)}${gemChips(BRES.gems)}${zyChips(BRES.zy)}${BRES.items.length || BRES.gems.length || (BRES.zy && BRES.zy.length) ? '' : '<p class="sub">这次没有掉装备</p>'}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>撑不住了</h3><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
@@ -1235,8 +1254,8 @@ function zoneName() { const r = SAVE.run, S = wstate(r.chapter), m = wmap(r.chap
 const TQ = []; let TQon = false;
 function qtoast(msg) { TQ.push(msg); if (!TQon) nextToast(); }
 function nextToast() { const m = TQ.shift(); if (m == null) { TQon = false; return; } TQon = true; toast(m); setTimeout(nextToast, TQ.length ? 1500 : 200); }
-const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? '守关妖王已经现身——找到它，打倒它' : rCapped(run) ? '这一层的妖气吸够了（每层最多攒四成）：去传送阵，换下一层'
-  : `撞上一群妖物，旁边的会一起卷进来。精英倒下会掉精魄，走过去捡。${R.last ? '这是最后一层，进度不封顶。' : '每层最多攒四成进度。'}`; };
+const riftHint = run => { const R = wmap(RCH).def.rift; return run.rw.boss ? '守关妖王已经现身——找到它，打倒它'
+  : `撞上一群妖物，旁边的会一起卷进来。精英倒下会掉精魄，走过去捡。${R.last ? '这是最后一层，妖物最肥。' : R.fi ? `这一层每只妖物的进度 +${Math.round((R_DEEP[R.fi] - 1) * 100)}%，越往下越肥。` : '越往下越肥：下一层每只妖物给的进度更多。'}`; };
 // 幻境的地图界面：没有任务栏，换成进度条和香
 function riftWorldHTML() {
   const run = SAVE.run, B = run.rbuff;   // 地图顶上只留层名：同伴的名字放这儿会和层名挤在一起
@@ -2585,8 +2604,12 @@ function itemModal(id, shopIdx) {
     if (tab === 'info') {
       if (!isMine && where !== 'eq') {
         if (canEquip(it, cls)) {
-          const d = powerWith(cls, it) - power(charStats(cls));
-          h += `<div class="pdelta2"><span>${cur ? `和身上的 <b class="r-${cur.rarity}">${itemTitle(cur)}</b> 比` : `${SLOT_NAME[it.slot]}现在空着`}</span><b class="${d >= 0 ? 'up' : 'dn'}">战力 ${d >= 0 ? '+' : ''}${d}</b></div>${diffChips(it, cur)}`;
+          const base = power(charStats(cls)), pb = powerBest(cls, it), d = pb.raw - base, sg = n => (n >= 0 ? '+' : '') + n;
+          if (pb.inh && where === 'stash') { const di = pb.p - base, c = inheritCost(it, cur);
+            h += `<div class="pdelta2"><span>和身上的 <b class="r-${cur.rarity}">${itemTitle(cur)}</b> 比</span></div>
+              <div class="pdelta3"><span>直接换上</span><b class="${d >= 0 ? 'up' : 'dn'}">战力 ${sg(d)}</b></div>
+              <div class="pdelta3 hl"><span>传承后再换<small>把身上那件的强化${cur.gems && cur.gems.length ? '和玉' : ''}搬过来，强化降一级 · ${c.gold} 两 ${c.mats} 魂晶</small></span><b class="${di >= 0 ? 'up' : 'dn'}">战力 ${sg(di)}</b></div>${diffChips(it, cur)}`;
+          } else h += `<div class="pdelta2"><span>${cur ? `和身上的 <b class="r-${cur.rarity}">${itemTitle(cur)}</b> 比` : `${SLOT_NAME[it.slot]}现在空着`}</span><b class="${d >= 0 ? 'up' : 'dn'}">战力 ${sg(d)}</b></div>${diffChips(it, cur)}`;
         } else h += `<p class="pdelta warn">${CLASSES[cls].n}用不了这件门派套装</p>`;
       }
       h += itemCard(it, cls, isMine ? '当前装备' : where === 'eq' ? '别的角色正在用' : '');
@@ -2599,7 +2622,9 @@ function itemModal(id, shopIdx) {
     } else h += smithHTML(it, where);
     const acts = [];
     if (where === 'stash') {
-      if (canEquip(it, cls)) acts.push(`<button class="btn" data-act="equip" data-arg="${it.id}">穿上</button>`);
+      const pbx = canEquip(it, cls) && !inFight ? powerBest(cls, it) : null;
+      if (pbx && pbx.inh) acts.push(`<button class="btn" data-act="inheq" data-arg="${it.id}">传承并换上</button>`);
+      if (canEquip(it, cls)) acts.push(`<button class="btn ${pbx && pbx.inh ? 'ghost' : ''}" data-act="equip" data-arg="${it.id}">${pbx && pbx.inh ? '只换上' : '穿上'}</button>`);
       if (!inFight) acts.push(`<button class="btn ghost" data-act="sell" data-arg="${it.id}">卖 ${sellPrice(it)} 两</button>`, `<button class="btn ghost" data-act="salv" data-arg="${it.id}">分解 ${salvageValue(it)} 魂晶</button>`, `<button class="btn ghost" data-act="lock" data-arg="${it.id}">${it.lk ? '解锁' : '锁定'}</button>`);
     }
     if (isMine) acts.push(`<button class="btn ghost" data-act="unequip" data-arg="${it.slot}">卸下</button>`);
@@ -2774,7 +2799,18 @@ const ACT = {
   unequip: sl => { unequip(ctxCls(), sl); closeModal(); refresh(); },
   sell: id => { const g = sellItem(id); SFX.play('coin'); toast(`卖了 ${g} 两`); closeModal(); refresh(); },
   salv: id => { const m = salvage(id); SFX.play('forge'); toast(`分解得到 ${m} 颗魂晶`); closeModal(); refresh(); },
-  best: () => { bestGear.left = []; const n = bestGear(ctxCls()), left = bestGear.left.filter(x => SAVE.stash.includes(x)); toast(n ? `换上了 ${n} 件更强的装备${left.length ? `。换下来的「${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}」${left.length > 1 ? `等 ${left.length} 件` : ''}上有强化或玉，可以在铸剑坊「传承」到新装备上` : ''}` : '已经是最强搭配了'); refresh(); achToast(checkAch()); },
+  best: () => { const cls = ctxCls(), plan = bestPlan(cls), ni = plan.filter(e => e.inh);
+    if (!plan.length) return toast('已经是最强搭配了');
+    if (ni.length && !inFightNow()) return openModal(() => bestModal(cls, plan));
+    ACT.bestgo('0'); },
+  bestgo: a => { const cls = ctxCls(); bestGear.left = []; const r = bestApply(cls, a === '1'), left = (bestGear.left || []).filter(x => SAVE.stash.includes(x));
+    closeModal(); if (r.n) SFX.play(r.inh ? 'forge' : 'loot');
+    toast(r.n ? `换上了 ${r.n} 件更强的装备${r.inh ? `，其中 ${r.inh} 件做了传承` : ''}${r.skip ? `；${r.skip} 件银两或魂晶不够传承，没动` : ''}${left.length ? `。换下来的「${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}」${left.length > 1 ? `等 ${left.length} 件` : ''}上有强化或玉，可以找张大锤「传承」到新装备上` : ''}` : (r.skip ? '银两或魂晶不够传承' : '不传承的话，身上已经是最强搭配'));
+    refresh(); achToast(checkAch()); },
+  inheq: id => { const cls = ctxCls(), f = findItem(id); if (!f || f.where !== 'stash' || inFightNow()) return;
+    const cur = SAVE.chars[cls].eq[f.it.slot], base = power(charStats(cls));
+    const r = inheritFrom(f.it, cur); if (r.err) return toast(r.err);
+    if (equipItem(cls, id)) { const d = power(charStats(cls)) - base; SFX.play('forge'); closeModal(); toast(`传承并穿上了 <b>${esc(f.it.name)}</b>：现在 +${r.plus}${r.gems ? `，带过来 ${r.gems} 颗玉` : ''}，战力 ${d >= 0 ? '+' : ''}${d}`); refresh(); achToast(checkAch()); } },
   junk: () => { const r = sellJunk(); if (r.n) SFX.play('coin'); toast(r.n ? `卖掉 ${r.n} 件，得到 ${r.g} 两` : '没有可以卖的凡品和灵品（强化过或镶了玉的不会卖）'); refresh(); },
   salvjunk: () => { const r = salvageJunk(); if (r.n) SFX.play('forge'); toast(r.n ? `分解 ${r.n} 件，得到 ${r.m} 颗魂晶` : '没有可以分解的凡品和灵品'); refresh(); },
   filter: f => { FILTER = f; refresh(); },

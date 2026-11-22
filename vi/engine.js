@@ -299,11 +299,11 @@ function rollRarity(quality, mf, diffLoot) {
     w.rare *= m * m2; w.set *= (1 + (mf || 0) / 300) * m2; w.legend *= (1 + (mf || 0) / 300) * m2;
     return RNG.w(w);
   }
-  const w = { normal: 40, magic: 36, rare: 18, set: 2.5, legend: 0.12 };
+  const w = { normal: 40, magic: 36, rare: 18, set: 2.5, legend: 0.5 };   // 神兵原来是 0.12，幻境里一局难得见一件
   if (quality === 'elite') { w.normal = 6; w.magic = 40; w.rare *= 2.2; w.set *= 3; w.legend *= 3; }
   if (quality === 'boss')  { w.normal = 0; w.magic = 18; w.rare *= 3; w.set *= 6; w.legend *= 6; }
-  if (quality === 'gamble'){ w.normal = 0; w.magic = 50; w.rare = 36; w.set = 7; w.legend = 0.8; }
-  if (quality === 'cache') { w.normal = 0; w.magic = 0; w.rare = 60; w.set = 20; w.legend = 3; }
+  if (quality === 'gamble'){ w.normal = 0; w.magic = 50; w.rare = 36; w.set = 7; w.legend = 2.5; }
+  if (quality === 'cache') { w.normal = 0; w.magic = 0; w.rare = 60; w.set = 20; w.legend = 5; }
   const m2 = (1 + (mf || 0) / 180) * Math.pow(1.3, diffLoot || 0);
   w.rare *= 1 + (mf || 0) / 100; w.set *= m2; w.legend *= m2;
   return RNG.w(w);
@@ -314,12 +314,13 @@ function rollSockets(slot, rarity) {
   return n;
 }
 const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
+const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%：神兵掉得多了，这两档收一收才显得珍贵）
 const primalOK = () => SAVE && (SAVE.unlocked.hell || SAVE.riftMax >= 10);
 function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
   it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
   if (it.rarity === 'legend' || it.rarity === 'set') {
-    it.anc = primalOK() && RNG.ch(0.006) ? 2 : RNG.ch(0.1) ? 1 : 0;
+    it.anc = primalOK() && RNG.ch(ANC_P[1]) ? 2 : RNG.ch(ANC_P[0]) ? 1 : 0;
     if (it.anc === 2) it.aff = it.aff.map(([k]) => [k, affixValue(AFFIXES.find(a => a.k === k), it.ilvl, affMult(it), true)]);
   }
   return it;
@@ -548,10 +549,64 @@ function power(s) {
 }
 const RSET_FX = new Set(SETS.filter(S => S.rift).flatMap(S => [S.b4, S.b6]));
 function powerWith(cls, item) { const ch = SAVE.chars[cls]; return power(calcStats(cls, { ...ch.eq, [item.slot]: item }, ch.level, null, ch)); }
+// 传承后的样子（不动原件）：把 src 的强化（降一级）、孔和玉搬到 dst 上。新捡的 +0 装备要这样才能和身上强化过的比
+function inheritSim(dst, src) {
+  if (typeof canInherit !== 'function' || !canInherit(dst, src)) return dst;
+  const c = { ...dst, gems: [...(dst.gems || [])] };
+  c.plus = Math.min(ENHANCE_MAX, Math.max(dst.plus || 0, Math.max(0, (src.plus || 0) - 1)));
+  c.sockets = Math.max(dst.sockets || 0, Math.min(MAX_SOCKETS[dst.slot], src.sockets || 0));
+  for (const g of src.gems || []) if (c.gems.length < c.sockets) c.gems.push(g);
+  return c;
+}
+// 换上这件能到的战力：直接换、传承后换，取高的。inh：要传承才到得了这个数
+function powerBest(cls, item) {
+  const raw = powerWith(cls, item), sim = inheritSim(item, SAVE.chars[cls].eq[item.slot]);
+  if (sim === item) return { p: raw, raw, inh: false };
+  const pi = powerWith(cls, sim);
+  return pi > raw ? { p: pi, raw, inh: true } : { p: raw, raw, inh: false };
+}
+// 「一键换上最强」的打算：每个位置挑传承后最强的那件。不动存档，只出清单
+function bestPlan(cls) {
+  const ch = SAVE.chars[cls], eq = { ...ch.eq }, plan = {};
+  const P = e => power(calcStats(cls, e, ch.level, null, ch));
+  for (let pass = 0; pass < 2; pass++) for (const sl of SLOT_IDS) {
+    let bestP = P(eq), best = null;
+    for (const it of SAVE.stash) {
+      if (it.slot !== sl || !canEquip(it, cls)) continue;
+      const sim = inheritSim(it, ch.eq[sl]), pr = P({ ...eq, [sl]: it }), ps = sim === it ? pr : P({ ...eq, [sl]: sim });
+      const inh = ps > pr, p = Math.max(pr, ps);
+      if (p > bestP) { bestP = p; best = { it, sl, inh, sim: inh ? sim : it, cost: inh ? inheritCost(it, ch.eq[sl]) : null }; }
+    }
+    if (best) { eq[sl] = best.sim; plan[sl] = best; }
+  }
+  return Object.values(plan);
+}
+// 照清单办：useInh 为假就只换不用传承也更强的；银两魂晶不够的那件，不传承也更强就照换，否则跳过
+function bestApply(cls, useInh) {
+  if (!useInh) return { n: bestGear(cls), inh: 0, skip: 0 };
+  const ch = SAVE.chars[cls]; let n = 0, ni = 0, skip = 0;
+  for (const e of bestPlan(cls)) {
+    if (!SAVE.stash.includes(e.it)) continue;
+    if (e.inh) { const r = inheritFrom(e.it, ch.eq[e.sl]); if (r.err) { if (powerWith(cls, e.it) <= power(calcStats(cls, ch.eq, ch.level, null, ch))) { skip++; continue; } } else ni++; }
+    if (equipItem(cls, e.it.id)) n++;
+  }
+  return { n, inh: ni, skip };
+}
 
 // ---------------- 等级 ----------------
 const MAX_LV = MAX_LEVEL;
 const xpNeed = L => Math.round(40 * Math.pow(L, 1.75));
+// 通关后的小号追赶：比账号里等级最高的角色低多少级，战斗经验就翻多少倍（差得越多追得越快），追平了就没有。
+// 最高的还没满级时，差 1 级不算——免得两个号互相垫着爬
+function catchUpMul(cls) {
+  if (!SAVE.story || !SAVE.story.ended) return 1;
+  const top = topLevel(), gap = top - SAVE.chars[cls].level;
+  return gap > 0 && (top >= MAX_LV || gap >= 2) ? 3 + gap * 0.25 : 1;
+}
+// 幻境前 10 层照顾小号：妖物最多比你高 2 级（大号等级够，不受影响）；10 级以前再让一步——妖物不比你高，一群只来一只
+const R_EASY = 10;
+const riftNewbie = run => !!run && run.riftLv <= R_EASY && SAVE.chars[run.cls].level < 10;
+const riftLvCap = (run, lv) => run && run.riftLv <= R_EASY ? Math.max(1, Math.min(lv, SAVE.chars[run.cls].level + (riftNewbie(run) ? 0 : 2))) : lv;
 function gainXp(cls, x) {
   const ch = SAVE.chars[cls]; let ups = 0, pups = 0;
   if (ch.level < MAX_LV) {
@@ -681,7 +736,7 @@ function bulkPick(cls, f) {
     if (f.keepAnc && it.anc) return false;
     if (f.keepCube && it.legend && !SAVE.cube[it.legend]) return false;
     if (f.keepQ && it.aff.length && itemQ(it) >= 0.8) return false;
-    if (f.keepUp && canEquip(it, cls) && powerWith(cls, it) > cur) return false;
+    if (f.keepUp && canEquip(it, cls) && powerBest(cls, it).p > cur) return false;   // 传承后更强的也算：新捡的没强化，直接比会输给身上强化过的
     return true;
   });
 }
@@ -1390,6 +1445,10 @@ function heal(u, amt, out, quiet) {
   if (u.hp <= 0) return 0;
   const a = Math.min(u.maxHp - u.hp, Math.round(amt));
   if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); }
+  if (u.kind === 'hero' && u.fx && u.fx.has('daRi4')) {   // 大日如来：溢出的治疗攒成护体
+    const over = Math.round(amt) - Math.max(0, a), cap = Math.round(u.maxHp * DARI_CAP);
+    if (over >= 1 && (u.shield || 0) < cap) { u.shield = Math.min(cap, (u.shield || 0) + over); if (!quiet) out.pops.push([u.id, "Hộ Thể", 'buff']); }
+  }
   return Math.max(0, a);
 }
 function freezeU(u, out, label) {
@@ -1399,8 +1458,14 @@ function freezeU(u, out, label) {
 }
 function applyPoison(src, tgt, pct, bonus) {
   const m = src.fx && src.fx.has('plague') ? 2.5 : 1;
-  tgt.st.poison = { d: src.atk * pct / 100 * m * (1 + (bonus || 0) / 100), t: 3 };
+  const d = src.atk * pct / 100 * m * (1 + (bonus || 0) / 100), old = tgt.st.poison;
+  const own = src.kind === 'minion' ? null : src;   // 五毒独行：毒可以叠，最多叠到单次的 DUXING_STACK 倍
+  tgt.st.poison = { d: own && own.fx && own.fx.has('duXing6') && old ? Math.min(d * DUXING_STACK, old.d + d) : d, t: 3 };
 }
+// 第二套幻境套装的数（调平衡只动这里）
+let BUSI_HP = 0.03, BUSI_AOE = 5, WANFU_ST = 0.2, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.6, DUXING_DR = 0.13, DUXING_STACK = 5, DUXING_BURST = 2, QIANJI_MUL = 3, DARI_CAP = 0.5, DARI_DMG = 1, DARI_HIT = 2, DARI_REGEN = 0.12;
+const emptySlots = (b, P) => Math.max(0, Math.min(4, (P.minionCap || 3)) - zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length);
+const DART_SK = new Set(['venom', 'bingpo', 'fan']), BUSI_SK = new Set(['whirl', 'liedi']);
 // ---------------- 赶尸人的僵尸 ----------------
 const ZOMBIES = {
   tiaoshi: { n: "Khiêu Thi",   lv: 1,  spr: 'jiangshi', pal: null, hp: 0.34, atk: 0.8, spd: 112, arm: 1, ae: 'phys', d: "Hàng trước · đánh nhanh, vồ cắn" },
@@ -1489,6 +1554,7 @@ function act(b, u, out) {
   }
   if (u.regen) heal(u, u.regen, out, true);
   if (u.kind === 'hero' && u.cls === 'paladin' && u.hp > 0) heal(u, u.maxHp * sustV(u, 'b') / 100, out, true);
+  if (u.kind === 'hero' && u.hp > 0 && u.fx && u.fx.has('daRi4')) u.shield = Math.min(Math.round(u.maxHp * DARI_CAP), Math.max(u.shield || 0, 0) + Math.round(u.maxHp * DARI_REGEN));
   if (u.st.renew) { heal(u, u.maxHp * 0.06, out); if (--u.st.renew <= 0) delete u.st.renew; }
   if (u.kind === 'hero') return heroAct(b, u, out);
   if (u.kind === 'ally') return ngocAct(b, u, out);
@@ -1570,10 +1636,12 @@ function ultimate(b, P, foes, out) {
 }
 function skillReady(b, P, sk, foes) {
   switch (sk.id) {
-    case 'whirl': case 'fan': return foes.length >= 2;
+    case 'whirl': return foes.length >= 2 || P.fx.has('buSi4');
+    case 'fan': return foes.length >= 2 || P.fx.has('qianJi4');
     case 'warcry': return !P.st.warcry;
     case 'summon': return zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length < P.minionCap;
-    case 'jihuo': case 'bonestorm': return zombiesOf(b).length > 0;
+    case 'jihuo': return zombiesOf(b).length > 0;
+    case 'bonestorm': return zombiesOf(b).length > 0 || P.fx.has('duXing4');
     case 'yangshi': return zombiesOf(b).some(z => z.hp < z.maxHp * 0.8 || !z.st.yang);
     case 'bawang': return P.fury >= 40;
     case 'deathmark': case 'shadowkill': return P.ki >= Math.min(3, P.kiMax);
@@ -1601,6 +1669,9 @@ function skillCd(P, sk) {
   if (sk.id === 'bloodlust' && fx.has('bloodPlus')) cd -= 2;
   if (sk.id === 'lunzhuan' && fx.has('detPlus')) cd -= 1;
   if (sk.id === 'shadowstep' && fx.has('shadow3')) cd -= 2;
+  if (BUSI_SK.has(sk.id) && fx.has('buSi4')) cd--;
+  if (sk.id === 'lunzhuan' && fx.has('wanFu6')) cd--;
+  if (DART_SK.has(sk.id) && fx.has('qianJi4')) cd--;
   if (fx.has('cdr')) cd--;
   return Math.max(1, cd);
 }
@@ -1628,6 +1699,7 @@ function heroAct(b, P, out) {
     const lian0 = P.lian;
     P.lian = P.lastWx && WX_SHENG[P.lastWx] === sk.wx ? Math.min(cap, P.lian + 1) : P.fx.has('guiYuan4') ? Math.max(0, P.lian - 2) : 0; P.lastWx = sk.wx;
     if (P.cls === 'mage' && (P.lian > lian0 || (P.lian === cap && lian0 === cap))) { const capS = Math.round(P.maxHp * SUST.mage.cap / 100), add = Math.round(P.maxHp * sustV(P, 'a') / 100); if ((P.shield || 0) < capS) { P.shield = Math.min(capS, (P.shield || 0) + add); out.pops.push(['P', "Hộ Thể", 'buff']); } }
+    if (P.fx.has('wanFu4') && sk.ap && !(P.lian > lian0)) { const capS = Math.round(P.maxHp * SUST.mage.cap / 100), add = Math.round(P.maxHp * sustV(P, 'a') / 100); if ((P.shield || 0) < capS) { P.shield = Math.min(capS, (P.shield || 0) + add); out.pops.push(['P', "Hộ Thể", 'buff']); } }
     if (P.fx.has('guiYuan6') && P.lian >= 5) { b.guiYuan = true; out.pops.push(['P', "Quy Nguyên", 'crit']); }
     if (P.lian) out.pops.push(['P', `Liên ${P.lian}`, 'buff']);
     if (P.fx.has('tianshi') && P.lian >= cap) { b.castCrit = true; b.lianReset = true; } }
@@ -1644,6 +1716,10 @@ function heroAct(b, P, out) {
     if (sk.fin && P.fx.has('qiSha6') && aliveOf(b, 'e').length < nFoe0) { sk.left = 0; out.pops.push(['P', "Thất Sát", 'crit']); }
   }
   if (sk.fin && P.fx.has('qiSha4')) P.ki = Math.min(P.kiMax, P.ki + 2);
+  if (sk.cd && P.fx.has('daRi6') && P.shield > 0 && P.hp > 0) {   // 大日如来：出招后护体真气震荡，打所有敌人（护体不消耗）
+    const al = aliveOf(b, 'e');
+    if (al.length) { out.pops.push(['P', "Đại Nhật", 'crit']); al.forEach(f => hit(b, P, f, DARI_HIT, 'holy', out, { proc: 1, aoe: 1 })); }
+  }
   if (P.yi.langwang && RNG.ch((18 + P.yi.langwang * 5) / 100)) { const t2 = aliveOf(b, 'e')[0];
     if (t2) { out.pops.push([t2.id, "Bóng sói", 'crit']); hit(b, P, t2, 0.6 + P.yi.langwang * 0.2, 'phys', out, { proc: 1 }); } }
 }
@@ -1651,6 +1727,27 @@ function heroAct(b, P, out) {
 function autoPick(b, P, foes) {
   const ready = P.skills.filter(k => k.cd && k.left <= 0 && skillReady(b, P, k, foes)), basic = P.skills.find(k => !k.cd);
   const has = s => foes.some(f => stHas(f, s)), pick = id => ready.find(k => k.id === id);
+  const FX = P.fx;
+  if (P.cls === 'necro' && FX.has('duXing4')) {   // 五毒独行：不召尸。先让人人带毒，叠着毒等尸毒蔓、土遁葬来结算
+    const r2 = ready.filter(k => !['summon', 'jihuo', 'yangshi', 'corpse'].includes(k.id)), p2 = id => r2.find(k => k.id === id);
+    const allPois = foes.every(f => f.st.poison);
+    if (!allPois && p2('shidu')) return p2('shidu');
+    if (FX.has('duXing6') && foes.some(f => f.st.poison)) { const x = p2('tudun') || p2('shidu'); if (x) return x; }
+    if (foes.length >= 3 && p2('curse')) return p2('curse');
+    if (FX.has('duXing6')) return (foes.length >= 3 ? p2('bonestorm') : null) || basic;   // 招式都在冷却：用镇魂钉接着叠毒
+    return p2('tudun') || p2('bonestorm') || p2('shidu') || p2('curse') || basic;
+  }
+  if (P.cls === 'mage' && FX.has('wanFu4')) {   // 万符归宗：不管相生。先把状态挂齐（蔓延到全场），再引爆
+    const n = Math.max(...foes.map(f => stHas(f, 'any'))), det = pick('lunzhuan');
+    if (det && n >= (FX.has('wanFu6') ? 2 : 3)) return det;
+    const ap = ready.filter(k => k.ap && !foes.every(f => stHas(f, k.ap))).sort((x, y) => (y.k === 'aoe' || y.id === 'frostnova' ? 1 : 0) - (x.k === 'aoe' || x.id === 'frostnova' ? 1 : 0))[0];
+    if (ap) return ap;
+    if (det && n >= 1) return det;
+    const py = ready.find(k => k.pay && k.id !== 'lunzhuan' && has(k.pay.s)); if (py) return py;
+    return ready.find(k => k.id !== 'lunzhuan') || basic;
+  }
+  if (P.cls === 'berserker' && FX.has('buSi4') && !(P.fury >= 80 && pick('bawang') && foes.length < 2)) { const x = (foes.some(f => f.st.melt) ? pick('whirl') : null) || pick('liedi') || pick('whirl'); if (x) return x; }
+  if (P.cls === 'assassin' && FX.has('qianJi4')) { const pz = foes.some(f => f.st.poison); const x = (!foes.every(f => f.st.poison) ? pick('venom') : null) || (pz ? pick('fan') || pick('bingpo') : null); if (x && !(P.ki >= P.kiMax && ready.some(k => k.fin))) return x; }
   if (P.cls === 'necro' && pick('summon') && zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length < Math.min(2, P.minionCap)) return pick('summon');
   if (P.cls === 'paladin' && P.hp / P.maxHp < 0.5 && (pick('prayer') || pick('aegis'))) return pick('prayer') || pick('aegis');
   if (P.cls === 'berserker' && P.fury >= 80 && pick('bawang')) return pick('bawang');
@@ -1682,10 +1779,12 @@ function castInner(b, P, sk, foes, out) {
   const all = (mult, elem, after) => foes.forEach(f => { const d = hit(b, P, f, mult, elem, out, { aoe: 1 }); if (after) after(f, d); });
   switch (sk.id) {
     case 'slash': hit(b, P, t, m, 'phys', out); break;
-    case 'missile': case 'bonespear': case 'holy': hit(b, P, t, m * (sk.id === 'bonespear' ? 0.6 : sk.id === 'missile' ? 1.1 : 1.15), elemOf, out); if (sk.id === 'bonespear' && t.hp > 0) { b.focus = t.id; out.pops.push([t.id, "Trấn hồn", 'curse']); } break;
+    case 'missile': case 'bonespear': case 'holy': hit(b, P, t, m * (sk.id === 'bonespear' ? 0.6 : sk.id === 'missile' ? 1.1 : 1.15), elemOf, out); if (sk.id === 'bonespear' && t.hp > 0) { b.focus = t.id; out.pops.push([t.id, "Trấn hồn", 'curse']);
+      if (P.fx.has('duXing4')) { applyPoison(P, t, 35, P.poisonPct || 0); out.pops.push([t.id, "Trúng độc", 'poison', 1]); } } break;
     case 'whirl': {
       for (let r = 0; r < (P.fx.has('whirl2') ? 2 : 1); r++) {
         let n = 0; aliveOf(b, 'e').forEach(f => { if (hit(b, P, f, 0.7 * m * (R === 'b' ? 1.5 : 1), 'phys', out, { aoe: 1 })) n++; });
+        if (P.fx.has('buSi4') && n) heal(P, P.maxHp * 0.03 * n, out);
         if (P.fx.has('rampage')) heal(P, P.maxHp * 0.05, out);
         if ((R === 'a' || P.fx.has('whirl2')) && n) heal(P, P.maxHp * 0.02 * n, out);
       }
@@ -1725,15 +1824,16 @@ function castInner(b, P, sk, foes, out) {
     case 'wulei': { const all5 = P.lian >= 5; (all5 ? foes : [t]).forEach(f => hit(b, P, f, 1.9 * m, 'light', out, { aoe: all5 ? 1 : 0 })); out.cast.aoe = all5; break; }
     case 'twin': { hit(b, P, t, 0.6 * m, 'phys', out); const t2 = aliveOf(b, 'e')[0]; if (t2) hit(b, P, t2, 0.6 * m, 'phys', out); break; }
     case 'venom': {
-      const pois = f => { if (f.hp > 0) { applyPoison(P, f, 40 * (R === 'a' ? 2 : 1), P.sk.venom); out.pops.push([f.id, "Trúng độc", 'poison', 1]); } };
+      const pois = f => { if (f.hp > 0) { applyPoison(P, f, 40 * (R === 'a' ? 2 : 1), Math.max(P.sk.venom || 0, P.poisonPct || 0)); out.pops.push([f.id, "Trúng độc", 'poison', 1]); } };
       if (R === 'b') all(0.72 * m, 'phys', (f, d) => { if (d) pois(f); });
-      else { const d = hit(b, P, t, 1.2 * m, 'phys', out); if (d) pois(t); }
+      else { const d = hit(b, P, t, 1.2 * m, 'phys', out); if (d) pois(t); if (d && P.fx.has('qianJi4')) aliveOf(b, 'e').filter(f => f !== t).forEach(pois); }
       break;
     }
     case 'shadowstep': P.st.shadow = R === 'b' ? 6 : 4; P.st.shadowCrit = P.fx.has('shadow3') ? 3 : 1; out.pops.push(['P', "Ảnh bộ", 'buff']); if (R === 'a') hit(b, P, t, 1.5 * m, 'phys', out); break;
     case 'fan':
       if (R === 'b') foes.forEach(f => { hit(b, P, f, 0.5 * m, 'phys', out, { aoe: 1 }); hit(b, P, f, 0.5 * m, 'phys', out, { aoe: 1 }); });
       else all(0.6 * m * (R === 'a' ? 1.4 : 1), 'phys');
+      if (P.fx.has('qianJi6')) { P.ki = Math.min(P.kiMax, P.ki + foes.length); out.pops.push(['P', "Sát ý " + P.ki, 'buff']); }
       if (P.fx.has('fanBurn')) aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out));
       break;
     case 'deathmark': { hit(b, P, t, 2.5 * m * (1 + P.ki * (0.25 + (P.kiPct || 0) / 100)), 'phys', out); P.ki = 0; if (t.hp > 0) { t.st.mark = 4; if (R === 'b') t.st.markB = true; out.pops.push([t.id, "Đánh dấu", 'curse']); } break; }
@@ -1767,7 +1867,9 @@ function castGen(b, P, sk, foes, out, m) {
   if (sk.id === 'ganlu' && FX.has('ganlu2')) { heal(P, P.maxHp * 0.12 * (1 + (P.healPct || 0) / 100), out); delete P.st.poison; delete P.st.frozen; out.pops.push(['P', "Thanh tẩy", 'buff']); }
   switch (sk.k) {
     case 'single': if (hit(b, P, t, sk.m * m, el, out)) stun(t); break;
-    case 'aoe': foes.forEach(f => { if (hit(b, P, f, sk.m * m, el, out, { aoe: 1 })) stun(f); });
+    case 'aoe': { let nh = 0; foes.forEach(f => { if (hit(b, P, f, sk.m * m, el, out, { aoe: 1 })) { nh++; stun(f); } });
+      if (sk.id === 'liedi' && FX.has('buSi4') && nh) heal(P, P.maxHp * 0.03 * nh, out);
+      if ((sk.id === 'shidu' || sk.id === 'tudun') && FX.has('duXing6')) foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(ps.d * ps.t * DUXING_BURST), proc: 1, aoe: 1, raw: 1 }); } }); }
       if (sk.heal === 'minion') aliveOf(b, 'p').filter(u => u.kind === 'minion').forEach(u => heal(u, u.maxHp * 0.3, out));
       if (sk.shield) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * sk.shield * (FX.has('budong2') ? 2 : 1))); out.pops.push(['P', "Hộ Thể", 'buff']); }
       break;
@@ -1918,6 +2020,12 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (fx.has('xueHai6') && src.fury) d *= 1 + src.fury * 0.015;
     if (fx.has('qiSha6') && src === b.P && b.castSk && b.castSk.fin) d *= 4;
     if (fx.has('luoHan6') && src.fonu) d *= 1 + src.fonu * 0.3;
+    if (src === b.P && !opt.raw) {
+      if (fx.has('buSi6')) d *= (1 + BUSI_HP * 100 * (1 - Math.max(0, src.hp) / src.maxHp)) * (b.castSk && BUSI_SK.has(b.castSk.id) && !opt.proc ? BUSI_AOE : 1);
+      if (fx.has('wanFu4') && tgt.side === 'e') d *= 1 + WANFU_ST * stHas(tgt, 'any');
+      if (fx.has('duXing4')) d *= 1 + DUXING_DMG * emptySlots(b, src);
+      if (fx.has('daRi6') && src.shield > 0) d *= 1 + DARI_DMG;
+    }
   }
   if (src === b.P && b.guiYuan && !opt.proc) d *= 3;
   if (src.side === 'p' && b.P && b.P.yi && b.P.yi.xuanbing && (tgt.st.frozen || tgt.st.slow)) d *= 1 + (12 + b.P.yi.xuanbing * 6) / 100;
@@ -1932,6 +2040,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   let crit = false;
   if (opt.crit || (src === b.P && b.castCrit)) crit = true;
   else if (src.st.shadowCrit) { crit = true; src.st.shadowCrit = (src.st.shadowCrit === true ? 1 : src.st.shadowCrit) - 1; if (src.st.shadowCrit <= 0) delete src.st.shadowCrit; }
+  else if (src === b.P && fx && fx.has('qianJi6') && b.castSk && DART_SK.has(b.castSk.id) && tgt.st.poison && !opt.proc) { crit = true; d *= QIANJI_MUL; }
   else if (RNG.ch((src.crit || 0) / 100)) crit = true;
   if (crit) { d *= (src.critDmg || 150) / 100; if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; }
   if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1)); }
@@ -1946,13 +2055,14 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       if (P2.x === 'dmg') d *= P2.v;
       else if (P2.x === 'shatter') { d *= P2.v; stClear(tgt, P2.s); }
       else if (P2.x === 'crit' && !crit) { crit = true; d *= (src.critDmg || 150) / 100; }
-      else if (P2.x === 'detonate') { d *= 1 + (fx && fx.has('detPlus') ? 2.3 : 0.8) * has; stClear(tgt, 'any'); }
+      else if (P2.x === 'detonate') { d *= 1 + ((fx && fx.has('detPlus') ? 2.3 : 0.8) + (fx && fx.has('wanFu6') ? WANFU_DET : 0)) * has; if (!(fx && fx.has('wanFu6'))) stClear(tgt, 'any'); }
     }
   }
   if (tfx) {
     if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 0.75;
     if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
     if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
+    if (tfx.has('duXing4') && tgt === b.P) d *= 1 - DUXING_DR * emptySlots(b, tgt);
     if (tgt.yi && tgt.yi.mozun) d *= 1.08;
     if (tfx.has('stoneSkin')) d *= 0.88;
     if (tfx.has('budong2') && tgt.shield > 0) d *= 0.8;
@@ -2003,13 +2113,16 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     out.pops.push([tgt.id, pay.n, 'react']); (out.react = out.react || []).push({ id: tgt.id, n: pay.n, s: pay.s });
     if (pay.x === 'heal' && src.hp > 0) heal(src, src.maxHp * pay.v, out);
     if (pay.x === 'spread') aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => stSet(src, f, pay.s, out));
+    if (pay.x === 'detonate' && src.fx && src.fx.has('wanFu6')) aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => hit(b, src, f, 0, elem, out, { flat: Math.round(d * WANFU_SPLASH), proc: 1, aoe: 1, raw: 1 }));
     if (pay.x === 'shatter' && src.fx && src.fx.has('shatterBlast')) aliveOf(b, 'e').filter(f => f !== tgt).forEach(f => hit(b, src, f, 0, 'cold', out, { flat: Math.round(d * 0.6), proc: 1, aoe: 1 }));
   }
-  if (SK && SK.ap && tgt.side === 'e' && tgt.hp > 0 && !opt.proc && RNG.ch(SK.apc || 1)) stSet(src, tgt, SK.ap, out);
+  if (SK && SK.ap && tgt.side === 'e' && tgt.hp > 0 && !opt.proc && RNG.ch(SK.apc || 1)) { stSet(src, tgt, SK.ap, out);
+    if (src === b.P && fx && fx.has('wanFu4') && !opt.aoe) aliveOf(b, 'e').filter(f => f !== tgt && !stHas(f, SK.ap)).forEach(f => stSet(src, f, SK.ap, out)); }
   if (src.kind === 'minion' && tgt.side === 'e' && tgt.hp > 0 && b.P.fx.has('minionArmor') && !tgt.st.melt) stSet(src, tgt, 'armor', out);
   if (src.kind === 'hero' && !opt.ult) addRage(src, crit ? 9 : 5);
   if (tgt.kind === 'hero' || tgt.kind === 'ally') addRage(tgt, 6);
   if (tgt.kind === 'hero') {
+    if (tgt.hp <= 0 && tfx.has('buSi6') && !b.buSi) { b.buSi = true; tgt.hp = 1; tgt.st.butui = 3; out.lines.push("Tu La Bất Tử: bạn nhất quyết không ngã!"); out.pops.push([tgt.id, "Bất Tử", 'buff']); }
     if (tgt.hp <= 0 && tfx.has('cheatDeath') && !b.cheated) {
       b.cheated = true; tgt.hp = Math.round(tgt.maxHp * 0.3);
       out.lines.push("Giáp Bất Hủ tỏa sáng, bạn trở về từ bờ vực cái chết!"); out.pops.push([tgt.id, "Bất hủ", 'buff']);
@@ -2145,9 +2258,11 @@ function finishBattle(b) {
       const g = zyGrade(run.riftLv), nm = u.def.n;
       if (q === 'boss' || (q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6))) zyTake(res, nm, g);
       else if (u.kind === 'normal' && RNG.ch((zyOf(nm) < g ? 0.05 : 0.01) * (rw ? 0.4 : 1))) zyTake(res, nm, g);
-      if (run.riftLv >= RSET_LV && RNG.ch(q === 'boss' ? 0.7 : u.rare ? 0.15 : q === 'elite' ? (rw ? 0.03 : 0.06) : 0)) {
-        const mine = SETS.find(S => S.rift && S.cls === run.cls), other = RNG.pick(SETS.filter(S => S.rift));
+      const two = run.riftLv >= RSET2_LV;   // 30 层起多一套：两套各半，掉率跟着提，免得凑头一套变慢
+      if (run.riftLv >= RSET_LV && RNG.ch(q === 'boss' ? (two ? 1 : 0.7) : u.rare ? (two ? 0.25 : 0.15) : q === 'elite' ? (rw ? (two ? 0.05 : 0.03) : 0.06) : 0)) {
+        const avail = SETS.filter(S => S.rift && (S.rlv || RSET_LV) <= run.riftLv), mine = RNG.pick(avail.filter(S => S.cls === run.cls)), other = RNG.pick(avail);
         res.items.push(makeItem({ ilvl: u.lv + 1, rarity: 'set', setId: (RNG.ch(0.85) ? mine : other).id, cls: run.cls }));
+        if (two && q === 'boss' && RNG.ch(0.4)) res.items.push(makeItem({ ilvl: u.lv + 1, rarity: 'set', setId: RNG.pick(avail.filter(S => S.cls === run.cls)).id, cls: run.cls }));
       }
     }
     if (RNG.ch(q === 'boss' ? 1 : q === 'elite' ? 0.35 : rw ? 0.02 : 0.05)) dropGem(res, rollGem(run));
@@ -2160,6 +2275,7 @@ function finishBattle(b) {
   SAVE.gold += res.gold; run.goldGot += res.gold;
   SAVE.mats += res.mats; run.matsGot += res.mats;
   res.gems.forEach(k => addGem(k)); run.gemsGot += res.gems.length;
+  const cu = catchUpMul(run.cls); if (cu > 1) { res.xp = Math.round(res.xp * cu); res.cu = cu; }
   res.levels = gainXp(run.cls, res.xp); run.xpGot += res.xp;
   res.items.forEach(it => storeItem(run, it));
   const s2 = runStats(run);

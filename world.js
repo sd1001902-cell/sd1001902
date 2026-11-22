@@ -1308,12 +1308,12 @@ const rBase = run => riftD(run.riftLv).base;
 // 一层的妖物：一簇一簇地放（一簇两三群，挨在一起，方便一口气拉进来），每层四五只精英
 function rSpawnFloor(ch, sc, wave) {
   const m = wmap(ch, sc), S = SAVE.world[wk(ch)], D = S.sd[sc], R = m.def.rift, Z = rSanitize(R.c, R.sc), run = SAVE.run;
-  const lv = (run ? rBase(run) : 1) + R.fi, key = p => p.y * m.W + p.x;
+  const lv = riftLvCap(run, (run ? rBase(run) : 1) + R.fi), key = p => p.y * m.W + p.x;
   const taken = new Set(D.mons.map(key)); for (const p of [Z.entry, Z.exit, Z.pylon]) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) taken.add((p.y + dy) * m.W + p.x + dx);
   let cells = Z.cells.filter(p => !taken.has(key(p)));
   if (wave) cells = cells.filter(p => Math.max(Math.abs(p.x - S.pos.x), Math.abs(p.y - S.pos.y)) >= 6);
   const nGroups = wave || Math.max(22, Math.min(34, Math.round(Z.cells.length / 20)));
-  let nElite = wave ? 2 : 4 + (RNG.ch(0.5) ? 1 : 0), rareLeft = wave ? 0 : (RNG.ch(0.5) ? 1 : 0);
+  let nElite = wave ? 2 : 4 + R.fi + (RNG.ch(0.5) ? 1 : 0), rareLeft = wave ? 0 : (RNG.ch(0.5) ? 1 : 0);
   const centers = []; let guard = 0, left = nGroups;
   while (left > 0 && cells.length && guard++ < 400) {
     const c0 = RNG.pick(cells); if (centers.some(o => Math.max(Math.abs(o.x - c0.x), Math.abs(o.y - c0.y)) < 5)) continue;
@@ -1324,7 +1324,7 @@ function rSpawnFloor(ch, sc, wave) {
       const el = i === 0 && nElite > 0 && RNG.ch(0.45) ? 1 : 0; if (el) nElite--;
       const rare = el && rareLeft > 0 ? 1 : 0; if (rare) rareLeft--;
       const r = Math.random(), beh = el ? 'guard' : r < 0.35 ? 'chase' : r < 0.75 ? 'patrol' : 'sleep';
-      D.mons.push(wNewMon(ch, { x: p.x, y: p.y, z: 'r', m: i === 0 || RNG.ch(0.6) ? main : RNG.pick(Z.mons), c: R.c, lv: lv + (RNG.ch(0.3) ? 1 : 0), beh, elite: el, rare })); left--; }
+      D.mons.push(wNewMon(ch, { x: p.x, y: p.y, z: 'r', m: i === 0 || RNG.ch(0.6) ? main : RNG.pick(Z.mons), c: R.c, lv: lv + (!riftNewbie(run) && RNG.ch(0.3) ? 1 : 0), beh, elite: el, rare })); left--; }
   }
   // 精英没放够：把普通的升上去
   for (const mn of RNG.shuffle(D.mons.filter(o => !o.elite && !o.boss))) { if (nElite <= 0) break; mn.elite = 1; mn.beh = 'guard'; nElite--; }
@@ -1353,25 +1353,25 @@ function rPrep(run, enc) {
   const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0]); u.atk *= R_NORM[1]; return u; };
   for (const id of enc.ids) { const mn = D.mons.find(o => o.id === id); if (!mn) continue; const def = F.mons[mn.m] || F.mons[0];
     if (mn.elite) {
-      const affs = RNG.shuffle(ELITE_AFFIXES.map(a => a.id)).slice(0, nAff + (mn.rare ? 1 : 0)), e = makeMonster(def, mn.lv + 1, run, 'elite', affs);
+      const affs = RNG.shuffle(ELITE_AFFIXES.map(a => a.id)).slice(0, nAff + (mn.rare ? 1 : 0)), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);
       e.name = mn.rare ? RNG.pick(RARE_ELITE_NAMES) : joinName(RNG.pick(ELITE_TITLES), def.n);
       e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * (mn.rare ? 1.3 : 1)); e.atk *= R_ELITE[1]; if (mn.rare) e.rare = true; if (e.shield) e.shield = Math.round(e.maxHp * 0.3);
       el.push(e); if (RNG.ch(0.6)) no.push(norm(def, mn.lv));
-    } else { const n = Math.min(3, +RNG.w({ 1: 35, 2: 45, 3: 20 }) + (def.pack ? 1 : 0)); for (let i = 0; i < n; i++) no.push(norm(i === 0 || RNG.ch(0.6) ? def : F.mons[RNG.pick(Z.mons)] || def, mn.lv)); }
+    } else { const n = riftNewbie(run) ? 1 : Math.min(3, +RNG.w({ 1: 35, 2: 45, 3: 20 }) + (def.pack ? 1 : 0)); for (let i = 0; i < n; i++) no.push(norm(i === 0 || RNG.ch(0.6) ? def : F.mons[RNG.pick(Z.mons)] || def, mn.lv)); }
   }
   const units = [...el, ...no];
   run.encUnits = units.slice(0, R_STAGE); if (units.length > R_STAGE) run.encReinf = units.slice(R_STAGE);
   return el.length ? 'elite' : 'battle';
 }
 // 进度：打死的妖物按分算（在战斗里一只一只记），这里把分换成百分比
-// 前三层每层最多攒四成（R_FLOOR_CAP）：逼着人换层，一局至少走三张图；最后一层不封顶
-const R_FLOOR_CAP = 0.4;
-const rCapped = run => run.rw.f < run.rw.floors.length - 1 && (run.rw.fp || 0) >= R_NEED * R_FLOOR_CAP - 1e-6;
+// 每层不封顶：想在一层打到底、还是往下走，自己定。越往下越肥——妖物高一级，每只给的进度更多（R_DEEP），精英也多一只
+const R_DEEP = [1, 1.15, 1.3, 1.5];
+const rDeep = run => R_DEEP[Math.min(R_DEEP.length - 1, (run.rw && run.rw.f) || 0)];
+const rCapped = () => false;
 function rAddPts(run, p) {
-  const last = run.rw.f >= run.rw.floors.length - 1, room = last ? Infinity : Math.max(0, R_NEED * R_FLOOR_CAP - (run.rw.fp || 0)), add = Math.min(p, room);
+  const add = p * rDeep(run);
   run.rw.fp = (run.rw.fp || 0) + add; run.pts = (run.pts || 0) + add; run.prog = Math.min(100, run.pts / R_NEED * 100);
 }
-function rCapMsg(run) { if (!rCapped(run) || run.rw.capSaid === run.rw.f || run.rw.boss) return []; run.rw.capSaid = run.rw.f; return [{ toast: '这一层的妖气吸够了（每层最多攒四成）——去传送阵，换下一层' }, { rcap: true }]; }
 function rPickOrbs(ch, run) {
   const S = wstate(ch), D = wScene(ch), acts = []; if (!D.orbs || !D.orbs.length) return acts;
   const keep = []; let got = 0;
@@ -1386,7 +1386,7 @@ function rCheckBoss(ch, run) {
   for (let r = 2; r <= 6 && !at; r++) { const c = []; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = S.pos.x + dx, y = S.pos.y + dy; if (wPassMon(ch, x, y) && wPath(ch, x, y)) c.push({ x, y }); } if (c.length) at = RNG.pick(c); }
   if (!at) at = { x: S.pos.x, y: S.pos.y };
   const B = CHAPTERS[run.rw.bossC - 1].boss;
-  D.mons.push(wNewMon(ch, { x: at.x, y: at.y, z: 'rb', m: -1, c: run.rw.bossC, lv: rBase(run) + rFloorOf(ch).fi, beh: 'guard', boss: 1 }));
+  D.mons.push(wNewMon(ch, { x: at.x, y: at.y, z: 'rb', m: -1, c: run.rw.bossC, lv: riftLvCap(run, rBase(run) + rFloorOf(ch).fi), beh: 'guard', boss: 1 }));
   run.rw.boss = 1; run.rw.bossF = rFloorOf(ch).fi;
   return [{ rboss: B.n, d: B.d }];
 }
@@ -1397,7 +1397,7 @@ function rWon(ch, key, run) {
     if (mn.elite) (D.orbs = D.orbs || []).push({ x: mn.x, y: mn.y, p: mn.rare ? 6 : 4 }); }
   run.fights = (run.fights || 0) + 1;
   rBuffTick(run);
-  acts.push(...rPickOrbs(ch, run), ...rCheckBoss(ch, run), ...rCapMsg(run));
+  acts.push(...rPickOrbs(ch, run), ...rCheckBoss(ch, run));
   if (R.last && !run.rw.boss && D.mons.length < 8) { rSpawnFloor(ch, S.sc, 10); acts.push({ toast: '妖气又聚了起来——这一层又冒出一批妖物' }); }
   return acts;
 }
@@ -1422,7 +1422,7 @@ function rPylon(ch, run, type) {
 function rStep(ch, x, y, run) {
   const S = wstate(ch), m = wmap(ch), R = m.def.rift, P = wPt(ch, x, y), acts = [];
   if (!run) return { acts };
-  acts.push(...rPickOrbs(ch, run), ...rCheckBoss(ch, run), ...rCapMsg(run));
+  acts.push(...rPickOrbs(ch, run), ...rCheckBoss(ch, run));
   if (P && P.t === 'rpylon' && !S.got[wgk(S.sc, x, y)]) { S.got[wgk(S.sc, x, y)] = 1; acts.push(...rPylon(ch, run, P.py)); }
   if (acts.some(a => a.rboss)) return { stop: true, acts };   // 妖王现身：停下脚步
   if (P && P.t === 'rexit') {
