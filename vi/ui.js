@@ -1206,15 +1206,90 @@ function battleHTML() {
   return `${runBar(run)}
     <div class="arena sv ${T0 ? 'k-' + T0.kind : ''}" id="arena" style="--bg:${T0 ? T0.bg : themeOf(run).bg};--g:${T.g};--p:${T.p}">${typeof GFX !== 'undefined' ? `<div class="sv-paint" style="background-image:url(${GFX.background(run.theme || (run.mode === 'rift' ? 'rift' + (themeOf(run).n || '') : 'gen'), T0 || { kind: T.kind || 'field', bg: themeOf(run).bg, g: T.g, p: T.p, wx: T.wx }, B && B.kind === 'boss')})"></div>` : ''}<div class="sv-back">${deco}</div>${wxl}
       <div class="turnbar" id="turnbar"></div><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
-      <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div><div id="bres"></div></div>
+      <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
+      <div class="spdc" id="spdc">${[1, 2, 4].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div>
+      <div class="stpop" id="stpop" data-act="stclose" hidden></div><div id="bres"></div></div>
     <div class="hud" id="hud"><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
 </div>
-    <div class="bctl" id="bctl">${[1, 2, 4].map(s => `<button class="btn sm ${SAVE.speed === s ? '' : 'ghost'}" data-act="speed" data-arg="${s}">x${s}</button>`).join('')}
-      ${SAVE.showSkip ? "<button class=\"btn sm ghost\" data-act=\"skip\">Bỏ qua trận</button>" : ''}
-      <button class="btn sm potb" id="potb" data-act="bpot" ${run.potions > 0 ? '' : 'disabled'}>Uống đan ×${run.potions}</button></div>
+    <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
     <div class="bstatp" id="bstatp"></div>
     <div class="blog" id="blog" data-act="logt" title="Chạm để mở/thu"></div>`;
+}
+// ---- 状态栏和状态说明 ----
+// 身上的状态统一在这里列：名字、颜色、还剩几回合、说明（点一下在画面上浮出说明）
+const ST_INFO = {
+  frozen: ["Choáng", '#f1d34e', 0, "Bỏ qua lần ra tay kế tiếp. Thủ lĩnh có một nửa khả năng không bị choáng."],
+  slow: ["Đóng băng", '#5fb0ff', 0, "Ra tay chậm lại (tốc độ ×0,65); yêu vật biết bay sẽ rơi xuống."],
+  melt: ["Phá giáp", '#d8a05a', 0, "Hộ giáp giảm một nửa, kháng toàn bộ -20; Cốt giáp, giáp bạc sẽ bị đánh vỡ."],
+  burn: ["Thiêu đốt", '#ff7a3a', 0, "Mỗi lượt mất máu; yêu vật Hồi xuân đang cháy thì không hồi được máu, Kén tơ cháy là thủng."],
+  poison: ["Trúng độc", '#7fe05a', 0, "Mỗi lượt mất máu, kéo dài 3 lượt. Cửu Vĩ khi hồi máu (hảo cảm 10) sẽ tiện tay xóa."],
+  curse: ["Nhiếp Hồn", '#c39cff', 0, "Sát thương gây ra giảm ba phần."],
+  mark: ["Đoạt Mệnh Ấn", '#ff5a5a', 0, "Kẻ địch bị đánh dấu chịu sát thương cao hơn."],
+  warcry: ["Phấn chấn", '#ffb066', 1, "Sát thương +40%, hộ giáp +50% (Sư Tử Hống, chính khí của Long đạo trưởng đều là cái này)."],
+  kangG: ["Đỡ đao", '#ffd75a', 1, "Quản gia Khang gánh thay bạn ba phần sát thương (hảo cảm 10 là bốn phần); khi máu của ông dưới một phần tư thì không đỡ nữa."],
+  liuDr: ["Kinh thanh", '#fff2b0', 1, "An Hồn Kinh của sư phụ Lưu: sát thương phải nhận -20% (hảo cảm 10 là -30%)."],
+  tieArm: ["Gia cố", '#d8a05a', 1, "Miếng giáp Thiết Đản gắn cho: hộ giáp +40%."],
+  shadow: ["Vô Ảnh", '#b9a0ff', 1, "Né tránh tăng mạnh, đòn kế tiếp chắc chắn chí mạng."],
+  smoke: ["Yên Độn", '#b9a0ff', 1, "Kẻ địch đánh không trúng bạn."],
+  butui: ["Bất Thoái", '#ff9a5a', 1, "Sát thương phải nhận -50%, bị đánh tích gấp đôi nộ ý."],
+  chan: ["Thiền", '#fff2b0', 1, "Tỷ lệ phản kích +40%, phản kích chắc chắn làm địch choáng."],
+  renew: ["Hồi xuân", '#5df07a', 1, "Mỗi lượt hồi 6% khí huyết."],
+  shield: ["Hộ Thể", '#ffe58a', 1, "Chân khí hộ thể: chặn sát thương trước, chặn hết mới mất máu."],
+  charging: ["Tụ lực", '#ff5a3a', 0, "Thủ lĩnh đang tụ lực, chiêu sau rất nặng. Làm nó choáng là cắt được, tuyệt kỹ cũng cắt được."],
+  enraged: ["Cuồng Bạo", '#ff5a3a', 0, "Sát thương và tốc độ tăng mạnh."],
+  ghost: ["Quỷ thân", '#c39cff', 0, "Hóa thành quỷ ảnh, rất khó đánh trúng. Dùng choáng để nó hiện hình."],
+  cocoon: ["Kén tơ", '#e8e0d0', 0, "Nhả tơ bọc lấy mình, chặn sát thương. Dùng thiêu đốt có thể đốt thủng kén tơ."],
+  silver: ["Giáp bạc", '#cfd8e8', 0, "Một lớp giáp bạc chặn sát thương. Dùng phá giáp có thể đánh vỡ."],
+  hufa: ["Hộ pháp", '#ff9a5a', 0, "Trợ thủ của thủ lĩnh: bạn mang bao nhiêu đồng hành, thủ lĩnh mang bấy nhiêu hộ pháp."],
+  call: ["Quát lớn", '#ff9a5a', 0, "Khi máu thủ lĩnh còn một nửa, nó sẽ gọi một đợt tiểu yêu xông lên."],
+  stacks: ["Cửu U", '#ffd23a', 1, "Bộ Cửu U: mỗi lần chí mạng chồng một tầng, sát thương càng đánh càng cao."] };
+function unitSts(u) {
+  const L = [], add = (k, t, extra) => { const I = ST_INFO[k]; if (I) L.push({ k, n: I[0] + (t ? ' ' + t : ''), c: I[1], good: !!I[2], ...(extra || {}) }); };
+  if (!u || u.hp <= 0) return L;
+  if (u.charging) add('charging'); if (u.ghostForm) add('ghost'); if (u.cocoon && u.shield > 0) add('cocoon'); if (u.silver && u.shield > 0) add('silver');
+  if (u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)) add('enraged');
+  for (const k of ['frozen', 'slow', 'melt', 'burn', 'poison', 'curse', 'mark', 'warcry', 'kangG', 'liuDr', 'tieArm', 'shadow', 'smoke', 'butui', 'chan', 'renew']) {
+    const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, t > 0 && t < 99 ? t : ''); }
+  if (u.shield > 0 && !u.cocoon && !u.silver) add('shield', fmtBig(Math.round(u.shield * uK(u))));
+  if (u.kind === 'hero' && u.stacks) add('stacks', '×' + u.stacks);
+  if (u.hufa) add('hufa'); if (u.callU) add('call');
+  return L;
+}
+let STPOP = null;
+function stDesc(u, k) {
+  if (!u) return null;
+  if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + " (đặc tính yêu vật)", c: '#e8c88a', d: TRAITS[u.trait].d };
+  if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + " (thuộc tính tinh anh)", c: '#ffb066', d: A.d } : null; }
+  const x = unitSts(u).find(y => y.k === k), I = ST_INFO[k]; if (!x || !I) return null;
+  const t = u.st[k], left = typeof t === 'number' ? t : t && t.t;
+  return { n: I[0] + (left > 0 && left < 99 ? ` · còn ${left} lượt` : ''), c: I[1], d: I[3] };
+}
+document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],#stpop')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
+function drawStPop() {
+  const el = document.getElementById('stpop'); if (!el) return;
+  const u = STPOP && B && B.units.find(x => x.id === STPOP.id), D = u && stDesc(u, STPOP.k);
+  if (!D) { STPOP = null; el.hidden = true; return; }
+  el.hidden = false; el.innerHTML = `<b style="color:${D.c}">${D.n}</b><span class="stx">✕</span><p>${esc(u.side === 'e' ? u.name : u.id === 'P' ? "Bạn" : u.name)}: ${D.d}</p>`;
+}
+// 状态栏：左边你，右边选中的目标（没选就是首领／精英，只有小怪就合计）
+function sbChips(u, aff) {
+  const L = unitSts(u).map(x => `<span class="sbc ${x.good ? 'g' : ''}" style="--c:${x.c}" data-act="stinfo" data-arg="${u.id}|${x.k}">${x.n}</span>`);
+  if (aff) { if (u.trait) L.unshift(`<span class="sbc a" data-act="stinfo" data-arg="${u.id}|trait">${TRAITS[u.trait].n}</span>`); (u.aff || []).forEach(a => { const A = ELITE_AFFIXES.find(x => x.id === a); if (A) L.unshift(`<span class="sbc a" data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>`); }); }
+  return L.join('');
+}
+const sbHp = (h, m, c) => `<div class="sbhp"><i style="width:${Math.max(0, Math.min(100, h / Math.max(1, m) * 100))}%;background:${c}"></i></div>`;
+function drawSbar() {
+  const me = $('#sbme'), fo = $('#sbfoe'); if (!me || !fo || !B) return;
+  const P = B.P, run = SAVE.run, pc = run ? run.potions : 0;
+  me.innerHTML = `<div class="sbh"><b>Bạn</b><button class="potb" id="potb" data-act="bpot" ${B.over || pc <= 0 || P.hp <= 0 || P.hp >= P.maxHp ? 'disabled' : ''}>Đan ×${pc}</button></div>
+    ${sbHp(P.hp, P.maxHp, '#5fbf5a')}<div class="sbt">${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))}/${fmtBig(P.maxHp * uK(P))}</div><div class="sbcs">${sbChips(P)}</div>`;
+  const E = aliveOf(B, 'e'); if (!E.length) { fo.innerHTML = ''; return; }
+  const T = E.find(u => u.id === B.target) || E.find(u => u.kind === 'boss') || E.find(u => u.kind === 'elite' || u.rare) || null;
+  if (T) { const tag = T.id === B.target ? "Đang chọn" : T.kind === 'boss' ? "Thủ lĩnh" : "Tinh anh";
+    fo.innerHTML = `<div class="sbh"><b>${esc(T.name)}</b><small>${tag}</small></div>${sbHp(T.hp, T.maxHp, '#d8463a')}<div class="sbt">${Math.round(T.hp / T.maxHp * 100)}%${T.kind === 'boss' && E.length > 1 ? ` · còn ${E.length - 1} trợ thủ` : ''}</div><div class="sbcs">${sbChips(T, true)}</div>`; }
+  else { const h = E.reduce((a, u) => a + Math.max(0, u.hp), 0), m = E.reduce((a, u) => a + u.maxHp, 0), more = (B.reinf || []).length;
+    fo.innerHTML = `<div class="sbh"><b>Tiểu yêu ×${E.length}</b>${more ? `<small>phía sau còn ${more} con</small>` : ''}</div>${sbHp(h, m, '#d8463a')}<div class="sbt">Tổng máu ${Math.round(h / m * 100)}%</div><div class="sbcs"></div>`; }
 }
 // 役使：跟在你身边的两只首领精魄（小图标）；本事一触发就闪一下
 const yiBoss = id => { const Y = YISHI[id], e = Y && zyEntries(Y.pg).find(x => x.boss); return e ? allMonsterDefs().find(d => d.n === e.n) : null; };
@@ -1232,7 +1307,7 @@ function unitEl(u) {
     if (Object.values(E).filter(it => it && it.rarity === 'set').length >= 2) el.classList.add('gear-set'); }
   el.innerHTML = `<div class="aura"><i class="a-rage"></i><i class="a-fire"></i><i class="a-tox"></i><i class="a-ice"></i><i class="a-shd"></i><i class="a-cur"></i><i class="a-stun"><b>✦</b><b>✦</b><b>✦</b></i></div><div class="sp">${VFX.rigHTML(u, img, size, spr)}</div>
     <div class="un">${esc(u.name)}</div>
-    ${(u.aff && u.aff.length) || u.trait ? `<div class="tags">${u.trait ? `<span class="tr" title="${TRAITS[u.trait].d}">${TRAITS[u.trait].n}</span>` : ''}${(u.aff || []).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return `<span title="${A.d}">${A.n}</span>`; }).join('')}</div>` : ''}
+    ${(u.aff && u.aff.length) || u.trait ? `<div class="tags">${u.trait ? `<span class="tr" data-act="stinfo" data-arg="${u.id}|trait">${TRAITS[u.trait].n}</span>` : ''}${(u.aff || []).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return `<span data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>`; }).join('')}</div>` : ''}
     <div class="hpbar"><i></i><b class="sh"></b><span></span></div><div class="sts"></div>${u.kind === 'hero' && u.yi && Object.keys(u.yi).length ? yiFolHTML(u.yi) : ''}`;
   setTimeout(() => el.classList.remove('spawn'), u.kind === 'boss' ? 650 : 400);
   if (u.kind === 'boss' && !u.guard) setTimeout(() => VFX.onLand(u.id), 560);
@@ -1359,21 +1434,8 @@ function applyStep(o, anim) {
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">Giữ lấy ông ấy!</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} lượt nữa chuồn</span>`);
-    if (u.charging && u.hp > 0) st.push("<span style=\"color:#ff5a3a\">Đang tụ lực!</span>");
     if (u.fleeDef && u.flee && u.hp > 0) st.push(`<span style="color:#f1c94a">${Math.max(0, (u.fleeDef.n || 3) - u.flee + 1)} lượt nữa bỏ chạy</span>`);
-    if (u.st.frozen) st.push("<span style=\"color:#f1d34e\">Choáng</span>");
-    if (u.st.slow) st.push("<span style=\"color:#5fb0ff\">Đóng băng</span>");
-    if (u.st.melt) st.push("<span style=\"color:#d8a05a\">Phá giáp</span>");
-    if (u.st.burn) st.push("<span style=\"color:#ff7a3a\">Thiêu đốt</span>");
-    if (u.st.poison) st.push("<span style=\"color:#7fe05a\">Trúng độc</span>");
-    if (u.st.curse) st.push("<span style=\"color:#c39cff\">Nhiếp hồn</span>");
-    if (u.st.mark) st.push("<span style=\"color:#ff5a5a\">Đoạt Mệnh Ấn</span>");
-    if (u.st.warcry) st.push("<span style=\"color:#ffb066\">Sư Tử Hống</span>");
-    if (u.st.shadow) st.push("<span style=\"color:#b9a0ff\">Vô ảnh</span>");
-    if (u.st.renew) st.push("<span style=\"color:#5df07a\">Hồi xuân</span>");
-    if (u.shield > 0) st.push("<span style=\"color:#ffe58a\">Hộ thể</span>");
-    if (u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)) st.push("<span style=\"color:#ff5a3a\">Cuồng bạo</span>");
-    if (u.kind === 'hero' && u.stacks) st.push(`<span style="color:#ffd23a">Cửu U ×${u.stacks}</span>`);
+    for (const x of unitSts(u)) if (!x.aff) st.push(`<span style="color:${x.c}" data-act="stinfo" data-arg="${u.id}|${x.k}">${x.n}</span>`);
     el.classList.toggle('frozen', !!u.st.frozen);
     // 状态挂在身上：火、毒、冰壳、金星、护盾、狂暴
     const alive = u.hp > 0 && !u.dead;
@@ -1454,7 +1516,7 @@ function applyStep(o, anim) {
     $('#ultpct').textContent = B.ultReq ? "Chiêu sau" : full ? (B.ultAuto ? "Đầy" : "Chạm!") : `${r}%`; ub.disabled = B.over; }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = "Đan dược " + SAVE.run.potions;
-  { const pb = $('#potb'); if (pb) { pb.textContent = `Uống đan ×${SAVE.run.potions}`; pb.disabled = B.over || SAVE.run.potions <= 0 || P.hp <= 0 || P.hp >= P.maxHp; } }
+  drawSbar(); drawStPop();
   const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `Tiến độ ${Math.floor(SAVE.run.prog)}%`;
   const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `Hương ${xiangTxt(SAVE.run)}`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
@@ -3204,7 +3266,9 @@ const ACT = {
   cine: () => { SAVE.cineOff = !SAVE.cineOff; save(); refresh(); },
   hdpx: () => { SAVE.hdOff = !SAVE.hdOff; save(); render(); },
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`Lần này dẫn ${COMPANIONS[c].n} đi cùng: ${COMPANIONS[c].d}`); },
-  speed: s => { SAVE.speed = +s; VFX.setSpeed(+s); save(); document.querySelectorAll('#bctl [data-act=speed]').forEach(b => b.classList.toggle('ghost', b.dataset.arg !== s)); schedule(); },
+  speed: s => { SAVE.speed = +s; VFX.setSpeed(+s); save(); document.querySelectorAll('#spdc [data-act=speed]').forEach(b => b.classList.toggle('on', b.dataset.arg === String(s))); schedule(); },
+  stinfo: a => { const [id, k] = String(a).split('|'); STPOP = STPOP && STPOP.id === id && STPOP.k === k ? null : { id, k }; drawStPop(); },
+  stclose: () => { STPOP = null; drawStPop(); },
   kitedit: i => openModal(kitModal(+i)),
   kitsave: i => { const el = document.getElementById('kitn'); const k = kitSave(SAVE.cls, +i, el && el.value.trim()); SFX.play('buff'); closeModal(); save(); refresh(); toast(`Đã lưu: <b>${esc(k.n)}</b>`); },
   kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast("Đã xóa bộ phối đồ này (trang bị vẫn còn)"); },

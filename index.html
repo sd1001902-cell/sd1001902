@@ -1467,6 +1467,21 @@ body[data-view=title] .wrap{max-width:none;padding:0}
 .ultb{min-width:62px;min-height:30px;padding:0 6px}.ultb b{font-size:15px;line-height:1}.ultb small{font-size:calc(10px * var(--fs,1))}
 @media(max-width:700px){.ultb{min-width:58px}}
 .bstatp{margin:4px auto 6px;padding:4px 6px;max-width:560px}.stbl.mini{margin-top:0;font-size:calc(11px * var(--fs,1))}.stbl.mini td,.stbl.mini th{padding:1px 3px}.stbl.mini small{font-size:calc(9.5px * var(--fs,1))}
+/* 2026-11 倍速缩到战场右下角；原来那一行改成状态栏；状态说明浮在战场上 */
+.spdc{position:absolute;right:6px;bottom:6px;z-index:7;display:flex;gap:2px;background:rgba(10,8,8,.6);border:1px solid rgba(255,220,150,.2);border-radius:8px;padding:2px}
+.spdc button{border:0;background:none;color:#cfc3a8;font:600 calc(11px * var(--fs,1)) sans-serif;padding:3px 6px;border-radius:6px;cursor:pointer}.spdc button.on{background:#7a2a18;color:#ffe9c4}
+.sbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:4px 0;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:#120c0a;align-items:start}
+.sb-foe{border-left:1px solid var(--line2);padding-left:8px}
+.sbh{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:calc(12.5px * var(--fs,1));min-width:0}.sbh b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sbh small{color:var(--dim);font-size:calc(10.5px * var(--fs,1));white-space:nowrap}
+.sbhp{height:6px;background:#2a1f19;border-radius:3px;margin:3px 0 2px;overflow:hidden}.sbhp i{display:block;height:100%;border-radius:3px;transition:width .25s}
+.sbt{font-size:calc(10.5px * var(--fs,1));color:var(--dim)}
+.sbcs{display:flex;flex-wrap:wrap;gap:3px;margin-top:3px;min-height:4px}
+.sbc{font-size:calc(10.5px * var(--fs,1));padding:1px 5px;border-radius:4px;color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);cursor:pointer;white-space:nowrap}
+.sbc.a{--c:#ffb066;border-style:dashed}
+.potb{border:1px solid #3e6a32;background:#152210;color:#a8e08a;border-radius:6px;font-size:calc(11px * var(--fs,1));padding:1px 7px;cursor:pointer}.potb:disabled{opacity:.45;cursor:default}
+.stpop{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);width:min(82%,360px);z-index:9;background:rgba(16,11,9,.93);border:1px solid #c8a05a;border-radius:8px;padding:7px 10px;font-size:calc(12px * var(--fs,1));cursor:pointer}
+.stpop .stx{float:right;color:var(--dim)}.stpop p{margin:3px 0 0;color:#e8dcc8;line-height:1.5}
+.unit .sts span[data-act],.unit .tags span[data-act]{cursor:pointer}
 </style>
 </head>
 <body>
