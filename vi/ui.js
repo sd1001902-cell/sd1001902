@@ -357,9 +357,9 @@ function townHTML() {
   // 2026-11 一屏：顶上两条（资源一条，角色切换＋当前角色一条），下面一排页签，再下面内容区；整页不滚，只在内容区里的框滚
   return `<div class="thead"><div class="th1"><button class="homeb" data-act="home" aria-label="Trang chủ">‹</button><h1>Cửu U Hồi Lang</h1>
       <div class="rescur"><span class="pill gold">${SPR.img('ingot', 16)}${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 16)}${fmtBig(SAVE.mats)}</span></div></div>
-    <div class="th2"><div class="ctabs">${tabs}</div>
+    <div class="th2"><div class="ctabs">${tabs}</div>${!seen('clstip') && storyCleared('normal') < 2 && !SAVE.story.ended ? "<button class=\"clstip\" data-act=\"clstip\"><b>↖ Năm hình đầu này là năm môn phái</b>Chạm một cái là đổi người, mỗi phái một lối đánh <i>Đã hiểu</i></button>" : ''}
       <div class="cinfo"><div class="ci1"><b>${C.n}</b><span><i>Lực chiến</i> <b>${power(s)}</b></span></div>
-        <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}Tu vi ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `Cấp ${ch.level} · Kinh nghiệm ${ch.xp}/${need}`}</small></div></div></div>
+        <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}Tu vi ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `Cấp ${ch.level}${featureOn('para') && SAVE.para.lv ? ` · Tu vi ${realmName(SAVE.para.lv)}` : ` · Kinh nghiệm ${ch.xp}/${need}`}`}</small></div></div></div>
   ${storageOK ? '' : "<p class=\"warn\">Trình duyệt này không cho lưu tiến độ, đóng trang là mất hết.</p>"}
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>
   <main class="tcont t-${TT}" data-scroll="tc-${TT}">${body}</main>`;   // 页签放在上面（原来钉在屏幕最底下）
@@ -556,6 +556,7 @@ function goTab() {
     body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
         <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
+      <div class="rquick"><button data-act="rlvto" data-arg="1" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>Tầng 1</button><button data-act="rlv" data-arg="-50" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-50</button><button data-act="rlv" data-arg="-10" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-10</button><button data-act="rlv" data-arg="10" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+10</button><button data-act="rlv" data-arg="50" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+50</button>${rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? `<button data-act="rlvto" data-arg="${rec.lv}" class="rq-rec">Kỷ lục ${rec.lv}</button>` : ''}<button data-act="rlvto" data-arg="${maxR}" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>Cao nhất ${maxR}</button></div>
       <div class="rinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
       ${riftPath() && !SAVE.story.ended ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">Đang đuổi theo: kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (thấp hơn nhân vật cao nhất ${topLevel() - SAVE.chars[cls].level} cấp)</p>` : ''}
@@ -984,6 +985,13 @@ const CH_ACCENT = [null, '#7fd8b0', '#7fc46a', '#e86aa8', '#ff7a2a', '#9ae05a', 
 const INTER = { 3: ["Màn chuyển 1", "Túy Tiên Lâu mở cửa lại", "Náo nhiệt", "Trời tối, cả con phố treo đầy đèn lồng đỏ."], 4: ["Màn chuyển 2", "Hội đèn Thất Tịch", "Tâm ý", "Đèn trên sông trôi xa dần, từng chiếc một."],
   6: ["Màn chuyển 3", "Giấc mơ ba trăm năm trước", "Đưa cơm", "Năm ấy, bạn mười lăm tuổi."], 8: ["Màn chuyển 4", "Đêm trước xuất chinh", "Từ biệt", "Trước khi trời sáng, ai cũng đã đến."] };
 const hasProgress = () => !!(SAVE.run || storyCleared('normal') > 0 || CLASS_IDS.some(c => SAVE.chars[c].level > 1) || Object.keys(SAVE.world || {}).length);
+// 开局挑门派：五张卡，写明打法和上手难度；底下说清楚以后能换、哪些东西五门共用
+let CPICK = null;
+const CLS_PICK = [['berserker', "Cận chiến", "Máu dày da cứng, càng đánh càng điên; máu càng ít, sát thương càng cao", '★', "Dễ chơi nhất"], ['paladin', "Cận chiến", "Chịu đòn giỏi nhất: bị đánh thì đỡ và phản đòn, còn tự hồi máu", '★', "Dễ"],
+  ['mage', "Pháp thuật", "Vẽ bùa niệm chú, đánh lan gắn trạng thái rồi kích nổ; thân thể yếu nhất", '★★', "Trung bình"], ['assassin', "Ám Khí", "Nhanh nhất, hiểm nhất, chuyên giết một mục tiêu; đánh lan yếu", '★★★', "Khó"], ['necro', "Triệu hồi", "Lắc chuông điều khiển cương thi chiến đấu, bản thân núp phía sau", '★★★', "Khó"]];
+const clsPickModal = () => `<h2 class="mh">Chọn một môn phái</h2><p class="sub cpk-sub">Có tất cả năm môn phái, chọn trước một phái hợp tay. Sau này chạm vào hình đầu ở trên cùng doanh trại để đổi người bất cứ lúc nào; bạc, rương đồ, tu vi, số tầng Ảo Cảnh năm phái dùng chung, cấp độ thì phái nào luyện phái nấy.</p>
+  <div class="cpick">${CLS_PICK.map(([id, tag, d, st, hard]) => `<button class="cpk" data-act="clspick" data-arg="${id}"><span class="cpk-a">${heroSpr(id, 46)}</span>
+    <span class="cpk-t"><b>${CLASSES[id].n}<em>${tag}</em></b><small>${d}</small></span><span class="cpk-h"><i>${st}</i><small>${hard}</small></span></button>`).join('')}</div>`;
 function titleHTML() {
   const prog = hasProgress(), cls = SAVE.cls, lv = SAVE.chars[cls].level;
   const ch = SAVE.run ? SAVE.run.chapter : Math.min(10, storyCleared('normal') + 1);
@@ -1416,10 +1424,10 @@ function battleHTML() {
       <div class="turnbar" id="turnbar"></div><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><div id="bres"></div></div>
+    <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
     <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 4].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div><button class="statc" id="statc" data-act="statfull">Thống kê</button></div><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
-</div>
-    <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>`;
+</div>`;
 }
 // ---- 状态栏和状态说明 ----
 // 身上的状态统一在这里列：名字、颜色、还剩几回合、说明（点一下在画面上浮出说明）
@@ -3416,7 +3424,7 @@ function npcTalk(id) {
   bump(el, 'talk', 400); setTimeout(() => b.remove(), 3200);
 }
 const ACT = {
-  tab: c => { SAVE.cls = c; FILTER = 'all'; GSLOT = null; refresh(); },
+  tab: c => { SAVE.cls = c; FILTER = 'all'; GSLOT = null; if (!seen('clstip')) markSeen('clstip'); refresh(); },
   tt: k => { TT = k; refresh(); },
   diff: d => { SAVE.diff = d; refresh(); },
   chap: k => { SAVE.chapter = +k; refresh(); },
@@ -3428,6 +3436,7 @@ const ACT = {
   logt: () => { const l = $('#blog'); if (l) l.classList.toggle('open'); },
   auto: () => { if (AUTO) { stopAuto(); return; } AUTO = true; const b = document.querySelector('.autob'); if (b) { b.classList.remove('ghost'); b.textContent = "Đang tự khám phá…"; } autoStep(); },
   mode: m => { SAVE.mode = m; refresh(); },
+  rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },
   zyhelp: () => openModal(zyHelpModal()),
@@ -3753,7 +3762,10 @@ const ACT = {
   },
   reset: () => openModal(resetModal()),
   doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'title'; render(); toast("Đã bắt đầu lại: chọn một con đường"); },
-  tpath: p => { SAVE.path = p === 'rift' ? 'rift' : 'story'; if (p === 'rift') { SAVE.mode = 'rift'; SAVE.riftLv = 1; } save(); closeModal(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); if (p === 'rift') playRiftIntro(); else playPrologue(); },
+  tpath: p => { CPICK = p === 'rift' ? 'rift' : 'story'; BACK = null; openModal(clsPickModal); },   // 新开局：先挑门派（原来默认狂刀客，新人不知道还有另外四个）
+  clspick: c => { if (!CLASSES[c]) return; const p = CPICK || 'story'; CPICK = null; SAVE.cls = c; markSeen('clspick');
+    SAVE.path = p; if (p === 'rift') { SAVE.mode = 'rift'; SAVE.riftLv = 1; } save(); closeModal(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); if (p === 'rift') playRiftIntro(); else playPrologue(); },
+  clstip: () => { markSeen('clstip'); refresh(); },
   topath: () => openModal(toPathModal),
   setpath: () => { SAVE.path = 'rift'; SAVE.mode = 'rift'; save(); closeModal(); refresh(); playRiftIntro(true); },
   rpath: () => openModal(rpathModal),
@@ -3816,6 +3828,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.paraUp2) { const [a0, a1] = SAVE.paraUp2; delete SAVE.paraUp2; save(); setTimeout(() => toast(`Tu vi lên cấp lại nhanh gấp đôi, kinh nghiệm cày trước đây đã được bù theo chuẩn mới: cấp <b>${a0}</b> → cấp <b>${a1}</b>. Tu vi năm môn phái dùng chung, điểm dư ra hãy cộng ở 「Nhân vật · Tu vi」`, 6500), 1200); }
 if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`Tu vi lên cấp nhanh gấp hai mươi lần, kinh nghiệm cày trước đây đã được bù theo chuẩn mới: cấp <b>${a0}</b> → cấp <b>${a1}</b>, điểm dư cộng ở “Tu luyện · Tu vi”`, 6000), 1200); }
 if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }
 if (SAVE.story.ended && seen('postg') && !seen('npcsvc')) { markSeen('npcsvc'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(svcNoteModal); }, 1400); }

@@ -26,7 +26,7 @@ let onPersist = null;
 function newChar() { return { level: 1, xp: 0, tal: {}, runes: {}, order: null, off: {}, yi: [], cube: [null, null, null],
   eq: { weapon: makeItem({ slot: 'weapon', ilvl: 1, rarity: 'normal', noSocket: true }) } }; }
 function newSave() {
-  const s = { v: 4, gv: 2, boxv: 1, pv: 1, team: ['ngoc'], t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
+  const s = { v: 4, gv: 2, boxv: 1, pv: 2, team: ['ngoc'], t: 0, gold: 0, mats: 0, gems: {}, stash: [], chars: {}, unlocked: { normal: true }, cls: 'berserker', diff: 'normal',
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
@@ -58,7 +58,12 @@ function migrate(s) {
     while (T >= paraNeed(L) && L < 9999) { T -= paraNeed(L); L++; }
     if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp = [L0, L]; }
   }
-  s.pv = 1;
+  if (s.para && pv0 === 1) {   // 修为又快了一倍：按上一版标准（1500 + 75×级）折回总经验，再按新标准重新算等级。只做一次
+    const L0 = s.para.lv || 0; let T = s.para.xp || 0, L = 0; for (let i = 0; i < L0; i++) T += 1500 + 75 * i;
+    while (T >= paraNeed(L) && L < 99999) { T -= paraNeed(L); L++; }
+    if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp2 = [L0, L]; }
+  }
+  s.pv = 2;
   if (s.flags && !s.flags.wpnForged) { const all = [...(s.stash || [])]; for (const c in s.chars || {}) for (const sl in s.chars[c].eq || {}) if (s.chars[c].eq[sl]) all.push(s.chars[c].eq[sl]);
     if (all.some(it => it && it.legend && (LEGENDS.find(l => l.id === it.legend) || {}).w)) s.flags.wpnForged = 1; }   // 老存档：手里有专属兵器就算打过
   if (!Array.isArray(s.team)) s.team = s.ngocJoin !== false ? ['ngoc'] : s.comp && s.comp !== 'ngoc' ? [s.comp] : [];   // 幻境组队：老存档按原来带的那位
@@ -505,7 +510,7 @@ function resetTalents(cls) {
 }
 
 // ---------------- 巅峰等级 ----------------
-const paraNeed = p => 1500 + p * 75;   // 原来 30000 + 1500p：修为 100 级时十来局才升一级。除以 20：69 层一局约 2.5 万经验，100 级时一局升 3 级，200 级时一局一级多
+const paraNeed = p => Math.round((1500 + p * 75) / 2);   // 2026-11-23 再快一倍（用户：幻境层数高了修为跟不上妖物）；原来 1500 + 75p   // 原来 30000 + 1500p：修为 100 级时十来局才升一级。除以 20：69 层一局约 2.5 万经验，100 级时一局升 3 级，200 级时一局一级多
 function paraFree() { let n = 0; for (const k in SAVE.para.pts) n += SAVE.para.pts[k]; return SAVE.para.lv - n; }
 function paraCanAdd(k) { const P = PARAGON_STATS.find(x => x.k === k); const cur = SAVE.para.pts[k] || 0; return paraFree() > 0 && (!P.cap || (cur + 1) * P.v <= P.cap); }
 function addPara(k, n = 1) { let done = 0; while (done < n && paraCanAdd(k)) { SAVE.para.pts[k] = (SAVE.para.pts[k] || 0) + 1; done++; } return done; }

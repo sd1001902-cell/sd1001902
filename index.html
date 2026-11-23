@@ -1780,7 +1780,7 @@ html body .arena.sv .side.form .unit .hpbar{width:62px;height:9px;font-size:8.5p
 html body .arena.sv .side.form .unit.k-boss .hpbar{width:96px;height:10px}
 @media(min-width:701px){html body .arena.sv .side.form .unit .un{font-size:13px;line-height:16px}html body .arena.sv .side.form .unit .hpbar{width:84px;height:11px;font-size:10px;line-height:11px}html body .arena.sv .side.form .unit.k-boss .hpbar{width:128px}}
 /* 2026-11-23 战斗下方：技能块放大，你和目标两条状态条加高；倍速、统计从画面里挪到技能上面一行 */
-html body .hud{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 72px;column-gap:6px;row-gap:0;align-items:end;margin:8px 0 6px}
+html body .hud{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 72px;column-gap:6px;row-gap:0;align-items:end;margin:7px 0 2px}
 .hud-ctl{position:absolute;right:0;top:0;height:28px;display:flex;gap:6px;align-items:center;z-index:3}
 html body .hud .spdc{position:static;display:flex;gap:2px;background:#120c0a;border:1px solid var(--line2);border-radius:8px;padding:2px}
 html body .hud .spdc button{padding:3px 9px;font-size:12px;border-radius:6px}
@@ -1798,7 +1798,7 @@ html body .hud .hs-grid .skb2.cd{opacity:.5}html body .hud .hs-grid .skb2.cd sma
 html body .hud .hs-grid .skb2.rdy{box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--c) 70%,transparent)}
 html body .hud .ultb{height:56px;min-height:56px;width:72px;min-width:0;border-radius:9px;padding:0;align-self:end}
 html body .hud .ultb b{font-size:19px}html body .hud .ultb small{font-size:11px}
-html body .sbar{gap:10px;padding:8px 10px 7px;border-radius:10px;margin:0 0 4px}
+html body .sbar{gap:10px;padding:8px 10px 7px;border-radius:10px;margin:6px 0 0}
 html body .sbar .sb-foe{padding-left:10px}
 html body .sbar .sbh{font-size:14px;min-height:24px}html body .sbar .sbh b{font:700 14.5px "Noto Serif SC",serif}html body .sbar .sbh small{font-size:12px}
 html body .sbar .sbhp{position:relative;height:17px;border-radius:5px;margin:5px 0 3px;background:#2a1d18;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
@@ -1810,6 +1810,23 @@ html body .sbar .potb{font-size:12px;padding:2px 8px}
 html body .arena.sv .side.form .unit .un{max-width:96px;overflow:hidden;text-overflow:ellipsis}html body .arena.sv .side.form .unit.k-boss .un{max-width:112px}
 html body .hud .hs-top .rchip{flex:0 1 auto;width:auto;min-width:0;max-width:100%}html body .hud .hs-top .rchip.fury{min-width:150px}
 @media(min-width:701px){html body .arena.sv{height:clamp(340px,calc(100vh - 326px),480px)}}
+.rquick{display:flex;gap:5px;margin:6px 0 2px;overflow-x:auto;scrollbar-width:none}.rquick::-webkit-scrollbar{display:none}
+.rquick button{flex:1 0 auto;min-width:44px;height:34px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:#0e0a09;color:var(--ink);font-size:13px;cursor:pointer;white-space:nowrap}
+.rquick button:disabled{opacity:.35;cursor:default}.rquick .rq-rec{border-color:#6a5a2a;color:var(--gold2)}
+/* 开局挑门派 */
+.cpk-sub{margin:0 0 10px;line-height:1.5}
+.cpick{display:flex;flex-direction:column;gap:7px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.cpk{display:grid;grid-template-columns:52px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:68px;padding:6px 12px 6px 8px;border:1px solid var(--line2);border-radius:12px;background:linear-gradient(180deg,#1c1411,#110c0a);color:var(--ink);text-align:left;cursor:pointer}
+.cpk:active{border-color:var(--gold2);background:#24170f}
+.cpk-a{display:grid;place-items:center;width:52px;height:52px;border-radius:10px;background:radial-gradient(circle at 50% 70%,#3a2216,#120c0a 70%)}
+.cpk-t b{display:flex;align-items:baseline;gap:8px;font:700 17px "Noto Serif SC",serif;color:#f3e6cc}.cpk-t b em{font:400 11px "Noto Sans SC",sans-serif;font-style:normal;color:var(--gold);border:1px solid #5a4a2a;border-radius:9px;padding:0 6px;line-height:16px}
+.cpk-t small{display:block;margin-top:3px;font-size:12.5px;line-height:1.4;color:var(--dim)}
+.cpk-h{display:flex;flex-direction:column;align-items:flex-end;gap:2px}.cpk-h i{font-style:normal;color:var(--gold2);font-size:12px;letter-spacing:1px}.cpk-h small{font-size:11px;color:var(--dim);white-space:nowrap}
+.th2{position:relative}.thead:has(.clstip){position:relative;z-index:60}
+.clstip{position:absolute;left:0;top:calc(100% + 4px);z-index:200;display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;max-width:min(320px,92vw);padding:8px 12px;border:1px solid var(--gold);border-radius:10px;background:#2a1a0e;color:var(--ink);font-size:13px;text-align:left;box-shadow:0 6px 20px rgba(0,0,0,.6);cursor:pointer;animation:tipb 1.6s ease-in-out infinite alternate}
+.clstip b{color:var(--gold2);font:700 14px "Noto Serif SC",serif;width:100%}.clstip i{font-style:normal;color:var(--gold);margin-left:auto;border:1px solid #6a5030;border-radius:8px;padding:0 8px}
+@keyframes tipb{from{transform:translateY(0)}to{transform:translateY(3px)}}
+@media(prefers-reduced-motion:reduce){.clstip{animation:none}}
 </style>
 </head>
 <body>
