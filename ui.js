@@ -823,12 +823,14 @@ function buildCard(cls) {
   const cubeRow = B.cube.map(lid => chip((ch.cube || []).includes(lid), 'C:' + lid, LEGENDS.find(l => l.id === lid).n)).join('');
   const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t); return chip(!!g && (ch.lgs || []).includes(g.id), 'G:' + t, LGEMS[t].n); }).join('');
   const sec = (h, row) => `<div class="bc-sec"><span class="bc-h">${h}</span><div class="bc-bits">${row}</div></div>`;
-  return `<div class="bcard"><h4 class="sub-h">流派推荐</h4>
+  const nMiss = (skRow + legRow + cubeRow + gemRow).split('bc-no').length - 1 + (nSet >= 6 ? 0 : 1) + (WX0 && !owned.has(WX0.id) ? 1 : 0);
+  // 2026-11-24 默认收起，点标题展开（展开状态记住，换套装、配完都不会自己合上）
+  return `<details class="bcard" ${window.BCOPEN ? 'open' : ''} ontoggle="window.BCOPEN=this.open"><summary class="sub-h">流派推荐 <small>${S.n} · 套装 ${nSet}/6${nMiss ? ` · 还缺 ${nMiss} 样` : ' · 齐了'}</small></summary>
     <div class="seg sm">${L.map((X, i) => `<button class="${i === bi ? 'on' : ''}" data-act="bldpick" data-arg="${i}">${SETS.find(z => z.id === X.set).n}</button>`).join('')}</div>
     <p class="help-p">${B.d}</p>
     ${sec('招式', skRow)}${sec('套装', chip(nSet >= 6, 'S:' + S.id, `${S.n}<small>${nSet}/6</small>`))}${WX0 ? sec('兵器', chip(owned.has(WX0.id), 'W:' + WX0.id, WX0.n)) : ''}${sec('神兵', legRow)}${featureOn('cube') ? sec('乾坤袋', cubeRow) : ''}${sec('灵玉', gemRow)}
     <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">一键照配</button>
-    <div class="bc-san">散件流（不穿套装）<button class="qhelp sm" data-act="sanhelp" aria-label="说明">?</button></div></div>`;
+    <div class="bc-san">散件流（不穿套装）<button class="qhelp sm" data-act="sanhelp" aria-label="说明">?</button></div></details>`;
 }
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);
@@ -837,7 +839,7 @@ function mechCard(cls) {
     const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => effWx(cls, k))), miss = WX_IDS.filter(w => !have.has(w));
     extra = `<p class="help-p wxrow">你现在带的五行：${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join(' ')}　<small>带的五行越杂，「连」越好叠</small></p>`;
   }
-  return `<details class="mech"><summary><b>本门功法 · ${M[0]}</b> <small>被动，一直生效 · 点开看说明</small></summary>
+  return `<details class="mech" open><summary><b>本门功法 · ${M[0]}</b> <small>职业特性，一直生效</small></summary>
     <p class="help-p">${M[1]}</p><p class="help-p">${sustText(cls, s)}</p></details>${extra}`;
 }
 // 现在身上哪些东西在加强这一招：套装、神兵（穿着的和乾坤袋里启用的）、点过的心法——说明里点了这招名字的都列出来

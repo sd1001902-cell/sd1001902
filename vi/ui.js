@@ -824,12 +824,14 @@ function buildCard(cls) {
   const cubeRow = B.cube.map(lid => chip((ch.cube || []).includes(lid), 'C:' + lid, LEGENDS.find(l => l.id === lid).n)).join('');
   const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t); return chip(!!g && (ch.lgs || []).includes(g.id), 'G:' + t, LGEMS[t].n); }).join('');
   const sec = (h, row) => `<div class="bc-sec"><span class="bc-h">${h}</span><div class="bc-bits">${row}</div></div>`;
-  return `<div class="bcard"><h4 class="sub-h">Gợi ý lối chơi</h4>
+  const nMiss = (skRow + legRow + cubeRow + gemRow).split('bc-no').length - 1 + (nSet >= 6 ? 0 : 1) + (WX0 && !owned.has(WX0.id) ? 1 : 0);
+  // 2026-11-24 默认收起，点标题展开（展开状态记住，换套装、配完都不会自己合上）
+  return `<details class="bcard" ${window.BCOPEN ? 'open' : ''} ontoggle="window.BCOPEN=this.open"><summary class="sub-h">Gợi ý lối chơi <small>${S.n} · Bộ ${nSet}/6${nMiss ? ` · còn thiếu ${nMiss} món` : " · đủ rồi"}</small></summary>
     <div class="seg sm">${L.map((X, i) => `<button class="${i === bi ? 'on' : ''}" data-act="bldpick" data-arg="${i}">${SETS.find(z => z.id === X.set).n}</button>`).join('')}</div>
     <p class="help-p">${B.d}</p>
     ${sec("Chiêu", skRow)}${sec("Bộ", chip(nSet >= 6, 'S:' + S.id, `${S.n}<small>${nSet}/6</small>`))}${WX0 ? sec("Binh khí", chip(owned.has(WX0.id), 'W:' + WX0.id, WX0.n)) : ''}${sec("Thần binh", legRow)}${featureOn('cube') ? sec("Túi Càn Khôn", cubeRow) : ''}${sec("Linh ngọc", gemRow)}
     <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">Phối theo một chạm</button>
-    <div class="bc-san">Đồ lẻ (không mặc Bộ)<button class="qhelp sm" data-act="sanhelp" aria-label="Giải thích">?</button></div></div>`;
+    <div class="bc-san">Đồ lẻ (không mặc Bộ)<button class="qhelp sm" data-act="sanhelp" aria-label="Giải thích">?</button></div></details>`;
 }
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);
@@ -838,7 +840,7 @@ function mechCard(cls) {
     const { act, basic } = skillList(cls), have = new Set([...act, basic].map(k => effWx(cls, k))), miss = WX_IDS.filter(w => !have.has(w));
     extra = `<p class="help-p wxrow">Ngũ hành bạn đang mang: ${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join(' ')}　<small>mang càng nhiều hành khác nhau, “Liên” càng dễ chồng</small></p>`;
   }
-  return `<details class="mech"><summary><b>Công pháp bản môn · ${M[0]}</b> <small>bị động, luôn có hiệu lực · chạm để xem giải thích</small></summary>
+  return `<details class="mech" open><summary><b>Công pháp bản môn · ${M[0]}</b> <small>đặc tính môn phái, luôn có hiệu lực</small></summary>
     <p class="help-p">${M[1]}</p><p class="help-p">${sustText(cls, s)}</p></details>${extra}`;
 }
 // 现在身上哪些东西在加强这一招：套装、神兵（穿着的和乾坤袋里启用的）、点过的心法——说明里点了这招名字的都列出来
