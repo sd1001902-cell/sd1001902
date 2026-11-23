@@ -1486,7 +1486,7 @@ function endBattle() {
     return setTimeout(() => { if (BRES && VIEW === 'battle') battleContinue(); }, 500);
   }
   save(); showRes();
-  if (!BRES.win && isRift(SAVE.run) && WAUTO && RDEATH < 1) setTimeout(() => { if (BRES && !BRES.win && VIEW === 'battle' && WAUTO) battleContinue(); }, 2400);   // 自动闯关：第一次倒下自己爬起来
+  if (!BRES.win && isRift(SAVE.run) && WAUTO && (RDEATH < 1 || (WKEY && WKEY.key && WKEY.key.rboss && rBossGain(B)))) setTimeout(() => { if (BRES && !BRES.win && VIEW === 'battle' && WAUTO) battleContinue(); }, 2400);   // 自动闯关：第一次倒下自己爬起来；打妖王时只要这次打掉了一截，就接着爬起来
   if (!BRES.win && !(WKEY && WKEY.key && WKEY.key.scripted)) SFX.play('lose');
   else if (BRES.items.some(i => i.anc || i.rarity === 'legend' || i.rarity === 'set')) SFX.play('legend');
   else if (BRES.levels) SFX.play('level');
@@ -1999,7 +1999,7 @@ function riftWorldHTML() {
   const run = SAVE.run, B = run.rbuff;   // 地图顶上只留层名：同伴的名字放这儿会和层名挤在一起
   const hint = riftHint(run);
   return `${runBar(run)}
-    <div class="rhud"><div class="rprog ${run.prog >= 100 ? 'full' : ''}" id="rprog"><i style="width:${run.prog}%"></i><em style="left:40%"></em><em style="left:80%"></em><span>${run.rw.boss ? "Tiến độ đã đầy · yêu vương giữ ải đã hiện thân" : `Tiến độ Ảo Cảnh ${Math.floor(run.prog)}%`}</span></div>${xiangBar(run)}${B ? `<p class="rbuff">${R_PYLONS[B.k].n} đang có hiệu lực: còn ${B.n} trận</p>` : ''}<p class="rhint" id="rhint">${hint}</p></div>
+    <div class="rhud"><div class="rprog ${run.prog >= 100 ? 'full' : ''}" id="rprog"><i style="width:${run.prog}%"></i><em style="left:40%"></em><em style="left:80%"></em><span>${run.rw.boss ? `Tiến độ đã đầy · yêu vương giữ ải đã hiện thân${(() => { const mb = wScene(RCH).mons.find(o => o.boss && o.bst); if (!mb) return ''; const L = mb.bst.b.filter(x => x.hp > 0); return L.length ? ` · còn ${Math.round(100 * L.reduce((a, x) => a + x.hp, 0) / L.length)}% máu` : ''; })()}` : `Tiến độ Ảo Cảnh ${Math.floor(run.prog)}%`}</span></div>${xiangBar(run)}${B ? `<p class="rbuff">${R_PYLONS[B.k].n} đang có hiệu lực: còn ${B.n} trận</p>` : ''}<p class="rhint" id="rhint">${hint}</p></div>
     <div class="wmap" id="wmap"><canvas id="wcv"></canvas><div class="wzone" id="wzone">${esc(zoneName())}</div>
       ${(() => { const E = fmEnemyNow(); if (!E) return '<div class="wfol"></div>'; const k = formK(formCur() || 'san', E.b || E.f);
         return `<button class="wfol fmchip k${k}" data-act="fmopen">${E.b ? "Yêu vương" : "Trận yêu"} ${fmShort(E.b || E.f)} · <b>${fmKTxt(k)}</b></button>`; })()}
@@ -2640,11 +2640,14 @@ function beginWorldBattle(enc) {
 function riftBattleContinue() {
   const run = SAVE.run, k = WKEY || {}; WKEY = null;
   if (!BRES.win) {
-    const auto = WAUTO, keep = auto && ++RDEATH < 2;   // 自动闯关：倒下一次爬起来接着打；连着倒两次就停，免得白白烧香
-    const pen = riftRevive(run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; MAPGOAL = null; wStopAuto(); WHERO = null; save(); render();
-    banner("Bạn ngã xuống rồi", `Ảo Cảnh ném bạn về lối vào của tầng này · hương cháy mất ${fmtClock(pen)}`, 1800);
+    const gain = k.key && k.key.rboss ? rBossGain(B) : false, kept = k.key && k.key.rboss ? rBossKeep(B, k.key) : null;   // 打妖王倒下：它的血记下来，下次接着打（每倒一次回一成）
+    const auto = WAUTO, pen = riftRevive(run), left = xiangLeft(run) > 0;
+    // 自动闯关：打小怪倒下一次爬起来接着打，连着倒两次就停；打妖王只要这次打动了（掉的血比它回的多，或者打死了帮手），香也还有，就一直接着去打
+    const keep = auto && (kept ? gain && left : ++RDEATH < 2); if (kept && gain) RDEATH = 0;
+    B = null; VIEW = 'world'; WALK = null; WGOAL = null; MAPGOAL = null; wStopAuto(); WHERO = null; save(); render();
+    banner("Bạn ngã xuống rồi", kept ? `Yêu vương còn ${Math.round(Math.min(1, kept.now + R_BOSS_BACK) * 100)}% máu (mỗi lần bạn ngã nó hồi một phần mười) · hương cháy mất ${fmtClock(pen)}` : `Ảo Cảnh ném bạn về lối vào của tầng này · hương cháy mất ${fmtClock(pen)}`, 2200);
     if (keep) setTimeout(() => { if (VIEW === 'world' && !WAUTO && isRift(SAVE.run)) wStartAuto(); }, 2000);
-    else if (auto) qtoast("Ngã liền hai lần, tự vượt ải tạm dừng: thay bộ trang bị, hoặc hạ một tầng rồi thử lại");
+    else if (auto) qtoast(kept ? (!left ? "Hương đã cháy hết, tự động vượt ải tạm dừng. Máu yêu vương vẫn được ghi lại, bạn có thể tự đánh tiếp (tính là \"Hương tàn\")" : "Lần này không đánh nổi yêu vương (máu mất chưa bằng máu nó hồi), tự động vượt ải tạm dừng: đổi trang bị, đổi trận rồi đánh tiếp") : "Ngã liền hai lần, tự vượt ải tạm dừng: thay bộ trang bị, hoặc hạ một tầng rồi thử lại");
     return;
   }
   RDEATH = 0; if (B && B.kind === 'boss') wStopAuto();   // 打完妖王停在结算

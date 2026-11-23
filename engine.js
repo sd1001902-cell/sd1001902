@@ -1761,6 +1761,7 @@ function startBattle(run, kind) {
   if (P.allyPct) for (const u of b.units) if (u.kind === 'ally') { const k = 1 + P.allyPct / 100; u.maxHp = u.hp = Math.round(u.maxHp * k); u.atk *= k; }   // 同心玉
   for (const u of b.units) { const k = stKey(u); if (k && !(b.stat && b.stat[k])) { stAddK(b, k, 'dmg', 1e-9); b.stat[k].dmg = 0; } }   // 开战就有统计框：你、每个伙伴、僵尸先各占一行
   applyForm(b, run);   // 阵法：号位加成、前后排、克制
+  { const bz = b.units.filter(u => u.kind === 'boss'); if (bz.length) b.bossHp0 = bz.reduce((a, u) => a + u.hp / u.maxHp, 0) / bz.length; }   // 开打时首领剩几成血（幻境妖王可能是上次打剩的）
   if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
     if (P.yi.zhizhu) { f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2); (b.yiPops = b.yiPops || []).push([f.id, '缠丝', 'cold', 'zhizhu']); }
     if (P.yi.xianling && RNG.ch(YI_STUN(P.yi.xianling) / 100 * (f.kind === 'boss' ? 0.5 : 1))) { f.st.frozen = true; (b.yiPops = b.yiPops || []).push([f.id, '惊堂木', 'cold', 'xianling']); }
@@ -2013,7 +2014,7 @@ function battleStep(b) {
     if (u.ph2 && u.hp / u.maxHp < R_BOSS_PH[3]) { delete u.ph2; u.atk *= R_BOSS_PH[4]; u.rageB = true; out.pops.push([u.id, '暴怒', 'crit']); out.lines.push(`${u.name}暴怒了：出手更狠！`); }
   }
   for (const u of b.units) if (u.callU && u.hp > 0 && (u.ph2 != null || u.rageB ? !!u.rageB : u.hp / u.maxHp < 0.5)) {   // 幻境组队：首领喊小妖（守关妖王暴怒时喊；没有阶段的照旧半血喊）
-    const L = u.callU; delete u.callU; L.forEach(x => { x.g = RNG.i(0, 40); b.units.push(x); });
+    const L = u.callU; delete u.callU; L.forEach(x => { x.g = RNG.i(0, 40); x.called = true; b.units.push(x); });
     out.pops.push([u.id, '呼喝', 'crit']); out.lines.push(`${u.name}一声呼喝，又有 ${L.length} 只妖物冲了上来！`); }
   resolveDeaths(b, out);
   if (++b.turn > 700 && !b.over) { b.over = true; b.win = false; out.lines.push('战斗拖得太久，你力竭倒下。'); }

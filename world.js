@@ -1236,15 +1236,53 @@ var R_NORM = [1.3, 0.8], R_ELITE = [3.2, 1.25], R_BOSS = [2.6, 2.2];
 // A 速度每 50 层 +6%（最多 +30%），150 层起每出手 5 次连动一次；B 100/200/300 层起各多一条精英词缀（不给分身、铜皮、神行）；
 // C 打到 70% 血上一层护体真气（最大气血 15%，没打破之前受到的伤害减半），35% 血暴怒（攻击 ×1.2），组队时这时候喊小妖（原来半血喊）
 var R_BOSS_SPD = [50, 0.06, 0.3], R_BOSS_DUO = [150, 5], R_BOSS_AFF = [100, 200, 300], R_BOSS_PH = [0.7, 0.15, 0.5, 0.35, 1.2];   // 第一版（每 50 层 +10%、四招连动、暴怒 ×1.3）200 层妖王比小怪群还难一大截，收一收
-function rBossUp(run, u) {
+function rBossUp(run, u, fixed) {   // fixed：这只妖王上次抽到的词缀（倒下再来打，还是那几条）
   const N = run.riftLv || 0;
   u.spd *= 1 + Math.min(R_BOSS_SPD[2], R_BOSS_SPD[1] * Math.floor(N / R_BOSS_SPD[0]));
   if (N >= R_BOSS_DUO[0]) u.duo = R_BOSS_DUO[1];
   const n = R_BOSS_AFF.filter(x => N >= x).length;
-  if (n) { const pool = ELITE_AFFIXES.map(a => a.id).filter(a => !['split', 'tough', 'fast'].includes(a) && !(u.aff || []).includes(a)), add = RNG.shuffle(pool).slice(0, n);
+  let add = [];
+  if (fixed) add = fixed.slice();
+  else if (n) { const pool = ELITE_AFFIXES.map(a => a.id).filter(a => !['split', 'tough', 'fast'].includes(a) && !(u.aff || []).includes(a)); add = RNG.shuffle(pool).slice(0, n); }
+  if (add.length) {
     u.aff = [...(u.aff || []), ...add];
     if (add.includes('shielded')) u.shield = Math.max(u.shield || 0, Math.round(u.maxHp * 0.3)); }
   u.ph1 = true; u.ph2 = true; u.nAct = 0;
+  return add;
+}
+// 2026-11-23 打妖王倒下了：妖王的血接着上次（每倒一次回一成），已经过了的阶段不再来，词缀不变；护法打死的不复活，活着的接着上次的血；喊来的小妖同理
+var R_BOSS_BACK = 0.1, R_BOSS_PROG = 0.02;   // 每倒一次妖王回多少血；自动闯关：这一次打掉的要比它回的血多这么多（或者打死了护法、小妖），才算打动了、接着去打
+function rBossGain(b) {   // 这一场打妖王打动了没有：妖王掉的血超过它倒一次回的血，或者打死了护法、喊来的小妖
+  if (!b) return false; const bz = b.units.filter(u => u.kind === 'boss'); if (!bz.length) return false;
+  const now = bz.reduce((a, u) => a + Math.max(0, u.hp) / u.maxHp, 0) / bz.length, prog = (b.bossHp0 != null ? b.bossHp0 : 1) - now;
+  return prog >= R_BOSS_BACK + R_BOSS_PROG || b.units.some(u => (u.hufa || u.called) && u.hp <= 0);
+}
+function rBossKeep(b, key) {   // 输了的那一场：把妖王一伙的状态记在地图上的妖王身上
+  if (!b || !key || !key.rboss) return null;
+  const D = wScene(RCH), mn = D.mons.find(o => o.id === key.rboss); if (!mn) return null;
+  const bz = b.units.filter(u => u.kind === 'boss'); if (!bz.length) return null;
+  const frac = u => Math.max(0, u.hp) / u.maxHp, now = bz.reduce((a, u) => a + frac(u), 0) / bz.length;
+  const P = mn.bst || { b: [], h: [] }, B2 = P.b.map(x => ({ ...x })), H2 = P.h.slice();   // 上次就没上场的（已经打死的）保持死的
+  for (const u of bz) B2[u.bidx || 0] = { hp: u.hp > 0 ? Math.min(1, frac(u) + R_BOSS_BACK) : 0, p1: !!u.ph1, p2: !!u.ph2, sh: u.shield > 0 ? u.shield / u.maxHp : 0, ps: !!(u.phShield && u.shield > 0), n: u.nAct || 0, call: !!u.callU };   // 护体（词缀的、七成血的）剩多少也记着，不会重新长满
+  for (const u of b.units) if (u.hufa) H2[u.hidx || 0] = frac(u);
+  mn.bst = { b: B2, h: H2, a: b.units.filter(u => u.called).map(u => frac(u)).filter(f => f > 0) };
+  return { prog: (b.bossHp0 != null ? b.bossHp0 : 1) - now, now };
+}
+function rBossLoad(units, mn) {   // 再打：照记下来的摆回去
+  const S = mn && mn.bst; if (!S) return units;
+  const out = [];
+  for (const u of units) {
+    if (u.kind === 'boss') { const T = S.b[u.bidx || 0]; if (!T) { out.push(u); continue; } if (T.hp <= 0) continue;
+      u.hp = Math.max(1, Math.round(u.maxHp * T.hp)); u.nAct = T.n || 0;
+      u.shield = Math.round(u.maxHp * (T.sh || 0)); if (T.ps && u.shield > 0) u.phShield = true;
+      if (!T.p1) delete u.ph1;
+      if (!T.p2) { delete u.ph2; u.rageB = true; u.atk *= R_BOSS_PH[4]; }
+      if (!T.call && u.callU) { const L = u.callU; delete u.callU; S.a.forEach((f, j) => { const x = L[j]; if (x) { x.hp = Math.max(1, Math.round(x.maxHp * f)); x.called = true; out.push(x); } }); }
+      out.push(u); continue; }
+    if (u.hufa) { const f = S.h[u.hidx || 0]; if (f != null && f <= 0) continue; if (f != null) u.hp = Math.max(1, Math.round(u.maxHp * f)); }
+    out.push(u);
+  }
+  return out;
 }
 var R_BOSS_UP = 1.6;   // 守关妖王本身的血再 ×1.6（护法、小妖不动）：原来首领三四十手就倒，不像最后一关。香相应加了 1 分钟
 // 50 层以后精英涨得比小怪慢一点（每层 +6% 气血、+3.5% 攻击，小怪和妖王是 +8%、+5%）：实测精英战比小怪群、妖王战早二三十层就打不过，只能绕着走
@@ -1352,7 +1390,7 @@ function rSpawnFloor(ch, sc, wave) {
 // 撞上一群怪：旁边两格内的怪群一起卷进来
 function rFight(ch, mn, first) {
   const D = wScene(ch), run = SAVE.run, R = rFloorOf(ch);
-  if (mn.boss) return { fight: { kind: 'boss', rift: 1, c: mn.c, lv: mn.lv, first: 'e' }, key: { rboss: mn.id } };
+  if (mn.boss) return { fight: { kind: 'boss', rift: 1, c: mn.c, lv: mn.lv, first: 'e', mid: mn.id }, key: { rboss: mn.id } };
   const gather = run && run.rbuff && run.rbuff.k === 'gather', rad = gather ? R_PULL + 2 : R_PULL, cap = gather ? 7 : R_PULL_MAX, hp = wstate(ch).pos;
   const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));   // 离被撞上的那群、或者离你自己够近的，都算卷进来
   const near = D.mons.filter(o => o !== mn && !o.boss).map(o => ({ o, d: Math.min(cheb(o, mn), cheb(o, hp)) })).filter(e => e.d <= rad).sort((a, b) => a.d - b.d).slice(0, cap - 1);
@@ -1369,17 +1407,21 @@ function rPrep(run, enc) {
   const nT = (run.team || []).length, tK = 1 + R_TEAM[0] * nT, tKB = 1 + R_TEAM[5] * nT;   // 组队：每带一个伙伴，小怪精英血量 +10%，首领 +4%（首领另外带护法）
   if (enc.kind === 'boss') {
     run.theme = enc.c - 1;
-    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB * (u.kind === 'boss' ? R_BOSS_UP : 1)); u.atk *= R_BOSS[1]; if (u.kind === 'boss') rBossUp(run, u); });
+    const mn = enc.mid != null ? D.mons.find(o => o.id === enc.mid) : null; let bi = 0;   // 地图上的这只妖王：记着它的词缀、护法、上次打剩的血
+    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB * (u.kind === 'boss' ? R_BOSS_UP : 1)); u.atk *= R_BOSS[1];
+      if (u.kind === 'boss') { const fx = mn && mn.baff ? mn.baff[bi] : null, got = rBossUp(run, u, fx); if (mn) (mn.baff = mn.baff || [])[bi] = got; u.bidx = bi++; } });
     if (nT) {   // 首领也带帮手：伙伴几个，护法几个（本章妖物的精英，各带一条精英词缀）；半血时再喊一波小妖
       const F0 = CHAPTERS[enc.c - 1], B0 = units.find(u => u.kind === 'boss') || units[0], ez = rEliteEase(run.riftLv), lv = enc.lv;
       const okA = ['fiery', 'cold', 'vamp', 'enraged', 'tough', 'fast', 'shielded', 'venom'];   // 不给分身、反震
-      const hufa = []; for (let i = 0; i < nT; i++) { const def = RNG.pick(F0.mons), e = makeMonster(def, lv, run, 'elite', [RNG.pick(okA)]);
-        e.name = '护法·' + def.n; e.hufa = true; e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * R_TEAM[1]); e.atk *= R_ELITE[1] * ez[1] * R_TEAM[4]; if (e.shield) e.shield = Math.round(e.maxHp * 0.3); hufa.push(e); }
+      if (mn && !mn.hsp) mn.hsp = [];   // 护法长什么样、带什么词缀，第一次定下来以后不变
+      const hufa = []; for (let i = 0; i < nT; i++) { const sp = mn && mn.hsp[i] ? mn.hsp[i] : { m: RNG.i(0, F0.mons.length - 1), a: RNG.pick(okA) }; if (mn) mn.hsp[i] = sp;
+        const def = F0.mons[sp.m] || F0.mons[0], e = makeMonster(def, lv, run, 'elite', [sp.a]);
+        e.name = '护法·' + def.n; e.hufa = true; e.hidx = i; e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * R_TEAM[1]); e.atk *= R_ELITE[1] * ez[1] * R_TEAM[4]; if (e.shield) e.shield = Math.round(e.maxHp * 0.3); hufa.push(e); }
       B0.callU = []; for (let i = 0; i < 1 + Math.ceil(nT / 2); i++) { const u = makeMonster(RNG.pick(F0.mons), lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; B0.callU.push(u); }
       B0.sweep = true;
-      run.encUnits = [...hufa, ...units]; return 'boss';
+      run.encUnits = rBossLoad([...hufa, ...units], mn); return 'boss';
     }
-    run.encUnits = units; return 'boss';
+    run.encUnits = rBossLoad(units, mn); return 'boss';
   }
   run.theme = R.c - 1;
   const F = CHAPTERS[R.c - 1], Z = rSanitize(R.c, R.sc), nAff = 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= 45 ? 1 : 0), el = [], no = [];

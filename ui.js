@@ -1485,7 +1485,7 @@ function endBattle() {
     return setTimeout(() => { if (BRES && VIEW === 'battle') battleContinue(); }, 500);
   }
   save(); showRes();
-  if (!BRES.win && isRift(SAVE.run) && WAUTO && RDEATH < 1) setTimeout(() => { if (BRES && !BRES.win && VIEW === 'battle' && WAUTO) battleContinue(); }, 2400);   // 自动闯关：第一次倒下自己爬起来
+  if (!BRES.win && isRift(SAVE.run) && WAUTO && (RDEATH < 1 || (WKEY && WKEY.key && WKEY.key.rboss && rBossGain(B)))) setTimeout(() => { if (BRES && !BRES.win && VIEW === 'battle' && WAUTO) battleContinue(); }, 2400);   // 自动闯关：第一次倒下自己爬起来；打妖王时只要这次打掉了一截，就接着爬起来
   if (!BRES.win && !(WKEY && WKEY.key && WKEY.key.scripted)) SFX.play('lose');
   else if (BRES.items.some(i => i.anc || i.rarity === 'legend' || i.rarity === 'set')) SFX.play('legend');
   else if (BRES.levels) SFX.play('level');
@@ -1998,7 +1998,7 @@ function riftWorldHTML() {
   const run = SAVE.run, B = run.rbuff;   // 地图顶上只留层名：同伴的名字放这儿会和层名挤在一起
   const hint = riftHint(run);
   return `${runBar(run)}
-    <div class="rhud"><div class="rprog ${run.prog >= 100 ? 'full' : ''}" id="rprog"><i style="width:${run.prog}%"></i><em style="left:40%"></em><em style="left:80%"></em><span>${run.rw.boss ? '进度已满 · 守关妖王已现身' : `幻境进度 ${Math.floor(run.prog)}%`}</span></div>${xiangBar(run)}${B ? `<p class="rbuff">${R_PYLONS[B.k].n}生效中：还剩 ${B.n} 场</p>` : ''}<p class="rhint" id="rhint">${hint}</p></div>
+    <div class="rhud"><div class="rprog ${run.prog >= 100 ? 'full' : ''}" id="rprog"><i style="width:${run.prog}%"></i><em style="left:40%"></em><em style="left:80%"></em><span>${run.rw.boss ? `进度已满 · 守关妖王已现身${(() => { const mb = wScene(RCH).mons.find(o => o.boss && o.bst); if (!mb) return ''; const L = mb.bst.b.filter(x => x.hp > 0); return L.length ? ` · 还剩 ${Math.round(100 * L.reduce((a, x) => a + x.hp, 0) / L.length)}% 血` : ''; })()}` : `幻境进度 ${Math.floor(run.prog)}%`}</span></div>${xiangBar(run)}${B ? `<p class="rbuff">${R_PYLONS[B.k].n}生效中：还剩 ${B.n} 场</p>` : ''}<p class="rhint" id="rhint">${hint}</p></div>
     <div class="wmap" id="wmap"><canvas id="wcv"></canvas><div class="wzone" id="wzone">${esc(zoneName())}</div>
       ${(() => { const E = fmEnemyNow(); if (!E) return '<div class="wfol"></div>'; const k = formK(formCur() || 'san', E.b || E.f);
         return `<button class="wfol fmchip k${k}" data-act="fmopen">${E.b ? '妖王' : '妖阵'} ${fmShort(E.b || E.f)} · <b>${fmKTxt(k)}</b></button>`; })()}
@@ -2639,11 +2639,14 @@ function beginWorldBattle(enc) {
 function riftBattleContinue() {
   const run = SAVE.run, k = WKEY || {}; WKEY = null;
   if (!BRES.win) {
-    const auto = WAUTO, keep = auto && ++RDEATH < 2;   // 自动闯关：倒下一次爬起来接着打；连着倒两次就停，免得白白烧香
-    const pen = riftRevive(run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; MAPGOAL = null; wStopAuto(); WHERO = null; save(); render();
-    banner('你倒下了', `幻境把你吐回了这一层的入口 · 香烧掉 ${fmtClock(pen)}`, 1800);
+    const gain = k.key && k.key.rboss ? rBossGain(B) : false, kept = k.key && k.key.rboss ? rBossKeep(B, k.key) : null;   // 打妖王倒下：它的血记下来，下次接着打（每倒一次回一成）
+    const auto = WAUTO, pen = riftRevive(run), left = xiangLeft(run) > 0;
+    // 自动闯关：打小怪倒下一次爬起来接着打，连着倒两次就停；打妖王只要这次打动了（掉的血比它回的多，或者打死了帮手），香也还有，就一直接着去打
+    const keep = auto && (kept ? gain && left : ++RDEATH < 2); if (kept && gain) RDEATH = 0;
+    B = null; VIEW = 'world'; WALK = null; WGOAL = null; MAPGOAL = null; wStopAuto(); WHERO = null; save(); render();
+    banner('你倒下了', kept ? `妖王还剩 ${Math.round(Math.min(1, kept.now + R_BOSS_BACK) * 100)}% 血（每倒一次它回一成）· 香烧掉 ${fmtClock(pen)}` : `幻境把你吐回了这一层的入口 · 香烧掉 ${fmtClock(pen)}`, 2200);
     if (keep) setTimeout(() => { if (VIEW === 'world' && !WAUTO && isRift(SAVE.run)) wStartAuto(); }, 2000);
-    else if (auto) qtoast('连着倒下两次，自动闯关先停下：换身装备，或者降一层再来');
+    else if (auto) qtoast(kept ? (!left ? '香烧完了，自动闯关先停下。妖王的血还记着，可以自己接着打（算「香尽」）' : '这次没打动妖王（掉的血还没它回的多），自动闯关先停下：换身装备、换个阵，再接着打') : '连着倒下两次，自动闯关先停下：换身装备，或者降一层再来');
     return;
   }
   RDEATH = 0; if (B && B.kind === 'boss') wStopAuto();   // 打完妖王停在结算
