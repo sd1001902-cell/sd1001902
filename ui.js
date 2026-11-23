@@ -44,13 +44,13 @@ const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); if (n 
 const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
 // 跳字（2026-11-24 第三版）：游戏体粗数字 + 粗描边（后面垫一层描边字，前面是本色／暴击金色渐变）；头上「爆」出来，弹一下就往上飘、半程淡出，0.7 秒左右；
 // 暴击从三倍大旋着砸下来，炸一圈金环、画面抖一下；同一个目标的数字按中、左、右三条道轮流冒；站在最上排的（首领常在后排）数字放到身体中部
-const POP_KF = {
-  n: [[0, 6, .4, 0, 0], [.1, -4, 1.35, 1, 0], [.2, -8, 1, 1, 0], [.5, -20, 1, 1, 0], [1, -52, .9, 0, 0]],
-  b: [[0, 6, .4, 0, 0], [.1, -4, 1.6, 1, 0], [.22, -8, 1, 1, 0], [.5, -22, 1, 1, 0], [1, -58, .9, 0, 0]],
-  c: [[0, 0, 3, 0, -14], [.07, -2, .85, 1, 5], [.14, -6, 1.18, 1, -2], [.22, -8, 1, 1, 0], [.58, -16, 1, 1, 0], [1, -62, .92, 0, 0]],
-  h: [[0, 0, .5, 0, 0], [.12, -4, 1.3, 1, 0], [.24, -6, 1, 1, 0], [.55, -16, 1, 1, 0], [1, -40, 1, 0, 0]],
+const POP_KF = {   // 2026-11-24 第四版：不夸张——轻轻弹一下就往上飘、半程淡出
+  n: [[0, 6, .6, 0, 0], [.12, -3, 1.12, 1, 0], [.24, -6, 1, 1, 0], [.5, -16, 1, 1, 0], [1, -42, .95, 0, 0]],
+  b: [[0, 6, .6, 0, 0], [.12, -3, 1.22, 1, 0], [.26, -6, 1, 1, 0], [.5, -18, 1, 1, 0], [1, -46, .95, 0, 0]],
+  c: [[0, 0, 1.6, 0, 0], [.1, -3, .95, 1, 0], [.2, -6, 1.06, 1, 0], [.3, -8, 1, 1, 0], [.55, -16, 1, 1, 0], [1, -48, .95, 0, 0]],
+  h: [[0, 0, .6, 0, 0], [.12, -3, 1.12, 1, 0], [.24, -5, 1, 1, 0], [.55, -14, 1, 1, 0], [1, -36, 1, 0, 0]],
 };
-const POP_MS = { n: 700, b: 800, c: 1000, h: 650 };
+const POP_MS = { n: 700, b: 750, c: 850, h: 650 };
 const popSpd = () => ({ 1: 1, 2: 0.8, 3: 0.65 }[SAVE.speed] || 1);
 const popHTML = h => `<i class="o">${h}</i><b>${h}</b>`;
 function popPut(el, cls, html, kind) {
@@ -65,11 +65,6 @@ function popPut(el, cls, html, kind) {
   const kf = POP_KF[kind] || POP_KF.n, dur = (POP_MS[kind] || 700) * popSpd();
   if (p.animate) { const a = p.animate(kf.map(([o, y, sc, op, rt]) => ({ offset: o, transform: `translate(-50%,${y}px) scale(${sc})${rt ? ` rotate(${rt}deg)` : ''}`, opacity: op })), { duration: dur, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }); a.onfinish = () => p.remove(); }
   else setTimeout(() => p.remove(), dur);
-  if (kind === 'c') {   // 暴击：身后炸一圈金环，画面抖一下
-    const r = document.createElement('i'); r.className = 'cburst' + (el._low ? ' low' : ''); if (p.style.left) r.style.left = p.style.left; el.appendChild(r);
-    if (r.animate) r.animate([{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.9)', opacity: 0 }], { duration: 360 * popSpd(), easing: 'ease-out' }).onfinish = () => r.remove(); else setTimeout(() => r.remove(), 400);
-    if (VFX.shakeNow) VFX.shakeNow(5);
-  }
   return p;
 }
 const uK = u => u && u.side === 'p' && B && B.P ? hpK(B.P.lv) : 1;                       // 战斗里某个单位的显示倍数
@@ -1859,7 +1854,8 @@ function formAllies() {
   const desk = innerWidth > 700, LBL = desk ? 54 : 46, SPH = 58, BSH = 118;   // 名字、血条、状态三行的高度；一倍大小时小妖、首领的身高
   const sa = $('#allies'), sf = $('#foes'); if (!sa || !sf) return;
   for (const sd of [sa, sf]) { sd.classList.add('form', 'tb'); sd.style.transform = ''; }
-  const TOP = ar.clientHeight - pt - 8; if (TOP - pb <= 0 || !ar.clientWidth) return;   // 最上面的人头顶不能超过这里（出手顺序条下面）
+  const HR = desk ? 44 : 38;   // 2026-11-24 头顶留出跳字的地方：最上排妖物头上要能飘数字，整个战场往下压一点
+  const TOP = ar.clientHeight - pt - 8 - HR; if (TOP - pb <= 0 || !ar.clientWidth) return;   // 最上面的人头顶不能超过这里（出手顺序条下面再空出 HR）
   const put = (u, x, bot, z, zi) => { const el = document.getElementById('u-' + u.id); if (!el) return; el.style.left = x + '%'; el.style.bottom = Math.round(bot) + 'px'; el.style.setProperty('--uz', z.toFixed(2)); el.style.scale = ''; el.style.zIndex = String(zi); };
   const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
   // 前后排和战斗里妖物挑人打的规矩一致（engine 里的 FRONT_CLS、伙伴的 front）：狂刀客、武僧站前排，道士、赶尸人、刺客站后排；
