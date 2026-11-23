@@ -52,6 +52,25 @@ const RUNES = {
 // 灵玉 2026-11-23 重做：删掉只是普通属性的五颗（战神、长生、疾风、破军、回春）；留六颗特色玉；
 // 每个门派一颗本命玉（cls：只有本门能放进灵玉匣），两套幻境套装都吃得到；另外五颗不绑门派、绑一种打法。
 // st：直接加到属性上的部分；机制部分在战斗里按 P.lgv[类型] = 等级 读（LGV 里的公式）
+// ---------------- 阵法（2026-11-23，照梦幻西游的阵：四个号位，1、2 号前排，3、4 号后排，各号位加成不同，有的有代价） ----------------
+// b：加成（跟着阵的等级涨，10 级是 1 级的 1.9 倍）；p：代价（不涨）；all：全员都有的加成/代价（同样 b 涨 p 不涨）
+// 键：dmg 伤害%，dr 受到的伤害 -%（负数是多挨），spd 速度%，arm 护甲%，heal 受到的治疗%，aggro 妖物先打他的几率%，ext 挂的状态多几回合，stD 对身上有状态的妖物伤害%
+// at：幻境到过多少层学会；ch：主线通关第几章学会（哪个先到算哪个）
+const FORMS = {
+  san:       { n: "Tán Trận", s: "Tán", tag: "Không bày trận", d: "Không bày trận: hàng trước sau theo môn phái, không tăng ích cũng không phải trả giá. Yêu vật bày trận là sẽ khắc bạn." },
+  tianfu:    { n: "Thiên Phúc Trận", s: "Thiên Phúc", tag: "Cả đội tấn công mạnh", at: 10, ch: 2, rows: [0, 0, 1, 1], pos: [{}, {}, {}, {}], all: { b: { dmg: 18 }, p: { spd: -6 } } },
+  niaoxiang: { n: "Điểu Tường Trận", s: "Điểu Tường", tag: "Giành ra tay trước", at: 20, ch: 4, rows: [0, 0, 1, 1], pos: [{ b: { spd: 20 } }, { b: { spd: 10 } }, { b: { spd: 10 } }, { p: { dr: -10 } }] },
+  dizai:     { n: "Địa Tải Trận", s: "Địa Tải", tag: "Thủ vững", at: 30, ch: 6, rows: [0, 0, 1, 1], pos: [{ b: { dr: 25 } }, { b: { arm: 30 } }, { b: { heal: 20 } }, { b: { heal: 20 } }], all: { p: { dmg: -10 } } },
+  huyi:      { n: "Hổ Dực Trận", s: "Hổ Dực", tag: "Một người đột kích", at: 45, ch: 8, rows: [0, 0, 1, 1], pos: [{ b: { dmg: 30, aggro: 35 }, p: { dr: -15 } }, { b: { dmg: 10 } }, { b: { dmg: 10 } }, { b: { dr: 15 } }] },
+  shepan:    { n: "Xà Bàn Trận", s: "Xà Bàn", tag: "Khống chế, gắn trạng thái", at: 60, ch: 10, rows: [0, 0, 1, 1], pos: [{ b: { ext: 1, stD: 15 } }, { b: { dr: 10 } }, { b: { dr: 10 } }, { b: { dr: 10 } }], all: { p: { spd: -5 } } },
+};
+const FORM_IDS = ['tianfu', 'niaoxiang', 'dizai', 'huyi', 'shepan'];
+const FORM_BEAT = { huyi: 'shepan', shepan: 'niaoxiang', niaoxiang: 'tianfu', tianfu: 'dizai', dizai: 'huyi' };   // 谁克谁：虎翼冲散蛇蟠，蛇蟠缠住鸟翔，鸟翔快过天覆，天覆压垮地载，地载挡住虎翼；五个阵都克散阵
+const FORM_WHY = { huyi: "một người đột kích, phá tan trận cuộn", shepan: "quấn chặt kẻ nhanh", niaoxiang: "ra tay trước đợt tấn công mạnh", tianfu: "tấn công mạnh đè bẹp trận thủ", dizai: "thủ vững chặn đột kích đơn lẻ" };
+const FORM_MAX = 10; let FORM_K = 10, EFM_FROM = 20;   // 阵最高 10 级；克制：克的一方伤害 +10%，被克的一方 -10%；幻境 20 层起妖物摆阵
+const formCost = lv => 30 * lv;   // 升到下一级要的魂晶
+const formScale = (v, lv) => v * (1 + 0.1 * ((lv || 1) - 1));
+const FORM_STAT = { dmg: "Sát thương", dr: "nhận sát thương", spd: "Tốc độ", arm: "Hộ giáp", heal: "nhận hồi máu", aggro: "yêu vật đánh người này trước", ext: "trạng thái kéo dài thêm", stD: "sát thương lên yêu vật có trạng thái" };
 const LGEM_CAP = 150;   // 2026-11-23 灵玉最高 150 级（原来跟着幻境层数一直涨，300 层时灵玉近 300 级，高层没压力）
 const LGV = {
   zhLow: lv => 1 + lv * 0.05, zhHalf: lv => 10 + lv * 0.5,     // 战魂：气血每少 10%，伤害再 +x%；怒意过半时伤害 +x%

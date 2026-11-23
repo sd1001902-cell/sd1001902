@@ -10,7 +10,7 @@ const VFX = (() => {
   const RM = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const COL = { phys: '#f0e6d0', fire: '#ff6a1a', cold: '#8fd8ff', light: '#e6e0ff', magic: '#5df0c0', holy: '#ffd75a', poison: '#7fe05a', buff: '#ff8a4a', heal: '#ff9ac0' };
   const GHOST = '#5df0c0', GOLD = '#ffd75a', BLOOD = '#c4291f', INK = '#120a08';
-  const fac = () => ({ 1: 1, 2: 0.6, 4: 0.32 }[speed] || 1);
+  const fac = () => ({ 1: 1, 2: 0.6, 3: 0.4, 4: 0.32 }[speed] || 1);
 
   function setup(a, spd) { arena = a; layer = a && a.querySelector('.fxl'); speed = spd || 1; if (typeof GFX !== 'undefined') GFX.setup(a); clearInterval(idleH); if (a && !RM) idleH = setInterval(idleTick, 120); }
   // 待机呼吸：每个人自己的节奏，在站姿和「沉一下」两张图之间换

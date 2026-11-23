@@ -560,7 +560,7 @@ function goTab() {
         <button class="charr" data-act="chnav" data-arg="1" ${k < maxCh ? '' : 'disabled'} aria-label="下一章">›</button>
       </div>
       <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>
-      ${!SAVE.story.ended && !riftPath() ? '<button class="linkbtn topath" data-act="topath">不想看剧情？改走「幻境挑战」 ›</button>' : ''}`;
+      ${!SAVE.story.ended && !riftPath() ? '<button class="linkbtn topath" data-act="topath">不想看剧情？改走「幻境挑战」 ›</button>' : ''}${formRow()}`;
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
     const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id)), ar = ancRate(SAVE.riftLv);
@@ -573,7 +573,7 @@ function goTab() {
       <div class="rinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
       ${riftPath() && !SAVE.story.ended ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">追赶中：战斗经验 <b>×${cuTxt(cu)}</b>（比最高的角色低 ${topLevel() - SAVE.chars[cls].level} 级）</p>` : ''}
-      ${teamRow()}
+      ${teamRow()}${formRow()}
       <div class="yirow" data-act="zyopen"><span class="sub">役使</span>${[0, 1].map(i => { const id = yi[i], d = id && yiBoss(id), g = id && yiGrade(id);
         return id ? `<span class="yi2">${d ? SPR.img(d.spr, 26, d.pal) : ''}<b>${YISHI[id].n}</b><small>${ZY_CN[g]}</small></span>` : `<span class="yi2 empty">＋ 空位</span>`; }).join('')}<em>镇妖录 ›</em></div>`;
   }
@@ -911,6 +911,64 @@ const teamModal = () => () => {
 };
 const teamHelpModal = () => () => `<h2 class="mh">伙伴</h2><p class="help-p">妖物七成的攻击打前排，前排倒光了才打后排。伙伴吃你的伤害加成和暴击；你带了收某种状态的招式，伙伴会优先帮你把这种状态挂上。必杀时怒气满的伙伴一起合击，各带一段效果。</p>
   <p class="help-p">带伙伴组队时妖物也会变强：小怪血量变多，首领会带护法。</p><button class="btn ghost" data-act="close">返回</button>`;
+// ---- 阵法（2026-11-23）：选阵、摆号位、升级；妖阵和克制 ----
+let FMSEL = null, FMPICK = null;   // 弹窗里正在看的阵；点了哪个号位（再点一个就互换）
+const fmShort = id => id ? FORMS[id].s : '';
+const fmBeatBy = id => Object.keys(FORM_BEAT).find(k => FORM_BEAT[k] === id);
+const fmKTxt = k => k > 0 ? '克' : k < 0 ? '被克' : '平';
+function fmTxt(e) {   // 一个号位的效果写成几小段；代价标红
+  return Object.keys(e).filter(k => e[k]).map(k => { const v = e[k], bad = v < 0;
+    const t = k === 'dr' ? (v > 0 ? `受到的伤害 -${v}%` : `受到的伤害 +${-v}%`) : k === 'aggro' ? `妖物 ${v}% 先打他` : k === 'ext' ? `状态多 ${v} 回合` : k === 'stD' ? `打有状态的 +${v}%` : k === 'heal' ? `受到的治疗 +${v}%` : `${FORM_STAT[k]} ${v > 0 ? '+' : ''}${v}%`;
+    return `<i class="${bad ? 'bad' : ''}">${t}</i>`; }).join('');
+}
+function fmMembers() {   // 摆阵板上的人：出门在外按这一局带的；在城里按出征模式（幻境看组队，主线看同伴）
+  if (SAVE.run) return formMembers(SAVE.run);
+  if (SAVE.mode === 'rift' && pgOr(0)) return ['hero', ...teamOf()];
+  const c = SAVE.comp && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : 'ngoc'; return ['hero', c];
+}
+const fmName = k => k === 'hero' ? CLASSES[SAVE.cls].n : k === 'ngoc' ? 'Ngoc' : (COMPANIONS[k] || {}).n || k;
+const fmIcon = k => k === 'hero' ? heroSpr(SAVE.cls, 30) : unitIcon(k === 'ngoc' ? 'ngocfox' : COMPANIONS[k].spr, 30, null, '', 'head');
+function fmEnemyNow() {   // 幻境地图上：这一层的妖阵、守关妖王的阵（妖王出来以后）
+  const r = SAVE.run; if (!r || r.mode !== 'rift' || !r.world) return null;
+  const f = enemyForm(r, 'x'); if (!f) return null; return { f, b: r.rw && r.rw.boss ? enemyForm(r, 'boss') : null };
+}
+function formRow() {
+  if (!FORM_IDS.some(formOpen)) return '';
+  const c = formCur();
+  return `<button class="teamrow fmrow" data-act="fmopen"><span class="sub">阵法</span><b>${c ? `${FORMS[c].n} Lv ${formLv(c)}` : '散阵（没摆）'}</b><small>${FORM_IDS.filter(formOpen).length}/${FORM_IDS.length} 个阵</small><em>摆阵 ›</em></button>`;
+}
+const formModal = () => () => {
+  const F = formSave(), cur = formCur() || 'san', sel = FMSEL && FORMS[FMSEL] ? FMSEL : cur, cls = SAVE.cls, E = fmEnemyNow();
+  const list = ['san', ...FORM_IDS].map(id => { const op = formOpen(id), k = E && op ? formK(id, E.f) : null;
+    return `<button class="fmo ${id === sel ? 'sel' : ''} ${id === cur ? 'cur' : ''} ${op ? '' : 'lock'}" data-act="fmsel" data-arg="${id}"><b>${FORMS[id].n}</b><small>${op ? (id === 'san' ? '不摆' : 'Lv ' + formLv(id)) : '🔒'}</small>${id === cur ? '<em>用着</em>' : k != null && E ? `<i class="fk k${k}">${fmKTxt(k)}</i>` : ''}</button>`; }).join('');
+  const Fd = FORMS[sel], op = formOpen(sel);
+  let body;
+  if (sel === 'san') body = `<p class="help-p">${Fd.d}</p><div class="fmact">${cur !== 'san' ? '<button class="btn sm" data-act="fmuse" data-arg="san">不摆阵</button>' : '<button class="btn sm" disabled>正在用</button>'}</div>`;
+  else if (!op) body = `<p class="help-p"><b>${Fd.n}</b>（${Fd.tag}）还没学会：主线通关第 ${Fd.ch} 章，或幻境到过 ${Fd.at} 层，就会了。</p>`;
+  else {
+    const lv = formLv(sel), keys = fmMembers(), sl = formSlots(sel, keys, cls);
+    const cell = i => { const k = sl[i], e = formFx(sel, i, lv);
+      return `<button class="fmc ${FMPICK === i ? 'pick' : ''} ${k ? '' : 'empty'}" data-act="fmslot" data-arg="${i}"><span class="fmn">${i + 1}号</span>${k ? `<span class="fmw">${fmIcon(k)}<b>${esc(fmName(k))}</b></span>` : '<span class="fmw"><b class="dim">空</b></span>'}<span class="fme">${fmTxt(e) || '<i>没有加成</i>'}</span></button>`; };
+    const nb = FORM_BEAT[sel], by = fmBeatBy(sel), c = formCost(lv);
+    body = `<p class="fmh"><b>${Fd.n}</b> <span>Lv ${lv}/${FORM_MAX} · ${Fd.tag}</span></p>
+      <p class="fmk">克 <b>${FORMS[nb].n}</b>（${FORM_WHY[sel]}）· 被 <b>${FORMS[by].n}</b> 克 · 克散阵</p>
+      <div class="fmb"><div class="fmr"><span class="fml">前排</span>${cell(0)}${cell(1)}</div><div class="fmr"><span class="fml">后排</span>${cell(2)}${cell(3)}</div></div>
+      <p class="sub fmtip">${FMPICK != null ? `再点一个号位，和 ${FMPICK + 1} 号换位置` : '点一个号位，再点另一个，两个人换位置'}</p>
+      <div class="fmact">${sel !== cur ? `<button class="btn sm" data-act="fmuse" data-arg="${sel}">摆这个阵</button>` : '<button class="btn sm" disabled>正在用</button>'}
+        ${lv < FORM_MAX ? `<button class="btn sm ghost" ${SAVE.mats >= c ? '' : 'disabled'} data-act="fmup" data-arg="${sel}">升到 Lv ${lv + 1}（魂晶 ${c}）</button>` : '<button class="btn sm ghost" disabled>满级</button>'}</div>`;
+  }
+  const eTxt = E ? `<p class="fmen">这一层的妖阵：<b>${FORMS[E.f].n}</b>${E.b ? ` · 守关妖王：<b>${FORMS[E.b].n}</b>` : ''}</p>` : '';
+  return `<h2 class="mh">阵法 <small>魂晶 ${SAVE.mats}</small><button class="qhelp sm" data-act="fmhelp" aria-label="说明">?</button></h2>${eTxt}
+    <div class="fmlist">${list}</div><div class="fmbody">${body}</div>
+    <div class="sheet-act"><button class="btn ghost" data-act="close">好了</button></div>`;
+};
+const formHelpModal = () => () => `<h2 class="mh">阵法怎么用</h2>
+  <p class="help-p">每个阵四个号位：1、2 号站前排，3、4 号站后排。妖物七成的攻击先打前排。你和伙伴站哪个号位自己摆，每个号位的加成不一样，有的号位有代价（红字）。</p>
+  <p class="help-p">阵跟着进度学会（主线通关几章，或幻境到过多少层），花魂晶升级，最高 ${FORM_MAX} 级；升级只涨加成，代价不变。</p>
+  <p class="help-p"><b>相克</b>：${FORM_IDS.map(id => `${FORMS[id].n}克${FORMS[FORM_BEAT[id]].n}`).join('，')}；五个阵都克散阵。克的一方伤害 +${FORM_K}%，被克的一方伤害 -${FORM_K}%。</p>
+  <p class="help-p">幻境 ${EFM_FROM} 层起妖物也摆阵：每一层一个，守关妖王另摆一个。地图右上角写着这一层的妖阵，战斗左上角写着克制情况。打之前换个克它的阵，随时能换。</p>
+  <button class="btn ghost" data-act="close">返回</button>`;
+function formNotify() { const g = formCheckUnlock(); if (g.length) { save(); qtoast(`学会了${g.map(id => `「${FORMS[id].n}」`).join('、')}：去「出征 · 阵法」摆阵`); } }
 const compTag = c => COMPANIONS[c] && COMPANIONS[c].ap ? stTag(COMPANIONS[c].ap, '挂' + STATES[COMPANIONS[c].ap].n) : '';
 // 技能卡上的状态说明
 const skTags = k => `${k.ap ? stTag(k.ap, `挂${STATES[k.ap].n}${k.apc && k.apc < 1 ? ' ' + Math.round(k.apc * 100) + '%' : ''}`) : ''}${k.pay ? (k.pay.s === 'any' ? `<span class="stt pay" style="--c:#e8b0ff">打带状态的：${payText(k.pay)}</span>` : stTag(k.pay.s, `打${STATES[k.pay.s].n}：${payText(k.pay)}`).replace('class="stt"', 'class="stt pay"')) : ''}`;
@@ -1383,7 +1441,7 @@ function narrate(o) {
   else what = c.elem && c.elem !== 'phys' ? '施放妖法' : '扑咬';
   return `${who}${isVi() ? ' ' : ''}${what}${dmg ? `，造成 ${dmg} 伤害${crit ? '（暴击）' : ''}` : ''}`;
 }
-const spdF = () => ({ 1: 1, 2: 0.5, 4: 0.25 }[SAVE.speed] || 1);
+const spdF = () => ({ 1: 1, 2: 0.5, 3: 0.33 }[SAVE.speed] || 1);   // 2026-11-23 最高 3 倍（原来 4 倍，用户定）
 function schedule(o) {
   clearTimeout(timer); if (!B || B.over) return;
   let ms = o ? Math.min(800, Math.max(120, (o.dt || 8) * 18)) * spdF() : 500;
@@ -1391,8 +1449,8 @@ function schedule(o) {
   if (o && o.foilKey) ms += 950 * spdF();
   timer = setTimeout(tick, ms);
 }
-const CUT_MS = () => SAVE.speed === 4 ? 650 : SAVE.speed === 2 ? 900 : 1150;
-const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed === 4 ? 300 : 500;   // 必杀：顶上一条细横幅，不压暗、不挡人
+const CUT_MS = () => SAVE.speed >= 3 ? 700 : SAVE.speed === 2 ? 900 : 1150;
+const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed >= 3 ? 320 : 500;   // 必杀：顶上一条细横幅，不压暗、不挡人
 function tick() {
   if (!B || VIEW !== 'battle') return;
   // 手动出招：轮到你时停下来等你点
@@ -1458,11 +1516,11 @@ function battleHTML() {
   const deco = [0.08, 0.3, 0.55, 0.8].map((x, i) => { const D = T.d[i % T.d.length]; return `<span class="svd" style="left:${x * 100}%">${SPR.img(D[0], 44 + i * 6, D[1])}</span>`; }).join('');
   return `${battleBar(run)}
     <div class="arena sv ${T0 ? 'k-' + T0.kind : ''}" id="arena" style="--bg:${T0 ? T0.bg : themeOf(run).bg};--g:${T.g};--p:${T.p}">${typeof GFX !== 'undefined' ? `<div class="sv-paint" style="background-image:url(${GFX.background(run.theme || (run.mode === 'rift' ? 'rift' + (themeOf(run).n || '') : 'gen'), T0 || { kind: T.kind || 'field', bg: themeOf(run).bg, g: T.g, p: T.p, wx: T.wx }, B && B.kind === 'boss')})"></div>` : ''}<div class="sv-back">${deco}</div>${wxl}
-      <div class="turnbar" id="turnbar"></div><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
+      <div class="turnbar" id="turnbar"></div><button class="fbadge" id="fbadge" data-act="fminfo" hidden></button><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
-    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 4].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div><button class="statc" id="statc" data-act="statfull">统计</button></div><div class="hud-sk" id="hudsk"></div>
+    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div><button class="statc" id="statc" data-act="statfull">统计</button></div><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="必杀·${U.n}"><i id="ultfill"></i><span><b>必杀</b><small id="ultpct"></small></span></button>
 </div>`;
 }
@@ -1603,7 +1661,7 @@ function showCutin(kind, data) {
   const el = $('#cutin'); if (!el) return;
   let h;
   if (kind === 'ult') {   // 必杀：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
-    const run = SAVE.run, sm = SAVE.speed === 4, ms = ULT_MS();
+    const run = SAVE.run, sm = SAVE.speed >= 3, ms = ULT_MS();
     const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
     el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
     el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');
@@ -1679,8 +1737,14 @@ function resChip(P) {
 // 出手顺序条：接下来 6 次谁出手；头像下面是速度
 const TB_SZ = 26;
 function tbIcon(u) { if (!u._tbi) u._tbi = u.kind === 'hero' ? heroSpr(u.cls, TB_SZ) : unitIcon(u.spr || 'skeleton', TB_SZ, u.pal, '', 'head'); return u._tbi; }
+function drawFBadge() {   // 战斗左上角：你的阵 / 克制 / 妖物的阵
+  const el = $('#fbadge'), ar = $('#arena'); if (!el || !B) return;
+  const my = B.fm || 'san', en = B.efm, on = !!(B.fm || en); el.hidden = !on; if (ar) ar.classList.toggle('hasfb', on); if (!on) return;
+  const k = B.fk || 0; el.className = `fbadge k${k}`;
+  setH(el, en ? `<span>${fmShort(my)}</span><em>${fmKTxt(k)}</em><span>${fmShort(en)}</span>` : `<span>${fmShort(my)}</span>`);
+}
 function drawTurnBar() {
-  const el = $('#turnbar'); if (!el || !B) return;
+  const el = $('#turnbar'); if (!el || !B) return; drawFBadge();
   if (B.over) { setH(el, ''); return; }
   const L = turnOrder(B, 6);
   setH(el, `<span class="tbl">出手</span>` + L.map((u, i) => `<div class="tbu ${u.side === 'e' ? 'e' : u.kind === 'hero' ? 'me' : 'p'} ${i === 0 ? 'now' : ''}" title="${esc(u.name)}">${tbIcon(u)}<b>${Math.round(spdOf(u) * 100)}</b></div>`).join(''));
@@ -1707,10 +1771,10 @@ function formAllies() {
   const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
   // 前后排和战斗里妖物挑人打的规矩一致（engine 里的 FRONT_CLS、伙伴的 front）：狂刀客、武僧站前排，道士、赶尸人、刺客站后排；
   // 你站自己那一排的正中，同排伙伴分站左右，另一排的伙伴和你那排左右错开
-  const isFront = u => u.kind === 'hero' ? FRONT_CLS.has(u.cls) : !!u.front;
+  const isFront = u => isFrontU(u);   // 摆了阵就看号位（u.frow），没摆按职业 / 伙伴本来的前后排
   const heroU = main.find(u => u.kind === 'hero'), heroF = !!(heroU && isFront(heroU));
   if (B._formP == null) {
-    const front = main.filter(isFront), back = main.filter(u => !front.includes(u)), hf = (x, y) => (x.kind === 'hero' ? -1 : 0) - (y.kind === 'hero' ? -1 : 0);
+    const front = main.filter(isFront), back = main.filter(u => !front.includes(u)), hf = B.fm ? (x, y) => (x.fslot ?? 9) - (y.fslot ?? 9) : (x, y) => (x.kind === 'hero' ? -1 : 0) - (y.kind === 'hero' ? -1 : 0);   // 摆了阵按号位从左到右
     front.sort(hf); back.sort(hf);
     front.forEach((u, i) => { u._fc = 0; u._fi = i; }); back.forEach((u, i) => { u._fc = 1; u._fi = i; });
     [...main].sort((x, y) => hf(x, y) || x._fc - y._fc).forEach((u, i) => { u._wi = i; });   // 宽屏一排时的顺序：你在正中，前排伙伴挨着你，后排伙伴往外
@@ -1742,7 +1806,9 @@ function formAllies() {
   ln.style.bottom = Math.round(LINE) + 'px';
   const FX = heroF ? [[50, 24, 76, 6, 94], [36, 64, 14, 86, 50]] : [[36, 64, 14, 86, 50], [50, 24, 76, 6, 94]];   // [前排, 后排] 依次站的横向位置（%）：你那一排从正中排起
   const WX = [50, 39, 61, 28, 72, 17, 83, 6, 94, 44, 56, 33, 67];   // 宽屏一排：你在正中，往两边依次站
-  main.forEach(u => { const back = u._fc === 1; if (wide) put(u, WX[u._wi % WX.length], L.A1, Z, 24); else put(u, FX[u._fc][u._fi % 5], back ? L.A0 : L.A1, Z, back ? 30 : 24); });
+  const nRow = [fA.length, bA.length], PX = (n, back) => n <= 1 ? [50] : n === 2 ? (back ? [24, 76] : [36, 64]) : n === 3 ? [24, 50, 76] : [14, 38, 62, 86];   // 摆了阵：每排按人数居中排开
+  main.forEach(u => { const back = u._fc === 1; if (wide) put(u, B.fm ? PX(main.length, false)[u._wi % main.length] : WX[u._wi % WX.length], L.A1, Z, 24);
+    else put(u, B.fm ? PX(nRow[u._fc], back)[u._fi % Math.max(1, nRow[u._fc])] : FX[u._fc][u._fi % 5], back ? L.A0 : L.A1, Z, back ? 30 : 24); });
   const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });
   const MX = [63, 37, 85, 15, 74, 26, 50, 95, 5];   // 召唤物：你头顶前面横着一排，各占一个位子，前面的倒了后面的也不挪
   mins.forEach(u => put(u, wide ? WX[(main.length + u._slot) % WX.length] : MX[u._slot % MX.length], L.AM, Z * 0.78, 18));
@@ -1810,7 +1876,7 @@ function applyStep(o, anim) {
       if (SP >= 2 && /^-\d+$/.test(txt) && (c === 'burn' || c === 'poison')) { if (anim && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); } continue; }   // 快速时持续伤害不跳字，看血条
       // 少跳字：2 倍速小伤害（不到一成血）不跳、4 倍速不到一成半不跳；同一时间场上最多五六个数字，挤不下的小数字就不跳了（暴击、大伤害照跳）
       const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08, nPop = document.querySelectorAll('#arena .pop').length;
-      const quiet = dmgN && c !== 'crit' && c !== 'thorn' && tu && tu.maxHp && ((SP >= 4 && +txt / tu.maxHp < 0.15) || (SP >= 2 && +txt / tu.maxHp < 0.1) || (nPop >= (SP >= 2 ? 4 : 6) && !big));
+      const quiet = dmgN && c !== 'crit' && c !== 'thorn' && tu && tu.maxHp && ((SP >= 3 && +txt / tu.maxHp < 0.15) || (SP >= 2 && +txt / tu.maxHp < 0.1) || (nPop >= (SP >= 2 ? 4 : 6) && !big));
       const parts = anim && SP < 2 && isBasic && dmgN && +txt >= 6 ? (() => { const a = Math.round(+txt * 0.3), b2 = Math.round(+txt * 0.3); return [a, b2, +txt - a - b2]; })() : [txt];
       const tier = v => { if (!dmgN || !tu || !tu.maxHp) return ''; const r = v / tu.maxHp; return r >= 0.22 ? ' big' : r >= 0.08 ? ' mid' : ''; };
       let pop = null, sum = 0;
@@ -1869,7 +1935,7 @@ function applyStep(o, anim) {
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
 }
 function finishRunView(run, outcome) {
-  endRun(run, outcome); LASTRUN = run; VIEW = 'end'; B = null; save(); render(); achToast(run.ach);
+  endRun(run, outcome); LASTRUN = run; VIEW = 'end'; B = null; save(); render(); achToast(run.ach); formNotify();   // 阵法跟着进度学会
 }
 function battleContinue() {
   const run = SAVE.run;
@@ -1925,7 +1991,8 @@ function riftWorldHTML() {
   return `${runBar(run)}
     <div class="rhud"><div class="rprog ${run.prog >= 100 ? 'full' : ''}" id="rprog"><i style="width:${run.prog}%"></i><em style="left:40%"></em><em style="left:80%"></em><span>${run.rw.boss ? '进度已满 · 守关妖王已现身' : `幻境进度 ${Math.floor(run.prog)}%`}</span></div>${xiangBar(run)}${B ? `<p class="rbuff">${R_PYLONS[B.k].n}生效中：还剩 ${B.n} 场</p>` : ''}<p class="rhint" id="rhint">${hint}</p></div>
     <div class="wmap" id="wmap"><canvas id="wcv"></canvas><div class="wzone" id="wzone">${esc(zoneName())}</div>
-      <div class="wfol">${''}</div>
+      ${(() => { const E = fmEnemyNow(); if (!E) return '<div class="wfol"></div>'; const k = formK(formCur() || 'san', E.b || E.f);
+        return `<button class="wfol fmchip k${k}" data-act="fmopen">${E.b ? '妖王' : '妖阵'} ${fmShort(E.b || E.f)} · <b>${fmKTxt(k)}</b></button>`; })()}
       ${SAVE.joy ? '<div class="joy" id="joy"><i></i></div>' : ''}</div>
     <div class="wctl"><button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? '闯关中…' : '自动闯关'}</button>
       <button class="btn ghost" data-act="wmini">地图</button>
@@ -1949,7 +2016,7 @@ function worldHTML() {
       <div class="wfol">${fol.length ? `同行：${fol.map(esc).join('、')}` : comp ? `同伴：${esc(COMPANIONS[comp].n)}` : ''}${run.food ? `${fol.length || comp ? ' · ' : ''}饱腹：${esc((FOODS.find(f => f.id === run.food) || {}).n || '')}` : ''}</div>
       ${SAVE.joy ? '<div class="joy" id="joy"><i></i></div>' : ''}</div>
     <div class="wctl">${(() => { const cc = wCompNow(run.chapter); if (!cc) return ''; const mk = wNpcMark(run.chapter, cc); if (!mk) return ''; return `<button class="btn" data-act="wtalkc" title="和${esc((SPEAKERS[cc] || {}).n || cc)}说话">💬${esc(((SPEAKERS[cc] || {}).n || cc).slice(0, 3))}</button>`; })()}${wYinScene(ch) && wHasKey(ch, 'yinyangjing') ? `<button class="btn ${S.flags.yin ? '' : 'ghost'} wyin" data-act="wyin">阴阳镜·${S.flags.yin ? '阴面' : '阳面'}</button>` : ''}<button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? '探索中…' : '自动探索'}</button>
-      <button class="btn ghost" data-act="wlog">任务</button><button class="btn ghost" data-act="wmini">地图</button>
+      <button class="btn ghost" data-act="wlog">任务</button><button class="btn ghost" data-act="wmini">地图</button>${FORM_IDS.some(formOpen) ? '<button class="btn ghost" data-act="fmopen">阵法</button>' : ''}
       <button class="btn ghost" data-act="bag">人物${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button></div>
 `;
 }
@@ -3506,6 +3573,15 @@ const ACT = {
   teamhelp: () => { const prev = MODALFN; openModal(teamHelpModal()); BACK = prev; },
   defhelp: () => { const prev = MODALFN; openModal(defHelpModal()); BACK = prev; },
   teamopen: () => { BACK = null; openModal(teamModal()); },
+  fmopen: () => { BACK = null; FMSEL = null; FMPICK = null; formCheckUnlock(); openModal(formModal()); },
+  fmsel: id => { FMSEL = id; FMPICK = null; refresh(); },
+  fmslot: i => { i = +i; const sel = FMSEL || formCur(); if (!sel || sel === 'san') return; if (FMPICK == null) { FMPICK = i; refresh(); return; }
+    if (FMPICK !== i) { formSwap(sel, SAVE.cls, fmMembers(), FMPICK, i); save(); SFX.play('click'); } FMPICK = null; refresh(); },
+  fmuse: id => { if (!formOpen(id)) return; formSave().cur = id; FMPICK = null; save(); SFX.play('rare'); toast(id === 'san' ? '不摆阵了' : `摆上了「${FORMS[id].n}」`); refresh(); },
+  fmup: id => { const r = formUp(id); if (r.err) return toast(r.err); save(); SFX.play('legend'); toast(`${FORMS[id].n}升到 Lv ${r.lv}`); refresh(); },
+  fmhelp: () => { const prev = MODALFN; openModal(formHelpModal()); BACK = prev; },
+  fminfo: () => { if (!B) return; const my = B.fm || 'san', en = B.efm, k = B.fk; if (!en) return toast(`你摆的是「${FORMS[my].n}」。这群妖物没摆阵`);
+    toast(`你：${FORMS[my].n}　妖物：${FORMS[en].n}　${k > 0 ? `你克它：你的伤害 +${FORM_K}%，它的伤害 -${FORM_K}%` : k < 0 ? `它克你：你的伤害 -${FORM_K}%，它的伤害 +${FORM_K}%` : '不相克'}`); },
   teamtog: c => { const T = teamOf(); if (T.includes(c)) SAVE.team = T.filter(x => x !== c); else if (T.length < teamSlots()) SAVE.team = [...T, c]; else return toast(`位置满了（${teamSlots()} 个），先取下一个`); save(); refresh(); },
   gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} 好感 +1 ♥（现在 ${r.v}）${r.v === 10 || r.v === 20 ? '：技能变强了！' : ''}`); save(); refresh(); },
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast('Ngoc：「早就该带上我了。」'); else toast('Ngoc：「……那你早点回来。」'); },
@@ -3745,7 +3821,7 @@ const ACT = {
   cine: () => { SAVE.cineOff = !SAVE.cineOff; save(); refresh(); },
   hdpx: () => { SAVE.hdOff = !SAVE.hdOff; save(); render(); },
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`这次带 ${COMPANIONS[c].n} 一起去：${COMPANIONS[c].d}`); },
-  speed: s => { SAVE.speed = +s; VFX.setSpeed(+s); save(); document.querySelectorAll('#spdc [data-act=speed]').forEach(b => b.classList.toggle('on', b.dataset.arg === String(s))); schedule(); },
+  speed: s => { SAVE.speed = Math.min(3, +s); VFX.setSpeed(+s); save(); document.querySelectorAll('#spdc [data-act=speed]').forEach(b => b.classList.toggle('on', b.dataset.arg === String(s))); schedule(); },
   stinfo: a => { const [id, k] = String(a).split('|'); STPOP = STPOP && STPOP.id === id && STPOP.k === k ? null : { id, k }; drawStPop(); },
   stclose: () => { STPOP = null; drawStPop(); },
   statfull: () => { STPOP = STPOP && STPOP.full ? null : { full: true }; drawStPop(); },
@@ -3891,6 +3967,7 @@ render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次
+setTimeout(formNotify, 1800);   // 老存档：进度够的阵直接学会
 if (SAVE.lgCut) { const L = SAVE.lgCut; delete SAVE.lgCut; save(); setTimeout(() => toast(`灵玉等级上限改为 <b>${LGEM_CAP}</b> 级：${L.map(([n, v]) => `${n} ${v} → ${LGEM_CAP}`).join('、')}。都满级以后，幻境结算的升级机会会换成修为经验`, 7000), 900); }
 if (SAVE.paraUp2) { const [a0, a1] = SAVE.paraUp2; delete SAVE.paraUp2; save(); setTimeout(() => toast(`修为升级又快了一倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级。修为五个门派共用，多出来的点在「人物 · 修为」里加`, 6500), 1200); }
 if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`修为升级快了二十倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级，多出来的点在「修炼 · 修为」里加`, 6000), 1200); }

@@ -1851,6 +1851,42 @@ html body .arena.sv .side.form.tb>.unit{pointer-events:auto}
 #bline::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;background:linear-gradient(90deg,transparent,rgba(214,170,98,.55) 18%,rgba(255,214,140,.8) 50%,rgba(214,170,98,.55) 82%,transparent)}
 #bline::after{content:'';position:absolute;left:10%;right:10%;top:-10px;height:20px;background:radial-gradient(ellipse at center,rgba(255,190,110,.16),transparent 70%)}
 #bline i{position:absolute;left:50%;top:-6px;width:12px;height:12px;margin-left:-6px;transform:rotate(45deg);background:#2a1d12;border:1.5px solid rgba(255,214,140,.85);box-shadow:0 0 8px rgba(255,190,110,.5)}
+
+/* 2026-11-23 阵法：选阵、摆位、战斗左上角克制标记、地图妖阵 */
+.fmrow b{font-size:calc(13px * var(--fs,1));color:var(--gold2)}
+.fmrow small{color:var(--dim);font-size:11px;margin-left:6px}
+.fmrow em{margin-left:auto;color:var(--dim);font-style:normal;font-size:12px}
+.fmlist{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:6px 0 8px}
+.fmo{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:5px 2px 4px;border:1px solid var(--line2);border-radius:8px;background:#1c1411;color:var(--ink);font:inherit}
+.fmo b{font-size:13px}.fmo small{font-size:10px;color:var(--dim)}
+.fmo.sel{border-color:var(--gold2);background:#2a1d12;box-shadow:0 0 0 1px rgba(255,214,140,.25) inset}
+.fmo.lock{opacity:.55}
+.fmo em{position:absolute;top:-6px;right:-4px;font-style:normal;font-size:9px;background:var(--gold2);color:#1a1208;border-radius:6px;padding:0 4px;line-height:13px}
+.fmo .fk{position:absolute;top:-6px;right:-4px;font-style:normal;font-size:9px;border-radius:6px;padding:0 4px;line-height:13px;background:#444;color:#ddd}
+.fk.k1,.fmchip.k1 b,.fbadge.k1 em{background:#2f7a3a;color:#e8ffe8}
+.fk.k-1,.fmchip.k-1 b,.fbadge.k-1 em{background:#8a2a22;color:#ffe8e4}
+.fmh{margin:2px 0;font-size:14px}.fmh span{color:var(--dim);font-size:12px}
+.fmk{margin:0 0 6px;font-size:12px;color:var(--dim)}.fmk b{color:var(--ink)}
+.fmen{margin:0 0 4px;font-size:12px;color:#ffd7a0}
+.fmb{display:flex;flex-direction:column;gap:5px}
+.fmr{display:grid;grid-template-columns:28px 1fr 1fr;gap:5px;align-items:stretch}
+.fml{writing-mode:vertical-rl;font-size:11px;color:var(--dim);display:flex;align-items:center;justify-content:center;border-right:1px dotted #3a2a20}
+.fmc{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:5px 6px;border:1px solid #3a2a20;border-radius:8px;background:#17100d;color:var(--ink);font:inherit;text-align:left;min-height:74px}
+.fmc.pick{border-color:var(--gold2);box-shadow:0 0 10px rgba(255,190,110,.35)}
+.fmc.empty{opacity:.7}
+.fmn{font-size:10px;color:var(--gold2)}
+.fmw{display:flex;align-items:center;gap:4px}.fmw b{font-size:12px}.fmw .dim{color:var(--dim);font-weight:400}
+.fme{display:flex;flex-wrap:wrap;gap:2px 4px}.fme i{font-style:normal;font-size:10.5px;color:#cfe8c0;line-height:1.3}.fme i.bad{color:#ff9a8a}
+.fmtip{margin:6px 0 4px;text-align:center}
+.fmact{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:4px}
+.fbadge{position:absolute;left:5px;top:5px;z-index:8;display:flex;flex-direction:column;align-items:center;gap:1px;padding:3px 4px;border-radius:8px;background:rgba(10,8,8,.62);border:1px solid rgba(255,220,150,.22);color:#f3e3c4;font:inherit;font-size:10.5px;line-height:1.15;min-width:34px}
+.fbadge[hidden]{display:none}
+.fbadge span{white-space:nowrap}
+.fbadge em{font-style:normal;font-size:9.5px;padding:0 4px;border-radius:5px;background:#555;color:#eee;line-height:13px}
+.arena.hasfb .combo{top:62px}
+.wfol.fmchip{pointer-events:auto;border:1px solid rgba(255,220,150,.25);font:inherit;font-size:calc(12px * var(--fs,1));color:#ffd7a0;cursor:pointer}
+.wfol.fmchip b{font-weight:400;padding:0 4px;border-radius:5px;background:#555;color:#eee;margin-left:2px}
+.wfol.fmchip.k1 b{background:#2f7a3a;color:#e8ffe8}.wfol.fmchip.k-1 b{background:#8a2a22;color:#ffe8e4}
 </style>
 </head>
 <body>

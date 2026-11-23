@@ -64,6 +64,7 @@ function migrate(s) {
     if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp2 = [L0, L]; }
   }
   s.pv = 2;
+  if ((s.speed || 1) > 3) s.speed = 3;   // 2026-11-23 倍速最高 3 倍
   for (const g of s.lgems || []) if (LGEM_OLD[g.t]) { g.old = g.t; g.t = 'reforge'; }
   for (const g of s.lgems || []) if ((g.lv || 0) > LGEM_CAP) { (s.lgCut = s.lgCut || []).push([g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : (LGEMS[g.t] || {}).n || "Linh ngọc", g.lv]); g.lv = LGEM_CAP; }   // 等级上限 150：超出的降回来，进游戏提示一次   // 2026-11-23 删掉的五颗灵玉：等玩家挑新的（等级保留）
   if (s.flags && !s.flags.wpnForged) { const all = [...(s.stash || [])]; for (const c in s.chars || {}) for (const sl in s.chars[c].eq || {}) if (s.chars[c].eq[sl]) all.push(s.chars[c].eq[sl]);
@@ -1697,6 +1698,7 @@ function startBattle(run, kind) {
   if (s.fx.has('cShiyu')) for (const u of b.units) if (u.kind === 'ally') { u.maxHp = u.hp = Math.round(u.maxHp * 1.3); u.atk *= 1.3; }   // 尸语冠
   if (P.allyPct) for (const u of b.units) if (u.kind === 'ally') { const k = 1 + P.allyPct / 100; u.maxHp = u.hp = Math.round(u.maxHp * k); u.atk *= k; }   // 同心玉
   for (const u of b.units) { const k = stKey(u); if (k && !(b.stat && b.stat[k])) { stAddK(b, k, 'dmg', 1e-9); b.stat[k].dmg = 0; } }   // 开战就有统计框：你、每个伙伴、僵尸先各占一行
+  applyForm(b, run);   // 阵法：号位加成、前后排、克制
   if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
     if (P.yi.zhizhu) { f.st.slow = 3 + Math.ceil(P.yi.zhizhu / 2); (b.yiPops = b.yiPops || []).push([f.id, "Triền Ti", 'cold', 'zhizhu']); }
     if (P.yi.xianling && RNG.ch(YI_STUN(P.yi.xianling) / 100 * (f.kind === 'boss' ? 0.5 : 1))) { f.st.frozen = true; (b.yiPops = b.yiPops || []).push([f.id, "Kinh Đường Mộc", 'cold', 'xianling']); }
@@ -1720,6 +1722,69 @@ function spdOf(u) {
 let COMP_DK = { ngoc: 5, zhen: 14, long: 14, kang: 12, lei: 9, liu: 14, tie: 12 };   // 各伙伴的伤害系数（对着幻境 40 层的配装校出来的）
 const COMP_AFF_MAX = 25, FRONT_CLS = new Set(['berserker', 'paladin']);
 const teamSlots = () => 1 + ((SAVE.riftMax || 0) >= 120 ? 1 : 0) + ((SAVE.riftMax || 0) >= 150 ? 1 : 0);
+// ---------------- 阵法（2026-11-23）：四个号位，谁站哪自己摆；号位决定前后排（妖物七成先打前排）；阵花魂晶升级；幻境 20 层起妖物也摆阵，五阵循环相克 ----------------
+const formSave = () => { if (!SAVE.form) SAVE.form = { cur: 'san', lv: {}, pos: {} }; return SAVE.form; };
+const formLv = id => formSave().lv[id] || 0;
+const formOpen = id => id === 'san' || formLv(id) > 0;
+const formCur = () => { const F = formSave(); return F.cur && F.cur !== 'san' && F.lv[F.cur] ? F.cur : null; };
+function formCheckUnlock() {   // 跟着进度学会：主线通关第几章，或幻境到过多少层，哪个先到算哪个
+  const F = formSave(), ch = (SAVE.story && SAVE.story.cleared && SAVE.story.cleared.normal) || 0, r = SAVE.riftMax || 0, got = [];
+  for (const id of FORM_IDS) if (!F.lv[id] && (ch >= FORMS[id].ch || r >= FORMS[id].at)) { F.lv[id] = 1; got.push(id); }
+  return got;
+}
+function formFx(id, i, lv) {   // 某个阵第 i 号位（0 起）在 lv 级时的全部效果（全员的 + 这个号位的）
+  const F = FORMS[id], o = {}; if (!F || !F.pos) return o;
+  const add = (src, sc) => { for (const k in src || {}) o[k] = (o[k] || 0) + (sc ? formScale(src[k], lv) : src[k]); };
+  for (const part of [F.all || {}, F.pos[i] || {}]) { add(part.b, true); add(part.p, false); }
+  for (const k in o) o[k] = k === 'ext' ? Math.floor(o[k]) : Math.round(o[k]);
+  if (o.aggro) o.aggro = Math.min(60, o.aggro);
+  return o;
+}
+const memKey = u => u.kind === 'hero' ? 'hero' : (u.cid || u.comp || 'ngoc');
+const natRow = (k, cls) => k === 'hero' ? (FRONT_CLS.has(cls) ? 0 : 1) : ((COMPANIONS[k] || {}).row === 'front' ? 0 : 1);
+function formSlots(id, keys, cls) {   // 这个阵四个号位上各站谁：按存下来的摆；新来的人按他本来的前后排找空位
+  const F = formSave(), rows = FORMS[id].rows, sv = (((F.pos || {})[cls] || {})[id] || []).slice(0, 4); while (sv.length < 4) sv.push(null);
+  const have = new Set(keys);
+  for (const k of keys) if (!sv.includes(k)) {
+    const free = j => sv[j] == null || !have.has(sv[j]), w = natRow(k, cls);
+    let i = [0, 1, 2, 3].find(j => free(j) && rows[j] === w); if (i == null) i = [0, 1, 2, 3].find(free); if (i != null) sv[i] = k;
+  }
+  return sv.map(k => have.has(k) ? k : null);
+}
+function formSwap(id, cls, keys, a, b) { const sv = formSlots(id, keys, cls); [sv[a], sv[b]] = [sv[b], sv[a]]; const F = formSave(); F.pos = F.pos || {}; (F.pos[cls] = F.pos[cls] || {})[id] = sv; return sv; }
+function formUp(id) {
+  const F = formSave(), lv = F.lv[id]; if (!lv) return { err: "Chưa học trận này" }; if (lv >= FORM_MAX) return { err: "Đã tối đa cấp" };
+  const c = formCost(lv); if (SAVE.mats < c) return { err: `Không đủ hồn tinh (cần ${c})` };
+  SAVE.mats -= c; F.lv[id] = lv + 1; return { lv: lv + 1 };
+}
+const formK = (my, en) => !en ? 0 : (!my || my === 'san') ? -1 : FORM_BEAT[my] === en ? 1 : FORM_BEAT[en] === my ? -1 : 0;   // 1 你克它，-1 它克你
+const rFloorIdx = () => { try { const R = rFloorOf(RCH); return (R && R.fi) || 0; } catch (e) { return 0; } };
+function enemyForm(run, kind) {   // 幻境 20 层起：每层妖物摆一个阵（这一局开始时定好），守关妖王另摆一个
+  if (!run || run.mode !== 'rift' || (run.riftLv || 0) < EFM_FROM) return null;
+  if (!run.efm) run.efm = { f: [0, 1, 2, 3].map(() => RNG.pick(FORM_IDS)), b: RNG.pick(FORM_IDS) };
+  return kind === 'boss' ? run.efm.b : run.efm.f[rFloorIdx()] || run.efm.f[0];
+}
+// 我方的人：你 + 这场带的伙伴（幻境组队 / 主线的同伴或 Ngoc）
+function formMembers(run) {
+  const r = run || SAVE.run, ks = ['hero'];
+  if (r && r.team) ks.push(...r.team); else if (r && r.mode !== 'rift') { if (r.comp && r.comp !== 'ngoc') ks.push(r.comp); else if (r.ngoc || r.comp === 'ngoc') ks.push('ngoc'); }
+  else ks.push(...teamOf());
+  return [...new Set(ks)];
+}
+function applyForm(b, run) {
+  const F = formCur(), en = enemyForm(run, b.kind);
+  b.fm = F; b.efm = en; b.fk = formK(F || 'san', en);
+  if (!F) return;
+  const mem = b.units.filter(u => u.side === 'p' && (u.kind === 'hero' || u.kind === 'ally')), lv = formLv(F);
+  const sl = formSlots(F, mem.map(memKey), run.cls);
+  for (const u of mem) {
+    const i = sl.indexOf(memKey(u)); if (i < 0) continue;
+    const e = formFx(F, i, lv); u.fslot = i; u.frow = FORMS[F].rows[i];
+    if (e.dmg) u.fmD = e.dmg; if (e.dr) u.fmR = e.dr; if (e.heal) u.fmHeal = e.heal; if (e.aggro) u.fmAggro = e.aggro; if (e.ext) u.fmExt = e.ext; if (e.stD) u.fmStD = e.stD;
+    if (e.spd) u.spd *= 1 + e.spd / 100; if (e.arm) u.armor *= 1 + e.arm / 100;
+  }
+}
+const isFrontU = a => a.frow != null ? a.frow === 0 : a.kind === 'hero' ? FRONT_CLS.has(a.cls) : a.kind === 'ally' && !!a.front;
 const zyPagesDone = () => ZY_PAGES.reduce((a, _, i) => a + (zyPageDone(i) ? 1 : 0), 0);
 const COMP_LOCK = {   // 通关后才认识的伙伴：[现在多少, 要多少]
   lei: () => [(SAVE.stats && SAVE.stats.bounties) || 0, 10],
@@ -1755,6 +1820,7 @@ const popN = (u, n) => String(n);   // 跳字仍然给原始数；界面显示�
 let BK = 1;
 function heal(u, amt, out, quiet) {
   if (u.hp <= 0) return 0;
+  if (u.fmHeal) amt *= 1 + u.fmHeal / 100;   // 地载阵后排：受到的治疗加成
   if (u.side === 'e' && BNOW && wearyN(BNOW) > 0) return 0;   // 久战破绽：妖物回不了血了
   const a = Math.min(u.maxHp - u.hp, Math.round(amt));
   if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); if (u.side === 'p') stAdd(BNOW, stActor(BNOW), 'heal', a); }
@@ -1780,7 +1846,7 @@ function applyPoison(src, tgt, pct, bonus) {
 }
 const mageCap = P => SUST.mage.cap + (P.fx && P.fx.has('taijiOff') ? 20 : 0);
 const dariCap = u => u.fx && u.fx.has('dariBelt') ? 0.8 : DARI_CAP;
-const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv && u.lgv.shigu != null ? 1 : 0);   // 百符带 +2；蚀骨玉 +1   // 百符带：状态多挂两回合
+const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv && u.lgv.shigu != null ? 1 : 0) + ((u && u.fmExt) || 0);   // 百符带 +2；蚀骨玉 +1   // 百符带：状态多挂两回合
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, "Kiệt lực", 'curse', 1]); } };
 let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
@@ -1978,7 +2044,7 @@ function compAct(b, u, out) {
       if (RNG.ch(0.3)) out.say = [u.id, RNG.pick(["Đừng loạn, cứ theo quy củ.", "Lão phu làm giấy thông hành bốn mươi năm, chưa thấy ai vô lý thế này.", "An Hồn Kinh tụng tới đây rồi — đừng động."])]; }
     else { const st = compStart(b, u, 'stun', foes, out), t = st || RNG.pick(foes); out.cast = { id: 'liuBell', elem: 'holy', target: t.id, wx: 'shui' }; hit(b, u, t, 0.85, 'holy', out, { sk: { ap: 'stun', apc: st ? 1 : 0.3 } }); }
   } else if (u.comp === 'tie') {   // 铁蛋：火铳灼烧；每三招给前排加固
-    if (u.n % 3 === 0) { const T = b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward' && (u.afl >= 10 || x.front || (x === P && FRONT_CLS.has(P.cls)) || x.kind === 'minion'));
+    if (u.n % 3 === 0) { const T = b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward' && (u.afl >= 10 || isFrontU(x) || x.kind === 'minion'));
       T.forEach(x => { x.st.tieArm = 3; }); out.pops.push([T.includes(P) ? 'P' : (T[0] || u).id, "Gia cố", 'buff']); out.cast = { id: 'tieBolt', elem: 'phys', target: 'P' };
       if (RNG.ch(0.3)) out.say = [u.id, RNG.pick(["Sư phụ bảo đinh tán phải đóng ba lần!", "Miếng giáp này chính tay ta gõ đấy!", "Giữ vững, ta lắp thêm cho một miếng!"])]; }
     else if (u.afl >= 20) { out.cast = { id: 'tieGun', elem: 'fire', aoe: true }; foes.forEach(f => hit(b, u, f, 0.55, 'fire', out, { aoe: 1, sk: { ap: 'burn', apc: 0.5 } })); }
@@ -2424,9 +2490,9 @@ function enemyAct(b, u, out) {
   const others = allies.filter(a => a !== P), tank = others.find(a => a.taunt), wd = others.find(a => a.kind === 'ward');
   if (wd && !(tank && RNG.ch(tank.taunt)) && RNG.ch(0.4)) { out.cast = { id: 'atk', elem: u.ae, target: wd.id, enemy: true }; hit(b, u, wd, 1, u.ae, out); return; }
   let t = tank && RNG.ch(tank.taunt * (u.kind === 'boss' ? 0.5 : 1)) ? tank : null;
-  if (!t && b.run && b.run.team) {   // 幻境组队：七成打前排，前排倒光了才打后排
-    const isF = a => a.kind === 'hero' ? FRONT_CLS.has(a.cls) : a.kind === 'ally' && a.front;
-    const fr = allies.filter(a => a.kind !== 'ward' && isF(a));
+  if (!t) { const ag = allies.find(a => a.fmAggro); if (ag && RNG.ch(ag.fmAggro / 100)) t = ag; }   // 虎翼阵 1 号：妖物更爱打他
+  if (!t && b.run && (b.run.team || b.fm)) {   // 幻境组队、摆了阵：七成打前排，前排倒光了才打后排
+    const fr = allies.filter(a => a.kind !== 'ward' && isFrontU(a));
     if (fr.length && RNG.ch(0.7)) t = RNG.pick(fr);
   }
   if (!t) t = P.hp > 0 && (!others.length || RNG.ch(0.55)) ? P : RNG.pick(others);
@@ -2449,7 +2515,7 @@ function bossAct(b, u, out) {
   }
   for (const A of u.abs || []) if (u.cnt % A.every === 0 && doAbility(b, u, A, out)) return true;
   if (u.sweep && u.cnt % R_TEAM[3] === 2) {   // 幻境组队：首领横扫前排（没有前排就扫全队）
-    const L = aliveOf(b, 'p').filter(a => a.kind !== 'ward'), isF = a => a.kind === 'hero' ? FRONT_CLS.has(a.cls) : (a.kind === 'ally' && a.front) || a.kind === 'minion';
+    const L = aliveOf(b, 'p').filter(a => a.kind !== 'ward'), isF = a => isFrontU(a) || a.kind === 'minion';
     const T = L.filter(isF).length ? L.filter(isF) : L; if (!T.length) return false;
     out.cast = { id: 'atk', elem: u.ae, aoe: true, enemy: true, target: T[0].id }; out.pops.push([u.id, "Quét ngang", 'crit']); out.lines.push(`${u.name} quét ngang, cả tiền tuyến cùng lãnh một đòn!`);
     T.forEach(t => hit(b, u, t, R_TEAM[2], u.ae, out, { aoe: 1 })); return true;
@@ -2542,6 +2608,10 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (V.duopo != null && b.castSk && b.castSk.fin && !opt.proc) d *= 1 + LGV.dpFin(V.duopo) / 100;
   }
   if (tgt === b.P && tgt.st.chan) d *= 0.7;   // 狮子吼：嘲讽期间受到的伤害 -30%
+  if (src.fmD) d *= 1 + src.fmD / 100;                                           // 阵法：号位伤害
+  if (src.fmStD && tgt.st && stHas(tgt, 'any')) d *= 1 + src.fmStD / 100;          // 蛇蟠阵 1 号：打身上有状态的
+  if (tgt.fmR) d *= 1 - tgt.fmR / 100;                                           // 阵法：号位受到的伤害
+  if (b.fk) d *= 1 + FORM_K / 100 * b.fk * (src.side === 'p' ? 1 : src.side === 'e' ? -1 : 0);   // 克制：克的一方 +10%，被克的一方 -10%
   if (tgt.kind === 'hero' && tgt.st.butui) d *= 0.5;
   if (tgt.kind === 'minion' && tgt.st.yang && b.P && b.P.runes && b.P.runes.yangshi === 'b') d *= 0.6;   // 养尸符·尸甲
   if (src.st.curse) d *= src.st.curseW ? 0.55 : 0.7;
