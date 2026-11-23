@@ -1692,6 +1692,30 @@ body[data-view=credits] #app{height:100vh;height:100svh;overflow:hidden;box-sizi
 .rpl li.ok{opacity:1;border-color:#2f5a32}.rpl li.ok>b{color:#6fe27c}
 .rpl li.nx{opacity:1;border-color:#7a5aa8;background:#150d1c}.rpl li.nx>b{color:var(--gold2)}
 .linkbtn{display:block;margin:10px auto 0;padding:4px 8px;border:0;background:none;color:var(--dim);font-size:calc(12px * var(--fs,1));text-decoration:underline;cursor:pointer}
+/* 战斗：统计改画中画（左下角小按钮），日志去掉；下面空出来的高度全给战斗画面 */
+.statc{position:absolute;left:6px;bottom:6px;z-index:7;padding:3px 10px;font-size:calc(12px * var(--fs,1));color:#e8c88a;background:rgba(10,8,8,.6);border:1px solid rgba(255,220,150,.25);border-radius:8px;cursor:pointer}
+.statc.on{background:rgba(70,48,20,.85);border-color:#c8a05a}
+.stpop.full{top:auto;bottom:40px;max-height:calc(100% - 84px)}
+@media(max-width:700px){body[data-view=battle] #app{padding-bottom:calc(8px + env(safe-area-inset-bottom))}.arena.sv{height:clamp(270px,calc(100vh - 183px - env(safe-area-inset-bottom)),660px);height:clamp(270px,calc(100svh - 183px - env(safe-area-inset-bottom)),660px)}}
+@media(max-width:700px) and (min-height:680px){.arena.sv .side{align-content:space-evenly}.arena.sv{padding-top:46px}.arena.sv .unit .sp .pose{zoom:1.12}}   /* 画面高了：前后排拉开站，人也大一点 */
+.wardbar[hidden]{display:none}   /* 原来 display:flex 盖过了 hidden，战斗画面底部一直有个空框 */
+.legbeam.legtip{left:50%;top:calc(52px + env(safe-area-inset-top));bottom:auto;width:auto;max-width:86vw;margin-left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:5px 14px;border:1px solid #e0a83a;border-radius:16px;background:rgba(30,18,6,.92);box-shadow:0 0 12px rgba(255,170,40,.35);animation:legtip 2.6s ease-out forwards}
+.legbeam.legtip b{position:static;transform:none;font-size:calc(14px * var(--fs,1));text-shadow:none;color:#ffd77a;overflow:hidden;text-overflow:ellipsis}
+.legbeam.legtip i{font-style:normal;color:#ffb02a}
+@keyframes legtip{0%{opacity:0;transform:translate(-50%,-8px)}10%{opacity:1;transform:translate(-50%,0)}85%{opacity:1}100%{opacity:0}}
+.swcur{margin:0 0 8px}
+.swl{display:flex;flex-direction:column;gap:5px}
+.swr{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:7px;background:#0d0a09;color:var(--ink);text-align:left;cursor:pointer}
+.swr span{flex:1;min-width:0;display:flex;flex-direction:column;font-size:calc(13px * var(--fs,1));overflow:hidden}.swr span small{color:var(--dim);font-size:calc(11px * var(--fs,1))}
+.swr em{flex:none;font-style:normal;font-weight:700;font-size:calc(13px * var(--fs,1));color:var(--dim)}.swr em.up{color:#6fe27c}.swr em.dn{color:#e86a5a}
+/* 主页页签挪到上面：角色条下面一排，选中的下划红线；不再钉在屏幕底部 */
+@media(max-width:700px){
+  body[data-view=town] #app{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  body[data-view=town] .ttabs{position:static;flex:none;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);grid-template-columns:none;margin:6px 0;padding:0;gap:0;background:#120c0a;border:1px solid var(--line2);border-radius:8px;box-shadow:none;overflow:hidden}
+  body[data-view=town] .ttab{min-height:40px;border-top:0;border-bottom:3px solid transparent;font-size:calc(15px * var(--fs,1))}
+  body[data-view=town] .ttab.on{border-top-color:transparent;border-bottom-color:var(--blood2);background:#1e1210;color:var(--ink)}
+  body[data-view=town] .ttab .dot{top:5px;right:6px}
+}
 </style>
 </head>
 <body>

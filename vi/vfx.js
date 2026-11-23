@@ -38,11 +38,15 @@ const VFX = (() => {
   const GX = () => (typeof GFX !== 'undefined' && arena) ? GFX : null;
   const lumOf = c => { const [r, g, b] = GX() ? GFX.rgb(c) : [200, 200, 200]; return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
   function setSpeed(s) { speed = s; }
+  // 人在画面里的位置：量一次要逼浏览器把版面排好，一招里要量好几次——量过的记 150 毫秒，这段时间里直接用
+  const PC = new Map(); let PCt = 0;
   function pos(id) {
     if (!arena) return null;
+    const now = performance.now(); if (now - PCt > 150) { PC.clear(); PCt = now; }
+    const hit = PC.get(id); if (hit && hit.el.isConnected) return hit.p;
     const el = document.getElementById('u-' + id); if (!el) return null;
     const s = el.querySelector('.sp') || el, r = s.getBoundingClientRect(), A = arena.getBoundingClientRect();
-    return { x: r.left - A.left + r.width / 2, y: r.top - A.top + r.height / 2, w: r.width, h: r.height };
+    const p = { x: r.left - A.left + r.width / 2, y: r.top - A.top + r.height / 2, w: r.width, h: r.height }; PC.set(id, { el, p }); return { ...p };
   }
   function spawn(cls, x, y, dur, vars, html) {
     if (!layer) return null;
@@ -133,13 +137,14 @@ const VFX = (() => {
   }
   function shake(power) {
     if (!arena) return;
+    if (speed >= 4 && (power || 4) < 9) return;   // 4 倍速：小震屏不要了（每震一次都要逼页面重排）
     if (OFF > 0) return deferred(shake, [power]);
     arena.style.setProperty('--sh', (power || 4) + 'px');
     const lv = GX() ? GFX.lvl() : 2; if (lv === 0) return; power = (power || 4) * (lv === 1 ? 0.7 : 1);
     arena.style.setProperty('--sh', power + 'px');
     if (GX() && power >= 8) GFX.punch(Math.min(0.06, power / 260));
-    arena.classList.remove('shake'); void arena.offsetWidth; arena.classList.add('shake');
-    setTimeout(() => arena && arena.classList.remove('shake'), 320);
+    const ar = arena; clearTimeout(ar._shT); const on = () => { ar.classList.add('shake'); ar._shT = setTimeout(() => ar.classList.remove('shake'), 320); };
+    if (ar.classList.contains('shake')) { ar.classList.remove('shake'); requestAnimationFrame(() => requestAnimationFrame(on)); } else on();   // 不读 offsetWidth，免得逼重排
   }
   function sprite(p, html, dur, cls, vars) { return p && spawn('sprfx ' + (cls || ''), p.x, p.y, dur, vars, html); }
   // 全屏水墨泼溅（大招）

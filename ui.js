@@ -22,7 +22,7 @@ function applyFs() { document.documentElement.style.setProperty('--fs', SAVE.fs 
 // 掉了传奇：金色光柱 + 声音
 function legBeam() {
   if (!SAVE || !SAVE.newLeg || !SAVE.newLeg.length) return;
-  const name = SAVE.newLeg.shift(); const el = document.createElement('div'); el.className = 'legbeam'; el.innerHTML = `<b>传奇 · ${name}</b>`;
+  const name = SAVE.newLeg.shift(); const el = document.createElement('div'); el.className = 'legbeam legtip'; el.innerHTML = `<i>✦</i><b>传奇 · ${esc(name)}</b>`;   // 原来是一整道全屏金光，太夸张；现在顶上一条小金条
   document.body.appendChild(el); SFX.play('legend'); setTimeout(() => el.remove(), 2700);
 }
 setInterval(() => { if (!document.querySelector('.legbeam')) legBeam(); }, 500);
@@ -353,15 +353,15 @@ function townHTML() {
   const tabs = CLASS_IDS.map(id => `<button class="ct ${id === cls ? 'on' : ''}" data-act="tab" data-arg="${id}" title="${CLASSES[id].n}">${heroSpr(id, 30)}<span>${SAVE.chars[id].level}</span></button>`).join('');
   const body = ({ go: goTab, gear: gearTab, hero: heroTab, col: colTab, set: setTab }[TT] || goTab)();
   const xpk = top ? SAVE.para.xp / paraNeed(SAVE.para.lv) : ch.xp / need;
-  // 2026-11 一屏：顶上两条（资源一条，角色切换＋当前角色一条），中间内容区，底下页签；整页不滚，只在内容区里的框滚
+  // 2026-11 一屏：顶上两条（资源一条，角色切换＋当前角色一条），下面一排页签，再下面内容区；整页不滚，只在内容区里的框滚
   return `<div class="thead"><div class="th1"><button class="homeb" data-act="home" aria-label="主页">‹</button><h1>九幽回廊</h1>
       <div class="rescur"><span class="pill gold">${SPR.img('ingot', 16)}${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 16)}${fmtBig(SAVE.mats)}</span></div></div>
     <div class="th2"><div class="ctabs">${tabs}</div>
       <div class="cinfo"><div class="ci1"><b>${C.n}</b><span><i>战力</i> <b>${power(s)}</b></span></div>
         <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}修为 ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `${ch.level} 级 · 经验 ${ch.xp}/${need}`}</small></div></div></div>
   ${storageOK ? '' : '<p class="warn">当前浏览器不允许保存进度，关闭页面后进度会丢失。</p>'}
-  <main class="tcont t-${TT}" data-scroll="tc-${TT}">${body}</main>
-  <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>`;
+  <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>
+  <main class="tcont t-${TT}" data-scroll="tc-${TT}">${body}</main>`;   // 页签放在上面（原来钉在屏幕最底下）
 }
 function npcList() {
   const c = storyCleared('normal');
@@ -1411,13 +1411,12 @@ function battleHTML() {
       <div class="turnbar" id="turnbar"></div><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
       <div class="spdc" id="spdc">${[1, 2, 4].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div>
-      <div class="blog inar" id="blog" data-act="logt" title="点击展开/收起"></div>
+      <button class="statc" id="statc" data-act="statfull">统计</button>
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><div id="bres"></div></div>
     <div class="hud" id="hud"><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="必杀·${U.n}"><i id="ultfill"></i><span><b>必杀</b><small id="ultpct"></small></span></button>
 </div>
-    <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
-    <div class="bstatp" id="bstatp" data-act="statfull"></div>`;
+    <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>`;
 }
 // ---- 状态栏和状态说明 ----
 // 身上的状态统一在这里列：名字、颜色、还剩几回合、说明（点一下在画面上浮出说明）
@@ -1470,11 +1469,12 @@ function stDesc(u, k) {
   const t = u.st[k], left = typeof t === 'number' ? t : t && t.t;
   return { n: I[0] + (left > 0 && left < 99 ? ` · 还剩 ${left} 回合` : ''), c: I[1], d: I[3] };
 }
-document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],#stpop')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
+document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],#stpop,#statc')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
 function drawStPop() {
   const el = document.getElementById('stpop'); if (!el) return;
-  if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); el.innerHTML = `<b style="color:#e8c88a">本场统计</b><span class="stx">✕</span>${statTable(B.stat)}`; return; }
-  el.classList.remove('full');
+  const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
+  if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">本场统计</b><span class="stx">✕</span>${statTable(B.stat)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
+  el.classList.remove('full'); el._h = '';
   const u = STPOP && B && B.units.find(x => x.id === STPOP.id), D = u && stDesc(u, STPOP.k);
   if (!D) { STPOP = null; el.hidden = true; return; }
   el.hidden = false; el.innerHTML = `<b style="color:${D.c}">${D.n}</b><span class="stx">✕</span><p>${esc(u.side === 'e' ? u.name : u.id === 'P' ? '你' : u.name)}：${D.d}</p>`;
@@ -1486,18 +1486,24 @@ function sbChips(u, aff) {
   return L.join('');
 }
 const sbHp = (h, m, c) => `<div class="sbhp"><i style="width:${Math.max(0, Math.min(100, h / Math.max(1, m) * 100))}%;background:${c}"></i></div>`;
-function drawSbar() {
+const setH = (el, h) => { if (el._h === h) return false; el._h = h; el.innerHTML = h; return true; };   // 内容没变就不动 DOM
+function drawSbar() {   // 三段分开更新：名字和数字、血条、状态——状态没变就不重排（原来每一步整块重写还要重新量一遍状态放不放得下）
   const me = $('#sbme'), fo = $('#sbfoe'); if (!me || !fo || !B) return;
   const P = B.P, run = SAVE.run, pc = run ? run.potions : 0;
-  me.innerHTML = `<div class="sbh"><b>你 <small>${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))}</small></b><button class="potb" id="potb" data-act="bpot" ${B.over || pc <= 0 || P.hp <= 0 || P.hp >= P.maxHp ? 'disabled' : ''}>丹 ×${pc}</button></div>
-    ${sbHp(P.hp, P.maxHp, '#5fbf5a')}<div class="sbcs">${sbChips(P)}</div>`;
-  const E = aliveOf(B, 'e'); if (!E.length) { fo.innerHTML = ''; return; }
+  sbSet(me, `<b>你 <small>${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))}</small></b><button class="potb" id="potb" data-act="bpot" ${B.over || pc <= 0 || P.hp <= 0 || P.hp >= P.maxHp ? 'disabled' : ''}>丹 ×${pc}</button>`, P.hp / P.maxHp, '#5fbf5a', sbChips(P), 'P');
+  const E = aliveOf(B, 'e'); if (!E.length) { setH(fo, ''); return; }
   const T = E.find(u => u.id === B.target) || E.find(u => u.kind === 'boss') || E.find(u => u.kind === 'elite' || u.rare) || null;
   if (T) { const tag = T.id === B.target ? '选中' : T.kind === 'boss' ? '首领' : '精英';
-    fo.innerHTML = `<div class="sbh"><b>${esc(T.name.replace(/^幻境守关·/, ''))}</b><small>${tag} ${Math.round(T.hp / T.maxHp * 100)}%${T.kind === 'boss' && E.length > 1 ? ` +${E.length - 1}` : ''}</small></div>${sbHp(T.hp, T.maxHp, '#d8463a')}<div class="sbcs">${sbChips(T, true)}</div>`; }
+    sbSet(fo, `<b>${esc(T.name.replace(/^幻境守关·/, ''))}</b><small>${tag} ${Math.round(T.hp / T.maxHp * 100)}%${T.kind === 'boss' && E.length > 1 ? ` +${E.length - 1}` : ''}</small>`, T.hp / T.maxHp, '#d8463a', sbChips(T, true), T.id); }
   else { const h = E.reduce((a, u) => a + Math.max(0, u.hp), 0), m = E.reduce((a, u) => a + u.maxHp, 0), more = (B.reinf || []).length;
-    fo.innerHTML = `<div class="sbh"><b>小怪 ×${E.length}</b><small>总血 ${Math.round(h / m * 100)}%</small></div>${sbHp(h, m, '#d8463a')}<div class="sbcs">${more ? `<span class="sbc m">后面还有 ${more} 只</span>` : ''}</div>`; }
-  sbFit(me, 'P'); if (T) sbFit(fo, T.id);
+    sbSet(fo, `<b>小怪 ×${E.length}</b><small>总血 ${Math.round(h / m * 100)}%</small>`, h / m, '#d8463a', more ? `<span class="sbc m">后面还有 ${more} 只</span>` : '', 'x'); }
+}
+function sbSet(box, head, frac, col, chips, id) {
+  if (!box.querySelector(':scope > .sbh')) { box._h = null; box.innerHTML = `<div class="sbh"></div><div class="sbhp"><i></i></div><div class="sbcs"></div>`; }
+  const H = box.children[0], bar = box.children[1].firstElementChild, C = box.children[2];
+  setH(H, head);
+  const w = Math.max(0, Math.min(100, frac * 100)).toFixed(1) + '%'; if (bar._w !== w) { bar._w = w; bar.style.width = w; } if (bar._c !== col) { bar._c = col; bar.style.background = col; }
+  if (setH(C, chips) || C._id !== id) { C._id = id; sbFit(box, id); }
 }
 // 状态多了只显示放得下的两行，剩下的折成「+N」（点开看全部），状态栏高度固定不跳
 function sbFit(box, id) {
@@ -1533,7 +1539,12 @@ function bumpCombo(n) {
   const c = $('#combo'); if (!c || COMBO.n < 3) return;
   c.innerHTML = `<b>${COMBO.n}</b><span>连击</span>`; c.className = 'combo on' + (COMBO.n >= 20 ? ' hot' : ''); bump(c, 'pump', 160);
 }
-function bump(el, cls, ms) { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), ms); }
+// 给元素挂一下动画 class。原来先读一次 offsetWidth 逼浏览器重排来重启动画，战斗里一秒几十次，是卡顿的大头：
+// 现在没挂着就直接挂；正挂着就先摘掉，隔两帧再挂（不用逼重排）
+function bump(el, cls, ms) { if (!el) return; const k = '_b' + cls; clearTimeout(el[k]);
+  const on = () => { el.classList.add(cls); el[k] = setTimeout(() => el.classList.remove(cls), ms); };
+  if (!el.classList.contains(cls)) return on();
+  el.classList.remove(cls); requestAnimationFrame(() => requestAnimationFrame(on)); }
 function sayBubble(id, text) {
   const el = document.getElementById('u-' + id); if (!el || !text) return;
   el.querySelectorAll('.bubble').forEach(x => x.remove());
@@ -1563,7 +1574,7 @@ const ALLY_MOVES = { chain2: '锁链', zhengjue: '正气诀', zhengqi: '正气',
 const allyMoveName = (u, id) => id === 'blade2' ? ({ zhen: '捕快刀', kang: '算盘', lei: '劈刀' }[u.comp] || '出刀') : ALLY_MOVES[id] || '';
 const skShort = n => /[\u4e00-\u9fff]/.test(n) ? n.slice(0, 2) : n.split(' ').slice(0, 2).join(' ');   // 招式条上的短名：中文取两个字，越南语取前两个词
 // 小队统计表（战斗里、结算、幻境一局）
-let STATOPEN = true;   // 统计一直显示在招式条下面
+let STATOPEN = false;   // 统计改成画中画：战斗画面左下角「统计」，点开才有（每场默认收起）
 function statTable(st, mini) {
   const rows = Object.values(st || {}); if (!rows.length) return '<p class="sub">还没有数据。</p>';
   const ord = r => r.cid === 'P' ? 0 : r.cid === 'Z' ? 2 : 1; rows.sort((a, b) => ord(a) - ord(b) || b.dmg - a.dmg);
@@ -1580,12 +1591,13 @@ function statMini(st) {
     return `<div class="smr"><span>${esc(r.cid === 'P' ? '你' : r.n.replace(/（.*）/, ''))}</span><span class="smb"><i style="width:${pc}%"></i></span><span>${pc}%</span><span>${r.ctrl || '—'}</span><span>${f(r.heal)}</span><span>${f(r.taken)}</span></div>`; }).join('')}`;
 }
 let STATT = 0, STATQ = 0;
+function statPipRefresh() { const w = 450 - (performance.now() - STATT); if (w <= 0) { STATT = performance.now(); return drawStPop(); } if (!STATQ) STATQ = setTimeout(() => { STATQ = 0; STATT = performance.now(); if (STPOP && STPOP.full) drawStPop(); }, w); }
 function updStat() {   // 统计框半秒刷一次就够（原来每一步都整块重写，一直在逼页面重排）
   const go = () => { STATQ = 0; STATT = performance.now(); const el = document.getElementById('bstatp'); if (!el || !B) return; const h = statMini(B.stat); if (el._h !== h) { el._h = h; el.innerHTML = h; } };
   const w = 450 - (performance.now() - STATT); if (w <= 0) return go(); if (!STATQ) STATQ = setTimeout(go, w);
 }
 function updBattle(o, anim) {
-  if (STATOPEN) updStat();
+  if (STPOP && STPOP.full) statPipRefresh();
   if (!B) return;
   if (o && o.say) { const su = B.units.find(u => u.id === o.say[0]); if ((SAVE.speed || 1) < 2 || (su && su.kind === 'boss')) sayBubble(o.say[0], o.say[1]); }
   if (o && anim && o.foilKey) {   // 克制道具生效的特写
@@ -1621,9 +1633,9 @@ const TB_SZ = 26;
 function tbIcon(u) { if (!u._tbi) u._tbi = u.kind === 'hero' ? heroSpr(u.cls, TB_SZ) : unitIcon(u.spr || 'skeleton', TB_SZ, u.pal, '', 'head'); return u._tbi; }
 function drawTurnBar() {
   const el = $('#turnbar'); if (!el || !B) return;
-  if (B.over) { el.innerHTML = ''; return; }
+  if (B.over) { setH(el, ''); return; }
   const L = turnOrder(B, 6);
-  el.innerHTML = `<span class="tbl">出手</span>` + L.map((u, i) => `<div class="tbu ${u.side === 'e' ? 'e' : u.kind === 'hero' ? 'me' : 'p'} ${i === 0 ? 'now' : ''}" title="${esc(u.name)}">${tbIcon(u)}<b>${Math.round(spdOf(u) * 100)}</b></div>`).join('');
+  setH(el, `<span class="tbl">出手</span>` + L.map((u, i) => `<div class="tbu ${u.side === 'e' ? 'e' : u.kind === 'hero' ? 'me' : 'p'} ${i === 0 ? 'now' : ''}" title="${esc(u.name)}">${tbIcon(u)}<b>${Math.round(spdOf(u) * 100)}</b></div>`).join(''));
 }
 // 战斗区高度是定死的：哪边人多了排不下，就把那一边整体缩小，画面不跟着撑大缩小
 function fitSides() {
@@ -1691,8 +1703,10 @@ function applyStep(o, anim) {
       if (isSt || reactN.has(txt0)) continue;
       const txt = c === 'thorn' ? txt0.replace(/^\D+/, '') : txt0, dmgN = /^\d+$/.test(txt);
       if (SP >= 2 && /^-\d+$/.test(txt) && (c === 'burn' || c === 'poison')) { if (anim && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); } continue; }   // 快速时持续伤害不跳字，看血条
-      const quiet = SP >= 4 && dmgN && c !== 'crit' && c !== 'thorn' && tu && tu.maxHp && +txt / tu.maxHp < 0.08;   // 4 倍速：小伤害不跳字
-      const parts = anim && isBasic && dmgN && +txt >= 6 ? (() => { const a = Math.round(+txt * 0.3), b2 = Math.round(+txt * 0.3); return [a, b2, +txt - a - b2]; })() : [txt];
+      // 少跳字：2 倍速小伤害（不到一成血）不跳、4 倍速不到一成半不跳；同一时间场上最多五六个数字，挤不下的小数字就不跳了（暴击、大伤害照跳）
+      const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08, nPop = document.querySelectorAll('#arena .pop').length;
+      const quiet = dmgN && c !== 'crit' && c !== 'thorn' && tu && tu.maxHp && ((SP >= 4 && +txt / tu.maxHp < 0.15) || (SP >= 2 && +txt / tu.maxHp < 0.1) || (nPop >= (SP >= 2 ? 4 : 6) && !big));
+      const parts = anim && SP < 2 && isBasic && dmgN && +txt >= 6 ? (() => { const a = Math.round(+txt * 0.3), b2 = Math.round(+txt * 0.3); return [a, b2, +txt - a - b2]; })() : [txt];
       const tier = v => { if (!dmgN || !tu || !tu.maxHp) return ''; const r = v / tu.maxHp; return r >= 0.22 ? ' big' : r >= 0.08 ? ' mid' : ''; };
       let pop = null, sum = 0;
       parts.forEach((v, k) => setTimeout(() => {
@@ -1949,7 +1963,8 @@ function wDraw(cv, dpr, ts, t) {
   const g = cv.getContext('2d'), ch = wch(), m = wmap(ch), S = wstate(ch), T = wTheme(), K = T.kind;
   const Wp = cv.width / dpr, Hp = cv.height / dpr;
   // 匀速滑到下一格（不再一格一跳）
-  if (WHERO.mv) { const k = Math.min(1, (t - WHERO.mv.t0) / WHERO.mv.d); WHERO.x = WHERO.mv.fx + (S.pos.x - WHERO.mv.fx) * k; WHERO.y = WHERO.mv.fy + (S.pos.y - WHERO.mv.fy) * k; WHERO.dist = (WHERO.mv.dist0 || 0) + k; if (k >= 1 && !WALK) WHERO.mv = null; }
+  if (WHERO.mv) { const k = Math.min(1, (t - WHERO.mv.t0) / WHERO.mv.d); WHERO.x = WHERO.mv.fx + (S.pos.x - WHERO.mv.fx) * k; WHERO.y = WHERO.mv.fy + (S.pos.y - WHERO.mv.fy) * k; WHERO.dist = (WHERO.mv.dist0 || 0) + k; if (k >= 1 && !WALK) WHERO.mv = null;
+    else if (k >= 1 && WALK && WALK.h && !DLG && !MODALFN) { clearTimeout(WALK.h); WALK.h = 0; wStepLoop(); } }   // 这一格走完的那一帧就接着走下一格（原来等计时器，格与格之间会顿一下）
   else { WHERO.x = S.pos.x; WHERO.y = S.pos.y; }
   WF = WDRAWT ? Math.min(4, Math.max(0.25, (t - WDRAWT) / 16.67)) : 1; WDRAWT = t;   // 跟帧率无关：慢帧时一步走得多一点
   { const k = 1 - Math.pow(0.8, WF); WCAM.x += (WHERO.x - WCAM.x) * k; WCAM.y += (WHERO.y - WCAM.y) * k; }
@@ -2267,13 +2282,14 @@ function wStepLoop() {
   if (DLG || MODALFN) { WALK.h = setTimeout(wStepLoop, 200); return; }
   const ch = wch();
   let p = WALK.path[WALK.i++];
-  if (!p && WALK.joy && JOY && !DLG) { const T = wDirTarget(JOY[0], JOY[1]); if (T && !T.act) { const P2 = wPt(ch, T.x, T.y); WALK.path.push({ x: T.x, y: T.y }); p = WALK.path[WALK.i++]; WALK.onArrive = P2 && P2.t === 'camp' ? () => openModal(campModal(P2)) : null; } }
+  if (!p && WALK.joy && JOY && !DLG) { const T = wDirTarget(JOY[0], JOY[1]); if (T && !T.act) { const P2 = wPt(ch, T.x, T.y); WALK.path.push({ x: T.x, y: T.y }); WALK.i = WALK.path.length; p = WALK.path[WALK.i - 1]; /* 原来下标多加了一次，摇杆每走一格就断一下 */ WALK.onArrive = P2 && P2.t === 'camp' ? () => openModal(campModal(P2)) : null; } }
   if (!p) { const f = WALK.onArrive; WALK = null; if (f) f(); else if (WAUTO) setTimeout(wAutoStep, 120); updWorldHud(); return; }
   const S = wstate(ch);
   if (WHERO) { WHERO.flip = p.x < S.pos.x ? true : p.x > S.pos.x ? false : WHERO.flip; WHERO.back = p.y < S.pos.y ? true : p.y > S.pos.y ? false : (p.x !== S.pos.x ? false : WHERO.back); }
   const from = { x: S.pos.x, y: S.pos.y }, sc0 = S.sc;
   const diag = p.x !== S.pos.x && p.y !== S.pos.y, dur = W_STEP * (diag ? 1.35 : 1);
-  if (WHERO) WHERO.mv = { fx: WHERO.x, fy: WHERO.y, t0: performance.now(), d: dur, dist0: Math.round(WHERO.dist || 0) };
+  if (WHERO) { const pm = WHERO.mv, now = performance.now(), cont = pm && now - (pm.t0 + pm.d) < 80 && now >= pm.t0 + pm.d - 8;   // 接着上一格走：时间和位置都从上一格的终点算起，速度不断
+    WHERO.mv = { fx: cont ? from.x : WHERO.x, fy: cont ? from.y : WHERO.y, t0: cont ? pm.t0 + pm.d : now, d: dur, dist0: Math.round(WHERO.dist || 0) }; }
   const r = wStep(ch, p.x, p.y, SAVE.run);
   if (S.sc === sc0 && !r.blocked) { WTRAIL.unshift(from); WTRAIL.length = Math.min(WTRAIL.length, 4); }
   if (WALK) { const T2 = SCENE_THEMES[(wmap(ch).def || {}).theme] || {}, th = (wmap(ch).def || {}).theme; SFX.play(th === 'snow' || th === 'icecave' ? 'crunch' : th === 'swamp' ? 'squelch' : T2.kind === 'room' || T2.kind === 'hall' ? 'wood' : WALK.i % 2 ? 'step' : 'step2'); }
@@ -3192,6 +3208,17 @@ function cmpTable(it, cur) {
     ${keys.map(k => { const x = a[k], y = b[k], d = (x || 0) - (y || 0); return `<div class="cmr"><span>${nm(k)}</span><b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${fv(k, x)}</b><span>${fv(k, y)}</span></div>`; }).join('')}
     ${L || Lc || S || Sc ? `<div class="cmfx"><div><small>这件</small>${fx(it, L, S)}</div><div><small>身上</small>${fx(cur, Lc, Sc)}</div></div>` : ''}</div>`;
 }
+// 更换某一格：储物箱里这一类的装备，能提升的排前面
+const swapModal = sl => () => {
+  const cls = SAVE.cls, D = deltaMap(cls), cur = SAVE.chars[cls].eq[sl], typ = slotType(sl);
+  const L = SAVE.stash.filter(it => it.slot === typ && canEquip(it, cls)).sort((a, b) => (D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)).slice(0, 80);
+  return `<h2 class="mh">更换${SLOT_NAME[sl]} <small>储物箱里能换的 ${L.length} 件</small></h2>
+    <p class="sub swcur">身上：${cur ? `<b class="r-${cur.rarity}">${itemTitle(cur)}</b>` : '空着'}</p>
+    <div class="swl">${L.length ? L.map(it => { const d = D.get(it.id);
+      return `<button class="swr" data-act="swpick" data-arg="${it.id}|${sl}">${SPR.item(it, 28)}<span class="r-${it.rarity}">${itemTitle(it)}<small>${it.ilvl} 级${it.set ? ' · 套装' : ''}</small></span><em class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '+' + fmtBig(d) : d < 0 ? '-' + fmtBig(-d) : '—'}</em></button>`; }).join('')
+      : '<p class="empty-note">储物箱里没有能换的。多去打几趟吧。</p>'}</div>
+    <div class="sheet-act"><span class="sub">右边是换上以后战力的变化</span><button class="btn ghost" data-act="close">返回</button></div>`;
+};
 function itemModal(id, shopIdx) {
   return () => {
     const cls = ctxCls();
@@ -3393,7 +3420,10 @@ const ACT = {
   gsl: sl => { if (VIEW === 'town' && TT === 'gear') { if (sl === 'box') { GSLOT = GVIEW === 'box' ? null : 'box'; GVIEW = GVIEW === 'box' ? 'body' : 'box'; return refresh(); }
       const it = SAVE.chars[SAVE.cls].eq[sl]; if (it) { ITAB = 'info'; return openModal(itemModal(it.id)); }   // 点身上的装备格：弹出这件的属性
       GSLOT = sl; GVIEW = 'stash'; FILTER = 'all'; return refresh(); }   // 空格子：去储物箱挑这一类
-  gswap: sl => { closeModal(); GSLOT = sl; GVIEW = 'stash'; FILTER = 'all'; refresh(); }, GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
+  GSLOT = GSLOT === sl ? null : sl; refresh(); if (GSLOT) { const el = document.querySelector('.gdoll'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } },   // 点了部位：把这一排和下面摊开的属性滚到眼前
+  // 「更换」：原来这个动作被误写进了 gsl 里，按了没反应。现在弹出储物箱里这一格能换的装备，按提升排好；点一件看对比，「穿上」就换进这一格
+  gswap: sl => { const prev = MODALFN; openModal(swapModal(sl)); BACK = prev; },
+  swpick: a => { const [id, sl] = split(a); const prev = MODALFN; GSLOT = sl; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
   gsub: k => { GSUB = k; refresh(); },
   itab: k => { ITAB = k; refresh(); },
   npcfn: k => { NPCV.fn = k; NPCV.item = null; BULKARM = false; refresh(); },

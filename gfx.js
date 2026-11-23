@@ -95,9 +95,9 @@ const GFX = (() => {
     // CSS 动画用一个 class 一起停（原来一个个 pause，每停一个浏览器就重算一遍样式，一次顿帧算几十遍）；脚本动画少，还是一个个停
     const d = ms * Math.max(0.5, fac()), CA = typeof CSSAnimation !== 'undefined' ? CSSAnimation : null, CT = typeof CSSTransition !== 'undefined' ? CSSTransition : null;
     const anims = arena.getAnimations ? arena.getAnimations({ subtree: true }).filter(a => a.playState === 'running' && !(CA && a instanceof CA) && !(CT && a instanceof CT)) : [];
-    anims.forEach(a => { try { a.pause(); } catch (e) {} }); const ar = arena; ar.classList.add('hstop');
+    anims.forEach(a => { try { a.pause(); } catch (e) {} }); const ar = arena;   // CSS 的待机小动画不停了：停一下要重算整个画面的样式，顿帧那几十毫秒看不出来
     stopUntil = Math.max(stopUntil, now() + d);
-    setTimeout(() => { if (now() >= stopUntil - 5) ar.classList.remove('hstop'); anims.forEach(a => { try { if (a.playState === 'paused') a.play(); } catch (e) {} }); }, d);
+    setTimeout(() => { anims.forEach(a => { try { if (a.playState === 'paused') a.play(); } catch (e) {} }); }, d);
   }
   function slowmo(ms, rate) {
     if (!arena || RM || lvl() === 0) return;
@@ -112,9 +112,9 @@ const GFX = (() => {
     t.forEach(el => el.animate([{ scale: '1' }, { scale: String(1 + (k || 0.04)) }, { scale: '1' }], { duration: 260 * fac(), easing: 'cubic-bezier(.2,.8,.3,1)' }));
   }
   function whiteFlash(id) {
-    const el = document.getElementById('u-' + id); if (!el) return;
-    el.classList.remove('hflash'); void el.offsetWidth; el.classList.add('hflash');
-    setTimeout(() => el.classList.remove('hflash'), 90);
+    const el = document.getElementById('u-' + id); if (!el || fac() < 0.4) return;   // 4 倍速不闪白
+    clearTimeout(el._hfT); const on = () => { el.classList.add('hflash'); el._hfT = setTimeout(() => el.classList.remove('hflash'), 90); };
+    if (el.classList.contains('hflash')) { el.classList.remove('hflash'); requestAnimationFrame(() => requestAnimationFrame(on)); } else on();
   }
 
   // ======== 化灰：按像素把人拆成粒子 ========
@@ -155,10 +155,16 @@ const GFX = (() => {
 
   // ======== 单位身上的持续特效（每帧扫一遍场上的人） ========
   const acc = {};
+  // 身上的持续特效（灼烧、冰冻……）跟着人走：位置记 200 毫秒再量一次（原来每帧每个人量两回，逼浏览器重排）
+  const UB = new Map(); let UBt = 0, UBA = null;
   function unitBox(el) {
-    const s = el.querySelector('.sp'); if (!s || !arena) return null;
-    const A = arena.getBoundingClientRect(), r = s.getBoundingClientRect(); if (!r.width) return null;
-    return { x: r.left - A.left + r.width / 2, y: r.top - A.top + r.height / 2, w: r.width, h: r.height, top: r.top - A.top, bot: r.bottom - A.top };
+    if (!arena) return null; const now = performance.now();
+    if (now - UBt > 200) { UB.clear(); UBt = now; UBA = null; }
+    const hit = UB.get(el); if (hit !== undefined) return hit;
+    const s = el.querySelector('.sp'); if (!s) return null;
+    const A = UBA || (UBA = arena.getBoundingClientRect()), r = s.getBoundingClientRect();
+    const b = r.width ? { x: r.left - A.left + r.width / 2, y: r.top - A.top + r.height / 2, w: r.width, h: r.height, top: r.top - A.top, bot: r.bottom - A.top } : null;
+    UB.set(el, b); return b;
   }
   function every(key, rate, dt) { acc[key] = (acc[key] || 0) + rate * dens() * dt; const n = Math.floor(acc[key]); acc[key] -= n; return n; }
   const ELITE_C = { normal: '#ff8a3a', rare: '#ffd75a' };
@@ -238,6 +244,15 @@ const GFX = (() => {
     }
     g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
   }
+  // 光晕/烟贴图：按颜色（每通道 16 级）缓存一张 64×64 的渐变图
+  const BLOB = new Map();
+  function blobSpr(c, soft) {
+    const k = (soft ? 's' : 'g') + ((c[0] | 0) >> 4) + ',' + ((c[1] | 0) >> 4) + ',' + ((c[2] | 0) >> 4); let b = BLOB.get(k);
+    if (!b) { b = document.createElement('canvas'); b.width = b.height = 64; const x = b.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+      if (soft) { gr.addColorStop(0, css(c, 1)); gr.addColorStop(1, css(c, 0)); } else { gr.addColorStop(0, css(lighten(c, 0.5), 1)); gr.addColorStop(0.35, css(c, 0.75)); gr.addColorStop(1, css(c, 0)); }
+      x.fillStyle = gr; x.fillRect(0, 0, 64, 64); if (BLOB.size > 400) BLOB.clear(); BLOB.set(k, b); }
+    return b;
+  }
   function drawP(p, q) {
     const s = lerp(p.s0, p.s1, q), c = q < 0.5 ? mixRgb(p.c0, p.c1, q * 2 * 0.5) : mixRgb(p.c0, p.c1, 0.5 + (q - 0.5));
     let a = p.a0 * (q > 0.6 ? (1 - q) / 0.4 : 1); if (p.fadeIn && q < p.fadeIn) a *= q / p.fadeIn;
@@ -245,8 +260,7 @@ const GFX = (() => {
     g.globalCompositeOperation = p.add ? 'lighter' : 'source-over';
     switch (p.shape) {
       case 'px': { const z = Math.max(1, Math.round(s / 2) * 2); g.fillStyle = css(c, a); g.fillRect(Math.round(p.x / 2) * 2 - z / 2, Math.round(p.y / 2) * 2 - z / 2, z, z); break; }
-      case 'glow': { const gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, s); gr.addColorStop(0, css(lighten(c, 0.5), a)); gr.addColorStop(0.35, css(c, a * 0.75)); gr.addColorStop(1, css(c, 0)); g.fillStyle = gr; g.fillRect(p.x - s, p.y - s, s * 2, s * 2); break; }
-      case 'smoke': { const gr = g.createRadialGradient(p.x, p.y, 0, p.x, p.y, s); gr.addColorStop(0, css(c, a)); gr.addColorStop(1, css(c, 0)); g.fillStyle = gr; g.fillRect(p.x - s, p.y - s, s * 2, s * 2); break; }
+      case 'glow': case 'smoke': { g.globalAlpha = Math.min(1, a); g.drawImage(blobSpr(c, p.shape === 'smoke'), p.x - s, p.y - s, s * 2, s * 2); g.globalAlpha = 1; break; }   // 光晕、烟：先画好的小贴图，不再每颗每帧现算渐变
       case 'spark': { g.strokeStyle = css(c, a); g.lineWidth = Math.max(1, s); g.lineCap = 'round'; g.beginPath(); g.moveTo(p.x, p.y); g.lineTo(p.x - p.vx * p.len, p.y - p.vy * p.len); g.stroke(); break; }
       case 'ring': { g.strokeStyle = css(c, a); g.lineWidth = Math.max(1, p.w * (1 - q * 0.6)); g.beginPath(); g.arc(p.x, p.y, Math.max(0.5, s), 0, 6.283); g.stroke(); break; }
       case 'shard': { g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.fillStyle = css(c, a); g.beginPath(); g.moveTo(0, -s); g.lineTo(s * 0.45, 0); g.lineTo(0, s * 0.8); g.lineTo(-s * 0.45, 0); g.closePath(); g.fill(); g.fillStyle = css([255, 255, 255], a * 0.7); g.fillRect(-1, -s * 0.6, 1.5, s * 0.6); g.restore(); break; }
