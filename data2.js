@@ -136,7 +136,7 @@ const BUILDS = {
       leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['duopo', 'pain', 'shigu'] } ],
   paladin: [
     { set: 'luohan', d: '狮子吼拉住所有妖物，挨一下弹一下、攒满金刚震打全场，越打越硬', sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
-      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['jinshen', 'guard', 'xuanjia'] },
+      leg: ['fumodai', 'muyu'], cube: ['jinganglingo', 'earth', 'budongxiang'],   /* 2026-11-24 睚眦佩、荆棘铠换成金刚铃、镇山履（反击并进反震后睚眦佩只占 0.2% 伤害；300 层实测打小怪胜率 50%→64%） */ gems: ['jinshen', 'guard', 'xuanjia'] },
     { set: 'dari', d: '护体养着，主动出招追佛光', sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
       leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['jinshen', 'xuanjia', 'tiangang'] } ],
 };
