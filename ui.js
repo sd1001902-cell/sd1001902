@@ -364,7 +364,9 @@ function townHTML() {
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>`;
 }
 function npcList() {
-  const c = storyCleared('normal'); let L = wTownNpcs().map(id => [id, id]);
+  const c = storyCleared('normal');
+  if (!c) { const w1 = SAVE.world && SAVE.world[wk(1)]; if (!w1 || w1.main < WQ[1].main.findIndex(m => m.id === 'm10')) return []; }   // 第一章还没走进青石镇：镇上的人还不认识
+  let L = wTownNpcs().map(id => [id, id]);
   if (c >= 9) L = L.filter(([id]) => id !== 'long');   // 第九章，龙道长提着灯走上了坑口
   if (c >= 1 && c < 8) L.push(['taoist', 'taoist']);
   for (const id of ['tiedan', 'yujiang']) if (svcFns(id).length && !L.some(x => x[0] === id)) L.push([id, id]);   // 有手艺可做了才露面
@@ -503,6 +505,7 @@ const svcNoteModal = () => `<h2 class="mh">铸剑坊拆开了</h2>
   <p class="help-p">点开一件装备，下面也有「拿去找谁」的快捷按钮。</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`;
 function npcRow() {   // 镇上的人：一排小头像，点谁开谁的铺子
+  if (!npcList().length) return '';
   return `<div class="npcrow">${npcList().map(([id]) => { const S = SPEAKERS[id], qc = townCh(), mk = qc ? wNpcMark(qc, id) : '', sv = svcFns(id);
     return `<button class="npc2" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${unitIcon(S.spr, 34, S.pal, '', 'head')}<b>${S.n}</b>${sv.length ? `<small>${sv.map(f => f[1]).join('·')}</small>` : ''}</button>`; }).join('')}</div>`;
 }
@@ -524,7 +527,7 @@ function goTab() {
     const diff = SAVE.diff, cl = storyCleared(diff), maxCh = Math.min(10, cl + 1);
     if (SAVE.chapter > maxCh) SAVE.chapter = maxCh;
     const k = SAVE.chapter, C = CHAPTERS[k - 1], done = k <= cl, known = storyCleared('normal') >= k;
-    const rec = Math.min(MAX_LV, 2 + Math.round((k - 1) * 2.3) + DIFFS[diff].base);
+    const rec = Math.min(MAX_LV, (k === 1 ? 1 : 2) + Math.round((k - 1) * 2.3) + DIFFS[diff].base);
     const lv = SAVE.chars[cls].level;
     const diffs = DIFF_IDS.filter(d => SAVE.unlocked[d]);
     body = `${diffs.length > 1 ? `<div class="dsw">${diffs.map(d => `<button class="${diff === d ? 'on' : ''}" data-act="diff" data-arg="${d}">${DIFFS[d].n}</button>`).join('')}</div>` : ''}
@@ -853,7 +856,8 @@ function colTab() {
     return `<div class="mon ${k ? '' : 'unk'}">${SPR.img(d.spr, 40, d.pal)}<b>${k ? d.n : '？？？'}</b><small>斩 ${k}${nx ? ' / ' + nx : ''}</small><span class="tier">${'★'.repeat(t)}${'☆'.repeat(3 - t)}</span></div>`; }).join('');
   const cl = storyCleared('normal');
   const replay = CHAPTERS.map((C, i) => { const k = i + 1; if (k > cl) return '';
-    return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">开场</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">结尾</button>` : ''}</div>`; }).join('') + (SAVE.story.ended ? '<div class="rp"><b>终章</b><button class="btn sm" data-act="replay" data-arg="10|ending">结局</button></div>' : '');
+    if (wHas(k)) return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|wintro">开场</button><button class="btn sm ghost" data-act="replay" data-arg="${k}|woutro">${k === 10 ? '结局' : '结尾'}</button></div>`;   // 走地图的章节：回顾玩家真正看过的那几段
+    return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">开场</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">结尾</button>` : ''}</div>`; }).join('') + (SAVE.story.ended && !wHas(10) ? '<div class="rp"><b>终章</b><button class="btn sm" data-act="replay" data-arg="10|ending">结局</button></div>' : '');
   const rec = [...CHAPTERS.map((C, i) => { const b = SAVE.best['normal-' + (i + 1)]; return [chTitle(i + 1), b ? fmtTime(b.t) : '—']; }),
     ['幻境最高层', SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ['幻境·' + CLASSES[c].n, riftRecTxt(SAVE.riftRec[c])]), ['累计斩妖', SAVE.stats.kills], ['招财金蟾', SAVE.stats.goblins], ['完成悬赏', SAVE.stats.bounties]];
   const tabs = [...(featureOn('bounty') ? [['bty', '悬赏']] : []), ...(featureOn('rift') ? [['zy', '镇妖录']] : []), ['ach', `成就 ${nGot}/${ACHIEVEMENTS.length}`], ['dex', '图鉴'], ['rec', '纪录']];
@@ -864,7 +868,7 @@ function colTab() {
       return `<div class="${got ? 'got' : 'no'}"><b>${got ? L.n : '？？？'}</b><i>${(SLOTS.find(x => x.id === L.slot) || {}).n || ''}${L.cls ? ' · ' + CLASSES[L.cls].n : ' · 通用'}${L.ch ? ' · 多见于第' + L.ch + '章' : ''}</i><br>${got ? L.d : '尚未得到'}</div>`; }).join('')}</div></section>
       <section class="panel"><h3>百妖谱 <small>每种妖物斩 ${BESTIARY_TIERS.join(' / ')} 只点亮一颗星</small></h3><div class="mons">${mons}</div></section>`,
     rec: `<section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
-      <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>` };
+      <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${seen('snowfox') || cl >= 1 ? '<div class="rp"><b>序 · 雪夜</b><button class="btn sm ghost" data-act="snowreplay">重看</button></div>' : ''}${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>` };
   const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : sec[CTAB];
   return tpane(tabs, CTAB, 'ctab', body);
 }
@@ -937,8 +941,42 @@ function playPrologue() {
     ['narr', '三百年前，九尾天狐与五位镇妖师，将九幽魔尊封在了镇子底下。'],
     ['narr', '三百年后，封印开始松动。死人从坟里爬出来，镇上的人一个接一个失踪。'],
     ['narr', '而你，正躺在乱葬岗上，什么也想不起来——'],
-    ['narr', '（选一个职业，在「出征」里开始第一章）'],
+    ['narr', '（在最上面选一个职业，再点「出发」开始第一章）'],
   ], null), 400);
+}
+// ---------- 序 · 雪夜：三百年前，送饭的少年阿土在山道上救了一只白狐（第一章开场前播一次，江湖录·纪录里能重看）----------
+const SNOW_BEATS = [
+  { c: 'b1', t: '三百年前 · 冬', lines: [['', '那年的雪，下了整整七天。']] },
+  { c: 'b2', lines: [['', '山道上，一只白狐的后腿被猎户的铁夹咬住了。'], ['', '它挣了一夜，雪地上一圈一圈，全是它拖出来的血印子。']] },
+  { c: 'b3', lines: [['', '送饭上山的少年路过。他叫阿土，十五岁，挎着给五位师兄的饭篮。'], ['阿土', '别咬我啊……我给你掰开。']] },
+  { c: 'b4', lines: [['', '铁夹「咔」地一声松开了。他脱下棉袄把它裹住，又从饭篮里掰了半个饭团。'], ['阿土', '师兄们问起来，我就说路上饿了。'], ['阿土', '快走吧。别再被逮住了。']] },
+  { c: 'b5', lines: [['', '白狐跑出去十几步，停下来，回头看了他一眼。'], ['', '雪太大，阿土没看清——它身后拖着的，是九条尾巴。']] },
+  { c: 'b6', t: '三百年后', lines: [['', '乱葬岗。一座新坟。']] },
+];
+function snowPrologue(done) {
+  const el = document.createElement('div'); el.className = 'snowsc b1';
+  const flakes = Array.from({ length: 46 }, (_, i) => `<i style="--x:${(i * 53) % 100}%;--s:${2 + (i % 4)}px;--d:${4 + (i % 7) * 0.9}s;--dl:-${(i * 0.37) % 6}s;--dx:${(i % 2 ? 1 : -1) * (10 + i % 25)}px"></i>`).join('');
+  el.innerHTML = `<div class="ss-sky"></div><div class="ss-mtn"></div><div class="ss-snow">${flakes}</div><div class="ss-ground"></div>
+    <div class="ss-fox"><div class="ss-tails">${Array.from({ length: 9 }, (_, i) => `<i style="--r:${-60 + i * 15}deg"></i>`).join('')}</div>${SPR.img('fox', 56, { O: '#ece6dc', W: '#ffffff', Y: '#ffdd55' })}<i class="ss-blood"></i><i class="ss-trap"></i><i class="ss-coat"></i><i class="ss-rice"></i></div>
+    <div class="ss-boy">${unitIcon('villager', 78, { B: '#8a6a3a' }, '', 'stand')}<i class="ss-bask"></i></div>
+    <div class="ss-title"></div><div class="ss-cap"></div><button class="ss-skip">跳过</button><div class="ss-tap">点一下继续</div>`;
+  document.body.appendChild(el);
+  let bi = 0, li = 0, over = false, tm = null;
+  const cap = el.querySelector('.ss-cap'), ttl = el.querySelector('.ss-title');
+  const show = () => { const B = SNOW_BEATS[bi]; el.className = 'snowsc ' + B.c; ttl.textContent = B.t || ''; ttl.classList.toggle('on', !!B.t);
+    const [who, txt] = B.lines[li]; cap.innerHTML = `${who ? `<b>${esc(who)}</b>` : ''}<p>${esc(txt)}</p>`; cap.classList.remove('in'); void cap.offsetWidth; cap.classList.add('in');
+    clearTimeout(tm); tm = setTimeout(next, 3600 + txt.length * 70); };
+  const fin = () => { if (over) return; over = true; clearTimeout(tm); el.classList.add('out'); setTimeout(() => { el.remove(); try { SFX.mood(curMood()); } catch (e) {} done && done(); }, 900); };
+  const next = () => { if (over) return; const B = SNOW_BEATS[bi]; if (li < B.lines.length - 1) li++; else if (bi < SNOW_BEATS.length - 1) { bi++; li = 0; } else return fin(); show(); };
+  el.addEventListener('click', e => { e.stopPropagation(); if (e.target.classList.contains('ss-skip')) fin(); else next(); });
+  try { SFX.mood({ key: 'sad' }); } catch (e) {} show();
+}
+// 老存档（第一章已经开过头）没看过雪夜：回来的时候补放一次
+function snowCatchUp() {
+  const w1 = SAVE.world && SAVE.world[1];
+  if (seen('snowfox') || !(storyCleared('normal') > 0 || (w1 && w1.main > 0))) return;
+  setTimeout(() => { if (DLG || MODALFN || document.querySelector('.snowsc') || !(VIEW === 'town' || (VIEW === 'world' && !WAUTO))) return;   // 战斗、自动探索的时候不打断，下次回来再放
+    markSeen('snowfox'); save(); snowPrologue(() => toast('新剧情「序 · 雪夜」，以后可以在 江湖录 → 纪录 里重看')); }, 700);
 }
 // 每章 / 幕间开场：3–5 秒的小动画，点一下可以跳过
 function chapterIntro(o, done) {
@@ -1278,7 +1316,7 @@ function showRes() {
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>撑不住了</h3><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
       : run.mode === 'rift' ? `<div class="res lose"><h3>倒下了</h3><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
-      : `<div class="res lose"><h3>败</h3><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p><button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
+      : `<div class="res lose"><h3>败</h3><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
 }
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
@@ -2071,6 +2109,21 @@ function wTap(px, py, cv, ts) {
   const P = wPt(ch, x, y);
   wWalkTo(x, y, P && P.t === 'camp' && wPtVisible(ch, x, y) ? () => openModal(campModal(P)) : null, true);
 }
+// 走到最近的篝火，打开歇脚（第一次到会先点亮篝火，等它说完再开）
+function wGoCamp(ch) {
+  const cp = wNearCamp(ch); if (!cp) return; const S0 = wstate(ch);
+  if (cp.x === S0.pos.x && cp.y === S0.pos.y) return openModal(campModal(cp.P));
+  const arrive = (n = 0) => { if (VIEW !== 'world' || n > 120) return; if (WALK || DLG) return setTimeout(() => arrive(n + 1), 250);
+    const S1 = wstate(ch); if (S1.pos.x === cp.x && S1.pos.y === cp.y && !MODALFN) openModal(campModal(cp.P)); };
+  wWalkTo(cp.x, cp.y, null, true); setTimeout(arrive, 300);
+}
+// 这张图里离你最近、看得见的篝火
+function wNearCamp(ch) {
+  const S = wstate(ch), m = wmap(ch); let best = null;
+  for (const c of Object.keys(m.pts)) { const D = m.def.pts[c]; if (!D || D.t !== 'camp') continue;
+    for (const q of m.pts[c]) if (wPtVisible(ch, q.x, q.y)) { const d = Math.abs(q.x - S.pos.x) + Math.abs(q.y - S.pos.y); if (!best || d < best.d) best = { x: q.x, y: q.y, d, P: { code: c, ...D } }; } }
+  return best;
+}
 // 冰面上用手点：寻路不会替人解冰面，所以原来点冰面一点反应都没有（只能用方向键）。现在：
 //   人站在冰上，或者站在冰边、点的那格顺着冰面的方向——往点的那个方向滑；
 //   人离冰面还远——先走到冰边（正对着点的那一格的那个入口），再点一下才滑。
@@ -2230,6 +2283,22 @@ function wRun(acts, i = 0) {
   if (a.final) return wFinishChapter();
   if (a.dossier) { DOSS = { go: () => { closeModal(); next(); }, back: () => { closeModal(); WGOAL = null; render(); } }; wStopAuto(); return openModal(dossierModal(a.dossier)); }
   next();
+}
+// 走地图的章节，剧情回顾放玩家真正看过的：开场 = 第一步（紧跟着自动开始的第二步也算），结尾 = 收尾那一步（第十章按拿到的结局）
+function wReplayLines(k, part) {
+  const M = (WQ[k] || {}).main || [], S = (SAVE.world && SAVE.world[k]) || { flags: {}, pz: {}, side: {}, got: {}, sd: {} };
+  const L = x => { try { return (typeof x === 'function' ? x(S) : x) || []; } catch (e) { return []; } };
+  const of = m => (m ? [...L(m.lines), ...L(m.after)] : []).filter(l => Array.isArray(l) && typeof l[1] === 'string' && !/^（/.test(l[1]));
+  if (part === 'wintro') return [...of(M[0]), ...(M[1] && M[1].auto ? of(M[1]) : [])];
+  const F = M.filter(m => m.final), end = wflags().ending;
+  const z = (end && F.find(m => m.rw && m.rw.setw && m.rw.setw.ending === end)) || F[F.length - 1] || M[M.length - 1], out = of(z);
+  return out.length < 4 ? [...of(M[M.indexOf(z) - 1]), ...out] : out;   // 收尾那步太短（比如只剩一句「醒来」），把前一步也带上
+}
+// 打首领输了：提醒还有哪几样克制它的东西没带
+function bossMissHTML() {
+  const id = WKEY && WKEY.key && WKEY.key.boss, D = id && typeof DOSSIER !== 'undefined' && DOSSIER[id]; if (!D) return '';
+  const miss = D.items.filter(it => it.key && !wkeys()[it.key] && W_KEYS[it.key]); if (!miss.length) return '';
+  return `<p class="sub">还有 ${miss.length} 样克制它的东西没带：${miss.map(it => `「${esc(W_KEYS[it.key].n)}」`).join('、')}。去哪找写在首领卷宗里（任务栏也有线索），带上再来会轻松很多。</p>`;
 }
 // 首领卷宗
 let DOSS = null;
@@ -2713,7 +2782,7 @@ const campModal = P => () => {
   const talk = wCampTalkReady(ch);
   return `<h2 class="mh">${SPR.img('fire', 34, null, 'flicker')} ${esc(P.n)}</h2>
     <p class="help-p">火光驱散了阴气。在这里存档；打输了会回到最近的篝火。</p>
-    <div class="campb"><button class="btn" data-act="wrest">休息 <small>回满气血和丹药，小妖会重新出现${talk ? ' · <b class="talkdot">有人想和你说说话</b>' : ''}</small></button>
+    <div class="campb"><button class="btn" data-act="wrest">休息${WMAPS[ch].daynight ? (S.flags.night ? '到天亮' : '到天黑') : ''} <small>回满气血和丹药，小妖会重新出现${talk ? ' · <b class="talkdot">有人想和你说说话</b>' : ''}</small></button>
       ${comps.length > 1 && !forced ? `<div class="compsel camp"><span class="sub">带谁同行</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="wcomp" data-arg="${c}">${unitIcon(C2.spr, 30, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : ''}
       ${others.map(id => `<button class="btn ghost" data-act="wtele" data-arg="${id}">传送到「${esc(wCampName(ch, id))}」 <small>${esc(WMAPS[ch].scenes[wCampPos(ch, id).sc].n)}</small></button>`).join('')}
       <button class="btn ghost" data-act="wmenu">暂离 <small>回到出征菜单（换角色、看图鉴），之后从这里继续</small></button>
@@ -2923,9 +2992,8 @@ function creditsHTML() {
     ['反派', '白云子（清虚道长）'], ['大反派', '九幽魔尊'], ['阴间', '孟婆 · 牛头 · 马面 · 王小六 · 鬼货郎 · 阿福'],
     ['特别出演', '僵尸县令 · 狼妖王 · 蜘蛛娘娘 · 赤炎石魔 · 千年蛇母 · 鬼王'], ['特别鸣谢', '现实中的 Ngoc cute'], ['', '—— 全剧终 ——']];
   return `<div class="credits"><div class="cr-art">${heroSpr(SAVE.cls, 96, 'float')}${SPR.img('ngoc', 96, null, 'float')}</div>
-    <div class="cr-roll">${roll.map(([a, b]) => `<div class="cr-line"><small>${a}</small><b>${b}</b></div>`).join('')}</div>
-    <p class="cr-sign">出品 · 制作　涂与豪</p>
-    <div class="cr-unlock"><p>已开启：<b>装备养成</b>（营地页点镇上的人：张大锤强化、传承；铁蛋淬炼洗炼、升阶；玉掌柜打孔镶玉）· <b>赏银柜</b> · <b>九幽幻境</b>（限时一炷香，无尽深渊，可以带 Ngoc）· <b>幻境套装</b> · <b>镇妖录</b>（收服妖物、役使首领）· <b>修罗难度</b> · <b>修为</b> · <b>灵玉</b> · <b>江湖悬赏</b> · <b>加难度</b></p></div>
+    <div class="cr-win"><div class="cr-roll">${roll.map(([a, b]) => `<div class="cr-line"><small>${a}</small><b>${b}</b></div>`).join('')}<p class="cr-sign">出品 · 制作　涂与豪</p></div></div>
+    <details class="cr-unlock"><summary>新开启的玩法</summary><p><b>装备养成</b>（营地页点镇上的人：张大锤强化、传承；铁蛋淬炼洗炼、升阶；玉掌柜打孔镶玉）· <b>赏银柜</b> · <b>九幽幻境</b>（限时一炷香，无尽深渊，可以带 Ngoc）· <b>幻境套装</b> · <b>镇妖录</b>（收服妖物、役使首领）· <b>修罗难度</b> · <b>修为</b> · <b>灵玉</b> · <b>江湖悬赏</b> · <b>加难度</b></p></details>
     <button class="btn big" data-act="credend">回青石镇</button></div>`;
 }
 
@@ -3193,7 +3261,9 @@ const ACT = {
       VIEW = 'world'; WHERO = null; refresh(); window.scrollTo(0, 0);
       const ch = SAVE.chapter, C = CHAPTERS[ch - 1], M = WQ[ch].main, cur = M[S.main];
       const sv = SAVE, first = () => { if (SAVE !== sv || VIEW !== 'world' || wstate(ch).main !== 0) return; const g0 = M[0].goal; if (g0.talk) setTimeout(() => { if (SAVE === sv && VIEW === 'world' && wstate(ch).main === 0) wRun(wTalk(ch, g0.talk, SAVE.run)); }, 300); };
-      if (S.main === 0) chapterIntro(chIntroFor(ch), () => { if (SAVE !== sv) return; if (CH_RECAP[ch]) playDialog(recapLines(ch), null, first); else first(); });
+      const ci = () => chapterIntro(chIntroFor(ch), () => { if (SAVE !== sv) return; if (CH_RECAP[ch]) playDialog(recapLines(ch), null, first); else first(); });
+      if (S.main === 0 && ch === 1 && !seen('snowfox')) { markSeen('snowfox'); save(); snowPrologue(ci); }   // 序 · 雪夜
+      else if (S.main === 0) ci();
       else if (cur && /^i/.test(cur.id) && !/^i/.test((M[S.main - 1] || {}).id || '') && interIntroFor(ch) && !S.pz.iintro) { S.pz.iintro = 1; chapterIntro(interIntroFor(ch)); }
       else banner(chTitle(ch), C.sub, 2000);
       return;
@@ -3217,9 +3287,10 @@ const ACT = {
   resume: () => { VIEW = SAVE.run.world ? 'world' : 'map'; WHERO = null; refresh(); window.scrollTo(0, 0); },
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
-  town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); },
+  town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); snowCatchUp(); },
   credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); markSeen('boxnote'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
-  replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : C[part]; playDialog(lines, C.boss); },
+  snowreplay: () => snowPrologue(),
+  replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : /^w/.test(part) ? wReplayLines(+k, part) : C[part]; playDialog(lines, C.boss); },
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
   gview: k => { if (k === 'stash' && GVIEW === 'stash') GSLOT = null; if (k !== 'stash') GSLOT = null; GVIEW = k; GSUB = k === 'gems' || k === 'cube' ? k : 'stash'; FILTER = 'all'; refresh(); },
   statall: () => openModal(statAllModal(SAVE.cls)),
@@ -3327,11 +3398,12 @@ const ACT = {
     wStopAuto(); clearTimeout(WALK && WALK.h); WALK = null;
     { const p0 = wMarkPos(ch, q); if (p0 && p0.comp) { WGOAL = null; return ACT.wtalkc(); } }   // 要找的人就跟在身边：直接搭话
     if (wWatchBlock(ch)) { WGOAL = null; return qtoast('这里有人巡逻，自动寻路不管用——自己摸过去'); }
+    let todOff = false;
     { const MS = WQ[ch].main.find(m => m.id === id), nt = !!wstate(ch).flags.night;   // 昼夜：时辰不对，找不着人
-      if (WMAPS[ch].daynight && MS && MS.tod && (MS.tod === 'night') !== nt && !cont) qtoast(MS.tod === 'night' ? '这件事得等天黑——在篝火边歇一歇，天就黑了' : '这件事得等天亮——在篝火边歇一歇，天就亮了'); }
-    const p = wMarkPos(ch, q);
+      if (WMAPS[ch].daynight && MS && MS.tod && (MS.tod === 'night') !== nt && !cont) { todOff = true; qtoast(MS.tod === 'night' ? '这件事得等天黑——在篝火边歇一歇，天就黑了' : '这件事得等天亮——在篝火边歇一歇，天就亮了'); } }
+    const p = wMarkPos(ch, q), R = p && wRoute(ch, p);
+    if (todOff && wNearCamp(ch)) { WGOAL = null; return wGoCamp(ch); }   // 时辰不对，去了也白去：带去最近的篝火歇一歇
     if (!p) { WGOAL = null; return wStartAuto(); }
-    const R = wRoute(ch, p);
     if (!R) { WGOAL = null; return qtoast('那边的路现在还走不通'); }
     if (R.puzzle) {   // 被谜题挡住：走到边上停下，剩下的自己来
       WGOAL = null; WTAP = { x: R.x, y: R.y, t: 0 };
@@ -3451,7 +3523,7 @@ const ACT = {
   bknudge: () => { ACT.tsave(); },
   tcls: c => { TCLS = c; refresh(); },
   home: () => { stopAuto(); closeModal(); VIEW = 'title'; render(); window.scrollTo(0, 0); },
-  tcont: () => { closeModal(); if (SAVE.run) return ACT.resume(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); },
+  tcont: () => { closeModal(); if (SAVE.run) { ACT.resume(); return snowCatchUp(); } VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); snowCatchUp(); },
   tnew: () => openModal(resetModal()),
   ttest: () => openModal(() => `${testPanel()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">关闭</button></div>`),
   tsave: () => openModal(() => `${setSave()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">关闭</button></div>`),

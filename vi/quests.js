@@ -196,6 +196,8 @@ const WQ = {
           ['me', "Đó là gì vậy?"],
           ['ngoc', "Không có gì. Mảnh sắt vụn, mang về kê chân bàn."],
           ['ngoc', "Ta tên Ngoc, mở tiệm thuốc trong trấn. Vừa rồi đổ cho ngươi một bát canh hồi hồn — tiền thuốc ghi sổ, đừng hòng quỵt."],
+          ['narr', "Cô lại móc trong tay áo ra nửa nắm cơm, nhét vào tay bạn. Lạnh ngắt, bị đè hơi bẹp."],
+          ['ngoc', "…Nhìn cái gì mà nhìn. Nhặt dọc đường đấy."],
           ['ngoc', "Rời khỏi đây trước khi trời sáng. Dạo này Bãi Tha Ma không yên, người chết còn siêng năng hơn người sống."],
           ['ngoc', "Đi về phía đông có một nhà quàn, sư phụ Lưu giữ nhà quàn là một lão già kỳ quặc, nhưng không xấu. Tối nay cứ đến chỗ ông ấy nghỉ chân trước."],
           ['narr', "(Chạm vào một chỗ trên bản đồ, nhân vật sẽ đi tới. Chạm thanh nhiệm vụ phía trên để tự đi tới.)"],

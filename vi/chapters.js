@@ -3811,6 +3811,8 @@ WQ[6] = {
       lines: [
         ['jiuwei', "…Ngươi vẫn còn là một đứa trẻ."],
         ['atu', "Tôi đưa cơm ba năm rồi."],
+        ['jiuwei', "…Ta nhận ra ngươi. Năm tuyết lớn ấy, trên đường núi, người gỡ bẫy sắt rồi nhét cho ta nửa nắm cơm — chính là ngươi."],
+        ['atu', "…Là ngươi? Con hồ ly trắng trên đường núi năm ấy?"],
         ['jiuwei', '……'],
         ['jiuwei', "Năm cây đinh, không trấn nổi nó. Còn thiếu một ổ khóa."],
         ['narr', "Bạch hồ nhả ra một viên ngọc phát sáng — hồ đan của nàng."],

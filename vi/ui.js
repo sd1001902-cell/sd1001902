@@ -365,7 +365,9 @@ function townHTML() {
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>`;
 }
 function npcList() {
-  const c = storyCleared('normal'); let L = wTownNpcs().map(id => [id, id]);
+  const c = storyCleared('normal');
+  if (!c) { const w1 = SAVE.world && SAVE.world[wk(1)]; if (!w1 || w1.main < WQ[1].main.findIndex(m => m.id === 'm10')) return []; }   // 第一章还没走进青石镇：镇上的人还不认识
+  let L = wTownNpcs().map(id => [id, id]);
   if (c >= 9) L = L.filter(([id]) => id !== 'long');   // 第九章，龙道长提着灯走上了坑口
   if (c >= 1 && c < 8) L.push(['taoist', 'taoist']);
   for (const id of ['tiedan', 'yujiang']) if (svcFns(id).length && !L.some(x => x[0] === id)) L.push([id, id]);   // 有手艺可做了才露面
@@ -504,6 +506,7 @@ const svcNoteModal = () => `<h2 class="mh">Lò Rèn đã được chia ra</h2>
   <p class="help-p">Chạm mở một món trang bị, bên dưới cũng có nút tắt “Đem tới ai”.</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">Đã hiểu</button></div>`;
 function npcRow() {   // 镇上的人：一排小头像，点谁开谁的铺子
+  if (!npcList().length) return '';
   return `<div class="npcrow">${npcList().map(([id]) => { const S = SPEAKERS[id], qc = townCh(), mk = qc ? wNpcMark(qc, id) : '', sv = svcFns(id);
     return `<button class="npc2" data-act="npc" data-arg="${id}" id="npc-${id}">${mk ? `<em class="qmk ${mk}">${mk === 'turn' ? '?' : '!'}</em>` : ''}${unitIcon(S.spr, 34, S.pal, '', 'head')}<b>${S.n}</b>${sv.length ? `<small>${sv.map(f => f[1]).join('·')}</small>` : ''}</button>`; }).join('')}</div>`;
 }
@@ -525,7 +528,7 @@ function goTab() {
     const diff = SAVE.diff, cl = storyCleared(diff), maxCh = Math.min(10, cl + 1);
     if (SAVE.chapter > maxCh) SAVE.chapter = maxCh;
     const k = SAVE.chapter, C = CHAPTERS[k - 1], done = k <= cl, known = storyCleared('normal') >= k;
-    const rec = Math.min(MAX_LV, 2 + Math.round((k - 1) * 2.3) + DIFFS[diff].base);
+    const rec = Math.min(MAX_LV, (k === 1 ? 1 : 2) + Math.round((k - 1) * 2.3) + DIFFS[diff].base);
     const lv = SAVE.chars[cls].level;
     const diffs = DIFF_IDS.filter(d => SAVE.unlocked[d]);
     body = `${diffs.length > 1 ? `<div class="dsw">${diffs.map(d => `<button class="${diff === d ? 'on' : ''}" data-act="diff" data-arg="${d}">${DIFFS[d].n}</button>`).join('')}</div>` : ''}
@@ -854,7 +857,8 @@ function colTab() {
     return `<div class="mon ${k ? '' : 'unk'}">${SPR.img(d.spr, 40, d.pal)}<b>${k ? d.n : "? ? ? "}</b><small>Diệt ${k}${nx ? ' / ' + nx : ''}</small><span class="tier">${'★'.repeat(t)}${'☆'.repeat(3 - t)}</span></div>`; }).join('');
   const cl = storyCleared('normal');
   const replay = CHAPTERS.map((C, i) => { const k = i + 1; if (k > cl) return '';
-    return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">Mở đầu</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">Kết chương</button>` : ''}</div>`; }).join('') + (SAVE.story.ended ? "<div class=\"rp\"><b>Chương cuối</b><button class=\"btn sm\" data-act=\"replay\" data-arg=\"10|ending\">Kết cục</button></div>" : '');
+    if (wHas(k)) return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|wintro">Mở đầu</button><button class="btn sm ghost" data-act="replay" data-arg="${k}|woutro">${k === 10 ? "Kết cục" : "Kết chương"}</button></div>`;   // 走地图的章节：回顾玩家真正看过的那几段
+    return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">Mở đầu</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">Kết chương</button>` : ''}</div>`; }).join('') + (SAVE.story.ended && !wHas(10) ? "<div class=\"rp\"><b>Chương cuối</b><button class=\"btn sm\" data-act=\"replay\" data-arg=\"10|ending\">Kết cục</button></div>" : '');
   const rec = [...CHAPTERS.map((C, i) => { const b = SAVE.best['normal-' + (i + 1)]; return [chTitle(i + 1), b ? fmtTime(b.t) : '—']; }),
     ["Tầng Ảo Cảnh cao nhất", SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ["Ảo Cảnh ·" + CLASSES[c].n, riftRecTxt(SAVE.riftRec[c])]), ["Tổng yêu đã diệt", SAVE.stats.kills], ["Kim Thiềm Chiêu Tài", SAVE.stats.goblins], ["Truy nã đã xong", SAVE.stats.bounties]];
   const tabs = [...(featureOn('bounty') ? [['bty', "Truy nã"]] : []), ...(featureOn('rift') ? [['zy', "Trấn Yêu Lục"]] : []), ['ach', `Thành tựu ${nGot}/${ACHIEVEMENTS.length}`], ['dex', "Đồ giám"], ['rec', "Kỷ lục"]];
@@ -865,7 +869,7 @@ function colTab() {
       return `<div class="${got ? 'got' : 'no'}"><b>${got ? L.n : "? ? ? "}</b><i>${(SLOTS.find(x => x.id === L.slot) || {}).n || ''}${L.cls ? ' · ' + CLASSES[L.cls].n : " · dùng chung"}${L.ch ? " · hay gặp ở chương" + L.ch + "" : ''}</i><br>${got ? L.d : "Chưa có"}</div>`; }).join('')}</div></section>
       <section class="panel"><h3>Bách Yêu Phổ <small>Mỗi loại yêu vật diệt ${BESTIARY_TIERS.join(' / ')} con thì sáng một sao</small></h3><div class="mons">${mons}</div></section>`,
     rec: `<section class="panel"><h3>Kỷ lục cá nhân <small>Thời gian nhanh nhất mỗi chương ở độ khó Phàm Trần</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
-      <section class="panel"><h3>Xem lại cốt truyện <small>Đoạn đã xem có thể xem lại bất cứ lúc nào</small></h3>${replay || "<div class=\"empty-note\">Qua chương 1 rồi mới xem lại được cốt truyện.</div>"}</section>` };
+      <section class="panel"><h3>Xem lại cốt truyện <small>Đoạn đã xem có thể xem lại bất cứ lúc nào</small></h3>${seen('snowfox') || cl >= 1 ? "<div class=\"rp\"><b>Mở đầu · Đêm tuyết</b><button class=\"btn sm ghost\" data-act=\"snowreplay\">Xem lại</button></div>" : ''}${replay || "<div class=\"empty-note\">Qua chương 1 rồi mới xem lại được cốt truyện.</div>"}</section>` };
   const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : sec[CTAB];
   return tpane(tabs, CTAB, 'ctab', body);
 }
@@ -938,8 +942,42 @@ function playPrologue() {
     ['narr', "Ba trăm năm trước, Cửu Vĩ Thiên Hồ cùng năm vị trấn yêu sư đã phong ấn Cửu U Ma Tôn dưới lòng trấn."],
     ['narr', "Ba trăm năm sau, phong ấn bắt đầu lỏng. Người chết bò ra khỏi mộ, dân trong trấn lần lượt mất tích."],
     ['narr', "Còn bạn, đang nằm giữa Bãi Tha Ma, chẳng nhớ nổi điều gì —"],
-    ['narr', "(Chọn một môn phái, vào “Xuất chinh” để bắt đầu chương 1)"],
+    ['narr', "(Chọn một nghề ở hàng trên cùng, rồi bấm “Xuất phát” để bắt đầu chương 1)"],
   ], null), 400);
+}
+// ---------- 序 · 雪夜：三百年前，送饭的少年阿土在山道上救了一只白狐（第一章开场前播一次，江湖录·纪录里能重看）----------
+const SNOW_BEATS = [
+  { c: 'b1', t: "Ba trăm năm trước · Mùa đông", lines: [['', "Năm ấy tuyết rơi suốt bảy ngày bảy đêm."]] },
+  { c: 'b2', lines: [['', "Trên đường núi, một con hồ ly trắng bị bẫy sắt của thợ săn kẹp chặt chân sau."], ['', "Nó vùng vẫy cả đêm, trên tuyết từng vòng từng vòng toàn là vết máu nó kéo lê."]] },
+  { c: 'b3', lines: [['', "Một thiếu niên đưa cơm lên núi đi ngang qua. Cậu tên A Thổ, mười lăm tuổi, khoác giỏ cơm cho năm vị sư huynh."], ["A Thổ", "Đừng cắn tao nhé… để tao gỡ ra cho."]] },
+  { c: 'b4', lines: [['', "Bẫy sắt “cạch” một tiếng bật ra. Cậu cởi áo bông quấn lấy nó, rồi bẻ nửa nắm cơm trong giỏ."], ["A Thổ", "Các sư huynh có hỏi thì tao bảo dọc đường đói bụng."], ["A Thổ", "Chạy đi. Đừng để bị bắt nữa."]] },
+  { c: 'b5', lines: [['', "Hồ ly trắng chạy được mười mấy bước thì dừng lại, quay đầu nhìn cậu một cái."], ['', "Tuyết dày quá, A Thổ nhìn không rõ — phía sau nó kéo lê chín cái đuôi."]] },
+  { c: 'b6', t: "Ba trăm năm sau", lines: [['', "Bãi tha ma. Một nấm mồ mới."]] },
+];
+function snowPrologue(done) {
+  const el = document.createElement('div'); el.className = 'snowsc b1';
+  const flakes = Array.from({ length: 46 }, (_, i) => `<i style="--x:${(i * 53) % 100}%;--s:${2 + (i % 4)}px;--d:${4 + (i % 7) * 0.9}s;--dl:-${(i * 0.37) % 6}s;--dx:${(i % 2 ? 1 : -1) * (10 + i % 25)}px"></i>`).join('');
+  el.innerHTML = `<div class="ss-sky"></div><div class="ss-mtn"></div><div class="ss-snow">${flakes}</div><div class="ss-ground"></div>
+    <div class="ss-fox"><div class="ss-tails">${Array.from({ length: 9 }, (_, i) => `<i style="--r:${-60 + i * 15}deg"></i>`).join('')}</div>${SPR.img('fox', 56, { O: '#ece6dc', W: '#ffffff', Y: '#ffdd55' })}<i class="ss-blood"></i><i class="ss-trap"></i><i class="ss-coat"></i><i class="ss-rice"></i></div>
+    <div class="ss-boy">${unitIcon('villager', 78, { B: '#8a6a3a' }, '', 'stand')}<i class="ss-bask"></i></div>
+    <div class="ss-title"></div><div class="ss-cap"></div><button class="ss-skip">Bỏ qua</button><div class="ss-tap">Chạm để tiếp tục</div>`;
+  document.body.appendChild(el);
+  let bi = 0, li = 0, over = false, tm = null;
+  const cap = el.querySelector('.ss-cap'), ttl = el.querySelector('.ss-title');
+  const show = () => { const B = SNOW_BEATS[bi]; el.className = 'snowsc ' + B.c; ttl.textContent = B.t || ''; ttl.classList.toggle('on', !!B.t);
+    const [who, txt] = B.lines[li]; cap.innerHTML = `${who ? `<b>${esc(who)}</b>` : ''}<p>${esc(txt)}</p>`; cap.classList.remove('in'); void cap.offsetWidth; cap.classList.add('in');
+    clearTimeout(tm); tm = setTimeout(next, 3600 + txt.length * 70); };
+  const fin = () => { if (over) return; over = true; clearTimeout(tm); el.classList.add('out'); setTimeout(() => { el.remove(); try { SFX.mood(curMood()); } catch (e) {} done && done(); }, 900); };
+  const next = () => { if (over) return; const B = SNOW_BEATS[bi]; if (li < B.lines.length - 1) li++; else if (bi < SNOW_BEATS.length - 1) { bi++; li = 0; } else return fin(); show(); };
+  el.addEventListener('click', e => { e.stopPropagation(); if (e.target.classList.contains('ss-skip')) fin(); else next(); });
+  try { SFX.mood({ key: 'sad' }); } catch (e) {} show();
+}
+// 老存档（第一章已经开过头）没看过雪夜：回来的时候补放一次
+function snowCatchUp() {
+  const w1 = SAVE.world && SAVE.world[1];
+  if (seen('snowfox') || !(storyCleared('normal') > 0 || (w1 && w1.main > 0))) return;
+  setTimeout(() => { if (DLG || MODALFN || document.querySelector('.snowsc') || !(VIEW === 'town' || (VIEW === 'world' && !WAUTO))) return;   // 战斗、自动探索的时候不打断，下次回来再放
+    markSeen('snowfox'); save(); snowPrologue(() => toast("Cốt truyện mới “Mở đầu · Đêm tuyết”, sau này có thể xem lại ở Giang Hồ Lục → Kỷ lục")); }, 700);
 }
 // 每章 / 幕间开场：3–5 秒的小动画，点一下可以跳过
 function chapterIntro(o, done) {
@@ -1279,7 +1317,7 @@ function showRes() {
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>Không trụ nổi</h3><p>Nó mạnh quá. Bàn tay cầm đao của bạn run lên —</p><button class="btn big" data-act="bcont">……</button></div>`
       : run.mode === 'rift' ? `<div class="res lose"><h3>Ngã xuống rồi</h3><p>Ảo Cảnh không lấy mạng bạn, chỉ lấy hương: bạn bị ném về lối vào, hương cháy mất một đoạn (ngã càng nhiều cháy càng nhiều). Bầy yêu vật vừa hạ bạn vẫn ở chỗ cũ.</p><button class="btn big" data-act="bcont">Đứng dậy</button></div>`
-      : `<div class="res lose"><h3>Bại</h3><p>Trang bị, nguyên liệu, kinh nghiệm lần này đều được giữ lại. ${run.world ? "Bạn sẽ tỉnh lại bên đống lửa trại gần nhất." : run.ngoc ? "Ngoc đã kéo bạn về trấn." : ''}</p><button class="btn big" data-act="bcont">${run.world ? "Về lửa trại" : "Về trấn"}</button></div>`);
+      : `<div class="res lose"><h3>Bại</h3><p>Trang bị, nguyên liệu, kinh nghiệm lần này đều được giữ lại. ${run.world ? "Bạn sẽ tỉnh lại bên đống lửa trại gần nhất." : run.ngoc ? "Ngoc đã kéo bạn về trấn." : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? "Về lửa trại" : "Về trấn"}</button></div>`);
 }
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
@@ -2072,6 +2110,21 @@ function wTap(px, py, cv, ts) {
   const P = wPt(ch, x, y);
   wWalkTo(x, y, P && P.t === 'camp' && wPtVisible(ch, x, y) ? () => openModal(campModal(P)) : null, true);
 }
+// 走到最近的篝火，打开歇脚（第一次到会先点亮篝火，等它说完再开）
+function wGoCamp(ch) {
+  const cp = wNearCamp(ch); if (!cp) return; const S0 = wstate(ch);
+  if (cp.x === S0.pos.x && cp.y === S0.pos.y) return openModal(campModal(cp.P));
+  const arrive = (n = 0) => { if (VIEW !== 'world' || n > 120) return; if (WALK || DLG) return setTimeout(() => arrive(n + 1), 250);
+    const S1 = wstate(ch); if (S1.pos.x === cp.x && S1.pos.y === cp.y && !MODALFN) openModal(campModal(cp.P)); };
+  wWalkTo(cp.x, cp.y, null, true); setTimeout(arrive, 300);
+}
+// 这张图里离你最近、看得见的篝火
+function wNearCamp(ch) {
+  const S = wstate(ch), m = wmap(ch); let best = null;
+  for (const c of Object.keys(m.pts)) { const D = m.def.pts[c]; if (!D || D.t !== 'camp') continue;
+    for (const q of m.pts[c]) if (wPtVisible(ch, q.x, q.y)) { const d = Math.abs(q.x - S.pos.x) + Math.abs(q.y - S.pos.y); if (!best || d < best.d) best = { x: q.x, y: q.y, d, P: { code: c, ...D } }; } }
+  return best;
+}
 // 冰面上用手点：寻路不会替人解冰面，所以原来点冰面一点反应都没有（只能用方向键）。现在：
 //   人站在冰上，或者站在冰边、点的那格顺着冰面的方向——往点的那个方向滑；
 //   人离冰面还远——先走到冰边（正对着点的那一格的那个入口），再点一下才滑。
@@ -2231,6 +2284,22 @@ function wRun(acts, i = 0) {
   if (a.final) return wFinishChapter();
   if (a.dossier) { DOSS = { go: () => { closeModal(); next(); }, back: () => { closeModal(); WGOAL = null; render(); } }; wStopAuto(); return openModal(dossierModal(a.dossier)); }
   next();
+}
+// 走地图的章节，剧情回顾放玩家真正看过的：开场 = 第一步（紧跟着自动开始的第二步也算），结尾 = 收尾那一步（第十章按拿到的结局）
+function wReplayLines(k, part) {
+  const M = (WQ[k] || {}).main || [], S = (SAVE.world && SAVE.world[k]) || { flags: {}, pz: {}, side: {}, got: {}, sd: {} };
+  const L = x => { try { return (typeof x === 'function' ? x(S) : x) || []; } catch (e) { return []; } };
+  const of = m => (m ? [...L(m.lines), ...L(m.after)] : []).filter(l => Array.isArray(l) && typeof l[1] === 'string' && !/^（/.test(l[1]));
+  if (part === 'wintro') return [...of(M[0]), ...(M[1] && M[1].auto ? of(M[1]) : [])];
+  const F = M.filter(m => m.final), end = wflags().ending;
+  const z = (end && F.find(m => m.rw && m.rw.setw && m.rw.setw.ending === end)) || F[F.length - 1] || M[M.length - 1], out = of(z);
+  return out.length < 4 ? [...of(M[M.indexOf(z) - 1]), ...out] : out;   // 收尾那步太短（比如只剩一句「醒来」），把前一步也带上
+}
+// 打首领输了：提醒还有哪几样克制它的东西没带
+function bossMissHTML() {
+  const id = WKEY && WKEY.key && WKEY.key.boss, D = id && typeof DOSSIER !== 'undefined' && DOSSIER[id]; if (!D) return '';
+  const miss = D.items.filter(it => it.key && !wkeys()[it.key] && W_KEYS[it.key]); if (!miss.length) return '';
+  return `<p class="sub">Còn ${miss.length} món khắc chế nó chưa mang theo: ${miss.map(it => `“${esc(W_KEYS[it.key].n)}”`).join(", ")}. Chỗ tìm có ghi trong Hồ sơ thủ lĩnh (thanh Nhiệm vụ cũng có manh mối), mang theo rồi quay lại sẽ dễ hơn nhiều.</p>`;
 }
 // 首领卷宗
 let DOSS = null;
@@ -2714,7 +2783,7 @@ const campModal = P => () => {
   const talk = wCampTalkReady(ch);
   return `<h2 class="mh">${SPR.img('fire', 34, null, 'flicker')} ${esc(P.n)}</h2>
     <p class="help-p">Ánh lửa xua tan âm khí. Lưu tiến độ ở đây; thua trận sẽ về lửa trại gần nhất.</p>
-    <div class="campb"><button class="btn" data-act="wrest">Nghỉ ngơi <small>Hồi đầy khí huyết và đan dược, tiểu yêu sẽ xuất hiện lại${talk ? " · <b class=\"talkdot\">Có người muốn nói chuyện với bạn</b>" : ''}</small></button>
+    <div class="campb"><button class="btn" data-act="wrest">Nghỉ ngơi${WMAPS[ch].daynight ? (S.flags.night ? " đến sáng" : " đến tối") : ''} <small>Hồi đầy khí huyết và đan dược, tiểu yêu sẽ xuất hiện lại${talk ? " · <b class=\"talkdot\">Có người muốn nói chuyện với bạn</b>" : ''}</small></button>
       ${comps.length > 1 && !forced ? `<div class="compsel camp"><span class="sub">Dẫn ai đi cùng</span>${comps.map(c => { const C2 = COMPANIONS[c]; return `<button class="cmp2 ${SAVE.comp === c ? 'on' : ''}" data-act="wcomp" data-arg="${c}">${unitIcon(C2.spr, 30, null, '', 'head')}<b>${C2.n}</b>${compTag(c)}</button>`; }).join('')}</div>` : ''}
       ${others.map(id => `<button class="btn ghost" data-act="wtele" data-arg="${id}">Dịch chuyển tới “${esc(wCampName(ch, id))}” <small>${esc(WMAPS[ch].scenes[wCampPos(ch, id).sc].n)}</small></button>`).join('')}
       <button class="btn ghost" data-act="wmenu">Tạm rời <small>Về menu xuất chinh (đổi nhân vật, xem đồ giám), sau đó tiếp tục từ đây</small></button>
@@ -2924,9 +2993,8 @@ function creditsHTML() {
     ["Phản diện", "Bạch Vân Tử (Thanh Hư đạo trưởng)"], ["Đại phản diện", "Cửu U Ma Tôn"], ["Âm phủ", "Mạnh Bà · Đầu Trâu · Mặt Ngựa · Vương Tiểu Lục · Quỷ bán rong · A Phúc"],
     ["Khách mời đặc biệt", "Huyện Lệnh Cương Thi · Lang Yêu Vương · Nhện Nương Nương · Xích Viêm Thạch Ma · Xà Mẫu Ngàn Năm · Quỷ Vương"], ["Đặc biệt cảm ơn", "Ngoc cute ngoài đời thật"], ['', "— HẾT —"]];
   return `<div class="credits"><div class="cr-art">${heroSpr(SAVE.cls, 96, 'float')}${SPR.img('ngoc', 96, null, 'float')}</div>
-    <div class="cr-roll">${roll.map(([a, b]) => `<div class="cr-line"><small>${a}</small><b>${b}</b></div>`).join('')}</div>
-    <p class="cr-sign">Sản xuất · Thực hiện  Đồ Dữ Hào</p>
-    <div class="cr-unlock"><p>Đã mở: <b>Nuôi trang bị</b> (ra trang doanh trại chạm vào người trong trấn: Trương Đại Chùy cường hóa, truyền thừa; Thiết Đản tôi luyện tẩy luyện, thăng giai; Chưởng quầy Ngọc đục lỗ khảm ngọc) · <b>Quầy tiền thưởng</b> · <b>Ảo Cảnh Cửu U</b> (giới hạn một nén hương, vực sâu vô tận, có thể dẫn Ngoc) · <b>Bộ Ảo Cảnh</b> · <b>Trấn Yêu Lục</b> (thu phục yêu vật, sai khiến thủ lĩnh) · <b>Độ khó Tu La</b> · <b>Tu vi</b> · <b>Linh ngọc</b> · <b>Truy nã giang hồ</b> · <b>Tăng độ khó</b></p></div>
+    <div class="cr-win"><div class="cr-roll">${roll.map(([a, b]) => `<div class="cr-line"><small>${a}</small><b>${b}</b></div>`).join('')}<p class="cr-sign">Sản xuất · Thực hiện  Đồ Dữ Hào</p></div></div>
+    <details class="cr-unlock"><summary>Lối chơi mới đã mở</summary><p><b>Nuôi trang bị</b> (ra trang doanh trại chạm vào người trong trấn: Trương Đại Chùy cường hóa, truyền thừa; Thiết Đản tôi luyện tẩy luyện, thăng giai; Chưởng quầy Ngọc đục lỗ khảm ngọc) · <b>Quầy tiền thưởng</b> · <b>Ảo Cảnh Cửu U</b> (giới hạn một nén hương, vực sâu vô tận, có thể dẫn Ngoc) · <b>Bộ Ảo Cảnh</b> · <b>Trấn Yêu Lục</b> (thu phục yêu vật, sai khiến thủ lĩnh) · <b>Độ khó Tu La</b> · <b>Tu vi</b> · <b>Linh ngọc</b> · <b>Truy nã giang hồ</b> · <b>Tăng độ khó</b></p></details>
     <button class="btn big" data-act="credend">Về trấn Thanh Thạch</button></div>`;
 }
 
@@ -3194,7 +3262,9 @@ const ACT = {
       VIEW = 'world'; WHERO = null; refresh(); window.scrollTo(0, 0);
       const ch = SAVE.chapter, C = CHAPTERS[ch - 1], M = WQ[ch].main, cur = M[S.main];
       const sv = SAVE, first = () => { if (SAVE !== sv || VIEW !== 'world' || wstate(ch).main !== 0) return; const g0 = M[0].goal; if (g0.talk) setTimeout(() => { if (SAVE === sv && VIEW === 'world' && wstate(ch).main === 0) wRun(wTalk(ch, g0.talk, SAVE.run)); }, 300); };
-      if (S.main === 0) chapterIntro(chIntroFor(ch), () => { if (SAVE !== sv) return; if (CH_RECAP[ch]) playDialog(recapLines(ch), null, first); else first(); });
+      const ci = () => chapterIntro(chIntroFor(ch), () => { if (SAVE !== sv) return; if (CH_RECAP[ch]) playDialog(recapLines(ch), null, first); else first(); });
+      if (S.main === 0 && ch === 1 && !seen('snowfox')) { markSeen('snowfox'); save(); snowPrologue(ci); }   // 序 · 雪夜
+      else if (S.main === 0) ci();
       else if (cur && /^i/.test(cur.id) && !/^i/.test((M[S.main - 1] || {}).id || '') && interIntroFor(ch) && !S.pz.iintro) { S.pz.iintro = 1; chapterIntro(interIntroFor(ch)); }
       else banner(chTitle(ch), C.sub, 2000);
       return;
@@ -3218,9 +3288,10 @@ const ACT = {
   resume: () => { VIEW = SAVE.run.world ? 'world' : 'map'; WHERO = null; refresh(); window.scrollTo(0, 0); },
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
-  town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); },
+  town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); snowCatchUp(); },
   credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); markSeen('boxnote'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
-  replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : C[part]; playDialog(lines, C.boss); },
+  snowreplay: () => snowPrologue(),
+  replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : /^w/.test(part) ? wReplayLines(+k, part) : C[part]; playDialog(lines, C.boss); },
   item: id => { const prev = MODALFN; ITAB = 'info'; openModal(itemModal(id)); BACK = prev; },
   gview: k => { if (k === 'stash' && GVIEW === 'stash') GSLOT = null; if (k !== 'stash') GSLOT = null; GVIEW = k; GSUB = k === 'gems' || k === 'cube' ? k : 'stash'; FILTER = 'all'; refresh(); },
   statall: () => openModal(statAllModal(SAVE.cls)),
@@ -3328,11 +3399,12 @@ const ACT = {
     wStopAuto(); clearTimeout(WALK && WALK.h); WALK = null;
     { const p0 = wMarkPos(ch, q); if (p0 && p0.comp) { WGOAL = null; return ACT.wtalkc(); } }   // 要找的人就跟在身边：直接搭话
     if (wWatchBlock(ch)) { WGOAL = null; return qtoast("Chỗ này có người tuần tra, tự tìm đường vô dụng — tự lần mò qua đi"); }
+    let todOff = false;
     { const MS = WQ[ch].main.find(m => m.id === id), nt = !!wstate(ch).flags.night;   // 昼夜：时辰不对，找不着人
-      if (WMAPS[ch].daynight && MS && MS.tod && (MS.tod === 'night') !== nt && !cont) qtoast(MS.tod === 'night' ? "Việc này phải đợi trời tối — nghỉ chân bên lửa trại là trời tối" : "Việc này phải đợi trời sáng — nghỉ chân bên lửa trại là trời sáng"); }
-    const p = wMarkPos(ch, q);
+      if (WMAPS[ch].daynight && MS && MS.tod && (MS.tod === 'night') !== nt && !cont) { todOff = true; qtoast(MS.tod === 'night' ? "Việc này phải đợi trời tối — nghỉ chân bên lửa trại là trời tối" : "Việc này phải đợi trời sáng — nghỉ chân bên lửa trại là trời sáng"); } }
+    const p = wMarkPos(ch, q), R = p && wRoute(ch, p);
+    if (todOff && wNearCamp(ch)) { WGOAL = null; return wGoCamp(ch); }   // 时辰不对，去了也白去：带去最近的篝火歇一歇
     if (!p) { WGOAL = null; return wStartAuto(); }
-    const R = wRoute(ch, p);
     if (!R) { WGOAL = null; return qtoast("Đường bên đó giờ chưa đi được"); }
     if (R.puzzle) {   // 被谜题挡住：走到边上停下，剩下的自己来
       WGOAL = null; WTAP = { x: R.x, y: R.y, t: 0 };
@@ -3452,7 +3524,7 @@ const ACT = {
   bknudge: () => { ACT.tsave(); },
   tcls: c => { TCLS = c; refresh(); },
   home: () => { stopAuto(); closeModal(); VIEW = 'title'; render(); window.scrollTo(0, 0); },
-  tcont: () => { closeModal(); if (SAVE.run) return ACT.resume(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); },
+  tcont: () => { closeModal(); if (SAVE.run) { ACT.resume(); return snowCatchUp(); } VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); snowCatchUp(); },
   tnew: () => openModal(resetModal()),
   ttest: () => openModal(() => `${testPanel()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">Đóng</button></div>`),
   tsave: () => openModal(() => `${setSave()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">Đóng</button></div>`),
