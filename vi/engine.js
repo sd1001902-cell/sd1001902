@@ -1807,6 +1807,9 @@ function turnOrder(b, n) {
 let R_WEARY = [10, 0.10, 20], R_REGEN = 0.02;   // [普通战从第几轮起, 每轮多受多少, 妖王战从第几轮起]：妖王是这一局的关口，晚一倍才露破绽
 let BNOW = null;
 const riftB = b => !!(b && b.run && b.run.mode === 'rift' && b.run.world);
+// 幻境守关的蓄力大招（惊堂木、喷火、吞噬这些）：剧情里有道具能克，幻境里没得克，再乘上守关的攻击 ×2.2，满血一下就没（僵尸县令的惊堂木平均打掉 87%，最高 137%）。
+// 幻境里这类大招每下最多打掉目标一半气血：还是要命（后面接着眩晕和普攻），但不会满血秒人
+var R_CAP_HIT = 0.5;
 const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'boss' ? 2 : 0] + 1) : 0;
 // ---------------- 小队统计：输出、控制、治疗、护体挡下、承伤、挡刀（按人分；僵尸合一行） ----------------
 const stKey = u => !u ? null : u.kind === 'minion' ? 'Z' : u.side === 'p' && u.kind !== 'ward' ? u.id : null;
@@ -2383,7 +2386,7 @@ function enemyAct(b, u, out) {
 function bossSay(u, out, text) { if (!text) return; out.say = [u.id, text]; out.lines.push(`${u.name}: “${text}”`); }
 function bossAct(b, u, out) {
   u.cnt = (u.cnt || 0) + 1;
-  if (u.charging) { const A = u.charging; delete u.charging; return doAbility(b, u, A, out, true); }
+  if (u.charging) { const A = u.charging; delete u.charging; if (riftB(b) && u.kind === 'boss') b.capHit = R_CAP_HIT; const r = doAbility(b, u, A, out, true); b.capHit = 0; return r; }
   const H = u.halfDef;
   if (H && !u.halfDone && u.hp / u.maxHp < 0.5) {
     u.halfDone = true; bossSay(u, out, H.say);
@@ -2612,6 +2615,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   // 全抗词条不再随等级涨（普通装备第七章从约 48 掉到约 33），妖物打主角的术法伤害按章节相应调低（W_TUNE[章][4]）
   if (src.side === 'e' && tgt.kind === 'hero' && elem !== 'phys' && b.run && b.run.mode === 'story' && b.run.world) d *= (W_TUNE[b.run.chapter] || [])[4] || 1;
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
+  if (b.capHit && src.side === 'e' && tgt.side === 'p' && d > tgt.maxHp * b.capHit) d = Math.round(tgt.maxHp * b.capHit);   // 幻境守关蓄力的大招：一下最多打掉一半气血，不会满血被秒
   if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, "Hộ giá", 'miss']); }
   if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分
     const Z = zombiesOf(b).sort((x, y) => (y.taunt ? 1 : 0) - (x.taunt ? 1 : 0) || y.hp - x.hp)[0];

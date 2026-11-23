@@ -392,16 +392,19 @@ function bulkBody() {
   const tot = list.reduce((a, it) => a + (sell ? sellPrice(it) : salvageValue(it)), 0), risky = list.filter(it => it.rarity === 'set' || it.rarity === 'legend').length;
   const keeps = [['keepUp', `món giúp ${CLASSES[cls].n} mạnh lên`], ['keepSp', "món có dòng đặc biệt"], ['keepAnc', "Thượng Cổ, Thái Cổ"], ['keepQ', "món có phẩm chất dòng từ tám phần"], ...(featureOn('cube') ? [['keepCube', "thần binh chưa cất vào Túi Càn Khôn"]] : [])];
   const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 }, shown = all.slice().sort((a, b) => order[a.rarity] - order[b.rarity] || b.ilvl - a.ilvl).slice(0, 80);
-  return `<div class="bulk">
-    <div class="seg sm"><button class="${sell ? '' : 'on'}" data-act="bulkmode" data-arg="salv">Phân giải lấy hồn tinh</button><button class="${sell ? 'on' : ''}" data-act="bulkmode" data-arg="sell">Bán lấy bạc</button></div>
-    <h4 class="sub-h">Xử lý những phẩm cấp nào</h4>
-    <div class="chips">${RARITY_ORDER.map(r => `<button class="chip ${f.r[r] ? 'on' : ''}" data-act="bulkr" data-arg="${r}"><span class="r-${r}">${RARITY[r].n}</span> ${cnt[r] || 0}</button>`).join('')}</div>
-    <h4 class="sub-h">Giữ lại những món này</h4>
-    <div class="chips">${keeps.map(([k, n]) => `<button class="chip ${f[k] ? 'on' : ''}" data-act="bulkk" data-arg="${k}">${f[k] ? '✓ ' : ''}${n}</button>`).join('')}</div>
-    <p class="sub">Trang bị đã cường hóa, đã khảm ngọc, đã khóa thì không bao giờ bị xử lý hàng loạt.</p>
-    <div class="bulk-sum">${list.length ? `${sell ? "Bán" : "Phân giải"} <b>${list.length}</b> món, nhận <b>${tot}</b> ${sell ? "lượng" : "hồn tinh"}` : "Không có trang bị nào khớp điều kiện"}${all.length ? "<small>Chạm vào món bên dưới để giữ riêng món đó lại</small>" : ''}</div>
-    <div class="bulk-list">${shown.map(it => `<button class="lchip ${BULKX.has(it.id) ? 'off' : ''} ${ancCls(it)}" data-act="bulkx" data-arg="${it.id}">${SPR.item(it, 22)}<span class="r-${it.rarity}">${itemTitle(it)}</span></button>`).join('')}${all.length > shown.length ? `<span class="sub">…còn ${all.length - shown.length} món nữa</span>` : ''}</div>
-    <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? `Trong đó có ${risky} món Bộ hoặc Thần binh, chạm lần nữa để xác nhận` : `${sell ? "Bán" : "Phân giải"} ${list.length} món này`}</button></div>`;
+  // 2026-11-23 重排：品级一排五格、留下规则两列勾选、装备按品级分组排成整齐的方格；方格在框里滚，确认按钮钉在底部
+  const keepsTxt = { keepUp: "món giúp bạn mạnh lên", keepSp: "có dòng đặc biệt", keepAnc: "Thượng Cổ, Thái Cổ", keepQ: "phẩm chất dòng từ tám phần", keepCube: "thần binh chưa cất vào Túi Càn Khôn" };
+  const groups = RARITY_ORDER.slice().reverse().map(r => [r, shown.filter(it => it.rarity === r)]).filter(g => g[1].length);
+  const tile = it => `<button class="bk2-t r-${it.rarity} ${BULKX.has(it.id) ? 'off' : ''} ${ancCls(it)}" data-act="bulkx" data-arg="${it.id}">${SPR.item(it, 30)}<span>${esc(itemTitle(it))}</span>${BULKX.has(it.id) ? "<em>Giữ</em>" : ''}</button>`;
+  return `<div class="bulk bk2">
+    <div class="bk2-seg"><button class="${sell ? '' : 'on'}" data-act="bulkmode" data-arg="salv">Phân giải · lấy hồn tinh</button><button class="${sell ? 'on' : ''}" data-act="bulkmode" data-arg="sell">Bán · lấy bạc</button></div>
+    <h4 class="bk2-h">Xử lý những phẩm cấp nào</h4>
+    <div class="bk2-rar">${RARITY_ORDER.map(r => `<button class="r-${r} ${f.r[r] ? 'on' : ''}" data-act="bulkr" data-arg="${r}"><b>${RARITY[r].n}</b><small>${cnt[r] || 0} món</small></button>`).join('')}</div>
+    <h4 class="bk2-h">Giữ lại những món này<small>Đã cường hóa, khảm ngọc, khóa thì không bao giờ bị động tới</small></h4>
+    <div class="bk2-keep">${keeps.map(([k]) => `<button class="${f[k] ? 'on' : ''}" data-act="bulkk" data-arg="${k}"><i></i>${keepsTxt[k]}</button>`).join('')}</div>
+    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}</div>${L.map(tile).join('')}`).join('') : "<p class=\"bk2-empty\">Không có trang bị nào hợp điều kiện</p>"}${all.length > shown.length ? `<p class="bk2-empty">……còn ${all.length - shown.length} món chưa liệt kê</p>` : ''}</div>
+    <div class="bk2-foot"><p>${list.length ? `${sell ? "Bán" : "Phân giải"} <b>${list.length}</b> món → <b>${tot}</b> ${sell ? "lượng bạc" : "hồn tinh"}` : "Không có trang bị cần xử lý"}${all.length ? "<small>Chạm vào trang bị để giữ riêng món đó</small>" : ''}</p>
+    <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? `Trong đó có ${risky} món Bộ hoặc Thần binh, chạm lần nữa để xác nhận` : `${sell ? "Bán" : "Phân giải"} ${list.length} món này`}</button></div></div>`;
 }
 const bulkModal = () => `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Kiểm kê nhà kho</h2>${bulkBody()}`;
 function gambleBody() {
@@ -1412,10 +1415,8 @@ function battleHTML() {
     <div class="arena sv ${T0 ? 'k-' + T0.kind : ''}" id="arena" style="--bg:${T0 ? T0.bg : themeOf(run).bg};--g:${T.g};--p:${T.p}">${typeof GFX !== 'undefined' ? `<div class="sv-paint" style="background-image:url(${GFX.background(run.theme || (run.mode === 'rift' ? 'rift' + (themeOf(run).n || '') : 'gen'), T0 || { kind: T.kind || 'field', bg: themeOf(run).bg, g: T.g, p: T.p, wx: T.wx }, B && B.kind === 'boss')})"></div>` : ''}<div class="sv-back">${deco}</div>${wxl}
       <div class="turnbar" id="turnbar"></div><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
-      <div class="spdc" id="spdc">${[1, 2, 4].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div>
-      <button class="statc" id="statc" data-act="statfull">Thống kê</button>
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><div id="bres"></div></div>
-    <div class="hud" id="hud"><div class="hud-sk" id="hudsk"></div>
+    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 4].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div><button class="statc" id="statc" data-act="statfull">Thống kê</button></div><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
 </div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>`;
@@ -1492,18 +1493,18 @@ const setH = (el, h) => { if (el._h === h) return false; el._h = h; el.innerHTML
 function drawSbar() {   // 三段分开更新：名字和数字、血条、状态——状态没变就不重排（原来每一步整块重写还要重新量一遍状态放不放得下）
   const me = $('#sbme'), fo = $('#sbfoe'); if (!me || !fo || !B) return;
   const P = B.P, run = SAVE.run, pc = run ? run.potions : 0;
-  sbSet(me, `<b>Bạn <small>${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))}</small></b><button class="potb" id="potb" data-act="bpot" ${B.over || pc <= 0 || P.hp <= 0 || P.hp >= P.maxHp ? 'disabled' : ''}>Đan ×${pc}</button>`, P.hp / P.maxHp, '#5fbf5a', sbChips(P), 'P');
+  sbSet(me, `<b>Bạn</b><button class="potb" id="potb" data-act="bpot" ${B.over || pc <= 0 || P.hp <= 0 || P.hp >= P.maxHp ? 'disabled' : ''}>Đan ×${pc}</button>`, P.hp / P.maxHp, '#5fbf5a', sbChips(P), 'P', `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`);
   const E = aliveOf(B, 'e'); if (!E.length) { setH(fo, ''); return; }
   const T = E.find(u => u.id === B.target) || E.find(u => u.kind === 'boss') || E.find(u => u.kind === 'elite' || u.rare) || null;
   if (T) { const tag = T.id === B.target ? "Đang chọn" : T.kind === 'boss' ? "Thủ lĩnh" : "Tinh anh";
-    sbSet(fo, `<b>${esc(T.name.replace(/^幻境守关·/, ''))}</b><small>${tag} ${Math.round(T.hp / T.maxHp * 100)}%${T.kind === 'boss' && E.length > 1 ? ` +${E.length - 1}` : ''}</small>`, T.hp / T.maxHp, '#d8463a', sbChips(T, true), T.id); }
+    sbSet(fo, `<b>${esc(T.name.replace(/^幻境守关·/, ''))}</b><small>${tag} ${Math.round(T.hp / T.maxHp * 100)}%${T.kind === 'boss' && E.length > 1 ? ` +${E.length - 1}` : ''}</small>`, T.hp / T.maxHp, '#d8463a', sbChips(T, true), T.id, `${fmtBig(Math.max(0, T.hp) * uK(T))} / ${fmtBig(T.maxHp * uK(T))}`); }
   else { const h = E.reduce((a, u) => a + Math.max(0, u.hp), 0), m = E.reduce((a, u) => a + u.maxHp, 0), more = (B.reinf || []).length;
-    sbSet(fo, `<b>Tiểu yêu ×${E.length}</b><small>Tổng máu ${Math.round(h / m * 100)}%</small>`, h / m, '#d8463a', more ? `<span class="sbc m">phía sau còn ${more} con</span>` : '', 'x'); }
+    sbSet(fo, `<b>Tiểu yêu ×${E.length}</b><small>Tổng máu ${Math.round(h / m * 100)}%</small>`, h / m, '#d8463a', more ? `<span class="sbc m">phía sau còn ${more} con</span>` : '', 'x', `${fmtBig(h)} / ${fmtBig(m)}`); }
 }
-function sbSet(box, head, frac, col, chips, id) {
-  if (!box.querySelector(':scope > .sbh')) { box._h = null; box.innerHTML = `<div class="sbh"></div><div class="sbhp"><i></i></div><div class="sbcs"></div>`; }
-  const H = box.children[0], bar = box.children[1].firstElementChild, C = box.children[2];
-  setH(H, head);
+function sbSet(box, head, frac, col, chips, id, num) {
+  if (!box.querySelector(':scope > .sbh')) { box._h = null; box.innerHTML = `<div class="sbh"></div><div class="sbhp"><i></i><em></em></div><div class="sbcs"></div>`; }
+  const H = box.children[0], bar = box.children[1].firstElementChild, C = box.children[2], nm = box.children[1].lastElementChild;
+  setH(H, head); if (nm._t !== num) { nm._t = num; nm.textContent = num || ''; }   // 血量数字写在血条里
   const w = Math.max(0, Math.min(100, frac * 100)).toFixed(1) + '%'; if (bar._w !== w) { bar._w = w; bar.style.width = w; } if (bar._c !== col) { bar._c = col; bar.style.background = col; }
   if (setH(C, chips) || C._id !== id) { C._id = id; sbFit(box, id); }
 }
@@ -1643,26 +1644,49 @@ function drawTurnBar() {
 function fitSides() {
   const ar = $('#arena'); if (!ar || !ar.classList.contains('sv')) return;
   const cs = getComputedStyle(ar), avail = ar.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 10;
-  formAllies();
-  for (const id of ['foes']) { const sd = document.getElementById(id); if (!sd) continue;   // 我方站固定阵位（formAllies），只有敌方按人数缩放
-    const h = sd.offsetHeight, k = h > avail && h > 0 ? Math.max(0.5, Math.floor(avail / h * 100) / 100) : 1;
-    sd.style.transform = k < 1 ? `scale(${k})` : ''; }
+  formAllies();   // 双方都站固定阵位，不再整块缩放
 }
 window.addEventListener('resize', () => { if (typeof VIEW !== 'undefined' && VIEW === 'battle') fitSides(); });
 // 我方固定阵位：靠近敌人的一列是前排（你、康总管、雷老虎），后面一列是后排（Ngoc、龙道长、刘师傅、铁蛋）；
 // 每人一个格子，开战排一次，打的过程中谁挂状态、谁掉血都不挪（原来是自动换行排，状态一多一少人就跳来跳去）。召唤物站在最前面一小块
 function formAllies() {
-  const sd = $('#allies'), ar = $('#arena'); if (!sd || !ar || !B) return; sd.classList.add('form');
-  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + tb.offsetHeight + 4 : 0), pb = parseFloat(cs.paddingBottom) || 0, H = sd.clientHeight - pt - pb, W = sd.clientWidth; if (H <= 0 || !W) return;   // 顶上让出「出手」条
-  const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
-  const front = main.filter(u => u.kind === 'hero' || (COMPANIONS[u.cid || u.comp || u.id] || {}).row === 'front'), back = main.filter(u => !front.includes(u));
-  front.sort((a, b) => (a.kind === 'hero' ? 1 : 0) - (b.kind === 'hero' ? 1 : 0));   // 你站前排最下面（离镜头最近）
-  const col = (L, cx) => { const n = L.length; if (!n) return; const step = n > 1 ? Math.min(150, (H - 112) / (n - 1)) : 0, k = n > 1 ? Math.max(0.6, Math.min(1, step / 108)) : 1, off = Math.max(0, (H - 112 - (n - 1) * step) / 2) * (n < 3 ? 0.6 : 0.3);   // 一列人少就往中间站一点
-    L.forEach((u, i) => { const el = document.getElementById('u-' + u.id); if (!el) return; const r = n - 1 - i;
-      el.style.left = (cx + (r % 2 ? -7 : 0)) + '%'; el.style.bottom = Math.round(pb + off + r * step) + 'px'; el.style.scale = k < 1 ? k.toFixed(2) : ''; }); };
-  col(front, back.length ? 70 : 52); col(back, 26);
-  const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });   // 召唤物各占一个位子，前面的倒了后面的也不挪
-  mins.forEach(u => { const i = u._slot, el = document.getElementById('u-' + u.id); if (!el) return; el.style.left = (98 + (i % 4) * 13) + '%'; el.style.bottom = Math.round(pb + Math.floor(i / 4) * 46) + 'px'; el.style.scale = '0.8'; el.style.zIndex = '1'; });   // 召唤物：排在最前面贴地一排，不压着你
+  // 2026-11-23 双方都站规则的阵：每边两列（敌方有首领时三列：两列小妖 + 首领一列），每列最多三排，排距一样；
+  // 人整体缩小（手机上原来放大到 1.12 倍，挤成一团）。开战时排一次，之后谁倒了位子空着，补上来的妖物站进空位，别人不挪
+  const ar = $('#arena'); if (!ar || !B) return;
+  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + tb.offsetHeight + 4 : 0), pb = parseFloat(cs.paddingBottom) || 0;
+  const desk = innerWidth > 700, LBL = desk ? 56 : 46, SPH = 58;   // 名字、血条、状态三行的高度；一倍大小时小妖的身高
+  const put = (u, x, bot, z, zi) => { const el = document.getElementById('u-' + u.id); if (!el) return; el.style.left = x + '%'; el.style.bottom = Math.round(bot) + 'px'; el.style.setProperty('--uz', z.toFixed(2)); el.style.scale = ''; el.style.zIndex = String(zi); };
+  for (const side of ['p', 'e']) {
+    const sd = $(side === 'p' ? '#allies' : '#foes'); if (!sd) continue; sd.classList.add('form'); sd.style.transform = '';
+    const H = sd.clientHeight - pt - pb; if (H <= 0 || !sd.clientWidth) continue;
+    const Z = Math.max(0.6, Math.min(desk ? 1.35 : 0.86, (H / 3 - LBL) / SPH)), uh = LBL + SPH * Z, step = Math.min(desk ? 150 : 118, (H - uh) / 2);
+    const top0 = Math.max(0, (H - uh - 2 * step) / 2);   // 三排整体在画面里居中
+    const rowB = r => pb + top0 + r * step;               // 第 r 排（0 最下）离底边多高
+    if (side === 'p') {
+      const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
+      if (B._formP == null) {   // 开战排一次：你在前排最下面，前排伙伴往上；后排伙伴在后面一列
+        const front = main.filter(u => u.kind === 'hero' || (COMPANIONS[u.cid || u.comp || u.id] || {}).row === 'front'), back = main.filter(u => !front.includes(u));
+        front.sort((a, b) => (a.kind === 'hero' ? -1 : 0) - (b.kind === 'hero' ? -1 : 0));
+        const rows = n => n <= 1 ? [1] : n === 2 ? [0.5, 1.5] : n === 3 ? [0, 1, 2] : Array.from({ length: n }, (_, i) => i * 2 / (n - 1));
+        front.forEach((u, i) => { u._fc = 0; u._fr = rows(front.length)[i]; }); back.forEach((u, i) => { u._fc = 1; u._fr = rows(back.length)[i]; });
+        B._formP = 1; }
+      const hasM = mins.length > 0, cx = hasM ? [63, 27] : [main.some(u => u._fc === 1) ? 72 : 55, 30];   // 有召唤物：我方两列往后让，最前面多一列给召唤物
+      main.forEach(u => { if (u._fc == null) { u._fc = 1; u._fr = 1; } put(u, cx[u._fc], rowB(u._fr), Z, 20 - Math.round(u._fr * 3) - u._fc); });
+      const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });   // 召唤物各占一个位子，前面的倒了后面的也不挪
+      const MS = [1, 0, 2, 0.5, 1.5, 2.5, -0.5];   // 召唤物一列竖着站在最前面（原来贴地横着挤一排，名字叠在一起）
+      mins.forEach(u => { const r = MS[u._slot % MS.length]; put(u, 102 + (u._slot >= MS.length ? 14 : 0), rowB(Math.max(-0.3, Math.min(2.3, r))), Z * 0.8, 15 - Math.round(r * 3)); });
+      continue;
+    }
+    // 敌方：首领单独一列在最后面，其余按「中、下、上」的顺序先站前一列，再站第二列（和前一列错开半排）
+    const E = B.units.filter(u => u.side === 'e'), boss = E.filter(u => u.kind === 'boss'), rest = E.filter(u => u.kind !== 'boss');
+    const cols = boss.length ? [22, 48] : [30, 72];
+    const SL = [[0, 1], [0, 0], [0, 2], [1, 0.5], [1, 1.5], [1, 2.5], [1, -0.5]];   // [列, 排]
+    const taken = new Set(rest.filter(u => u.hp > 0 && u._fs != null).map(u => u._fs));
+    for (const u of rest) if (u._fs == null) { let k = 0; while (taken.has(k) && k < SL.length - 1) k++; u._fs = k; taken.add(k); }
+    for (const u of rest) { if (u.hp <= 0 && u._fs != null && rest.some(o => o !== u && o.hp > 0 && o._fs === u._fs)) continue;
+      const [c, r] = SL[u._fs]; put(u, cols[c], rowB(Math.max(-0.3, Math.min(2.3, r))), Z, 20 - Math.round(r * 3) - c * 4); }
+    boss.forEach((u, i) => { const n = boss.length, r = n === 1 ? 0.75 : i * 1.4; put(u, 74, rowB(r), Z, 8 - i); });
+  }
 }
 function applyStep(o, anim) {
   if (!B) return;
@@ -1770,7 +1794,7 @@ function applyStep(o, anim) {
   const foes0 = aliveOf(B, 'e'), tg = foes0.find(f => f.id === B.target) || foes0[0];
   const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? "Cơ" : payOn ? "Kết" : k.ap ? STATES[k.ap].n[0] : k.pay ? "Kết" : '';
-      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}">${skShort(k.n)}${k.left > 0 ? `<i>${k.left}</i>` : ''}</button>`; }).join('') + '</div>';
+      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `Hồi chiêu ${k.left}` : payOn ? "Thu chiêu!" : !k.cd ? "Đánh thường" : "Sẵn sàng"}</small></button>`; }).join('') + '</div>';
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
     $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full && !B.ultAuto); ub.classList.toggle('queued', !!B.ultReq);
     $('#ultpct').textContent = B.ultReq ? "Chiêu sau" : full ? (B.ultAuto ? "Đầy" : "Chạm!") : `${r}%`; ub.disabled = B.over; }
@@ -3049,13 +3073,14 @@ function wJoySetup() {
   const knob = j.querySelector('i');
   const set = e => { const r = j.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
     const L = Math.min(34, Math.hypot(dx, dy)), a = Math.atan2(dy, dx); knob.style.transform = `translate(${Math.cos(a) * L}px,${Math.sin(a) * L}px)`;
-    JOY = Math.hypot(dx, dy) < 12 ? null : (() => { const o = Math.round(a / (Math.PI / 4)); return [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]][(o + 8) % 8]; })(); };
-  j.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); j.setPointerCapture(e.pointerId); set(e); wJoyStep(); };
-  j.onpointermove = e => { if (j.hasPointerCapture(e.pointerId)) set(e); };
-  j.onpointerup = j.onpointercancel = () => { JOY = null; knob.style.transform = ''; };
+    JOY = Math.hypot(dx, dy) < 7 ? null : (() => { const o = Math.round(a / (Math.PI / 4)); return [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]][(o + 8) % 8]; })(); };
+  // 按住就一直盯着手指：原来按下时落在中心附近（还没方向）就不再检查，得先点准方向再按住才走；现在按住期间随时一拖就走
+  j.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); j.setPointerCapture(e.pointerId); JOYDOWN = true; j.classList.add('on'); set(e); wJoyStep(); };
+  j.onpointermove = e => { if (!j.hasPointerCapture(e.pointerId)) return; set(e); if (JOY && !WALK) wJoyStep(); };
+  j.onpointerup = j.onpointercancel = () => { JOYDOWN = false; JOY = null; j.classList.remove('on'); knob.style.transform = ''; clearTimeout(_joyH); };
 }
-let _joyH = 0;
-function wJoyStep() { clearTimeout(_joyH); if (!JOY || VIEW !== 'world') return; if (!WALK) wDirStep(JOY[0], JOY[1]); _joyH = setTimeout(wJoyStep, 60); }
+let _joyH = 0, JOYDOWN = false;
+function wJoyStep() { clearTimeout(_joyH); if (VIEW !== 'world' || (!JOY && !JOYDOWN)) return; if (JOY && !WALK) wDirStep(JOY[0], JOY[1]); _joyH = setTimeout(wJoyStep, 40); }
 // 按方向走一格：返回要走到的格子；挡着的人/机关返回交互
 function wDirTarget(dx, dy) {
   const ch = wch(), S = wstate(ch), x = S.pos.x + dx, y = S.pos.y + dy;
@@ -3373,7 +3398,10 @@ async function pushNow() {
 }
 
 // ---------- 操作 ----------
-function refresh() { save(); if (VIEW !== 'battle') render(); else applyStep(null); if (MODALFN) sheet.innerHTML = MODALFN(); }
+function refresh() { save(); if (VIEW !== 'battle') render(); else applyStep(null); if (MODALFN) setSheet(MODALFN()); }
+// 重画弹窗时，框里滚到哪儿还在哪儿（原来点一下就跳回顶上，比如清点库房里单独留下一件）
+function setSheet(html) { const keep = { _: sheet.scrollTop }; sheet.querySelectorAll('[data-scroll]').forEach(e => { keep[e.dataset.scroll] = e.scrollTop; });
+  sheet.innerHTML = html; if (keep._) sheet.scrollTop = keep._; sheet.querySelectorAll('[data-scroll]').forEach(e => { const v = keep[e.dataset.scroll]; if (v) e.scrollTop = v; }); }
 const split = a => a.split('|');
 function playActsTown(acts) { runCommon(acts, () => render()); }
 function npcTalk(id) {

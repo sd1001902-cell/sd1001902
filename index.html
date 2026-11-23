@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>九幽回廊</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0b0908">
@@ -1731,6 +1731,85 @@ body[data-view=credits] #app{height:100vh;height:100svh;overflow:hidden;box-sizi
 html body .arena.sv .side .unit .sts{height:13px;max-height:13px;min-height:0;overflow:hidden;flex-wrap:nowrap;white-space:nowrap;margin-inline:0;max-width:100%}
 .row.mgo{justify-content:center;gap:8px;margin:2px 0 6px}.row.mgo .btn{min-height:40px;padding:0 14px}
 .minicv{cursor:pointer;touch-action:manipulation}
+/* 连点不放大：苹果手机（尤其装到主屏幕后）快速点两下会当成双击放大 */
+html,body,button,a,label,select,summary,[data-act]{touch-action:manipulation}
+input,textarea,select{font-size:max(16px,1em)}
+.joy{width:118px;height:118px;right:12px;bottom:12px}.joy::before{content:'';position:absolute;inset:-18px;border-radius:50%}
+.joy.on{background:rgba(0,0,0,.45);border-color:rgba(232,199,125,.6)}
+/* 清点库房（2026-11-23 重排） */
+.sheet:has(.bk2){display:flex;flex-direction:column;overflow:hidden;height:min(94vh,820px)}
+.sheet:has(.bk2)>.x{position:absolute;top:12px;right:12px;z-index:2}.sheet:has(.bk2){position:relative}.sheet:has(.bk2)>h2.mh{margin:2px 0 8px}
+@media(max-width:700px){.sheet:has(.bk2){height:90dvh}}
+.bk2{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+.bk2 .r-normal{--rc:var(--r-normal)}.bk2 .r-magic{--rc:var(--r-magic)}.bk2 .r-rare{--rc:var(--r-rare)}.bk2 .r-set{--rc:var(--r-set)}.bk2 .r-legend{--rc:var(--r-legend)}
+.bk2-seg{display:grid;grid-template-columns:1fr 1fr;padding:3px;gap:3px;background:#0b0807;border:1px solid var(--line);border-radius:10px}
+.bk2-seg button{height:38px;border:0;border-radius:7px;background:transparent;color:var(--dim);font:600 15px "Noto Serif SC",serif;cursor:pointer}
+.bk2-seg button.on{background:linear-gradient(180deg,#3a1410,#24100c);color:#ffd9b8;box-shadow:inset 0 0 0 1px var(--blood2)}
+.bk2-h{margin:2px 0 -2px;font:600 13px "Noto Serif SC",serif;color:var(--gold);display:flex;align-items:baseline;gap:8px}
+.bk2-h small{font:400 11px "Noto Sans SC",sans-serif;color:var(--dim)}
+.bk2-rar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.bk2-rar button{height:46px;border:1px solid var(--line);border-radius:8px;background:#0b0807;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;opacity:.55}
+.bk2-rar button b{font:700 14px "Noto Serif SC",serif;color:var(--rc)}.bk2-rar button small{font-size:11px;color:var(--dim)}
+.bk2-rar button.on{opacity:1;border-color:color-mix(in srgb,var(--rc) 70%,transparent);background:color-mix(in srgb,var(--rc) 12%,#0b0807)}
+.bk2-keep{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.bk2-keep button{height:34px;display:flex;align-items:center;gap:7px;padding:0 9px;border:1px solid var(--line);border-radius:7px;background:#0b0807;color:var(--dim);font-size:13px;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden}
+.bk2-keep button i{flex:none;width:15px;height:15px;border:1.5px solid var(--line2);border-radius:4px;position:relative}
+.bk2-keep button.on{color:var(--ink);border-color:#4a3a28}.bk2-keep button.on i{background:var(--gold2);border-color:var(--gold2)}
+.bk2-keep button.on i::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #1a0d08;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.bk2-list{flex:1;min-height:90px;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));grid-auto-rows:min-content;gap:6px;align-content:start;padding:8px;background:#0b0807;border:1px solid var(--line);border-radius:10px}
+.bk2-g{grid-column:1/-1;font:600 12px "Noto Serif SC",serif;color:var(--rc);display:flex;align-items:center;gap:8px;margin-top:2px}
+.bk2-g::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,color-mix(in srgb,var(--rc) 40%,transparent),transparent)}
+.bk2-t{position:relative;height:74px;padding:6px 3px 4px;border:1px solid color-mix(in srgb,var(--rc) 35%,var(--line));border-radius:8px;background:linear-gradient(180deg,color-mix(in srgb,var(--rc) 10%,#140f0d),#0e0a09);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--rc);overflow:hidden}
+.bk2-t img{width:30px;height:30px;image-rendering:pixelated;flex:none}
+.bk2-t span{font-size:11px;line-height:1.25;text-align:center;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all}
+.bk2-t.r-set,.bk2-t.r-legend{box-shadow:0 0 8px color-mix(in srgb,var(--rc) 35%,transparent)}
+.bk2-t.off{opacity:.38;filter:grayscale(.6)}
+.bk2-t em{position:absolute;top:3px;right:3px;font:700 11px/16px "Noto Serif SC",serif;font-style:normal;color:#1a0d08;background:#9bd8b0;border-radius:4px;padding:0 4px}
+.bk2-empty{grid-column:1/-1;text-align:center;color:var(--dim);margin:14px 0}
+.bk2-foot{flex:none;display:flex;flex-direction:column;gap:6px;padding:2px 0 calc(10px + env(safe-area-inset-bottom))}
+.bk2-foot p{margin:0;text-align:center;font-size:14px}.bk2-foot p b{color:var(--gold2)}.bk2-foot p small{display:block;font-size:11px;color:var(--dim)}
+.bk2-foot .btn.big{margin:0}
+/* 2026-11-23 战斗：双方都站规则的阵（formAllies），人整体缩小 */
+.arena.sv .side.allies.form{width:42%;grid-column:auto;grid-row:auto}
+.arena.sv .side.foes.form{grid-column:auto;grid-row:auto;display:block;position:absolute;left:auto;right:0;top:0;bottom:0;width:58%;height:auto;min-height:0;transform:none!important}
+.arena.sv .side.foes.form>.unit{position:absolute;translate:-50% 0;transform-origin:50% 100%;margin:0}
+html body .arena.sv .side.form .unit .sp .pose{zoom:var(--uz,1)}
+html body .arena.sv .side.form .unit{min-width:0;max-width:none}
+html body .arena.sv .side.form .unit .un{font-size:11px;line-height:14px;white-space:nowrap}
+html body .arena.sv .side.form .unit .hpbar{width:62px;height:9px;font-size:8.5px;line-height:9px}
+html body .arena.sv .side.form .unit.k-boss .hpbar{width:96px;height:10px}
+@media(min-width:701px){html body .arena.sv .side.form .unit .un{font-size:13px;line-height:16px}html body .arena.sv .side.form .unit .hpbar{width:84px;height:11px;font-size:10px;line-height:11px}html body .arena.sv .side.form .unit.k-boss .hpbar{width:128px}}
+/* 2026-11-23 战斗下方：技能块放大，你和目标两条状态条加高；倍速、统计从画面里挪到技能上面一行 */
+html body .hud{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 72px;column-gap:6px;row-gap:0;align-items:end;margin:8px 0 6px}
+.hud-ctl{position:absolute;right:0;top:0;height:28px;display:flex;gap:6px;align-items:center;z-index:3}
+html body .hud .spdc{position:static;display:flex;gap:2px;background:#120c0a;border:1px solid var(--line2);border-radius:8px;padding:2px}
+html body .hud .spdc button{padding:3px 9px;font-size:12px;border-radius:6px}
+html body .hud .statc{position:static;height:28px;padding:0 11px;font-size:12px;background:#120c0a;border:1px solid var(--line2);border-radius:8px;color:#e8c88a}
+html body .hud .statc.on{background:rgba(70,48,20,.85);border-color:#c8a05a}
+html body .hud .hud-sk{display:flex;flex-direction:column;gap:7px;min-width:0;align-items:stretch}
+html body .hud .hs-top{height:28px;width:100%;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding-right:110px;overflow:hidden}html body .hud .hs-top>*{flex:none}
+html body .hud .hs-top .rchip{font-size:12.5px;padding:3px 8px}
+html body .hud .hs-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:5px}
+html body .hud .hs-grid .skb2{height:56px;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0 2px;border-radius:9px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--c) 16%,#1c1410),#0e0a09 80%);border:1px solid color-mix(in srgb,var(--c) 50%,#2a1f19);overflow:hidden;font-size:inherit}
+html body .hud .hs-grid .skb2 b{font:700 15px/1.1 "Noto Serif SC",serif;color:#f3e6cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+html body .hud .hs-grid .skb2 small{display:block;font-size:10.5px;line-height:1;color:color-mix(in srgb,var(--c) 75%,#fff)}
+html body .hud .hs-grid .skb2.cd{opacity:.5}html body .hud .hs-grid .skb2.cd small{color:var(--dim)}
+html body .hud .hs-grid .skb2.rdy{box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--c) 70%,transparent)}
+html body .hud .ultb{height:56px;min-height:56px;width:72px;min-width:0;border-radius:9px;padding:0;align-self:end}
+html body .hud .ultb b{font-size:19px}html body .hud .ultb small{font-size:11px}
+html body .sbar{gap:10px;padding:8px 10px 7px;border-radius:10px;margin:0 0 4px}
+html body .sbar .sb-foe{padding-left:10px}
+html body .sbar .sbh{font-size:14px;min-height:24px}html body .sbar .sbh b{font:700 14.5px "Noto Serif SC",serif}html body .sbar .sbh small{font-size:12px}
+html body .sbar .sbhp{position:relative;height:17px;border-radius:5px;margin:5px 0 3px;background:#2a1d18;box-shadow:inset 0 1px 2px rgba(0,0,0,.6)}
+html body .sbar .sbhp i{border-radius:5px}
+html body .sbar .sbhp em{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:600 11px system-ui,sans-serif;font-style:normal;color:#fff;text-shadow:0 1px 2px #000;pointer-events:none}
+html body .sbar .sbcs{min-height:20px}
+html body .sbar .potb{font-size:12px;padding:2px 8px}
+@media(max-width:700px){html body .arena.sv{height:clamp(260px,calc(100vh - 278px - env(safe-area-inset-bottom)),620px);height:clamp(260px,calc(100svh - 278px - env(safe-area-inset-bottom)),620px)}}
+html body .arena.sv .side.form .unit .un{max-width:96px;overflow:hidden;text-overflow:ellipsis}html body .arena.sv .side.form .unit.k-boss .un{max-width:112px}
+html body .hud .hs-top .rchip{flex:0 1 auto;width:auto;min-width:0;max-width:100%}html body .hud .hs-top .rchip.fury{min-width:150px}
+@media(min-width:701px){html body .arena.sv{height:clamp(340px,calc(100vh - 326px),480px)}}
 </style>
 </head>
 <body>
