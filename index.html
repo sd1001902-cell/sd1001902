@@ -1716,6 +1716,11 @@ body[data-view=credits] #app{height:100vh;height:100svh;overflow:hidden;box-sizi
   body[data-view=town] .ttab.on{border-top-color:transparent;border-bottom-color:var(--blood2);background:#1e1210;color:var(--ink)}
   body[data-view=town] .ttab .dot{top:5px;right:6px}
 }
+/* 我方固定阵位：每人钉在一个格子里，状态多少不影响站位 */
+.arena.sv .side.allies.form{display:block;position:absolute;left:0;top:0;bottom:0;width:40%;height:auto;min-height:0;transform:none!important}   /* 脱离网格：高度只跟画面走，不随敌方一列的高矮变 */
+.arena.sv .side.foes{grid-column:2}
+.arena.sv .side.allies.form>.unit{position:absolute;translate:-50% 0;transform-origin:50% 100%;margin:0}
+html body .arena.sv .side .unit .sts{height:13px;max-height:13px;min-height:0;overflow:hidden;flex-wrap:nowrap;white-space:nowrap;margin-inline:0;max-width:100%}
 </style>
 </head>
 <body>

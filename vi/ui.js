@@ -1642,11 +1642,27 @@ function drawTurnBar() {
 function fitSides() {
   const ar = $('#arena'); if (!ar || !ar.classList.contains('sv')) return;
   const cs = getComputedStyle(ar), avail = ar.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 10;
-  for (const id of ['allies', 'foes']) { const sd = document.getElementById(id); if (!sd) continue;
+  formAllies();
+  for (const id of ['foes']) { const sd = document.getElementById(id); if (!sd) continue;   // 我方站固定阵位（formAllies），只有敌方按人数缩放
     const h = sd.offsetHeight, k = h > avail && h > 0 ? Math.max(0.5, Math.floor(avail / h * 100) / 100) : 1;
     sd.style.transform = k < 1 ? `scale(${k})` : ''; }
 }
 window.addEventListener('resize', () => { if (typeof VIEW !== 'undefined' && VIEW === 'battle') fitSides(); });
+// 我方固定阵位：靠近敌人的一列是前排（你、康总管、雷老虎），后面一列是后排（Ngoc、龙道长、刘师傅、铁蛋）；
+// 每人一个格子，开战排一次，打的过程中谁挂状态、谁掉血都不挪（原来是自动换行排，状态一多一少人就跳来跳去）。召唤物站在最前面一小块
+function formAllies() {
+  const sd = $('#allies'), ar = $('#arena'); if (!sd || !ar || !B) return; sd.classList.add('form');
+  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + tb.offsetHeight + 4 : 0), pb = parseFloat(cs.paddingBottom) || 0, H = sd.clientHeight - pt - pb, W = sd.clientWidth; if (H <= 0 || !W) return;   // 顶上让出「出手」条
+  const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
+  const front = main.filter(u => u.kind === 'hero' || (COMPANIONS[u.cid || u.comp || u.id] || {}).row === 'front'), back = main.filter(u => !front.includes(u));
+  front.sort((a, b) => (a.kind === 'hero' ? 1 : 0) - (b.kind === 'hero' ? 1 : 0));   // 你站前排最下面（离镜头最近）
+  const col = (L, cx) => { const n = L.length; if (!n) return; const step = n > 1 ? Math.min(150, (H - 112) / (n - 1)) : 0, k = n > 1 ? Math.max(0.6, Math.min(1, step / 108)) : 1, off = Math.max(0, (H - 112 - (n - 1) * step) / 2) * (n < 3 ? 0.6 : 0.3);   // 一列人少就往中间站一点
+    L.forEach((u, i) => { const el = document.getElementById('u-' + u.id); if (!el) return; const r = n - 1 - i;
+      el.style.left = (cx + (r % 2 ? -7 : 0)) + '%'; el.style.bottom = Math.round(pb + off + r * step) + 'px'; el.style.scale = k < 1 ? k.toFixed(2) : ''; }); };
+  col(front, back.length ? 70 : 52); col(back, 26);
+  const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });   // 召唤物各占一个位子，前面的倒了后面的也不挪
+  mins.forEach(u => { const i = u._slot, el = document.getElementById('u-' + u.id); if (!el) return; el.style.left = (98 + (i % 4) * 13) + '%'; el.style.bottom = Math.round(pb + Math.floor(i / 4) * 46) + 'px'; el.style.scale = '0.8'; el.style.zIndex = '1'; });   // 召唤物：排在最前面贴地一排，不压着你
+}
 function applyStep(o, anim) {
   if (!B) return;
   drawTurnBar();
