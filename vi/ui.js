@@ -1710,6 +1710,8 @@ function sayBubble(id, text) {
   const b = document.createElement('div'); b.className = 'bubble'; b.textContent = text; el.appendChild(b);
   setTimeout(() => b.remove(), 2200);
 }
+// 主角团那半边的上沿（中线下面一点），连招、金刚震、必杀的字都放这里（2026-11-24：上半区只留妖物和伤害数字）
+const partyTop = () => { const ar = $('#arena'), ln = $('#bline'); if (!ar) return 0; const b = ln ? parseFloat(ln.style.bottom) : NaN; return isNaN(b) ? ar.clientHeight * 0.55 : ar.clientHeight - b + 10; };
 function showCutin(kind, data) {
   const el = $('#cutin'); if (!el) return;
   let h;
@@ -1717,7 +1719,7 @@ function showCutin(kind, data) {
     const run = SAVE.run, sm = SAVE.speed >= 3, ms = ULT_MS();
     const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
     el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
-    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');
+    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');   // 必杀横幅放在战场最下面（主角团这半边，见 .cutin.ultlite）
     SFX.play('gong');
     clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, ms); return;
   } else {
@@ -1852,7 +1854,7 @@ function formAllies() {
   // 2026-11-23 上下对阵（用户定）：妖物在上半，主角团在下半，中间一条阵营界线。每边最多两排（前排挨着界线，后排和前排左右错开），
   // 召唤物在我方前排上面再站一排。人的大小按画面高度算：能放下就尽量大，放不下就一起缩。开战时排一次，之后谁倒了位子空着，补上来的妖物站进空位，别人不挪
   const ar = $('#arena'); if (!ar || !B) return;
-  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + tb.offsetHeight + 2 : 0), pb = Math.max(6, (parseFloat(cs.paddingBottom) || 0) - 20);
+  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + Math.max(47, tb.offsetHeight) + 2 : 0)   /* 出手条还没画出来时也按 47 算，免得头一次排和之后排得不一样 */, pb = Math.max(6, (parseFloat(cs.paddingBottom) || 0) - 20);
   const desk = innerWidth > 700, LBL = desk ? 54 : 46, SPH = 58, BSH = 118;   // 名字、血条、状态三行的高度；一倍大小时小妖、首领的身高
   const sa = $('#allies'), sf = $('#foes'); if (!sa || !sf) return;
   for (const sd of [sa, sf]) { sd.classList.add('form', 'tb'); sd.style.transform = ''; }
@@ -1877,22 +1879,32 @@ function formAllies() {
   for (const u of rest) if (u._fs == null) { let k = 0; while (taken.has(k) && k < SL.length - 1) k++; u._fs = k; taken.add(k); }
   // 量一下每个人：字和血条那几行多高（lh）、一倍大小时身子多高（sb）——精英多一行词缀、首领和大块头身子高，各算各的
   const zNow = el => parseFloat(el.style.getPropertyValue('--uz')) || 1;
-  const meas = u => { const el = document.getElementById('u-' + u.id), sp = el && el.querySelector('.sp'); if (!el || !sp || !el.offsetHeight) return { lh: LBL, sb: u.kind === 'boss' ? BSH : SPH }; const z = zNow(el), h = sp.offsetHeight; return { lh: Math.max(LBL - 8, el.offsetHeight - h), sb: h / z }; };
+  // 每人只在头一次排的时候量一次，之后一直用这个数（挂上状态、倒下收起来，行高都不变，中线就不会跳）
+  const meas = u => { if (u._m && !u.phased) return u._m; const el = document.getElementById('u-' + u.id), sp = el && el.querySelector('.sp');
+    if (!el || !sp || !el.offsetHeight) return { lh: LBL, sb: u.kind === 'boss' ? BSH : SPH }; const z = zNow(el), h = sp.offsetHeight; return (u._m = { lh: Math.max(LBL - 8, el.offsetHeight - h), sb: h / z }); };
   const M = new Map(); for (const u of [...main, ...mins, ...E]) M.set(u, meas(u));
   const rowH = (L, z) => L.reduce((a, u) => { const m = M.get(u); return Math.max(a, m.lh + m.sb * z); }, 0);
   const fA = main.filter(u => u._fc === 0), bA = main.filter(u => u._fc === 1), fE = rest.filter(u => SL[u._fs][0] === 0), bE = rest.filter(u => SL[u._fs][0] === 1);
-  const hasM = mins.length > 0, GAP0 = desk ? 24 : 16, wide = ar.clientWidth * 0.12 > (desk ? 104 : 76), OV = wide ? 0.5 : 0.86;   // 前后排左右错开，上下可以叠一点（宽屏错得开，叠一半）
-  const lay = Z => {   // 给定大小，从下往上排，返回各排离底边多高
+  if (mins.length) B._hadM = 1; const hasM = !!B._hadM, GAP0 = desk ? 24 : 16, wide = ar.clientWidth * 0.12 > (desk ? 104 : 76), OV = wide ? 0.5 : 0.86;   // 前后排左右错开，上下可以叠一点（宽屏错得开，叠一半）
+  const lay = (Z, ZE = Z) => {   // 给定大小（我方 Z、妖物 ZE），从下往上排，返回各排离底边多高
     const L = {}; L.A0 = pb; L.A1 = bA.length && !wide ? pb + rowH(bA, Z) * OV : pb; let top = wide ? L.A1 + rowH(main, Z) : Math.max(L.A0 + rowH(bA, Z), L.A1 + rowH(fA, Z));
     if (hasM && wide) { L.AM = L.A1; top = Math.max(top, L.A1 + rowH(mins, Z * 0.78)); }   // 宽屏：我方所有人（伙伴、召唤物）站成一排
     else if (hasM) { L.AM = fA.length ? L.A1 + rowH(fA, Z) * OV : L.A1; top = Math.max(top, L.AM + rowH(mins, Z * 0.78)); }
-    L.line = top; L.E0 = top + GAP0; const h0 = rowH(fE, Z); L.E1 = L.E0 + h0 * OV; L.B = L.E0 + (fE.length ? h0 * 0.55 : 0);
-    L.top = Math.max(L.E0 + h0, bE.length ? L.E1 + rowH(bE, Z) : 0, boss.length ? L.B + rowH(boss, Z * 0.92) : 0); return L; };
-  let Z = desk ? 1.3 : 0.86; while (Z > 0.5 && lay(Z).top > TOP) Z -= 0.02;
-  const L = lay(Z), extra = Math.max(0, TOP - L.top), mid = Math.min(extra * 0.8, desk ? 120 : 80), lift = Math.max(0, extra - mid) / 2;   // 有富余：先加宽中间的界线空隙，剩下的上下居中
+    L.line = top; L.E0 = top + GAP0; const h0 = rowH(fE, ZE); L.E1 = L.E0 + h0 * OV; L.B = L.E0 + (fE.length ? h0 * 0.55 : 0);
+    L.top = Math.max(L.E0 + h0, bE.length ? L.E1 + rowH(bE, ZE) : 0, boss.length ? L.B + rowH(boss, ZE * 0.92) : 0); return L; };
+  // 2026-11-24 开战排一次就锁住：你们这边的位置、大小和中线一整场都不动。之后妖物多了（分身、补上来、召帮手）放不下，
+  // 只动妖物那半边：先往中线靠一点，再不够就把妖物缩小一点（原来是整场重新居中，中线会突然往下跳）
+  const C = B._lay, same = C && C.W === ar.clientWidth && C.H === ar.clientHeight && C.top === TOP;
+  let Z, ZE, L, lift, LINE, E0abs, keep = false;
+  if (same && Math.abs(lay(C.Z, C.ZE).line - C.line) < 1) {
+    Z = C.Z; lift = C.lift; LINE = C.LINE; const lo = LINE + GAP0 / 2;
+    for (ZE = C.ZE; ZE >= 0.5; ZE -= 0.02) { const L2 = lay(Z, ZE), blk = L2.top - L2.E0, base = Math.max(lo, Math.min(C.E0abs, TOP - blk)); if (base + blk <= TOP + 1) { L = L2; E0abs = base; keep = true; break; } }
+  }
+  if (!keep) { Z = desk ? 1.3 : 0.86; while (Z > 0.5 && lay(Z).top > TOP) Z -= 0.02; ZE = Z; L = lay(Z); const extra = Math.max(0, TOP - L.top), mid = Math.min(extra * 0.8, desk ? 120 : 80); lift = Math.max(0, extra - mid) / 2;   // 有富余：先加宽中间的界线空隙，剩下的上下居中
+    LINE = L.line + lift + (GAP0 + mid) / 2; E0abs = L.E0 + lift + mid; }
+  B._lay = { W: ar.clientWidth, H: ar.clientHeight, top: TOP, Z, ZE, lift, line: L.line, LINE, E0abs };
   for (const k of ['A0', 'A1', 'AM']) if (L[k] != null) L[k] += lift;
-  for (const k of ['E0', 'E1', 'B']) L[k] += lift + mid;
-  const LINE = L.line + lift + (GAP0 + mid) / 2;
+  const eSh = E0abs - L.E0; for (const k of ['E0', 'E1', 'B']) L[k] += eSh;
   let ln = $('#bline'); if (!ln) { ln = document.createElement('div'); ln.id = 'bline'; ln.innerHTML = '<i></i>'; ar.appendChild(ln); }
   ln.style.bottom = Math.round(LINE) + 'px';
   const FX = heroF ? [[50, 24, 76, 6, 94], [36, 64, 14, 86, 50]] : [[36, 64, 14, 86, 50], [50, 24, 76, 6, 94]];   // [前排, 后排] 依次站的横向位置（%）：你那一排从正中排起
@@ -1904,9 +1916,9 @@ function formAllies() {
   const MX = [63, 37, 85, 15, 74, 26, 50, 95, 5];   // 召唤物：你头顶前面横着一排，各占一个位子，前面的倒了后面的也不挪
   mins.forEach(u => put(u, wide ? WX[(main.length + u._slot) % WX.length] : MX[u._slot % MX.length], L.AM, Z * 0.78, 18));
   for (const u of rest) { if (u.hp <= 0 && u._fs != null && rest.some(o => o !== u && o.hp > 0 && o._fs === u._fs)) continue;
-    const [r, x] = SL[u._fs]; put(u, x, r ? L.E1 : L.E0, Z, r ? 10 : 16); }
+    const [r, x] = SL[u._fs]; put(u, x, r ? L.E1 : L.E0, ZE, r ? 10 : 16); }
   const BX = boss.length === 1 ? [50] : boss.length === 2 ? [32, 68] : [18, 50, 82];
-  boss.forEach((u, i) => put(u, BX[i % BX.length], L.B, Z * 0.92, 8 - i));
+  boss.forEach((u, i) => put(u, BX[i % BX.length], L.B, ZE * 0.92, 8 - i));
 }
 function applyStep(o, anim) {
   if (!B) return;

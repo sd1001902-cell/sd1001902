@@ -861,7 +861,9 @@ const VFX = (() => {
       for (let k = 1; k <= 3; k++) { const rr = R * k / 3, aa = a0 + (Math.random() - 0.5) * 0.6; x = Math.cos(aa) * rr; y = Math.sin(aa) * rr; d += ` L${x.toFixed(1)},${y.toFixed(1)}`; } }
     spawn('cracks', p.x, p.y, Math.round(620 * fac()), { s: size + 'px', c }, `<svg viewBox="${-R} ${-R} ${size} ${size}"><path d="${d}" stroke="${c}" stroke-width="3" fill="none" stroke-linejoin="round"/><path d="${d}" stroke="#fff" stroke-width="1" fill="none"/></svg>`); }
   const iceshell = (p, size) => p && spawn('iceshell', p.x, p.y, Math.round(520 * fac()), { s: (size || 90) + 'px' });
-  const banner = (name, c, c2, lab) => arena && spawn('cbanner', arena.clientWidth / 2, arena.clientHeight * 0.16, Math.round(1100 * fac()), { c, c2: c2 || c }, `<small>${lab || '连招'}</small><b>${name}</b>`);
+  // 连招、金刚震的横幅放在中线下面（主角团那半边），上半区只留妖物和伤害数字
+  const bannerY = () => { const ln = document.getElementById('bline'), b = ln ? parseFloat(ln.style.bottom) : NaN; return isNaN(b) ? arena.clientHeight * 0.58 : arena.clientHeight - b + 18; };
+  const banner = (name, c, c2, lab) => arena && spawn('cbanner', arena.clientWidth / 2, bannerY(), Math.round(1100 * fac()), { c, c2: c2 || c }, `<small>${lab || '连招'}</small><b>${name}</b>`);
   const REACT_FX = {
     破军(p) { slash(p, '#fff', -45, 130, 360 * fac()); slash(p, '#d8a05a', 45, 130, 360 * fac()); parts(p, 16, '#d8a05a', 80, 700 * fac(), { cls: 'shard', size: 8 }); cracks(p, '#d8a05a', 120); },
     饮火(p) { flames(p, 14, '#ff6a2a', 50, 800 * fac()); pillar(p, '#ff3a1a', 700 * fac()); ink(p, 10, 70, 700 * fac(), BLOOD); boom(p, '#ff6a2a', 140, 500 * fac()); },

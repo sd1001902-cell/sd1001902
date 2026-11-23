@@ -33,7 +33,7 @@ html[lang=vi] .arena.sv .unit .sts{flex-wrap:wrap;white-space:normal;max-height:
 html[lang=vi] .ci-theme{letter-spacing:0}.ci-theme span{max-width:92vw;font-size:clamp(24px,7.4vw,44px)!important}
 html[lang=vi] textarea,html[lang=vi] input{font-family:"Noto Sans",sans-serif}
 html[lang=vi] .wctl .btn{font-size:calc(14px * var(--fs,1));line-height:1.1}
-html[lang=vi] .combo{top:48px}
+html[lang=vi] .combo{top:auto}
 html[lang=vi] .combo span{font-size:15px}
 html[lang=vi] .arena .unit .tags,html[lang=vi] .arena.sv .unit .tags{flex-wrap:wrap;white-space:normal;row-gap:2px;overflow:visible}
 html[lang=vi] .hs-grid .skb2{white-space:normal;line-height:1.05;font-size:calc(10.5px * var(--fs,1));text-align:left;padding-right:4px;overflow:visible}
