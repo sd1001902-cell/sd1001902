@@ -1904,7 +1904,7 @@ function heal(u, amt, out, quiet) {
 function freezeU(u, out, label) {
   if (u.hp <= 0 || (u.kind === 'boss' && RNG.ch(0.5))) return;
   if (u.kind === 'hero' && u.xTen && RNG.ch(u.xTen / 100)) { out.pops.push([u.id, "Thanh thần", 'buff']); return; }
-  u.st.frozen = true; out.pops.push([u.id, label || "Choáng", 'cold', 1]); if (u.side === 'e') stAdd(BNOW, stActor(BNOW), 'ctrl', 1);
+  u.st.frozen = true; out.pops.push([u.id, label || "Choáng", 'cold', 1]); if (u.side === 'e') { const by = stActor(BNOW); u.frzA = !!(by && by.kind === 'ally'); stAdd(BNOW, by, 'ctrl', 1); }
   if (u.ghostForm) { u.ghostForm = false; out.pops.push([u.id, "Hiện hình", 'react']); out.lines.push(`${u.name} bị đánh choáng, quỷ thân hiện hình!`); }
 }
 function applyPoison(src, tgt, pct, bonus) {
@@ -2035,7 +2035,7 @@ function act(b, u, out) {
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
     if (u.hp <= 0) { out.lines.push(`${u.name} ${k === 'burn' ? "bị thiêu" : "trúng độc"} chết`); return; }
   }
-  if (u.st.frozen) { delete u.st.frozen; if (u.charging) { delete u.charging; out.pops.push([u.id, "Ngắt", 'buff']); out.lines.push(`${u.name} bị đánh choáng, tụ lực bị ngắt!`); } else out.lines.push(`${u.name} bị choáng`); out.actor = null; return; }
+  if (u.st.frozen) { delete u.st.frozen; if (u.frzA) { u.frzA = false; if (u.side === 'e' && b.P && b.P.cls === 'paladin') thornHit(b, b.P, u, out, { thf: 1 }); if (u.hp <= 0) { out.actor = null; return; } } if (u.charging) { delete u.charging; out.pops.push([u.id, "Ngắt", 'buff']); out.lines.push(`${u.name} bị đánh choáng, tụ lực bị ngắt!`); } else out.lines.push(`${u.name} bị choáng`); out.actor = null; return; }
   if (u.trait === 'regen' && u.hp > 0 && !u.st.burn && !(riftB(b) && u.st.poison)) heal(u, u.maxHp * (riftB(b) ? R_REGEN : 0.05), out);   // 幻境里精英血厚三倍多，回 5% 打不动：改成 2%，中毒也压得住
   for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'tg', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG', 'liuDr', 'tieArm']) if (u.st[k] && --u.st[k] <= 0) {
     delete u.st[k];
@@ -2954,11 +2954,18 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
 // 反震（2026-11-23 重做）：不再是死数。每挨一下打（被护体挡下的也算），对出手的敌人打一下 = 你的攻击 × 反震倍率，
 // 吃伤害加成和佛怒。和尚的狮子吼嘲讽期间反震倍率 +50%；罗汉金身 2 件 +100%、4 件嘲讽期间翻倍、6 件反震也叠佛怒并回一成血
 const THORN_TAUNT = 50;
+// 护法金身（2026-11-24）：和尚的伤害八成靠挨打，带控场伙伴、妖物去打伙伴都会少挨打。所以：
+//   伙伴晕住/冻住的妖物，跳过回合时照样吃和尚一次完整反震（act 里，opt.thf）；妖物打伙伴，和尚替伙伴反震一半（HUFA_K）。
+//   和尚自己晕住的不算（单刷强度不变）；反击不动，还是得真挨打
+const HUFA_K = 0.5;
 function thornHit(b, tgt, src, out, opt) {
+  let f = opt.thf || 1;
+  if (tgt !== b.P && tgt.kind === 'ally' && b.P && b.P.cls === 'paladin') { f *= HUFA_K; tgt = b.P; }
   if (tgt !== b.P || src.side !== 'e' || src.hp <= 0 || tgt.hp <= 0 || opt.refl) return;
   const tfx = tgt.fx, chan = !!tgt.st.chan;
   let K = (tgt.thornK || 0) + (chan && tgt.cls === 'paladin' ? THORN_TAUNT : 0); if (K <= 0) return;
   if (chan && tfx && tfx.has('luoHan4')) K *= 2;
+  K *= f;
   const d = hit(b, tgt, src, K / 100, 'holy', out, { proc: 1, refl: 1 });
   if (d > 0 && tfx && tfx.has('luoHan6')) {
     if (tgt.fonu < (tfx.has('fumoBelt') ? 15 : 10) && RNG.ch(0.5)) { tgt.fonu++; out.pops.push([tgt.id, "Phật nộ " + tgt.fonu, 'buff']); }

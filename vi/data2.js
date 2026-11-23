@@ -282,7 +282,7 @@ SETS.push(
     b6: 'qiSha6', b6d: "Sát thương đòn kết liễu ×4; đòn kết liễu giết được mục tiêu thì hồi chiêu ngay lập tức" },
   { id: 'luohan', n: "La Hán Kim Thân", cls: 'paladin', rift: true,
     pieces: [['helm', "La Hán Tăng Mạo"], ['chest', "La Hán Cà Sa"], ['gloves', "La Hán Hộ Uyển"], ['boots', "La Hán Tăng Hài"], ['ring', "La Hán Ban Chỉ"], ['amulet', "La Hán Niệm Châu"]],
-    b2: { counter: 20, armorPct: 30, thornK: 100 }, b2d: "Tỉ lệ phản kích +20%, hộ giáp +30%, bội số phản chấn +100% (phản chấn = công kích của bạn × bội số phản chấn, bị đánh một cái bật lại một cái)",
+    b2: { counter: 20, armorPct: 30, thornK: 100 }, b2d: "Tỉ lệ phản kích +20%, hộ giáp +30%, bội số phản chấn +100% (phản chấn = công kích của bạn × bội số phản chấn, bị đánh một cái bật lại một cái; yêu vật bị đồng hành làm choáng cũng ăn một lần, yêu vật đánh đồng hành thì bạn bật thay một nửa)",
     b4: 'luoHan4', b4d: "Phản kích đánh mọi kẻ địch, sát thương từ 80% lên 200%; đòn bị hộ thể đỡ cũng phản kích; trong lúc Sư Tử Hống khiêu khích, phản chấn nhân đôi",
     b6: 'luoHan6', b6d: "Tỉ lệ phản kích thêm +15%; mỗi lần phản kích (phản chấn có nửa tỉ lệ) cộng một tầng “Phật nộ” (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải nhận -4%; một phần mười sát thương phản chấn hồi cho bạn" },
 );

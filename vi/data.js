@@ -374,7 +374,7 @@ const CLASSES = {
       { id: 'kiUp',     n: "Sát Tâm",   d: "Đòn kết liễu: mỗi điểm Sát ý tăng thêm +5%", max: 5, st: { kiPct: 5 } },
       { id: 'reap',     n: "Đoạt Hồn",   d: "Địch mang Đoạt Mệnh Ấn nhận thêm +50% sát thương; giới hạn Sát ý +1", max: 1, fx: 'deathMarkPlus' } ] } },
   paladin: {
-    n: "Võ Tăng Kim Cương", d: "Ngoại gia công phu Thiếu Lâm, chịu đòn giỏi nhất, sát thương thấp nhất. Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (sát thương Phật quang), đang có hộ thể chân khí thì thêm +15%; còn tự hồi máu được.", spr: 'monk',
+    n: "Võ Tăng Kim Cương", d: "Ngoại gia công phu Thiếu Lâm, chịu đòn giỏi nhất, sát thương thấp nhất. Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (sát thương Phật quang), đang có hộ thể chân khí thì thêm +15%; còn tự hồi máu được. Khi dẫn đồng hành có «Hộ Pháp Kim Thân»: yêu vật bị đồng hành đánh choáng, đóng băng mà mất lượt vẫn ăn một lần phản chấn của bạn; yêu vật đánh đồng hành, bạn phản chấn thay họ một nửa.", spr: 'monk',
     base: { hp: 130, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 10 }, per: { hp: 12.5, atk: 2.9, armor: 1.7 },
     res: { n: "Phản kích" },
     skills: [
