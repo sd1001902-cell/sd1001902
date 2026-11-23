@@ -40,8 +40,16 @@ const heroSpr = (cls, size, extra) => typeof HERO !== 'undefined' && HERO.has(cl
 const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== 'undefined' && HERO.lookOf(spr);
   return lk ? `<img class="spr hpor ${extra || ''}" src="${HERO.portrait(lk, mode || (size >= 100 ? 'full' : size >= 50 ? 'stand' : 'head'), HERO.mapPal(lk, pal))}" width="${size}" height="${size}" alt="" draggable="false">` : SPR.img(spr, size, pal, extra); };
 // 顶栏的大数字缩写：十万以上写成「12.3万」，省地方
-const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); const v = n >= 1000000 ? Math.round(n / 10000) : Math.round(n / 1000) / 10; return `${v}万`; };
+const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); if (n >= 1e8) return `${Math.round(n / 1e7) / 10}亿`; const v = n >= 1000000 ? Math.round(n / 10000) : Math.round(n / 1000) / 10; return `${v}万`; };
 const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
+// 跳字：新数字放在头顶正中（主角的掉血在左、回血在右），同一列里还没散的往上挪一行，最多留三个；站在最上面一排的（首领常在后排），数字放低一点，不被出手条挡住
+function popPut(el, cls, html) {
+  if (!el) return null;
+  const side = / m[lr]\b/.exec(cls), sel = ':scope > .pop' + (side ? '.' + side[0].trim() : ':not(.ml):not(.mr):not(.move)');
+  const old = [...el.querySelectorAll(sel)]; old.forEach(q => { q.style.marginTop = ((parseFloat(q.style.marginTop) || 0) - 19) + 'px'; }); if (old.length >= 3) old[0].remove();
+  const now = performance.now(); if (!el._lowT || now - el._lowT > 1500) { el._lowT = now; const ar = document.getElementById('arena'); el._low = !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; }
+  const p = document.createElement('span'); p.className = cls + (el._low ? ' low' : ''); p.innerHTML = html; el.appendChild(p); setTimeout(() => p.remove(), 1150); return p;
+}
 const uK = u => u && u.side === 'p' && B && B.P ? hpK(B.P.lv) : 1;                       // 战斗里某个单位的显示倍数
 const chTitle = ch => CHAPTERS[ch - 1] ? `第${CN[ch]}章 · ${CHAPTERS[ch - 1].n}` : '九幽幻境';   // 幻境用的是假章节号
 
@@ -1537,9 +1545,9 @@ function battleHTML() {
     <div class="arena sv ${T0 ? 'k-' + T0.kind : ''}" id="arena" style="--bg:${T0 ? T0.bg : themeOf(run).bg};--g:${T.g};--p:${T.p}">${typeof GFX !== 'undefined' ? `<div class="sv-paint" style="background-image:url(${GFX.background(run.theme || (run.mode === 'rift' ? 'rift' + (themeOf(run).n || '') : 'gen'), T0 || { kind: T.kind || 'field', bg: themeOf(run).bg, g: T.g, p: T.p, wx: T.wx }, B && B.kind === 'boss')})"></div>` : ''}<div class="sv-back">${deco}</div>${wxl}
       <div class="turnbar" id="turnbar"></div><button class="fbadge" id="fbadge" data-act="fminfo" hidden></button><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
-      <div class="stpop" id="stpop" data-act="stclose" hidden></div><div id="bres"></div></div>
+      <div class="stpop" id="stpop" data-act="stclose" hidden></div><button class="statb" id="statc" data-act="statfull" aria-label="本场统计">统</button><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
-    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div><button class="statc" id="statc" data-act="statfull">统计</button></div><div class="hud-sk" id="hudsk"></div>
+    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div></div><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="必杀·${U.n}"><i id="ultfill"></i><span><b>必杀</b><small id="ultpct"></small></span></button>
 </div>`;
 }
@@ -1591,6 +1599,7 @@ let STPOP = null;
 function stDesc(u, k) {
   if (!u) return null;
   if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + '（妖物特性）', c: '#e8c88a', d: TRAITS[u.trait].d };
+  if (k === 'fonu') return { n: `佛怒 ${u.fonu || 0} 层`, c: '#ffb066', d: '罗汉金身 6 件：每次反震叠一层，每层伤害 +30%、受到的伤害 -4%，这场战斗内一直有效。' };
   if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + '（精英词缀）', c: '#ffb066', d: A.d } : null; }
   if (k === 'all') { const L = [...(u.trait ? [TRAITS[u.trait].n] : []), ...(u.aff || []).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean), ...unitSts(u).map(x => x.n)];
     return { n: '全部状态', c: '#e8c88a', d: L.join('、') + '。点状态栏里的单个状态看说明。' }; }
@@ -1656,8 +1665,8 @@ function unitEl(u) {
   if (u.kind === 'hero' && SAVE.chars[u.cls]) { const E = SAVE.chars[u.cls].eq || {}, w = E.weapon; if (w && w.rarity) el.classList.add('wr-' + w.rarity);
     if (Object.values(E).filter(it => it && it.rarity === 'set').length >= 2) el.classList.add('gear-set'); }
   el.innerHTML = `<div class="aura"><i class="a-rage"></i><i class="a-fire"></i><i class="a-tox"></i><i class="a-ice"></i><i class="a-shd"></i><i class="a-cur"></i><i class="a-stun"><b>✦</b><b>✦</b><b>✦</b></i></div><div class="sp">${VFX.rigHTML(u, img, size, spr)}</div>
-    <div class="un">${esc(u.name)}</div>
-    ${(u.aff && u.aff.length) || u.trait ? `<div class="tags">${u.trait ? `<span class="tr" data-act="stinfo" data-arg="${u.id}|trait">${TRAITS[u.trait].n}</span>` : ''}${(u.aff || []).slice(0, (u.aff || []).length > 3 ? 2 : 3).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return `<span data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>`; }).join('')}${(u.aff || []).length > 3 ? `<span data-act="stinfo" data-arg="${u.id}|all">+${u.aff.length - 2}</span>` : ''}</div>` : ''}
+    <div class="un${u.kind === 'boss' ? ' bs' : u.kind === 'elite' || u.rare ? ' el' : ''}">${esc(u.name)}</div>
+    ${u.side === 'e' && (u.kind === 'elite' || u.kind === 'boss' || u.rare) && u.aff && u.aff.length ? `<div class="tags">${u.aff.slice(0, 2).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return A ? `<span data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>` : ''; }).join('')}${u.aff.length > 2 ? `<span data-act="stinfo" data-arg="${u.id}|all">+${u.aff.length - 2}</span>` : ''}</div>` : ''}
     <div class="hpbar"><i></i><b class="sh"></b><span></span></div><div class="sts"></div>${u.kind === 'hero' && u.yi && Object.keys(u.yi).length ? yiFolHTML(u.yi) : ''}`;
   setTimeout(() => el.classList.remove('spawn'), u.kind === 'boss' ? 650 : 400);
   if (u.kind === 'boss' && !u.guard) setTimeout(() => VFX.onLand(u.id), 560);
@@ -1767,6 +1776,22 @@ function updBattle(o, anim) {
     if (delay > 0) { const b = B; setTimeout(() => { if (B === b) applyStep(o, anim); }, delay); return; }
   }
   applyStep(o, anim);
+}
+// 战场小圆点：每个状态一个字
+const ST_DOT = { frozen: '晕', slow: '冻', melt: '破', burn: '烧', poison: '毒', curse: '摄', mark: '印', warcry: '振', kangG: '挡', liuDr: '经', tieArm: '固', shadow: '影', smoke: '烟', butui: '退', chan: '禅', renew: '春', charging: '蓄', enraged: '狂', ghost: '鬼', cocoon: '茧', silver: '银', phsh: '盾', rageB: '怒', duo: '连', stacks: '幽' };
+const dotTxt = t => t.length > 1 ? t.charAt(0) + t.slice(1).toLowerCase() : t;   // 越南语版：只首字母大写
+// 震那一行：职业资源后面跟主角最要紧的两个状态（带层数、剩几回合）。先放本职业的招牌状态，不够再放快结束的增益
+const HERO_KEY = { paladin: ['fonu', 'chan'], berserker: ['butui', 'warcry'], assassin: ['shadow', 'smoke'] };
+function heroKeyChips(P) {
+  const out = [], seen = new Set(), left = k => { const v = P.st[k]; const t = typeof v === 'number' ? v : v && v.t; return t > 0 && t < 99 ? t : 0; };
+  const chip = (k, n, c, v) => { seen.add(k); out.push(`<span class="rchip kst" style="--c:${c}" data-act="stinfo" data-arg="P|${k}">${n}${v ? ` <b>${v}</b>` : ''}</span>`); };
+  for (const k of HERO_KEY[P.cls] || []) {
+    if (out.length >= 2) break;
+    if (k === 'fonu') { if (P.fonu > 0) chip(k, '佛怒', '#ffb066', P.fonu); continue; }
+    if (P.st[k] && ST_INFO[k]) chip(k, ST_INFO[k][0], ST_INFO[k][1], left(k));
+  }
+  if (out.length < 2) unitSts(P).filter(x => x.good && !seen.has(x.k) && x.k !== 'shield').sort((a, b) => (left(a.k) || 99) - (left(b.k) || 99)).slice(0, 2 - out.length).forEach(x => chip(x.k, ST_INFO[x.k][0], x.c, x.k === 'stacks' ? P.stacks : left(x.k)));
+  return out.join('');
 }
 // 职业资源：怒意、连、杀意、尸位、震
 function resChip(P) {
@@ -1888,9 +1913,9 @@ function applyStep(o, anim) {
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">守住他！</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} 回合后溜走</span>`);
     if (u.fleeDef && u.flee && u.hp > 0) st.push(`<span style="color:#f1c94a">${Math.max(0, (u.fleeDef.n || 3) - u.flee + 1)} 回合后跑掉</span>`);
-    { const L = unitSts(u).filter(x => x.k !== 'hufa' && x.k !== 'call'), N = 2;   // 战场上最多显示两个，多的折成 +N（状态栏里能看全）
-      L.slice(0, L.length > N + 1 ? N : N + 1).forEach(x => st.push(`<span style="color:${x.c}" data-act="stinfo" data-arg="${u.id}|${x.k}">${x.n}</span>`));
-      if (L.length > N + 1) st.push(`<span class="stm" data-act="stinfo" data-arg="${u.id}|all">+${L.length - N}</span>`); }
+    { const L = unitSts(u).filter(x => x.k !== 'hufa' && x.k !== 'call' && x.k !== 'shield');   // 2026-11-24 战场上统一成小圆点，最多两个，多的折成 +N；护体看血条末端那截白；全名和回合数在下面状态栏里
+      L.slice(0, 2).forEach(x => st.push(`<span class="sd" style="--c:${x.c}" data-act="stinfo" data-arg="${u.id}|${x.k}">${dotTxt(ST_DOT[x.k] || x.n.charAt(0))}</span>`));
+      if (L.length > 2) st.push(`<span class="sd m" data-act="stinfo" data-arg="${u.id}|all">+${L.length - 2}</span>`); }
     el.classList.toggle('frozen', !!u.st.frozen);
     // 状态挂在身上：火、毒、冰壳、金星、护盾、狂暴
     const alive = u.hp > 0 && !u.dead;
@@ -1912,46 +1937,51 @@ function applyStep(o, anim) {
     const isBasic = o.cast && basicId && o.cast.id === basicId;
     const SP = SAVE.speed || 1, reactN = new Set((o.react || []).map(R => R.n)), popIdx = {}, byAlly = actorU && (actorU.kind === 'ally' || actorU.kind === 'minion');
     const ALL = !!SAVE.allNums;   // 设置里「伤害数字：全部显示」；默认只看主角
-    for (const [id, txt0, c, isSt, by] of o.pops) {
+    // 2026-11-24 跳字再细：同一个目标这一下的数字合成一个（多段带「×n」）；普攻不跳；颜色只留白、金（暴击）、淡金（反震金刚震）、橙（灼烧）、绿（中毒）
+    const G = new Map(), TX = [], REFL = new Set(['反震', '金刚震', '反伤', '玄甲玉']);
+    for (const [id, txt0, c, isSt, by, tag] of o.pops) {
       const el = document.getElementById('u-' + id); if (!el) continue;
       const tu = B.units.find(u => u.id === id);
-      // 少字：状态名已经挂在血条下面、连招名在顶上横幅里，不再在人头上飘一遍；反伤只留数字
-      if (isSt || reactN.has(txt0)) continue;
-      const txt = c === 'thorn' ? txt0.replace(/^\D+/, '') : txt0, dmgN = /^\d+$/.test(txt);
-      if (SP >= 2 && /^-\d+$/.test(txt) && (c === 'burn' || c === 'poison')) { if (anim && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); } continue; }   // 快速时持续伤害不跳字，看血条
-      // 只看主角（默认）：妖物身上只跳主角打出来的数字；主角身上跳小号的掉血（红）、回血（绿）和格挡闪避；伙伴、僵尸身上不跳，只闪一下
-      const onHero = id === 'P', mine = by === 'P';
-      let cls2 = '';
-      if (!ALL) {
-        if (tu && tu.side === 'e') { if (!(mine && (dmgN || /^-\d+$/.test(txt)))) { if (anim && dmgN && tu.hp > 0 && SP < 3) VFX.onHit(id, false); continue; } }
-        else if (onHero) { if (dmgN || /^-\d+$/.test(txt)) cls2 = ' me-hurt'; else if (c === 'heal') cls2 = ' me-heal'; else if (txt === '格挡' || txt === '闪避') cls2 = ' me-hurt'; else continue; }
-        else { if (anim && dmgN && SP < 3) bump(el, 'hurt', 300); continue; }
+      if (isSt || reactN.has(txt0)) continue;   // 状态名挂在身上、连招名在顶上横幅里，不在人头上飘
+      const txt = c === 'thorn' ? txt0.replace(/^\D+/, '') : txt0, dmgN = /^\d+$/.test(txt), dot = /^-\d+$/.test(txt);
+      if (SP >= 2 && dot && (c === 'burn' || c === 'poison')) { if (anim && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); } continue; }   // 快速时持续伤害不跳字，看血条
+      const onHero = id === 'P', mine = by === 'P' || c === 'thorn' && by === 'P';
+      let show = true;
+      if (!ALL) {   // 只看主角：妖物身上只跳主角打的（普攻除外）；主角身上跳小号掉血、回血、格挡闪避；伙伴、僵尸身上不跳
+        if (tu && tu.side === 'e') show = mine && (dmgN || dot) && !(isBasic && !tag && dmgN && !o.jzz);
+        else if (onHero) show = dmgN || dot || c === 'heal' || txt === '格挡' || txt === '闪避';
+        else show = false;
       }
-      // 少跳字：全部显示时，快速下的小伤害不跳；只看主角时只在同一时间太挤时才省掉小数字（暴击、大伤害照跳）
-      const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08, nPop = document.querySelectorAll('#arena .pop').length;
-      const quiet = dmgN && c !== 'crit' && !onHero && tu && tu.maxHp && (ALL ? ((SP >= 3 && +txt / tu.maxHp < 0.15) || (SP >= 2 && +txt / tu.maxHp < 0.1) || (nPop >= (SP >= 2 ? 4 : 6) && !big)) : (nPop >= (SP >= 2 ? 5 : 7) && !big));
-      const parts = [txt];   // 一下就是一个数（原来普攻拆三段跳，看着乱）
-      const tier = v => { if (!dmgN || !tu || !tu.maxHp || onHero) return ''; const r = v / tu.maxHp; return r >= 0.08 ? ' big' : ''; };
-      let pop = null, sum = 0;
-      parts.forEach((v, k) => setTimeout(() => {
-        const last = k === parts.length - 1, cr = c === 'crit' && last && !onHero;
-        if (quiet) { if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e') && (SP < 3 || cr)) VFX.onHit(id, cr); return; }   // 3 倍速：不跳字的小伤害也不冒命中火花（暴击照冒）
-        if (!pop || !pop.isConnected) {   // 新数字在头顶正中，之前还没散的往上挪一行，排成一列；最多留三个
-          const old = [...el.querySelectorAll(':scope > .pop:not(.move)')]; old.forEach(q => { q.style.marginTop = ((parseFloat(q.style.marginTop) || 0) - 19) + 'px'; }); if (old.length >= 3) old[0].remove();
-          pop = document.createElement('span'); el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100); }
-        sum += dmgN ? +v : 0;
-        pop.className = 'pop ' + (onHero && !ALL ? '' : c) + tier(dmgN ? sum : 0) + cls2 + (ALL && byAlly && dmgN && tu && tu.side === 'e' ? ' ally' : '');
-        pop.textContent = dmgN ? (onHero && !ALL ? '-' : '') + fmtBig(sum * uK(tu)) + (cr ? '!' : '') : String(v).replace(/\d+/, n => fmtBig(+n * uK(tu)));
-        if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr);
-      }, k * 90 * spdF()));
-      if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(parts.length);
+      if (!show) { if (anim && dmgN && SP < 3) { if (tu && tu.side === 'e') { if (tu.hp > 0) VFX.onHit(id, false); } else bump(el, 'hurt', 300); } }
+      else if (dmgN || dot || c === 'heal') {
+        const kk = id + '|' + (onHero && !ALL ? (c === 'heal' ? 'heal' : 'hurt') : dot ? 'dot' + c : c === 'heal' ? 'heal' : 'dmg');
+        const g = G.get(kk) || { id, el, tu, onHero, n: 0, v: 0, crit: false, tag: '', c, dot, heal: c === 'heal', ally: ALL && byAlly && tu && tu.side === 'e' };
+        g.v += +txt.replace(/\D/g, '') || 0; g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
+        G.set(kk, g);
+      } else TX.push({ el, txt, c, onHero });
+      if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(1);
       if (anim && (txt === '闪避' || txt === '格挡') && el.animate) { el.animate([{ transform: 'none' }, { transform: txt === '闪避' ? 'translate(-22px,-6px)' : 'translateX(-6px)' }, { transform: 'none' }], { duration: 260 }); if (txt === '格挡') VFX.onBlock(id); }
-      if (anim && /^-\d+$/.test(txt) && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); }
-      if (anim && /^-\d+$/.test(txt) && c === 'poison') bump(el, 'drip', 450);
-      if (anim && /^\d+$/.test(txt) && el._shd) bump(el, 'crack', 320);
-      if (/^\d+$/.test(txt) && anim) { if (SP < 3 || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit') { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
+      if (anim && dot && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); }
+      if (anim && dot && c === 'poison') bump(el, 'drip', 450);
+      if (anim && dmgN && el._shd) bump(el, 'crack', 320);
+      const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08;
+      if (dmgN && anim && show) { if (SP < 3 || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
     }
+    let ji = 0, nPop = document.querySelectorAll('#arena .pop').length;
+    for (const g of G.values()) {
+      const r = g.tu && g.tu.maxHp ? g.v / g.tu.maxHp : 0, big = !g.onHero && r >= 0.08;
+      const quiet = !g.onHero && !g.crit && !big && (ALL ? (SP >= 3 && r < 0.15) || (SP >= 2 && r < 0.1) || nPop >= (SP >= 2 ? 4 : 6) : nPop >= (SP >= 2 ? 6 : 8));
+      if (quiet) continue; nPop++;
+      const heroSide = g.onHero && !ALL ? (g.heal ? ' mr' : ' ml') : '';
+      const col = g.heal ? 'heal' : g.onHero && !ALL ? 'hurt' : g.dot ? g.c : g.crit ? 'crit' : REFL.has(g.tag) ? 'refl' : ALL ? (g.ally ? 'ally' : g.c) : '';
+      const num = fmtBig(g.v * uK(g.tu)), sign = g.heal ? '+' : g.onHero && !ALL || g.dot ? '-' : '';
+      const html = `${sign}${num}${g.crit ? '!' : ''}${g.n > 1 ? `<small>×${g.n}</small>` : ''}`;
+      const delay = o.jzz && !g.onHero ? ji++ * 60 * spdF() : 0;   // 金刚震：数字跟着金光一个个亮
+      const put = () => { popPut(g.el, `pop ${col}${big ? ' big' : ''}${g.dot ? ' dot' : ''}${heroSide}`, html); if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
+      if (delay) setTimeout(put, delay); else put();
+    }
+    for (const t of TX) popPut(t.el, `pop ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))));
     if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
     if (anim && actorU && actorU.kind === 'ally' && o.cast) {   // 伙伴出手：头顶冒招式名，身上亮一圈
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
@@ -1976,7 +2006,7 @@ function applyStep(o, anim) {
   if (refit) fitSides();
   const P = B.P, rb = $('#rbhp');
   const foes0 = aliveOf(B, 'e'), tg = foes0.find(f => f.id === B.target) || foes0[0];
-  const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
+  const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}${heroKeyChips(P)}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? '普' : payOn ? '收' : k.ap ? STATES[k.ap].n[0] : k.pay ? '收' : '';
       return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`; }).join('') + '</div>';
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;

@@ -149,3 +149,6 @@ html[lang=vi] .clstip b{font-family:"Noto Serif",serif !important;}
 html[lang=vi] .lgre-o b{font-family:"Noto Serif",serif !important;}
 html[lang=vi] html body .pop{font-family:"Noto Sans",sans-serif !important;letter-spacing:normal;}
 html[lang=vi] html body .pop.crit,html[lang=vi] html body .pop.crit.big{font-family:"Noto Sans",sans-serif !important;}
+html[lang=vi] html body .pop{font-family:"Noto Sans",sans-serif !important;letter-spacing:normal;}
+html[lang=vi] html body .pop.crit,html[lang=vi] html body .pop.crit.big{font-family:"Noto Sans",sans-serif !important;}
+html[lang=vi] .statb{font-family:"Noto Serif",serif !important;}

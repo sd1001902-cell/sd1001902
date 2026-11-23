@@ -108,7 +108,9 @@ const VFX = (() => {
   const pillar = (p, c, dur) => p && spawn('pillar', p.x, p.y + p.h / 2, dur, { c, h: (p.y + p.h / 2) + 'px' });
   // 书法大字：落笔如印，墨散而去
   let LOUD = false;   // 大招、首领死亡时为 true：4 倍速也照样出字
-  const glyph = (p, ch, c, size, dur, dy, force) => p && (speed < 4 || LOUD || force) && spawn('glyph', p.x, p.y + (dy || 0), dur, { c, s: size + 'px' }, ch);
+  // 2026-11-24 大字只留必杀：普通招式、伙伴、小怪出招都不盖大字；必杀、首领大招、打死首领、克制道具传 force
+  const glyph = (p, ch, c, size, dur, dy, force) => p && force && spawn('glyph', p.x, p.y + (dy || 0), dur, { c, s: size + 'px' }, ch);
+  const glyphF = (p, ch, c, size, dur, dy) => glyph(p, ch, c, size, dur, dy, true);
   // 朱红印章
   const seal = (p, ch, dur) => p && spawn('seal', p.x, p.y, dur, null, ch);
   // 墨迹飞溅
@@ -647,30 +649,31 @@ const VFX = (() => {
       const W = arena.clientWidth, H = arena.clientHeight, mid = { x: W * 0.62, y: H * 0.45 }, foes = fps.length ? fps : [mid];
       inkWash(c.combo ? '#2a0a1a' : INK);
       switch (c.cls) {
-        case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyph(mid, "Trảm", '#ff3a2a', 170, G * 1.4); shake(12); break;
-        case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyph(mid, "LÔI", '#e6e0ff', 170, G * 1.4); shake(10); break;
-        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyph(mid, "QUỶ", GHOST, 170, G * 1.4); shake(8); break;
-        case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, "SÁT", G * 1.6); glyph(mid, "SÁT", '#ff3a3a', 150, G * 1.2); shake(8); break; }
-        case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyph(mid, "PHẬT", GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10); break;
+        case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, "Trảm", '#ff3a2a', 170, G * 1.4); shake(12); break;
+        case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, "LÔI", '#e6e0ff', 170, G * 1.4); shake(10); break;
+        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyphF(mid, "QUỶ", GHOST, 170, G * 1.4); shake(8); break;
+        case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, "SÁT", G * 1.6); glyphF(mid, "SÁT", '#ff3a3a', 150, G * 1.2); shake(8); break; }
+        case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyphF(mid, "PHẬT", GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10); break;
       }
-      if (c.combo) { const ap2 = pos('NG'); if (ap2) foes.forEach((p, i) => later(() => proj('foxfire', ap2, p, T, '#9ad8ff'), 200 + i * 40)); glyph({ x: W * 0.3, y: H * 0.35 }, "HỒ", '#ffb3d8', 110, G * 1.3); }
+      if (c.combo) { const ap2 = pos('NG'); if (ap2) foes.forEach((p, i) => later(() => proj('foxfire', ap2, p, T, '#9ad8ff'), 200 + i * 40)); glyphF({ x: W * 0.3, y: H * 0.35 }, "HỒ", '#ffb3d8', 110, G * 1.3); }
       return Math.round(T * 0.7);
     }
     // ---- 敌人 ----
     if (c.enemy) {
+      const bossA = !!(actor && actor.kind === 'boss');   // 首领的大招才盖大字
       switch (c.id) {
         case 'charge':
-          if (ap) { ring(ap, '#ff3a2a', 160, G, 6); glyph(ap, "TỤ", '#ff5a3a', 70, G, -50); parts(ap, 14, '#ff5a3a', 70, G, { dir: -Math.PI / 2, cone: 2.5, rise: -20 }); }
+          if (ap) { ring(ap, '#ff3a2a', 160, G, 6); (bossA ? glyphF : glyph)(ap, "TỤ", '#ff5a3a', 70, G, -50); parts(ap, 14, '#ff5a3a', 70, G, { dir: -Math.PI / 2, cone: 2.5, rise: -20 }); }
           return 0;
         case 'bossAoe': {
           const al = B.units.filter(u => u.side === 'p' && u.hp > 0).map(u => pos(u.id)).filter(Boolean);
           if (al.length) spawn('wave', arena.clientWidth / 2, al[0].y, D, { c: col });
           al.forEach(p => { boom(p, col, 90, D); parts(p, 10, col, 50, D, { cls: c.elem === 'fire' ? 'flame' : c.elem === 'cold' ? 'shard' : '' }); });
-          if (ap) glyph(ap, { fire: "THIÊU", cold: "BĂNG", light: "LÔI", poison: "ĐỘC", magic: "SÁT" }[c.elem] || "SÁT", col, 70, G, -30);
+          if (ap) (bossA ? glyphF : glyph)(ap, { fire: "THIÊU", cold: "BĂNG", light: "LÔI", poison: "ĐỘC", magic: "SÁT" }[c.elem] || "SÁT", col, 70, G, -30);
           shake(7); return Math.round(T * 0.6);
         }
         case 'summon': {
-          if (ap) { spawn('ink-circle', ap.x, ap.y + 30, D * 1.6, { c: GHOST }); glyph(ap, "TRIỆU", GHOST, 54, G, -40); }
+          if (ap) { spawn('ink-circle', ap.x, ap.y + 30, D * 1.6, { c: GHOST }); (bossA ? glyphF : glyph)(ap, "TRIỆU", GHOST, 54, G, -40); }
           B.units.filter(u => u.side === 'e' && u.kind === 'minion' && u.hp > 0).slice(-3).forEach(u => { const p = pos(u.id); if (p) flames(p, 5, GHOST, 24, D); });
           return 0;
         }
@@ -682,13 +685,13 @@ const VFX = (() => {
           if (ap) { ring(ap, '#7fe05a', 130, D, 4); parts(ap, 10, '#9aff8a', 40, D * 1.3, { cls: 'plus', rise: -60 }); }
           return 0;
         case 'roar':
-          if (ap) { ring(ap, BLOOD, 260, D * 1.2, 8); ring(ap, '#ff8a4a', 160, D, 4); glyph(ap, "HỐNG", '#ff5a3a', 80, G, -20); }
+          if (ap) { ring(ap, BLOOD, 260, D * 1.2, 8); ring(ap, '#ff8a4a', 160, D, 4); (bossA ? glyphF : glyph)(ap, "HỐNG", '#ff5a3a', 80, G, -20); }
           shake(8); return 0;
         case 'enrage':
-          if (ap) { boom(ap, BLOOD, 200, G); glyph(ap, "NỘ", '#ff3a2a', 100, G * 1.2); ink(ap, 12, 90, G, BLOOD); }
+          if (ap) { boom(ap, BLOOD, 200, G); (bossA ? glyphF : glyph)(ap, "NỘ", '#ff3a2a', 100, G * 1.2); ink(ap, 12, 90, G, BLOOD); }
           shake(9); return Math.round(T * 0.6);
         case 'phase':
-          if (ap) { inkWash(); boom(ap, '#5a0a2a', 260, G); glyph(ap, "MA", '#ff3a5a', 110, G * 1.4); ink(ap, 18, 120, G, '#2a0a14'); }
+          if (ap) { inkWash(); boom(ap, '#5a0a2a', 260, G); (bossA ? glyphF : glyph)(ap, "MA", '#ff3a5a', 110, G * 1.4); ink(ap, 18, 120, G, '#2a0a14'); }
           shake(12); return Math.round(T * 0.8);
       }
       if (!tp || !ap) return mv;
@@ -901,7 +904,7 @@ const VFX = (() => {
     const p = pos(id), h = pos('P'); if (!p) return 0;
     const f = fac(), T = Math.round(420 * f);
     if (h && icon) proj('keyfly', h, p, T, GOLD, icon);
-    setTimeout(() => { glyph(p, "PHÁ", GOLD, 130, Math.round(1100 * f)); ring(p, GOLD, 200, Math.round(600 * f), 6); ring(p, '#fff', 110, Math.round(380 * f), 3);
+    setTimeout(() => { glyphF(p, "PHÁ", GOLD, 130, Math.round(1100 * f)); ring(p, GOLD, 200, Math.round(600 * f), 6); ring(p, '#fff', 110, Math.round(380 * f), 3);
       boom(p, '#fff3c0', 140, Math.round(360 * f)); parts(p, 18, GOLD, 90, 800 * f, { cls: 'ember', rise: -30 }); shake(7); }, h && icon ? T : 0);
     return T + Math.round(900 * f);
   }

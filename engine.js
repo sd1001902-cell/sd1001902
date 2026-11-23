@@ -2859,7 +2859,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       b.tagang = (b.tagang || 0) + 1; out.lines.push('踏罡步：护体碎了，寒气卷过全场'); aliveOf(b, 'e').forEach(f => freezeU(f, out, '冰冻')); }
     if (d <= 0) {
       out.pops.push([tgt.id, '护盾', 'miss']);
-      if (shieldThorns && src.hp > 0) { const r = Math.round(dPre * 0.3); src.hp -= r; out.pops.push([src.id, '反伤' + r, 'thorn', 0, tgt === b.P ? 'P' : '']); if (tgt === b.P) hsDmg(b, '反伤', r); }
+      if (shieldThorns && src.hp > 0) { const r = Math.round(dPre * 0.3); src.hp -= r; out.pops.push([src.id, '反伤' + r, 'thorn', 0, tgt === b.P ? 'P' : '', '反伤']); if (tgt === b.P) hsDmg(b, '反伤', r); }
       thornHit(b, tgt, src, out, opt);
       return 0;
     }
@@ -2869,7 +2869,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (tgt.side === 'e') stAdd(b, src, 'dmg', d + Math.min(0, tgt.hp)); else stAdd(b, tgt, 'taken', d);
   if (hsT) hsT.hp += d;
   else if (src === b.P && tgt.side === 'e') { hsDmg(b, opt.tag || (opt.ult ? '必杀' : !opt.proc && b.castSk ? b.castSk.n : '特效'), d + Math.min(0, tgt.hp)); if (!opt.proc && !opt.tag && !opt.ult) { const h = hsOf(b); h.n++; if (crit) h.cr++; } }
-  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem, 0, src === b.P ? 'P' : '']);
+  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem, 0, src === b.P ? 'P' : '', opt.tag || '']);
   if (tgt.side === 'e' && b.P && b.P.fx) {   // 职业神兵：打中之后
     const PF = b.P.fx;
     if (src === b.P && tgt.st.melt && PF.has('cMeltFury') && b.mfAt !== b.pr) { b.mfAt = b.pr; src.fury = Math.min(100, (src.fury || 0) + 4); }          // 嗜战刀鞘
@@ -2961,7 +2961,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       refl += r;
     }
     if (tgt.st.butui && tgt.runes && tgt.runes.butui === 'b') refl *= 2;
-    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, '反伤' + refl, 'thorn', 0, tgt === b.P ? 'P' : '']); if (src === b.P) { const h = hsOf(b); h.raw += refl; h.hp += refl; } else if (tgt === b.P) hsDmg(b, '反伤', refl); }
+    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, '反伤' + refl, 'thorn', 0, tgt === b.P ? 'P' : '', '反伤']); if (src === b.P) { const h = hsOf(b); h.raw += refl; h.hp += refl; } else if (tgt === b.P) hsDmg(b, '反伤', refl); }
     if (tfx && tfx.has('revenge') && src.hp > 0 && RNG.ch(0.3)) hit(b, tgt, src, 1, 'phys', out, { proc: 1 });
   }
   return d;
