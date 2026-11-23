@@ -954,7 +954,7 @@ function salvage(id) {
   SAVE.stash.splice(i, 1); SAVE.mats += v; return v;
 }
 // 筛选分解／出售：按品级挑，再按几条「保留」规则留下好东西。强化过、镶了玉、锁定的、淬炼洗炼到一半的，永远不动
-const BULK_DEF = { mode: 'salv', r: { normal: 1, magic: 1, rare: 1, set: 0, legend: 0 }, keepUp: 1, keepSp: 1, keepAnc: 1, keepQ: 0, keepCube: 1 };
+const BULK_DEF = { mode: 'salv', r: { normal: 1, magic: 1, rare: 1, set: 0, legend: 0 }, keepUp: 1, keepSp: 1, keepAnc: 1, keepPri: 1, keepQ: 0, keepCube: 1 };   // keepAnc 只管上古，keepPri 管太古（2026-11-23 分开）
 function bulkFilter() { const f = SAVE.bulkf || (SAVE.bulkf = JSON.parse(JSON.stringify(BULK_DEF))); for (const k in BULK_DEF) if (f[k] == null) f[k] = JSON.parse(JSON.stringify(BULK_DEF[k])); return f; }
 const bulkSafe = it => !!(it.lk || it.plus > 0 || (it.gems && it.gems.length) || busyRoll(it) || inKit(it));   // 配装里用到的也不动
 function bulkPick(cls, f) {
@@ -962,7 +962,8 @@ function bulkPick(cls, f) {
   return SAVE.stash.filter(it => {
     if (!f.r[it.rarity] || bulkSafe(it)) return false;
     if (f.keepSp && it.aff.some(a => SP_AFFIXES.includes(a[0]))) return false;
-    if (f.keepAnc && it.anc) return false;
+    if (f.keepAnc && it.anc === 1) return false;
+    if (f.keepPri && it.anc === 2) return false;
     if (f.keepCube && it.legend && !SAVE.cube[it.legend]) return false;
     if (f.keepQ && it.aff.length && itemQ(it) >= 0.8) return false;
     if (f.keepUp && canEquip(it, cls) && powerBest(cls, it).p > cur) return false;   // 传承后更强的也算：新捡的没强化，直接比会输给身上强化过的

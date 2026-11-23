@@ -403,10 +403,11 @@ function bulkBody() {
   for (const it of SAVE.stash) cnt[it.rarity] = (cnt[it.rarity] || 0) + 1;
   const all = bulkPick(cls, f), list = all.filter(it => !BULKX.has(it.id));
   const tot = list.reduce((a, it) => a + (sell ? sellPrice(it) : salvageValue(it)), 0), risky = list.filter(it => it.rarity === 'set' || it.rarity === 'legend').length;
-  const keeps = [['keepUp', `能让${CLASSES[cls].n}变强的`], ['keepSp', '带特殊词条的'], ['keepAnc', '上古、太古'], ['keepQ', '词条成色八成以上的'], ...(featureOn('cube') ? [['keepCube', '乾坤袋还没收的神兵']] : [])];
+  const keeps = [['keepUp', `能让${CLASSES[cls].n}变强的`], ['keepSp', '带特殊词条的'], ['keepAnc', '上古'], ['keepPri', '太古'], ['keepQ', '词条成色八成以上的'], ...(featureOn('cube') ? [['keepCube', '乾坤袋还没收的神兵']] : [])];
   const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 }, shown = all.slice().sort((a, b) => order[a.rarity] - order[b.rarity] || b.ilvl - a.ilvl).slice(0, 80);
   // 2026-11-23 重排：品级一排五格、留下规则两列勾选、装备按品级分组排成整齐的方格；方格在框里滚，确认按钮钉在底部
-  const keepsTxt = { keepUp: '能让你变强的', keepSp: '带特殊词条', keepAnc: '上古、太古', keepQ: '成色八成以上', keepCube: '乾坤袋没收的神兵' };
+  const nA = n => SAVE.stash.filter(it => it.anc === n && f.r[it.rarity]).length;   // 选中的品级里有几件上古、太古
+  const keepsTxt = { keepUp: '能让你变强的', keepSp: '带特殊词条', keepAnc: `上古装备${nA(1) ? `<small>${nA(1)} 件</small>` : ''}`, keepPri: `太古装备${nA(2) ? `<small>${nA(2)} 件</small>` : ''}`, keepQ: '成色八成以上', keepCube: '乾坤袋没收的神兵' };
   const groups = RARITY_ORDER.slice().reverse().map(r => [r, shown.filter(it => it.rarity === r)]).filter(g => g[1].length);
   const tile = it => `<button class="bk2-t r-${it.rarity} ${BULKX.has(it.id) ? 'off' : ''} ${ancCls(it)}" data-act="bulkx" data-arg="${it.id}">${SPR.item(it, 30)}<span>${esc(itemTitle(it))}</span>${BULKX.has(it.id) ? '<em>留</em>' : ''}</button>`;
   return `<div class="bulk bk2">
@@ -415,7 +416,7 @@ function bulkBody() {
     <div class="bk2-rar">${RARITY_ORDER.map(r => `<button class="r-${r} ${f.r[r] ? 'on' : ''}" data-act="bulkr" data-arg="${r}"><b>${RARITY[r].n}</b><small>${cnt[r] || 0} 件</small></button>`).join('')}</div>
     <h4 class="bk2-h">这些留下<small>强化过、镶了玉、锁定的永远不动</small></h4>
     <div class="bk2-keep">${keeps.map(([k]) => `<button class="${f[k] ? 'on' : ''}" data-act="bulkk" data-arg="${k}"><i></i>${keepsTxt[k]}</button>`).join('')}</div>
-    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}</div>${L.map(tile).join('')}`).join('') : '<p class="bk2-empty">没有符合条件的装备</p>'}${all.length > shown.length ? `<p class="bk2-empty">……还有 ${all.length - shown.length} 件没列出来</p>` : ''}</div>
+    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => { const a1 = L.filter(it => it.anc === 1).length, a2 = L.filter(it => it.anc === 2).length; return `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}${a1 ? `<em class="ga1">上古 ${a1}</em>` : ''}${a2 ? `<em class="ga2">太古 ${a2}</em>` : ''}</div>${L.map(tile).join('')}`; }).join('') : '<p class="bk2-empty">没有符合条件的装备</p>'}${all.length > shown.length ? `<p class="bk2-empty">……还有 ${all.length - shown.length} 件没列出来</p>` : ''}</div>
     <div class="bk2-foot"><p>${list.length ? `${sell ? '卖掉' : '分解'} <b>${list.length}</b> 件 → <b>${tot}</b> ${sell ? '两银子' : '颗魂晶'}` : '没有要处理的装备'}${all.length ? '<small>点装备可以单独留下</small>' : ''}</p>
     <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? `里面有 ${risky} 件套装或神兵，再点一次确认` : `${sell ? '卖掉' : '分解'}这 ${list.length} 件`}</button></div></div>`;
 }

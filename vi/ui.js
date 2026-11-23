@@ -404,10 +404,11 @@ function bulkBody() {
   for (const it of SAVE.stash) cnt[it.rarity] = (cnt[it.rarity] || 0) + 1;
   const all = bulkPick(cls, f), list = all.filter(it => !BULKX.has(it.id));
   const tot = list.reduce((a, it) => a + (sell ? sellPrice(it) : salvageValue(it)), 0), risky = list.filter(it => it.rarity === 'set' || it.rarity === 'legend').length;
-  const keeps = [['keepUp', `món giúp ${CLASSES[cls].n} mạnh lên`], ['keepSp', "món có dòng đặc biệt"], ['keepAnc', "Thượng Cổ, Thái Cổ"], ['keepQ', "món có phẩm chất dòng từ tám phần"], ...(featureOn('cube') ? [['keepCube', "thần binh chưa cất vào Túi Càn Khôn"]] : [])];
+  const keeps = [['keepUp', `món giúp ${CLASSES[cls].n} mạnh lên`], ['keepSp', "món có dòng đặc biệt"], ['keepAnc', "Thượng Cổ"], ['keepPri', "Thái Cổ"], ['keepQ', "món có phẩm chất dòng từ tám phần"], ...(featureOn('cube') ? [['keepCube', "thần binh chưa cất vào Túi Càn Khôn"]] : [])];
   const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 }, shown = all.slice().sort((a, b) => order[a.rarity] - order[b.rarity] || b.ilvl - a.ilvl).slice(0, 80);
   // 2026-11-23 重排：品级一排五格、留下规则两列勾选、装备按品级分组排成整齐的方格；方格在框里滚，确认按钮钉在底部
-  const keepsTxt = { keepUp: "món giúp bạn mạnh lên", keepSp: "có dòng đặc biệt", keepAnc: "Thượng Cổ, Thái Cổ", keepQ: "phẩm chất dòng từ tám phần", keepCube: "thần binh chưa cất vào Túi Càn Khôn" };
+  const nA = n => SAVE.stash.filter(it => it.anc === n && f.r[it.rarity]).length;   // 选中的品级里有几件上古、太古
+  const keepsTxt = { keepUp: "món giúp bạn mạnh lên", keepSp: "có dòng đặc biệt", keepAnc: `Đồ Thượng Cổ${nA(1) ? `<small>${nA(1)} món</small>` : ''}`, keepPri: `Đồ Thái Cổ${nA(2) ? `<small>${nA(2)} món</small>` : ''}`, keepQ: "phẩm chất dòng từ tám phần", keepCube: "thần binh chưa cất vào Túi Càn Khôn" };
   const groups = RARITY_ORDER.slice().reverse().map(r => [r, shown.filter(it => it.rarity === r)]).filter(g => g[1].length);
   const tile = it => `<button class="bk2-t r-${it.rarity} ${BULKX.has(it.id) ? 'off' : ''} ${ancCls(it)}" data-act="bulkx" data-arg="${it.id}">${SPR.item(it, 30)}<span>${esc(itemTitle(it))}</span>${BULKX.has(it.id) ? "<em>Giữ</em>" : ''}</button>`;
   return `<div class="bulk bk2">
@@ -416,7 +417,7 @@ function bulkBody() {
     <div class="bk2-rar">${RARITY_ORDER.map(r => `<button class="r-${r} ${f.r[r] ? 'on' : ''}" data-act="bulkr" data-arg="${r}"><b>${RARITY[r].n}</b><small>${cnt[r] || 0} món</small></button>`).join('')}</div>
     <h4 class="bk2-h">Giữ lại những món này<small>Đã cường hóa, khảm ngọc, khóa thì không bao giờ bị động tới</small></h4>
     <div class="bk2-keep">${keeps.map(([k]) => `<button class="${f[k] ? 'on' : ''}" data-act="bulkk" data-arg="${k}"><i></i>${keepsTxt[k]}</button>`).join('')}</div>
-    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}</div>${L.map(tile).join('')}`).join('') : "<p class=\"bk2-empty\">Không có trang bị nào hợp điều kiện</p>"}${all.length > shown.length ? `<p class="bk2-empty">……còn ${all.length - shown.length} món chưa liệt kê</p>` : ''}</div>
+    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => { const a1 = L.filter(it => it.anc === 1).length, a2 = L.filter(it => it.anc === 2).length; return `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}${a1 ? `<em class="ga1">Thượng Cổ ${a1}</em>` : ''}${a2 ? `<em class="ga2">Thái Cổ ${a2}</em>` : ''}</div>${L.map(tile).join('')}`; }).join('') : "<p class=\"bk2-empty\">Không có trang bị nào hợp điều kiện</p>"}${all.length > shown.length ? `<p class="bk2-empty">……còn ${all.length - shown.length} món chưa liệt kê</p>` : ''}</div>
     <div class="bk2-foot"><p>${list.length ? `${sell ? "Bán" : "Phân giải"} <b>${list.length}</b> món → <b>${tot}</b> ${sell ? "lượng bạc" : "hồn tinh"}` : "Không có trang bị cần xử lý"}${all.length ? "<small>Chạm vào trang bị để giữ riêng món đó</small>" : ''}</p>
     <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? `Trong đó có ${risky} món Bộ hoặc Thần binh, chạm lần nữa để xác nhận` : `${sell ? "Bán" : "Phân giải"} ${list.length} món này`}</button></div></div>`;
 }
