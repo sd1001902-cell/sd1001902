@@ -254,7 +254,8 @@ const bldOpen = B => pgCh() >= (B.ch || 0);
 const bLv = id => { const B = BUILDINGS.find(x => x.id === id); return B && SAVE && SAVE.story ? Math.min(B.max, Math.floor(pgCh() * (B.max + 1) / 11)) : 0; };
 const stashMax = () => 120 + bLv('warehouse') * 40;
 const smithMax = () => Math.min(ENHANCE_MAX, 5 + bLv('smith'));
-const gemCap = () => Math.min(4, 2 + bLv('jewel'));
+const gemCap = () => { const j = Math.min(4, 2 + bLv('jewel')); return j < 4 ? j : 4 + GEM_RIFT.filter(l => (SAVE.riftMax || 0) >= l).length; };   // 玉器坊管到极品；后四档看幻境最高层
+function gemCapErr(nt) { if (nt <= gemCap()) return null; return gemCap() < 4 || nt <= 4 ? `玉器坊等级不够，现在最高只能合成到「${GEM_TIERS[gemCap()]}」` : `幻境最高要打到 ${GEM_RIFT[nt - 5]} 层，才合得出「${GEM_TIERS[nt]}」`; }
 function bldCost(B, lv) { return { gold: Math.round(B.gold * Math.pow(lv + 1, 2)), mats: B.mats * (lv + 1) }; }
 function upgradeBuilding(id) {
   const B = BUILDINGS.find(x => x.id === id), lv = bLv(id);
@@ -620,7 +621,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100) * (fx.has('gGlass') ? 0.8 : 1) * (1 + (s.pHp || 0) / 100)));   // pHp／pArmor／pAtk：修为的「根基」，乘在最终数值上
   s.cls = clsId; s.sust = clsId === 'berserker' ? 0 : Math.round(s.leech * 4);   // 别的职业：每 1% 吸血折成 4% 续航强度（本职的护体／替死／身法／金刚）
   s.armorT = Math.round(s.armor * (1 + s.armorPct / 100) * (1 + (s.pArmor || 0) / 100));
-  s.atk = Math.round(s.atk * (1 + (s.pAtk || 0) / 100));
+  s.atk = Math.round(s.atk * (1 + (s.atkPct || 0) / 100) * (1 + (s.pAtk || 0) / 100));   // atkPct：赤玉
   s.crit = Math.min(75, Math.round(s.crit * 10) / 10); s.res = Math.min(75, Math.round(s.res * 10) / 10);
   s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10;
   s.dodge = Math.min(45, s.dodge + (fx.has('dodge') ? 15 : 0));
@@ -1097,18 +1098,33 @@ function unsocket(it, idx) {
   return { ok: true };
 }
 const combineCost = key => Math.round(20 * Math.pow(+key.split('_')[1] + 1, 2) * (1 - bLv('jewel') * 0.2));
+const combineMats = key => { const t = +key.split('_')[1]; return t >= 4 ? 5 * Math.pow(2, t - 4) : 0; };   // 合无瑕起要魂晶：5、10、20、40
 function combineGem(key) {
   const [t, tier] = key.split('_');
-  if (+tier >= 4) return { err: '已经是最高等级' };
-  if (+tier + 1 > gemCap()) return { err: `珠宝工坊等级不够，现在最高只能合成到「${GEM_TIERS[gemCap()]}」` };
+  if (+tier >= GEM_TIERS.length - 1) return { err: '已经是最高等级' };
+  { const e = gemCapErr(+tier + 1); if (e) return { err: e }; }
   if ((SAVE.gems[key] || 0) < 3) return { err: '需要 3 颗相同的宝石' };
-  const c = combineCost(key); if (SAVE.gold < c) return { err: '金币不够' };
-  SAVE.gold -= c; SAVE.gems[key] -= 3; if (!SAVE.gems[key]) delete SAVE.gems[key];
+  const c = combineCost(key), m = combineMats(key); if (SAVE.gold < c) return { err: '金币不够' }; if (SAVE.mats < m) return { err: `魂晶不够（要 ${m}）` };
+  SAVE.gold -= c; SAVE.mats -= m; SAVE.gems[key] -= 3; if (!SAVE.gems[key]) delete SAVE.gems[key];
   const nk = gemKey(t, +tier + 1); addGem(nk); return { ok: true, key: nk };
 }
+// 镶着的玉石直接升一档：再拿两颗同色同档的（加上镶着的那颗就是三颗），花费和合成一样，不用先拆下来
+function upgradeSocketed(it, idx) {
+  const key = it && it.gems && it.gems[idx]; if (!key || key.startsWith('L:')) return { err: '这里没有玉石' };
+  const [t, tier] = key.split('_'), nt = +tier + 1;
+  if (nt >= GEM_TIERS.length) return { err: '已经是最高等级' };
+  { const e = gemCapErr(nt); if (e) return { err: e }; }
+  if ((SAVE.gems[key] || 0) < 2) return { err: `还要 2 颗${gemName(key)}（手上有 ${SAVE.gems[key] || 0} 颗）` };
+  const c = combineCost(key), m = combineMats(key); if (SAVE.gold < c) return { err: '金币不够' }; if (SAVE.mats < m) return { err: `魂晶不够（要 ${m}）` };
+  SAVE.gold -= c; SAVE.mats -= m; SAVE.gems[key] -= 2; if (!SAVE.gems[key]) delete SAVE.gems[key];
+  withOwnerHp(it, () => { it.gems[idx] = gemKey(t, nt); });
+  return { ok: true, key: it.gems[idx] };
+}
 function rollGem(run) {
-  const d = diffIdx(run);
-  const tier = Math.max(0, Math.min(4, d + (run.floor >= 3 ? 1 : 0) + (RNG.ch(0.2) ? 1 : 0)));
+  // 幻境层数越高掉得越好：30 层前照旧（最高到极品），30 层起每 30 层底子 +1 档；最高掉到无瑕（还要幻境最高层够 60）
+  const N = run.mode === 'rift' ? run.riftLv || 1 : 0, d = run.mode === 'rift' && N >= 30 ? Math.min(5, 2 + Math.floor((N - 30) / 30)) : diffIdx(run);
+  const top = Math.min(5, 4 + GEM_RIFT.filter(l => (SAVE.riftMax || 0) >= l).length);
+  const tier = Math.max(0, Math.min(top, d + (run.floor >= 3 ? 1 : 0) + (RNG.ch(0.2) ? 1 : 0)));
   return gemKey(RNG.pick(Object.keys(GEM_TYPES)), tier);
 }
 
@@ -1458,7 +1474,7 @@ function bountyReward(quality) {
   const lv = topLevel(), it = storeItem(null, makeItem({ ilvl: lv + 2, rarity: rollRarity(quality, 50, 0), cls: SAVE.cls }));
   const gold = 100 + lv * 25, mats = 6 + Math.floor(lv / 5);
   SAVE.gold += gold; SAVE.mats += mats;
-  const gem = RNG.ch(0.5) ? gemKey(RNG.pick(Object.keys(GEM_TYPES)), Math.min(gemCap(), Math.floor(lv / 15))) : null;
+  const gem = RNG.ch(0.5) ? gemKey(RNG.pick(Object.keys(GEM_TYPES)), Math.min(4, gemCap(), Math.floor(lv / 15))) : null;
   if (gem) addGem(gem);
   return { gold, mats, items: [it], gem };
 }
@@ -1485,7 +1501,7 @@ function claimDispatch(cls) {
   const gold = Math.round((15 + lv * 4) * h * 8 * mult), mats = Math.round(h * 2 * mult);
   const ups = gainXp(cls, xp); SAVE.gold += gold; SAVE.mats += mats;
   const items = []; for (let i = 0; i < Math.floor(h * 1.2 * mult) + 1; i++) items.push(storeItem(null, makeItem({ ilvl: lv, rarity: rollRarity(h >= 4 ? 'elite' : 'normal', 30, 0), cls })));
-  const gems = []; for (let i = 0; i < h; i++) if (RNG.ch(0.15)) { const k = gemKey(RNG.pick(Object.keys(GEM_TYPES)), Math.min(gemCap(), Math.floor(lv / 15))); addGem(k); gems.push(k); }
+  const gems = []; for (let i = 0; i < h; i++) if (RNG.ch(0.15)) { const k = gemKey(RNG.pick(Object.keys(GEM_TYPES)), Math.min(4, gemCap(), Math.floor(lv / 15))); addGem(k); gems.push(k); }
   return { xp, gold, mats, items, gems, ups };
 }
 

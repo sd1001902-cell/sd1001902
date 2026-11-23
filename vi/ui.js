@@ -267,9 +267,9 @@ function boxBody(cls) {
 }
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
-  return `<p class="help-p">Ba viên ngọc giống nhau ghép được một viên cao hơn một bậc, tối đa đến “${GEM_TIERS[gemCap()]}”. Muốn khảm ngọc: về trang doanh trại tìm Chưởng quầy Ngọc.</p>
+  return `<p class="help-p">Ba viên ngọc giống nhau ghép được một viên cao hơn một bậc, giờ tối đa ghép tới “${GEM_TIERS[gemCap()]}”. Xưởng Ngọc quản tới “cực phẩm”; bốn bậc sau “vô hà, thông linh, thiên thành, Cửu U” cần Ảo Cảnh cao nhất đánh tới tầng ${GEM_RIFT.join(", ")}. Ngọc đã khảm trên trang bị cũng nâng cấp thẳng được (chạm vào nó ở chỗ Chưởng quầy Ngọc).</p>
     <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
-      <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">Ghép (${combineCost(k)} lượng)</button></div>`).join('')
+      <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">Ghép (${combineCost(k)} lượng${combineMats(k) ? ` + ${combineMats(k)} hồn tinh` : ''})</button></div>`).join('')
       : "<div class=\"empty-note\">Chưa có ngọc. Tinh anh, thủ lĩnh và rương báu sẽ rơi ngọc.</div>"}</div>
     ${SAVE.lgems.length || featureOn('rift') ? `<h4 class="sub-h">Linh ngọc <small>yêu vương giữ ải trong Ảo Cảnh rơi ra, khảm trong Hộp Linh Ngọc (chạm “Hộp ngọc” ở ô trang bị)</small></h4>
     <div class="gems">${SAVE.lgems.length ? SAVE.lgems.map(g => { const users = CLASS_IDS.filter(c => (SAVE.chars[c].lgs || []).includes(g.id)).map(c => CLASSES[c].n), G = LGEMS[g.t];
@@ -3214,7 +3214,8 @@ function smithHTML(it, where, W, title) {
     h += "<div class=\"srow col\"><span>Ngọc</span><div class=\"gslots\">";
     for (let i = 0; i < it.sockets; i++) {
       const g = it.gems[i];
-      h += g ? `<button class="gslot" data-act="ungem" data-arg="${it.id}|${i}">${gemImg(g, 22)}${gemName(g)}<small>Gỡ ra${unsocketCost(g) ? ' ' + unsocketCost(g) + " lượng" : " (miễn phí)"}</small></button>` : "<span class=\"gslot empty\">Lỗ trống</span>";
+      const up = g && !g.startsWith('L:') && +g.split('_')[1] < GEM_TIERS.length - 1 ? `<button class="gslot gup ${(SAVE.gems[g] || 0) >= 2 && !gemCapErr(+g.split('_')[1] + 1) ? '' : 'off'}" data-act="gemup" data-arg="${it.id}|${i}">Nâng cấp<small>${(SAVE.gems[g] || 0) >= 2 ? `${combineCost(g)} lượng${combineMats(g) ? ' + ' + combineMats(g) + " hồn tinh" : ''}` : `Còn thiếu ${2 - (SAVE.gems[g] || 0)} viên`}</small></button>` : '';
+      h += g ? `<span class="gpair"><button class="gslot" data-act="ungem" data-arg="${it.id}|${i}">${gemImg(g, 22)}${gemName(g)}<small>${gemDesc(g)} · Gỡ ra${unsocketCost(g) ? ' ' + unsocketCost(g) + " lượng" : " (miễn phí)"}</small></button>${up}</span>` : "<span class=\"gslot empty\">Lỗ trống</span>";
     }
     h += '</div>';
     const free = it.sockets - it.gems.length, keys = Object.keys(SAVE.gems);
@@ -3566,6 +3567,7 @@ const ACT = {
   gem: a => { const [id, k] = split(a); const r = socketGem(findOwned(id), k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Khảm thành công"); refresh(); },
   boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast("Ba lỗ đều đầy, tháo một viên trước đã"); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
   boxoff: i => { const r = boxSet(ctxCls(), +i, null); if (r.err) return toast(r.err); SFX.play('click'); refresh(); },
+  gemup: a => { const [id, i] = split(a); const r = upgradeSocketed(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('rare'); toast("Đã nâng thành " + gemName(r.key)); refresh(); },
   ungem: a => { const [id, i] = split(a); const r = unsocket(findOwned(id), +i); if (r.err) return toast(r.err); toast("Đã gỡ ngọc"); refresh(); },
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast("Tẩy luyện xong"); refresh(); },

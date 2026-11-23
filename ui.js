@@ -267,9 +267,9 @@ function boxBody(cls) {
 }
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
-  return `<p class="help-p">三块相同的玉石可以合成高一阶，最高合成到「${GEM_TIERS[gemCap()]}」。想镶玉：回营地页找玉掌柜。</p>
+  return `<p class="help-p">三块相同的玉石可以合成高一阶，现在最高合成到「${GEM_TIERS[gemCap()]}」。玉器坊管到「极品」；后四档「无瑕、通灵、天成、九幽」要幻境最高层打到 ${GEM_RIFT.join('、')} 层。镶在装备上的玉石也能直接升级（玉掌柜那里点它）。</p>
     <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
-      <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">合成（${combineCost(k)} 两）</button></div>`).join('')
+      <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">合成（${combineCost(k)} 两${combineMats(k) ? ` + ${combineMats(k)} 魂晶` : ''}）</button></div>`).join('')
       : '<div class="empty-note">还没有玉石。精英、首领和宝箱会掉落玉石。</div>'}</div>
     ${SAVE.lgems.length || featureOn('rift') ? `<h4 class="sub-h">灵玉 <small>幻境守关妖王掉落，镶在灵玉匣里（点装备栏的「灵玉匣」）</small></h4>
     <div class="gems">${SAVE.lgems.length ? SAVE.lgems.map(g => { const users = CLASS_IDS.filter(c => (SAVE.chars[c].lgs || []).includes(g.id)).map(c => CLASSES[c].n), G = LGEMS[g.t];
@@ -3213,7 +3213,8 @@ function smithHTML(it, where, W, title) {
     h += '<div class="srow col"><span>玉石</span><div class="gslots">';
     for (let i = 0; i < it.sockets; i++) {
       const g = it.gems[i];
-      h += g ? `<button class="gslot" data-act="ungem" data-arg="${it.id}|${i}">${gemImg(g, 22)}${gemName(g)}<small>取下${unsocketCost(g) ? ' ' + unsocketCost(g) + ' 两' : '（免费）'}</small></button>` : '<span class="gslot empty">空孔</span>';
+      const up = g && !g.startsWith('L:') && +g.split('_')[1] < GEM_TIERS.length - 1 ? `<button class="gslot gup ${(SAVE.gems[g] || 0) >= 2 && !gemCapErr(+g.split('_')[1] + 1) ? '' : 'off'}" data-act="gemup" data-arg="${it.id}|${i}">升级<small>${(SAVE.gems[g] || 0) >= 2 ? `${combineCost(g)} 两${combineMats(g) ? ' + ' + combineMats(g) + ' 魂晶' : ''}` : `还差 ${2 - (SAVE.gems[g] || 0)} 颗`}</small></button>` : '';
+      h += g ? `<span class="gpair"><button class="gslot" data-act="ungem" data-arg="${it.id}|${i}">${gemImg(g, 22)}${gemName(g)}<small>${gemDesc(g)} · 取下${unsocketCost(g) ? ' ' + unsocketCost(g) + ' 两' : '（免费）'}</small></button>${up}</span>` : '<span class="gslot empty">空孔</span>';
     }
     h += '</div>';
     const free = it.sockets - it.gems.length, keys = Object.keys(SAVE.gems);
@@ -3565,6 +3566,7 @@ const ACT = {
   gem: a => { const [id, k] = split(a); const r = socketGem(findOwned(id), k); if (r.err) return toast(r.err); SFX.play('rare'); toast('镶嵌成功'); refresh(); },
   boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast('三个孔都满了，先取下一颗'); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
   boxoff: i => { const r = boxSet(ctxCls(), +i, null); if (r.err) return toast(r.err); SFX.play('click'); refresh(); },
+  gemup: a => { const [id, i] = split(a); const r = upgradeSocketed(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('rare'); toast('升成了 ' + gemName(r.key)); refresh(); },
   ungem: a => { const [id, i] = split(a); const r = unsocket(findOwned(id), +i); if (r.err) return toast(r.err); toast('玉石已取下'); refresh(); },
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast('洗炼完成'); refresh(); },

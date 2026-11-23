@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: "Công", hp: "Khí huyết", armor: "Hộ giáp", crit: "Tỉ lệ chí mạng", critDmg: "ST chí mạng",
   spd: "Tốc độ", leech: "Hút máu", res: "Kháng toàn bộ", dmgPct: "Sát thương", elem: "ST thuật pháp",
-  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", regen: "Hồi khí huyết mỗi lượt", thorns: "Phản chấn",
+  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", regen: "Hồi khí huyết mỗi lượt", thorns: "Phản chấn",
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
   regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };
-const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -410,15 +410,20 @@ const TALENT_SHARED = [
 ];
 const TALENT_TIER_REQ = 3;
 
+// 玉石 2026-11-23 重做：九档（碎……极品，后四档无瑕、通灵、天成、九幽跟着幻境最高层开）；
+// 赤玉、墨玉从死数（+16 攻击、+40 护甲，满级只占 2%～4%）改成百分比；每档按「极品」的倍数算：前五档每档 +0.2，后四档越涨越少，九幽 = 极品 ×1.6
+const GEM_MUL = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.35, 1.48, 1.6];
+const gemVals = top => GEM_MUL.map(m => Math.round(top * m * 10) / 10);
 const GEM_TYPES = {
-  ruby:     { n: "Xích ngọc", c: '#e04040', st: 'atk',     v: [2, 4, 7, 11, 16] },
-  sapphire: { n: "Thanh ngọc", c: '#4a9aff', st: 'res',     v: [3, 5, 8, 11, 15] },
-  topaz:    { n: "Hoàng ngọc", c: '#f1c94a', st: 'crit',    v: [1, 2, 3, 4, 6] },
-  emerald:  { n: "Thúy ngọc", c: '#3cc870', st: 'hpPct',   v: [2, 4, 6, 8, 11] },
-  amethyst: { n: "Mặc ngọc", c: '#8a6aaa', st: 'armor',   v: [5, 10, 18, 28, 40] },
-  diamond:  { n: "Bạch ngọc", c: '#f0f4f8', st: 'critDmg', v: [5, 9, 14, 20, 28] },
+  ruby:     { n: "Xích ngọc", c: '#e04040', st: 'atkPct',   v: gemVals(6) },
+  sapphire: { n: "Thanh ngọc", c: '#4a9aff', st: 'res',      v: gemVals(15).map(Math.round) },
+  topaz:    { n: "Hoàng ngọc", c: '#f1c94a', st: 'crit',     v: gemVals(6) },
+  emerald:  { n: "Thúy ngọc", c: '#3cc870', st: 'hpPct',    v: gemVals(11) },
+  amethyst: { n: "Mặc ngọc", c: '#8a6aaa', st: 'armorPct', v: gemVals(8) },
+  diamond:  { n: "Bạch ngọc", c: '#f0f4f8', st: 'critDmg',  v: gemVals(28) },
 };
-const GEM_TIERS = ["vụn", "thô", "tốt", "tinh", "cực phẩm"];
+const GEM_TIERS = ["vụn", "thô", "tốt", "tinh", "cực phẩm", "vô hà", "thông linh", "thiên thành", "Cửu U"];
+const GEM_RIFT = [60, 100, 150, 200];   // 无瑕、通灵、天成、九幽：幻境最高层打到这里才合得出
 const ENHANCE_RATE = [1, 1, 1, 1, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35];
 const ENHANCE_MAX = 10;
 

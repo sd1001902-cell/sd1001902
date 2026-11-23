@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: '攻击', hp: '气血', armor: '护甲', crit: '暴击率', critDmg: '暴击伤害',
   spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
-  hpPct: '最大气血', armorPct: '护甲', regen: '每回合回复气血', thorns: '反震',
+  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', regen: '每回合回复气血', thorns: '反震',
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
   dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果', eva: '闪避', skd: '某一招伤害',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: '疾行（开战前两回合速度）', xKill: '贪狼（每杀一个敌人回复气血）', cdSkip: '招式不进冷却的几率', xLuck: '神兵掉率', xShield: '磐石（开战自带护体，按最大气血）',
   regenPct: '每回合回复气血', xCritNext: '会心（暴击后下一招伤害）', allyPct: '同伴、僵尸的伤害和气血',
 };
-const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -410,15 +410,20 @@ const TALENT_SHARED = [
 ];
 const TALENT_TIER_REQ = 3;
 
+// 玉石 2026-11-23 重做：九档（碎……极品，后四档无瑕、通灵、天成、九幽跟着幻境最高层开）；
+// 赤玉、墨玉从死数（+16 攻击、+40 护甲，满级只占 2%～4%）改成百分比；每档按「极品」的倍数算：前五档每档 +0.2，后四档越涨越少，九幽 = 极品 ×1.6
+const GEM_MUL = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.35, 1.48, 1.6];
+const gemVals = top => GEM_MUL.map(m => Math.round(top * m * 10) / 10);
 const GEM_TYPES = {
-  ruby:     { n: '赤玉', c: '#e04040', st: 'atk',     v: [2, 4, 7, 11, 16] },
-  sapphire: { n: '青玉', c: '#4a9aff', st: 'res',     v: [3, 5, 8, 11, 15] },
-  topaz:    { n: '黄玉', c: '#f1c94a', st: 'crit',    v: [1, 2, 3, 4, 6] },
-  emerald:  { n: '翠玉', c: '#3cc870', st: 'hpPct',   v: [2, 4, 6, 8, 11] },
-  amethyst: { n: '墨玉', c: '#8a6aaa', st: 'armor',   v: [5, 10, 18, 28, 40] },
-  diamond:  { n: '白玉', c: '#f0f4f8', st: 'critDmg', v: [5, 9, 14, 20, 28] },
+  ruby:     { n: '赤玉', c: '#e04040', st: 'atkPct',   v: gemVals(6) },
+  sapphire: { n: '青玉', c: '#4a9aff', st: 'res',      v: gemVals(15).map(Math.round) },
+  topaz:    { n: '黄玉', c: '#f1c94a', st: 'crit',     v: gemVals(6) },
+  emerald:  { n: '翠玉', c: '#3cc870', st: 'hpPct',    v: gemVals(11) },
+  amethyst: { n: '墨玉', c: '#8a6aaa', st: 'armorPct', v: gemVals(8) },
+  diamond:  { n: '白玉', c: '#f0f4f8', st: 'critDmg',  v: gemVals(28) },
 };
-const GEM_TIERS = ['碎', '粗', '良', '精', '极品'];
+const GEM_TIERS = ['碎', '粗', '良', '精', '极品', '无瑕', '通灵', '天成', '九幽'];
+const GEM_RIFT = [60, 100, 150, 200];   // 无瑕、通灵、天成、九幽：幻境最高层打到这里才合得出
 const ENHANCE_RATE = [1, 1, 1, 1, 0.85, 0.75, 0.65, 0.55, 0.45, 0.35];
 const ENHANCE_MAX = 10;
 
