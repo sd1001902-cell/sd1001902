@@ -1618,7 +1618,7 @@ let STPOP = null;
 function stDesc(u, k) {
   if (!u) return null;
   if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + '（妖物特性）', c: '#e8c88a', d: TRAITS[u.trait].d };
-  if (k === 'fonu') return { n: `佛怒 ${u.fonu || 0} 层`, c: '#ffb066', d: '罗汉金身 6 件：每次反震叠一层，每层伤害 +30%、受到的伤害 -4%，这场战斗内一直有效。' };
+  if (k === 'fonu') return { n: `佛怒 ${u.fonu || 0} 层`, c: '#ffb066', d: '罗汉金身 6 件：每次反震有一半几率叠一层，每层伤害 +20%、受到的伤害 -4%，这场战斗内一直有效。' };
   if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + '（精英词缀）', c: '#ffb066', d: A.d } : null; }
   if (k === 'all') { const L = [...(u.trait ? [TRAITS[u.trait].n] : []), ...(u.aff || []).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean), ...unitSts(u).map(x => x.n)];
     return { n: '全部状态', c: '#e8c88a', d: L.join('、') + '。点状态栏里的单个状态看说明。' }; }

@@ -658,12 +658,22 @@ const heroLv = () => { try { return SAVE.chars[SAVE.cls].level || 1; } catch (e)
 // 各职业的续航：狂刀客靠吸血；别的职业吸血只有三成（按放大后的气血算），各有各的路子。sust = 续航强度加成（%）
 // 妖物打主角一方的伤害整体上调（MON_UP），换来各职业本职续航更有分量；两边一起调，胜率对齐改之前
 let MON_UP = 1.3;   // 1 / 1.3 ≈ 0.77：狂刀客的 23% 减伤就是照这个数定的
+// 2026-11-24 流派平衡（用户：其他流派都要拉一拉）：穿齐六件幻境套装，在幻境里主角（连同僵尸）的伤害、主角受到的伤害再乘一个系数，
+// 打守关妖王再乘一个（100 层起逐步加，250 层加满）。罗汉金身不加。数字同时写在套装六件说明里（SET_TUNE_TXT）
+// 定标：后期配装（上古、根基 100、灵玉 150、带两个伙伴）每场胜率 50% 落在 315–330 层，罗汉 ~370；80% 落在 250 层上下，罗汉 ~275
+const SET_TUNE = { xuehai: [1.35, 0.55, 2.5], busi: [1.35, 0.55, 4.5], guiyuan: [1.8, 0.3, 2.5], wanfu: [1.8, 0.3, 8], yinbing: [1.4, 0.65, 1],
+                   duxing: [1.5, 0.5, 9], qisha: [1.5, 0.4, 2.5], qianji: [3, 0.25, 2.5], dari: [2.2, 0.35, 1] };
+const TUNE_B = [100, 250];
+const setTuneOf = (fx, N) => { for (const S of SETS) if (SET_TUNE[S.id] && S.b6 && fx.has(S.b6)) { const T = SET_TUNE[S.id], f = Math.max(0, Math.min(1, ((N || 0) - TUNE_B[0]) / (TUNE_B[1] - TUNE_B[0]))); return [T[0], T[1], 1 + (T[2] - 1) * f]; } return null; };
+const pctTxt = x => (x >= 1 ? '+' : '') + Math.round((x - 1) * 100) + '%';
+const SET_TUNE_TXT = id => { const T = SET_TUNE[id]; return T ? `幻境加成：伤害 ${pctTxt(T[0])}，受到的伤害 ${pctTxt(T[1])}${T[2] > 1 ? `，打守关妖王再 ${pctTxt(T[2])}（${TUNE_B[0]} 层起逐步加，${TUNE_B[1]} 层加满）` : ''}` : ''; };
+SETS.forEach(S => { const t = SET_TUNE_TXT(S.id); if (t && S.b6d) S.b6d += '；' + t; });
 const SUST = {
   berserker:{ n: '血战', d: '皮糙肉厚：受到的伤害 -{dr}%；吸血足额生效（打出多少伤害，就按吸血的比例回多少血）', dr: 23 },
   mage:     { n: '水行护体', d: '每接上一层「连」，身上添一层护体（最大气血的 {a}%，最多叠到 {cap}%）', a: 6.5, cap: 45 },
   necro:    { n: '替死', d: '受到的伤害 -{dr}%；场上有僵尸时，再有 {a}% 由僵尸代受；僵尸倒下时，你回复最大气血的 {b}%', a: 17, b: 6, dr: 7 },
   assassin: { n: '身法', d: '受到的伤害 -{dr}%，闪避 +{a}%；每闪开一次回复最大气血的 {b}%，击杀敌人回复 {c}%', a: 25, b: 18, c: 22, dr: 12 },
-  paladin:  { n: '金刚不坏', d: '受到的伤害 -{dr}%；每次挨打反震回复最大气血的 {a}%；每回合再回复 {b}%', a: 4.5, b: 1.5, dr: 19 },
+  paladin:  { n: '金刚不坏', d: '受到的伤害 -{dr}%；每次挨打反震回复最大气血的 {a}%；每回合再回复 {b}%', a: 3, b: 1.5, dr: 19 },
 };
 // 等级越高，气血倍数越大，吸血缩水得越厉害，所以续航也跟着等级涨：10 级约 0.75 倍，23 级 1 倍，43 级起 1.4 倍封顶
 const sustLv = lv => Math.min(1.4, 0.55 + (lv || 1) / 50);
@@ -1738,7 +1748,7 @@ function startBattle(run, kind) {
               gDr: s.gDr || 0, regenPct: s.regenPct || 0, allyPct: s.allyPct || 0, cdSkip: s.cdSkip || 0,
               xDouble: s.xDouble || 0, xRage: s.xRage || 0, xTen: s.xTen || 0, xDr: s.xDr || 0, xLast: s.xLast || 0, xHaste: s.xHaste || 0, hasteN: s.xHaste ? 2 : 0, xKill: s.xKill || 0, xCritNext: s.xCritNext || 0,
               lgv: s.lgv || {}, lowHpK: s.lowHpK || 0, thornK: (s.thornK || 0) + (s.fx.has('thornsPct') ? 60 : 0), ssN: 0,
-              zhen: 0, thornDmg: s.thornDmg || 0, yi: yiOf(ch), fonu: 0, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
+              zhen: 0, thornDmg: s.thornDmg || 0, yi: yiOf(ch), fonu: 0, tune: run.mode === 'rift' ? setTuneOf(s.fx, run.riftLv) : null, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
               fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: 25 };
   const encU = run.encUnits; delete run.encUnits;
   const b = { kind, P, units: [P, ...(encU || makeEncounter(run, kind, cell))], corpses: 0, turn: 0, over: false, win: false,
@@ -2042,7 +2052,7 @@ function battleStep(b) {
 function act(b, u, out) {
   for (const k of ['burn', 'poison']) {
     const d = u.st[k]; if (!d) continue;
-    const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
+    const dmg = Math.max(1, Math.round(d.d * (u.side === 'e' && (d.by || 'P') === 'P' && b.P && b.P.tune ? b.P.tune[0] * (u.kind === 'boss' ? b.P.tune[2] || 1 : 1) : 1))); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
     if (u.side === 'e' && (d.by || 'P') === 'P') hsDmg(b, '持续伤害', Math.min(dmg, dmg + Math.min(0, u.hp))); else if (u === b.P) { const h = hsOf(b); h.raw += dmg; h.hp += dmg; }
     out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : '']);
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
@@ -2735,6 +2745,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (src.kind === 'minion' && b.P.fx.has('cSpear') && b.focus === tgt.id) d *= 1.2;                           // 镇魂扳指
   }
   if ((src.kind === 'ally' || src.kind === 'minion') && b.P && b.P.fx.has('gDrum')) d *= 1.15;                  // 聚将鼓
+  if (b.P && b.P.tune && (src === b.P || src.kind === 'minion')) d *= b.P.tune[0] * (tgt.kind === 'boss' ? b.P.tune[2] || 1 : 1);   // 流派平衡系数（套装六件）
   if (tgt.st.curse && tgt.st.curseB) d *= 1.25;
   if (fx) {
     if (fx.has('execute') && tgt.hp / tgt.maxHp < 0.3) d *= 1.6;
@@ -2750,7 +2761,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (fx.has('armorHunter') && tgt.st.melt) d *= 1.4;
     if (fx.has('xueHai6') && src.fury) d *= 1 + src.fury * 0.015;
     if (fx.has('qiSha6') && src === b.P && b.castSk && b.castSk.fin) d *= 4;
-    if (fx.has('luoHan6') && src.fonu) d *= 1 + src.fonu * 0.3;
+    if (fx.has('luoHan6') && src.fonu) d *= 1 + src.fonu * FONU_DMG;
     if (src === b.P && !opt.raw) {
       if (fx.has('buSi6')) d *= (1 + BUSI_HP * 100 * (1 - Math.max(0, src.hp) / src.maxHp)) * (b.castSk && BUSI_SK.has(b.castSk.id) && !opt.proc ? BUSI_AOE : 1);
       if (fx.has('wanFu4') && tgt.side === 'e') d *= 1 + WANFU_ST * stHas(tgt, 'any');
@@ -2801,6 +2812,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 0.75;
     if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
     if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
+    if (tgt === b.P && tgt.tune && src.side === 'e') d *= tgt.tune[1];
     if (tfx.has('duXing4') && tgt === b.P) d *= 1 - DUXING_DR * emptySlots(b, tgt);
     if (tgt.gDr && src.side === 'e') d *= 1 - Math.min(60, tgt.gDr * (tgt.hp / tgt.maxHp < 0.3 ? 2 : 1)) / 100;
     if (src.side === 'e' && (tgt.xDr || tgt.xLast)) d *= 1 - Math.min(50, (tgt.xDr || 0) + (tgt.hp / tgt.maxHp < 0.3 ? tgt.xLast || 0 : 0)) / 100;
@@ -2954,7 +2966,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       refl += r;
     }
     if (tgt.st.butui && tgt.runes && tgt.runes.butui === 'b') refl *= 2;
-    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, '反伤' + refl, 'thorn', 0, tgt === b.P ? 'P' : '', '反伤']); if (src === b.P) { const h = hsOf(b); h.raw += refl; h.hp += refl; } else if (tgt === b.P) hsDmg(b, '反伤', refl); }
+    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; if (src === b.P && src.hp <= 0) heroSave(b, src, out); out.pops.push([src.id, '反伤' + refl, 'thorn', 0, tgt === b.P ? 'P' : '', '反伤']); if (src === b.P) { const h = hsOf(b); h.raw += refl; h.hp += refl; } else if (tgt === b.P) hsDmg(b, '反伤', refl); }
     if (tfx && tfx.has('revenge') && src.hp > 0 && RNG.ch(0.3)) hit(b, tgt, src, 1, 'phys', out, { proc: 1 });
   }
   return d;
@@ -2971,6 +2983,7 @@ function dotIn(b, src, t, d) {
   if (t.sanN) k *= 1 - Math.min(SAN_DR_CAP, SAN_DR * t.sanN);
   if (t.st && t.st.chan) k *= 1 - CHAN_DR / 100;
   if (t.fx && t.fx.has('luoHan6') && t.fonu) k *= 1 - 0.04 * t.fonu;
+  if (t.tune) k *= t.tune[1];
   d *= k; if (b && riftB(b) && t.maxHp) d = Math.min(d, t.maxHp * R_DOT_CAP);
   return d;
 }
@@ -2991,6 +3004,8 @@ function heroSave(b, tgt, out) {
 //   和尚每反震一次攒一层「震」（罗汉 4 件：狮子吼期间攒两层），攒满 JZ_N 层（金刚铃 8 层）自动放「金刚震」：佛光打所有敌人 = 攻击 × 反震倍率 × JZ_K。
 //   真挨打的反震（不算定身、护法）才回血（金刚不坏）、给金身玉护体、木鱼回血
 // 护法金身：伙伴晕住/冻住的妖物，跳过回合时照样吃和尚一次完整反震（act 里，opt.thf）；妖物打伙伴，和尚替伙伴反震一半（HUFA_K）。和尚自己晕住的不算
+// 罗汉佛怒（2026-11-24 回调）：反震一半几率叠一层，每层伤害 +20%（原来必叠、每层 +30%，开场一轮就满层，伤害太高）
+const FONU_CH = 0.5, FONU_DMG = 0.2;
 const CHAN_DR = 45, THORN_TAUNT = 50, HUFA_K = 0.5, MONK_THK = 30, JZ_N = 10;
 let JZ_K = 0.7;   // 2026-11-24 模拟定的：罗汉单刷强度和改前差不多（快一成多），控场队快两成、高层胜率高一成
 const jzNeed = P => P && P.fx && P.fx.has('cCounter') ? 8 : JZ_N;
@@ -3010,7 +3025,7 @@ function thornHit(b, tgt, src, out, opt) {
     if (tfx.has('muyuOff')) { heal(tgt, tgt.maxHp * 0.015, out, true); b.units.filter(u => u.kind === 'ally' && u.hp > 0).forEach(u => heal(u, u.maxHp * 0.04, out, true)); }   // 镇心木鱼
   }
   if (tfx.has('luoHan6')) {
-    if (tgt.fonu < (tfx.has('fumoBelt') ? 15 : 10)) { tgt.fonu++; out.pops.push([tgt.id, '佛怒 ' + tgt.fonu, 'buff']); }
+    if (tgt.fonu < (tfx.has('fumoBelt') ? 15 : 10) && RNG.ch(FONU_CH)) { tgt.fonu++; out.pops.push([tgt.id, '佛怒 ' + tgt.fonu, 'buff']); }
     if (d > 0) heal(tgt, d * 0.1, out, true);
   }
   tgt.zhen = (tgt.zhen || 0) + (lh4 ? 2 : 1);

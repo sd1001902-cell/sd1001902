@@ -284,7 +284,7 @@ SETS.push(
     pieces: [['helm', "La Hán Tăng Mạo"], ['chest', "La Hán Cà Sa"], ['gloves', "La Hán Hộ Uyển"], ['boots', "La Hán Tăng Hài"], ['ring', "La Hán Ban Chỉ"], ['amulet', "La Hán Niệm Châu"]],
     b2: { armorPct: 30, thornK: 150 }, b2d: "Hộ giáp +30%, bội số phản chấn +150% (phản chấn = công kích của bạn × bội số phản chấn, bị đánh một cái bật lại một cái; yêu vật bị đồng hành làm choáng cũng ăn một lần, yêu vật đánh đồng hành thì bạn bật thay một nửa)",
     b4: 'luoHan4', b4d: "Trong lúc Sư Tử Hống khiêu khích: phản chấn gấp đôi, mỗi lần phản chấn tích hai tầng «Chấn» (Kim Cương Chấn đến nhanh gấp đôi)",
-    b6: 'luoHan6', b6d: "Mỗi lần phản chấn chồng một tầng «Phật nộ» (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải chịu -4%; một phần mười sát thương phản chấn hồi lại cho bản thân" },
+    b6: 'luoHan6', b6d: "Mỗi lần phản chấn có một nửa tỉ lệ chồng một tầng “Phật nộ” (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +20%, sát thương phải nhận -4%; một phần mười sát thương phản chấn hồi lại cho bản thân" },
 );
 // 第二套幻境套装：RSET2_LV 层起掉。上面那五套是把本门的招牌机制推到头；这五套换一种打法，用的是上面不碰的招式
 const RSET2_LV = 30;

@@ -1619,7 +1619,7 @@ let STPOP = null;
 function stDesc(u, k) {
   if (!u) return null;
   if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + " (đặc tính yêu vật)", c: '#e8c88a', d: TRAITS[u.trait].d };
-  if (k === 'fonu') return { n: `Phật nộ ${u.fonu || 0} tầng`, c: '#ffb066', d: "Bộ La Hán Kim Thân 6 món: mỗi lần phản chấn chồng một tầng, mỗi tầng sát thương +30%, sát thương phải chịu -4%, có hiệu lực suốt trận." };
+  if (k === 'fonu') return { n: `Phật nộ ${u.fonu || 0} tầng`, c: '#ffb066', d: "Bộ La Hán Kim Thân 6 món: mỗi lần phản chấn có một nửa tỉ lệ chồng một tầng, mỗi tầng sát thương +20%, sát thương phải nhận -4%, có hiệu lực suốt trận này." };
   if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + " (thuộc tính tinh anh)", c: '#ffb066', d: A.d } : null; }
   if (k === 'all') { const L = [...(u.trait ? [TRAITS[u.trait].n] : []), ...(u.aff || []).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean), ...unitSts(u).map(x => x.n)];
     return { n: "Tất cả trạng thái", c: '#e8c88a', d: L.join(", ") + ". Chạm vào từng trạng thái trên thanh trạng thái để xem giải thích." }; }
