@@ -1706,12 +1706,17 @@ function formAllies() {
   const TOP = ar.clientHeight - pt - 8; if (TOP - pb <= 0 || !ar.clientWidth) return;   // 最上面的人头顶不能超过这里（出手顺序条下面）
   const put = (u, x, bot, z, zi) => { const el = document.getElementById('u-' + u.id); if (!el) return; el.style.left = x + '%'; el.style.bottom = Math.round(bot) + 'px'; el.style.setProperty('--uz', z.toFixed(2)); el.style.scale = ''; el.style.zIndex = String(zi); };
   const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
-  if (B._formP == null) {   // 我方：你站前排正中，前排伙伴分站左右；后排伙伴在下面一排，和前排错开
-    const front = main.filter(u => u.kind === 'hero' || (COMPANIONS[u.cid || u.comp || u.id] || {}).row === 'front'), back = main.filter(u => !front.includes(u));
-    front.sort((x, y) => (x.kind === 'hero' ? -1 : 0) - (y.kind === 'hero' ? -1 : 0));
+  // 前后排和战斗里妖物挑人打的规矩一致（engine 里的 FRONT_CLS、伙伴的 front）：狂刀客、武僧站前排，道士、赶尸人、刺客站后排；
+  // 你站自己那一排的正中，同排伙伴分站左右，另一排的伙伴和你那排左右错开
+  const isFront = u => u.kind === 'hero' ? FRONT_CLS.has(u.cls) : !!u.front;
+  const heroU = main.find(u => u.kind === 'hero'), heroF = !!(heroU && isFront(heroU));
+  if (B._formP == null) {
+    const front = main.filter(isFront), back = main.filter(u => !front.includes(u)), hf = (x, y) => (x.kind === 'hero' ? -1 : 0) - (y.kind === 'hero' ? -1 : 0);
+    front.sort(hf); back.sort(hf);
     front.forEach((u, i) => { u._fc = 0; u._fi = i; }); back.forEach((u, i) => { u._fc = 1; u._fi = i; });
+    [...main].sort((x, y) => hf(x, y) || x._fc - y._fc).forEach((u, i) => { u._wi = i; });   // 宽屏一排时的顺序：你在正中，前排伙伴挨着你，后排伙伴往外
     B._formP = 1; }
-  main.forEach(u => { if (u._fc == null) { u._fc = 1; u._fi = main.filter(o => o._fc === 1 && o !== u).length; } });
+  main.forEach(u => { if (u._fc == null) { u._fc = isFront(u) ? 0 : 1; u._fi = main.filter(o => o._fc === u._fc && o !== u).length; u._wi = main.length - 1; } });
   const E = B.units.filter(u => u.side === 'e'), boss = E.filter(u => u.kind === 'boss'), rest = E.filter(u => u.kind !== 'boss');
   const SL = boss.length === 1 ? [[0, 30], [0, 70], [1, 12], [1, 88], [0, 50], [0, 8], [0, 92]] : boss.length ? [[0, 50], [0, 12], [0, 88], [1, 8], [1, 92], [0, 31], [0, 69]] : [[0, 50], [0, 24], [0, 76], [1, 36], [1, 64], [1, 12], [1, 88]];   // [排, 横向%]；前排让开首领站的地方
   const taken = new Set(rest.filter(u => u.hp > 0 && u._fs != null).map(u => u._fs));
@@ -1724,9 +1729,9 @@ function formAllies() {
   const fA = main.filter(u => u._fc === 0), bA = main.filter(u => u._fc === 1), fE = rest.filter(u => SL[u._fs][0] === 0), bE = rest.filter(u => SL[u._fs][0] === 1);
   const hasM = mins.length > 0, GAP0 = desk ? 24 : 16, wide = ar.clientWidth * 0.12 > (desk ? 104 : 76), OV = wide ? 0.5 : 0.86;   // 前后排左右错开，上下可以叠一点（宽屏错得开，叠一半）
   const lay = Z => {   // 给定大小，从下往上排，返回各排离底边多高
-    const L = {}; L.A0 = pb; L.A1 = bA.length && !wide ? pb + rowH(bA, Z) * OV : pb; let top = L.A1 + rowH(wide ? main : fA, Z);
+    const L = {}; L.A0 = pb; L.A1 = bA.length && !wide ? pb + rowH(bA, Z) * OV : pb; let top = wide ? L.A1 + rowH(main, Z) : Math.max(L.A0 + rowH(bA, Z), L.A1 + rowH(fA, Z));
     if (hasM && wide) { L.AM = L.A1; top = Math.max(top, L.A1 + rowH(mins, Z * 0.78)); }   // 宽屏：我方所有人（伙伴、召唤物）站成一排
-    else if (hasM) { L.AM = L.A1 + rowH(fA, Z) * OV; top = L.AM + rowH(mins, Z * 0.78); }
+    else if (hasM) { L.AM = fA.length ? L.A1 + rowH(fA, Z) * OV : L.A1; top = Math.max(top, L.AM + rowH(mins, Z * 0.78)); }
     L.line = top; L.E0 = top + GAP0; const h0 = rowH(fE, Z); L.E1 = L.E0 + h0 * OV; L.B = L.E0 + (fE.length ? h0 * 0.55 : 0);
     L.top = Math.max(L.E0 + h0, bE.length ? L.E1 + rowH(bE, Z) : 0, boss.length ? L.B + rowH(boss, Z * 0.92) : 0); return L; };
   let Z = desk ? 1.3 : 0.86; while (Z > 0.5 && lay(Z).top > TOP) Z -= 0.02;
@@ -1736,9 +1741,9 @@ function formAllies() {
   const LINE = L.line + lift + (GAP0 + mid) / 2;
   let ln = $('#bline'); if (!ln) { ln = document.createElement('div'); ln.id = 'bline'; ln.innerHTML = '<i></i>'; ar.appendChild(ln); }
   ln.style.bottom = Math.round(LINE) + 'px';
-  const FX = [[50, 24, 76, 6, 94], [36, 64, 14, 86, 50]];   // [前排, 后排] 依次站的横向位置（%）
-  const WX = [50, 39, 61, 28, 72, 17, 83, 6, 94, 44, 56, 33, 67], nF = fA.length;   // 宽屏一排：你在正中，往两边依次站
-  main.forEach(u => { const back = u._fc === 1; if (wide) put(u, WX[(back ? nF + u._fi : u._fi) % WX.length], L.A1, Z, 24); else put(u, FX[u._fc][u._fi % 5], back ? L.A0 : L.A1, Z, back ? 30 : 24); });
+  const FX = heroF ? [[50, 24, 76, 6, 94], [36, 64, 14, 86, 50]] : [[36, 64, 14, 86, 50], [50, 24, 76, 6, 94]];   // [前排, 后排] 依次站的横向位置（%）：你那一排从正中排起
+  const WX = [50, 39, 61, 28, 72, 17, 83, 6, 94, 44, 56, 33, 67];   // 宽屏一排：你在正中，往两边依次站
+  main.forEach(u => { const back = u._fc === 1; if (wide) put(u, WX[u._wi % WX.length], L.A1, Z, 24); else put(u, FX[u._fc][u._fi % 5], back ? L.A0 : L.A1, Z, back ? 30 : 24); });
   const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });
   const MX = [63, 37, 85, 15, 74, 26, 50, 95, 5];   // 召唤物：你头顶前面横着一排，各占一个位子，前面的倒了后面的也不挪
   mins.forEach(u => put(u, wide ? WX[(main.length + u._slot) % WX.length] : MX[u._slot % MX.length], L.AM, Z * 0.78, 18));
