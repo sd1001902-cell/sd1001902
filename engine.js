@@ -64,7 +64,8 @@ function migrate(s) {
     if (L > L0) { s.para.lv = L; s.para.xp = Math.round(T); s.paraUp2 = [L0, L]; }
   }
   s.pv = 2;
-  for (const g of s.lgems || []) if (LGEM_OLD[g.t]) { g.old = g.t; g.t = 'reforge'; }   // 2026-11-23 删掉的五颗灵玉：等玩家挑新的（等级保留）
+  for (const g of s.lgems || []) if (LGEM_OLD[g.t]) { g.old = g.t; g.t = 'reforge'; }
+  for (const g of s.lgems || []) if ((g.lv || 0) > LGEM_CAP) { (s.lgCut = s.lgCut || []).push([g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : (LGEMS[g.t] || {}).n || '灵玉', g.lv]); g.lv = LGEM_CAP; }   // 等级上限 150：超出的降回来，进游戏提示一次   // 2026-11-23 删掉的五颗灵玉：等玩家挑新的（等级保留）
   if (s.flags && !s.flags.wpnForged) { const all = [...(s.stash || [])]; for (const c in s.chars || {}) for (const sl in s.chars[c].eq || {}) if (s.chars[c].eq[sl]) all.push(s.chars[c].eq[sl]);
     if (all.some(it => it && it.legend && (LEGENDS.find(l => l.id === it.legend) || {}).w)) s.flags.wpnForged = 1; }   // 老存档：手里有专属兵器就算打过
   if (!Array.isArray(s.team)) s.team = s.ngocJoin !== false ? ['ngoc'] : s.comp && s.comp !== 'ngoc' ? [s.comp] : [];   // 幻境组队：老存档按原来带的那位
@@ -574,6 +575,11 @@ function globalStats() {
 
 // ---------------- 属性 ----------------
 const STAT_KEYS = Object.keys(STAT_NAMES);
+// 暴击、全抗的衰减：75 以内照算；暴击 75 以上每 2 点算 1 点，到 85 以后每 3 点算 1 点，最高 90；全抗 75 以上每 2 点算 1 点，到 80 以后每 3 点算 1 点，最高 85
+const softCap = (v, b, mx) => { if (!(v > 75)) return v; const r2 = 75 + 2 * (b - 75); const e = v <= r2 ? 75 + (v - 75) / 2 : b + (v - r2) / 3; return Math.round(Math.min(mx, e) * 10) / 10; };
+const CRIT_SOFT = [85, 90], RES_SOFT = [80, 85];
+const critSoft = v => softCap(v, CRIT_SOFT[0], CRIT_SOFT[1]), resSoft = v => softCap(v, RES_SOFT[0], RES_SOFT[1]);
+const softRaw = (e, b, mx) => e <= 75 ? e : e >= mx ? Infinity : e <= b ? 75 + 2 * (e - 75) : 75 + 2 * (b - 75) + 3 * (e - b);   // 反过来：想要实际 e，面板得堆多少
 function calcStats(clsId, eq, level, buffs, ch) {
   const C = CLASSES[clsId], s = { sk: {} }, lgv = {};   // lgv：灵玉匣里生效的灵玉 → 等级（战斗里按它算机制）
   for (const k of STAT_KEYS) s[k] = 0;
@@ -623,7 +629,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.cls = clsId; s.sust = clsId === 'berserker' ? 0 : Math.round(s.leech * 4);   // 别的职业：每 1% 吸血折成 4% 续航强度（本职的护体／替死／身法／金刚）
   s.armorT = Math.round(s.armor * (1 + s.armorPct / 100) * (1 + (s.pArmor || 0) / 100));
   s.atk = Math.round(s.atk * (1 + (s.atkPct || 0) / 100) * (1 + (s.pAtk || 0) / 100));   // atkPct：赤玉
-  s.crit = Math.min(75, Math.round(s.crit * 10) / 10); s.res = Math.min(75, Math.round(s.res * 10) / 10);
+  s.critRaw = Math.round(s.crit * 10) / 10; s.resRaw = Math.round(s.res * 10) / 10; s.crit = critSoft(s.critRaw); s.res = resSoft(s.resRaw);   // 2026-11-23 不再 75% 卡死：超出部分打折算
   s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10;
   s.dodge = Math.min(45, s.dodge + (fx.has('dodge') ? 15 : 0));
   if (fx.has('boneArmy')) s.minion += 1;
@@ -1170,11 +1176,14 @@ const MW = 5, MH = 6;
 // 50 层以后不再利滚利：每高一层，气血加 50 层时的 8%、攻击加 5%，妖物等级只涨 0.7 级（原来 1.4）。原来每 10 层气血翻一倍多，80 层的精英谁都打不动。
 // 改后 80 层 ≈ 原来 67 层，100 层 ≈ 原来 73 层，原来 80 层的难度落在 125–130 层
 const R_LIN = [50, 0.08, 0.05, 0.7];
+const R_HI = [150, 0.10, 0.06];   // 2026-11-23 150 层以后每层涨得更快（用户：线性从 6 提到 10）：气血每层 +10%、攻击每层 +6%（都按 50 层的数值算），小怪、精英、妖王一样
+const rLinHp = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[1] * Math.max(0, N - R_HI[0]); };
+const rLinAtk = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[2] * Math.max(0, N - R_HI[0]); };
 const rOldLv = N => 6 + Math.round(N * 1.4);   // 没改之前的妖物等级：幻境里的经验还按它算，免得层数高了经验反而少
 function riftD(N) {
   const M = Math.min(N, R_LIN[0]), k = Math.max(0, N - R_LIN[0]), base = 6 + Math.round(M * 1.4) + Math.round(k * R_LIN[3]), ar = 4 + base * 3.5;
   return { n: '秘境 ' + N + ' 层', base, res: Math.round(Math.min(N * 1.2, 100 * ar / (490 + ar))),   // 全抗跟着这一层妖物护甲的减伤走（对 50 级的主角），术法和物理吃一样的亏
-    hpMul: Math.pow(1.075, M) * (1 + R_LIN[1] * k), atkMul: Math.pow(1.055, M) * (1 + R_LIN[2] * k), loot: Math.min(4, 0.5 + N / 15) };
+    hpMul: Math.pow(1.075, M) * rLinHp(N, R_LIN[1]), atkMul: Math.pow(1.055, M) * rLinAtk(N, R_LIN[2]), loot: Math.min(4, 0.5 + N / 15) };
 }
 const dOf = run => run.mode === 'rift' ? riftD(run.riftLv) : DIFFS[run.diff];
 const themeOf = run => run.mode === 'rift' ? RIFT_THEMES[run.theme] : CHAPTERS[run.chapter - 1];
@@ -1442,6 +1451,7 @@ function riftComplete(run) {
   let newGem = null;
   if (un.length && (SAVE.lgems.length === 0 || RNG.ch(0.55))) { newGem = { id: uid(), t: mine || RNG.pick(un), lv: 0 }; SAVE.lgems.push(newGem); }
   run.upg = G.upg; run.riftDone = true; run.newGem = newGem;
+  lgemUpToPara(run);
 }
 // 幻境里倒下不算输：被吐回入口，香烧掉一截（倒得越多烧得越多）
 function riftRevive(run) {
@@ -1451,10 +1461,19 @@ function riftRevive(run) {
   if (run.world) { const S = wstate(RCH), e = wmap(RCH).pts['1'][0]; S.pos = { x: e.x, y: e.y }; wReveal(RCH); wUnstackMons(RCH); } else run.pos = run.maze.start;
   return pen;
 }
-function lgemChance(g, N) { const d = N - g.lv; return d >= 10 ? 1 : d >= 0 ? 0.6 + d * 0.04 : Math.max(0.05, 0.6 + d * 0.1); }
+function lgemChance(g, N) { if (g.lv >= LGEM_CAP) return 0; const d = N - g.lv; return d >= 10 ? 1 : d >= 0 ? 0.6 + d * 0.04 : Math.max(0.05, 0.6 + d * 0.1); }
+const lgemMaxed = () => SAVE.lgems.length > 0 && SAVE.lgems.every(g => g.lv >= LGEM_CAP);
+// 灵玉都满 150 级以后：这一局的升级次数换成修为经验，每次约半级修为
+function lgemUpToPara(run) {
+  if (!run || !run.upg || !lgemMaxed()) return 0;
+  let x = 0; for (let i = 0; i < run.upg; i++) x += Math.round(paraNeed(SAVE.para.lv + i) / 2);
+  const L0 = SAVE.para.lv; SAVE.para.xp += x; while (SAVE.para.xp >= paraNeed(SAVE.para.lv)) { SAVE.para.xp -= paraNeed(SAVE.para.lv); SAVE.para.lv++; }
+  run.upgPara = { n: run.upg, x, lv: SAVE.para.lv - L0 }; run.upg = 0; return x;
+}
 function upgradeLgem(run, gid) {
   if (!run || !run.upg) return null;
   const g = SAVE.lgems.find(x => x.id === gid); if (!g) return null;
+  if (g.lv >= LGEM_CAP) return null;
   run.upg--; const ok = RNG.ch(lgemChance(g, run.riftLv)); if (ok) withOwnerHpGem(gid, () => { g.lv++; });
   return ok;
 }
@@ -1574,11 +1593,14 @@ function makeMonster(def, lv, run, kind, affs) {
   return u;
 }
 // 地图上一只精英的词缀：第一次看见它的时候摇好，存在它身上，进战斗照用
+const R_AFF_HI = [150, 250, 200];   // 高层精英：150 层起多一个词缀，250 层起再多一个；200 层起小怪也带词缀（200 层一半带一个，250 层起都带）
+const PACK_AFFS = ['fiery', 'cold', 'vamp', 'enraged', 'fast', 'shielded', 'venom'];   // 小怪能带的：不带分身、铜皮、反震（一群一起来，太折腾）
+const packAffs = N => N >= R_AFF_HI[1] || (N >= R_AFF_HI[2] && RNG.ch(0.5)) ? [RNG.pick(PACK_AFFS)] : [];
 function eliteAffsOf(run, mn) {
   if (mn.affs) return mn.affs;
   const rift = run.mode === 'rift';
   if (!rift && mn.rr == null) mn.rr = RNG.ch(0.15) ? 1 : 0;
-  const n = (rift ? 1 + (run.riftLv >= 20 ? 1 : 0) :   /* 原来 45 层起再加一个（三个词缀）：高层精英叠三个词缀是打不过的主因之一，收回两个；稀有精英仍然多一个 */ 1 + diffIdx(run) + (run.world ? W_EAFF : 0)) + (mn.rare || mn.rr ? 1 : 0);
+  const n = (rift ? 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= R_AFF_HI[0] ? 1 : 0) + (run.riftLv >= R_AFF_HI[1] ? 1 : 0) :   /* 原来 45 层起再加一个（三个词缀）：高层精英叠三个词缀是打不过的主因之一，收回两个；稀有精英仍然多一个 */ 1 + diffIdx(run) + (run.world ? W_EAFF : 0)) + (mn.rare || mn.rr ? 1 : 0);
   mn.affs = RNG.shuffle(ELITE_AFFIXES.map(a => a.id)).slice(0, n); return mn.affs;
 }
 function makeEncounter(run, kind, cell) {
@@ -1725,7 +1747,7 @@ function makeAlly(b, P, c, idx) {
   const C = COMPANIONS[c], aff = wAffOf(c), afB = 1 + 0.04 * aff, fox = c === 'ngoc';
   const hp = fox ? 0.7 : C.hp, at = fox ? 0.85 : C.atk;
   const u = { id: idx ? 'NG' + (idx + 1) : 'NG', side: 'p', kind: 'ally', comp: fox ? null : c, cid: c, fox, front: C.row === 'front', afl: aff, name: fox ? 'Ngoc（九尾）' : C.n, lv: P.lv, spr: fox ? 'ngocfox' : C.spr, wx: C.wx,
-    maxHp: Math.round(P.maxHp * hp * afB), atk: P.atk * at * afB * (COMP_DK[c] || 1), armor: P.armor * (c === 'kang' ? 1.8 : C.row === 'front' ? 1.2 : 0.8), res: c === 'kang' ? Math.min(75, (P.res || 0) + 15) : P.res, spd: fox ? 108 : C.spd,
+    maxHp: Math.round(P.maxHp * hp * afB), atk: P.atk * at * afB * (COMP_DK[c] || 1), armor: P.armor * (c === 'kang' ? 1.8 : C.row === 'front' ? 1.2 : 0.8), res: c === 'kang' ? Math.max(P.res || 0, Math.min(75, (P.res || 0) + 15)) : P.res, spd: fox ? 108 : C.spd,
     crit: Math.max(10, P.crit || 0), critDmg: Math.max(160, P.critDmg || 0), dmgPct: P.dmgPct || 0, elem: P.elem || 0, g: 30, st: {}, rage: 0, n: 0, healCd: 0,
     taunt: c === 'kang' ? (aff >= 20 ? 0.55 : 0.35) : c === 'lei' ? 0.15 : 0 };
   u.hp = u.maxHp; return u;
@@ -2599,7 +2621,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (crit && src === b.P && fx.has('gReset') && !opt.proc && RNG.ch(0.1)) { const k2 = src.skills.find(k => k.left > 0 && !(b.castSk && b.castSk.id === k.id)); if (k2) { k2.left = 0; out.pops.push(['P', '回风', 'buff']); } }
   if (crit) { d *= ((src.critDmg || 150) + (src === b.P && fx && fx.has('cKiCrit') ? 10 * (b.kiSnap != null ? b.kiSnap : src.ki || 0) : 0)) / 100;   /* 夜行带：每点杀意暴伤 +10% */ if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; if (src === b.P) src.cbNext = true; }
   if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1) * (tgt.st.tieArm ? 1.4 : 1)); }
-  else d *= 1 - Math.max(0, Math.min(75, tgt.res || 0) - (tgt.st.melt ? 20 : 0)) / 100;
+  else d *= 1 - Math.max(0, Math.min(RES_SOFT[1], tgt.res || 0) - (tgt.st.melt ? 20 : 0)) / 100;
   if (tgt.st.liuDr && tgt.side === 'p' && src.side === 'e') d *= 1 - (b.liuDrV || 0.2);   // 刘师傅念经
   // 收招：打带状态的敌人
   let pay = null;

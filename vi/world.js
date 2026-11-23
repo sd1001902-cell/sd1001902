@@ -1235,7 +1235,7 @@ var R_NORM = [1.3, 0.8], R_ELITE = [3.2, 1.25], R_BOSS = [2.6, 2.2];
 var R_BOSS_UP = 1.6;   // 守关妖王本身的血再 ×1.6（护法、小妖不动）：原来首领三四十手就倒，不像最后一关。香相应加了 1 分钟
 // 50 层以后精英涨得比小怪慢一点（每层 +6% 气血、+3.5% 攻击，小怪和妖王是 +8%、+5%）：实测精英战比小怪群、妖王战早二三十层就打不过，只能绕着走
 var R_ELITE_LIN = [0.06, 0.035];
-function rEliteEase(N) { const k = Math.max(0, N - R_LIN[0]); return [(1 + R_ELITE_LIN[0] * k) / (1 + R_LIN[1] * k), (1 + R_ELITE_LIN[1] * k) / (1 + R_LIN[2] * k)]; }   // 幻境妖物在 makeMonster 基础上再乘的 [气血, 攻击]
+function rEliteEase(N) { return [rLinHp(N, R_ELITE_LIN[0]) / rLinHp(N, R_LIN[1]), rLinAtk(N, R_ELITE_LIN[1]) / rLinAtk(N, R_LIN[2])]; }   // 幻境妖物在 makeMonster 基础上再乘的 [气血, 攻击]
 var R_NEED = 100;            // 召唤妖王要攒的分：小妖 1、精英 4（精魄球再 4）、稀有精英 6（球 6）
 const R_FLOORS = 4, R_PULL = 3, R_PULL_MAX = 4, R_STAGE = 5;   // 四层；拉怪半径 3 格、一次最多 4 群；台上最多 5 只，其余排队上
 const R_BT_MS = 30;          // 战斗里的时间按读条折算：读条 100（主角出手一轮）= 3 秒。和几倍速、跳不跳过战斗无关
@@ -1369,7 +1369,7 @@ function rPrep(run, enc) {
   }
   run.theme = R.c - 1;
   const F = CHAPTERS[R.c - 1], Z = rSanitize(R.c, R.sc), nAff = 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= 45 ? 1 : 0), el = [], no = [];
-  const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; return u; };
+  const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal', packAffs(run.riftLv)); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; return u; };
   for (const id of enc.ids) { const mn = D.mons.find(o => o.id === id); if (!mn) continue; const def = F.mons[mn.m] || F.mons[0];
     if (mn.elite) {
       const affs = eliteAffsOf(run, mn), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);

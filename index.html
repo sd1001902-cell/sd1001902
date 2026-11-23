@@ -1834,6 +1834,23 @@ html body .hud .hs-top .rchip{flex:0 1 auto;width:auto;min-width:0;max-width:100
 .lgre-o{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:9px 12px;border:1px solid var(--line2);border-radius:10px;background:#120c0a;color:var(--ink);text-align:left;cursor:pointer}
 .lgre-o b{font:700 15px "Noto Serif SC",serif}.lgre-o small{font-size:12px;line-height:1.45;color:var(--dim)}
 .lgre-o:active{border-color:var(--gold2)}
+
+/* 2026-11-23 暴击/全抗衰减：面板值小字；护甲减伤说明 */
+.stats b small.rawv{display:block;font-size:10px;font-weight:400;color:var(--dim);text-align:right;line-height:1.1}
+.help-p.defp{display:flex;align-items:center;flex-wrap:wrap;gap:2px 4px}
+.help-p.defp .qhelp{margin-left:auto}
+.deftbl{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 10px;font-variant-numeric:tabular-nums}
+.deftbl th,.deftbl td{border:1px solid #2c201a;padding:3px 4px;text-align:center}
+.deftbl td:first-child{text-align:left;color:var(--dim);white-space:nowrap}
+.deftbl .on{color:var(--gold2);background:#2a1d12}
+
+/* 2026-11-23 上下对阵：两边都铺满整个画面（妖物在上、主角团在下），中间一条阵营界线 */
+html body .arena.sv .side.form.tb{position:absolute;left:0;right:0;top:0;bottom:0;width:auto;height:auto;grid-column:auto;grid-row:auto;pointer-events:none}
+html body .arena.sv .side.form.tb>.unit{pointer-events:auto}
+#bline{position:absolute;left:4%;right:4%;height:0;z-index:1;pointer-events:none}
+#bline::before{content:'';position:absolute;left:0;right:0;top:-1px;height:2px;background:linear-gradient(90deg,transparent,rgba(214,170,98,.55) 18%,rgba(255,214,140,.8) 50%,rgba(214,170,98,.55) 82%,transparent)}
+#bline::after{content:'';position:absolute;left:10%;right:10%;top:-10px;height:20px;background:radial-gradient(ellipse at center,rgba(255,190,110,.16),transparent 70%)}
+#bline i{position:absolute;left:50%;top:-6px;width:12px;height:12px;margin-left:-6px;transform:rotate(45deg);background:#2a1d12;border:1.5px solid rgba(255,214,140,.85);box-shadow:0 0 8px rgba(255,190,110,.5)}
 </style>
 </head>
 <body>

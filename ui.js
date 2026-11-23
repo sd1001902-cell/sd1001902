@@ -256,7 +256,7 @@ function stashBody(cls, D) {
 }
 // 灵玉一行：名字、等级、说明；本命玉标上是哪个门派的
 function lgemRow(g, btn) { const G = LGEMS[g.t] || LGEMS.reforge;
-  return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : G.n}</b> ${g.lv} 级${G.cls ? ` <em class="lgcls">${CLASSES[G.cls].n}本命</em>` : ''} <small>${G.d(g.lv)}</small></span>${btn || ''}</div>`; }
+  return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : G.n}</b> ${g.lv}${g.lv >= LGEM_CAP ? '（满）' : ''} 级${G.cls ? ` <em class="lgcls">${CLASSES[G.cls].n}本命</em>` : ''} <small>${G.d(g.lv)}</small></span>${btn || ''}</div>`; }
 // 灵玉重铸：老存档里被删的五颗（战神、长生、疾风、破军、回春）挑一颗新的换，等级原样保留
 let LGRE = null;
 const lgReModal = () => {
@@ -272,7 +272,7 @@ function boxBody(cls) {
   const L = boxOf(cls), bs = boxStat(SAVE.riftMax), inBox = new Set(L.filter(Boolean)), rest = SAVE.lgems.filter(g => !inBox.has(g.id));
   const gemRow = (g, btn) => lgemRow(g, btn);
   return `<div class="gcur2"><div class="gcur-h"><span class="sub">灵玉匣</span><button class="btn sm ghost" data-act="gsl" data-arg="box">收起</button></div>
-      <p class="help-p">匣子自带：最大气血 +${bs}%，伤害 +${bs}%（幻境最高纪录每过 10 层，各再 +1%）。三个孔只镶灵玉。灵玉全账号共用：每个角色各挑三颗，换角色不用拆。</p>
+      <p class="help-p">匣子自带：最大气血 +${bs}%，伤害 +${bs}%（幻境最高纪录每过 10 层，各再 +1%）。三个孔只镶灵玉。灵玉全账号共用：每个角色各挑三颗，换角色不用拆。灵玉最高 ${LGEM_CAP} 级，靠幻境结算升级。</p>
       <div class="gems">${L.map((gid, i) => { const g = gid && SAVE.lgems.find(x => x.id === gid);
         return g ? gemRow(g, `<button class="btn sm ghost" data-act="boxoff" data-arg="${i}">取下</button>`) : `<div class="gemrow lg empty"><span class="nm"><i>第 ${i + 1} 孔 · 空着</i></span></div>`; }).join('')}</div></div>
     <h4 class="sub-h gcur-t">还能放进去的灵玉</h4>
@@ -640,7 +640,8 @@ const goHelpModal = () => () => {
   return `<h2 class="mh">${rift ? '九幽幻境' : '主线剧情'}</h2>${rift ? `<p class="help-p">最多可以挑战 ${Math.max(1, SAVE.riftCap || 3)} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
     <p class="help-p">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
     <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
-    <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>`
+    <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>
+    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个；${R_AFF_HI[2]} 层起小怪也带词缀（${R_AFF_HI[1]} 层起每只都带）。</p>`
     : `<p class="help-p">一章一张大地图：走路遇怪、找钥匙、做任务，最后打首领。首领有专门克制它的线索和钥匙，先找钥匙再打会轻松很多。倒下了得到的东西都会保留，会在最近的篝火边醒来。</p>`}
     ${featureOn('mods') ? `<h4 class="sub-h">加难度</h4><div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}
     <button class="btn ghost" data-act="close">好了</button>`;
@@ -826,11 +827,34 @@ function skillBoosts(cls, k) {
 // 人物属性：一排数值 + 本职续航。城镇「人物」「修炼」和游戏里的「人物」弹窗共用
 function statBlock(cls) {
   const ch = SAVE.chars[cls], s = SAVE.run && SAVE.run.cls === cls && (VIEW === 'world' || VIEW === 'battle' || VIEW === 'map') ? runStats(SAVE.run) : charStats(cls);   // 出门在外：把吃的、带的加成也算上
-  const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击率', s.crit + '%'], ['暴击伤害', s.critDmg + '%'],
+  const raw = (v, r) => v + '%' + (r > 75 ? `<small class="rawv">面板 ${r}</small>` : '');
+  const stats = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', raw(s.res, s.resRaw)], ['暴击率', raw(s.crit, s.critRaw)], ['暴击伤害', s.critDmg + '%'],
     ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法伤害', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10 + '%'], ['福缘', '+' + s.mf + '%']];
   const mfTxt = `福缘 +${s.mf}%：神兵、套装掉率 ×${mfK(s.mf).toFixed(2)}，上古几率 ×${mfAnc(s.mf).toFixed(2)}${s.mf > MF_CAP ? `（只算到 +${MF_CAP}%）` : ''}。`;
-  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p sustp">${sustText(cls, s)}</p><p class="help-p">${mfTxt}</p>`;
+  const R = armorRef(), red = armorRed(s.armorT, R.lv);
+  const defTxt = `<span>对${R.short}：物理减伤 <b>${red}%</b>，术法减伤 <b>${s.res}%</b></span><button class="qhelp sm" data-act="defhelp" aria-label="说明">?</button>`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p defp">${defTxt}</p><p class="help-p sustp">${sustText(cls, s)}</p><p class="help-p">${mfTxt}</p>`;
 }
+// 护甲减伤：物理伤害 × 系数 ÷（系数 + 护甲），系数 = 40 + 妖物等级 × 9（和 engine hit() 里一样）
+const armorK = lv => 40 + lv * 9;
+const armorRed = (a, lv) => Math.round(100 * a / (a + armorK(lv)));
+function armorRef() {   // 拿哪一层的妖物来比：在幻境里就是这一层，没在打就用你选好的层数；还没开幻境就按自己等级
+  const r = SAVE.run, N = r && r.mode === 'rift' ? r.riftLv : featureOn('rift') ? Math.max(1, SAVE.riftLv || SAVE.riftMax || 1) : 0;
+  if (N) { const lv = riftD(N).base; return { n: `幻境 ${N} 层（妖物 ${lv} 级）`, short: `幻境 ${N} 层`, lv }; }
+  const lv = SAVE.chars[SAVE.cls].level; return { n: `${lv} 级妖物`, short: `${lv} 级妖物`, lv };
+}
+const defHelpModal = () => () => {
+  const s = charStats(SAVE.cls), R = armorRef(), N0 = SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : SAVE.riftLv || SAVE.riftMax || 0;
+  const Ns = featureOn('rift') ? [...new Set([50, 100, 150, 200, 300, N0].filter(n => n > 0))].sort((a, b) => a - b) : [];
+  const tbl = Ns.length ? `<table class="deftbl"><tr><th>幻境层</th>${Ns.map(n => `<th class="${n === N0 ? 'on' : ''}">${n}</th>`).join('')}</tr><tr><td>妖物等级</td>${Ns.map(n => `<td class="${n === N0 ? 'on' : ''}">${riftD(n).base}</td>`).join('')}</tr><tr><td>你的物理减伤</td>${Ns.map(n => `<td class="${n === N0 ? 'on' : ''}">${armorRed(s.armorT, riftD(n).base)}%</td>`).join('')}</tr></table>` : '';
+  const line = (n, v, r, cap) => `${n}：面板 <b>${r}%</b> → 实际 <b>${v}%</b>${r > 75 ? '' : `（还没到 75，照算）`}，最高 ${cap}%`;
+  return `<h2 class="mh">护甲、全抗、暴击怎么算</h2><div>
+  <p class="help-p"><b>护甲</b>只挡物理伤害：受到的物理伤害 × 系数 ÷（系数 + 你的护甲），<b>系数 = 40 + 妖物等级 × 9</b>。护甲越堆越不划算，没有硬上限；同样的护甲，妖物等级越高减得越少。你现在护甲 <b>${s.armorT}</b>，对${R.n}减伤 <b>${armorRed(s.armorT, R.lv)}%</b>。</p>${tbl}
+  <p class="help-p"><b>全抗</b>挡火、冰、毒、雷这些术法伤害，直接按百分比减。75% 以内照算；超过 75 的部分每 2 点算 1 点，到 80% 以后每 3 点算 1 点，<b>最高 ${RES_SOFT[1]}%</b>（面板 85 → 80，面板 100 → 85）。<br>${line('你的全抗', s.res, s.resRaw, RES_SOFT[1])}</p>
+  <p class="help-p"><b>暴击</b>：75% 以内照算；超过 75 的部分每 2 点算 1 点，到 85% 以后每 3 点算 1 点，<b>最高 ${CRIT_SOFT[1]}%</b>（面板 95 → 85，面板 110 → 90）。<br>${line('你的暴击', s.crit, s.critRaw, CRIT_SOFT[1])}</p>
+  <p class="help-p">物理、术法之外，金钟玉、减伤词条这些「受到的伤害 -x%」另外再乘一次。</p></div>
+  <button class="btn ghost" data-act="close">好</button>`;
+};
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
   const tabs = [['stat', '属性'], ['tal', `心法${ti.free ? ` <b class="upn">${ti.free}</b>` : ''}`], ['skill', '武学'], ...(featureOn('para') ? [['para', `修为${pf ? ` <b class="upn">${pf}</b>` : ''}`]] : [])];
@@ -1671,43 +1695,56 @@ window.addEventListener('resize', () => { if (typeof VIEW !== 'undefined' && VIE
 // 我方固定阵位：靠近敌人的一列是前排（你、康总管、雷老虎），后面一列是后排（Ngoc、龙道长、刘师傅、铁蛋）；
 // 每人一个格子，开战排一次，打的过程中谁挂状态、谁掉血都不挪（原来是自动换行排，状态一多一少人就跳来跳去）。召唤物站在最前面一小块
 function formAllies() {
-  // 2026-11-23 双方都站规则的阵：每边两列（敌方有首领时三列：两列小妖 + 首领一列），每列最多三排，排距一样；
-  // 人整体缩小（手机上原来放大到 1.12 倍，挤成一团）。开战时排一次，之后谁倒了位子空着，补上来的妖物站进空位，别人不挪
+  // 2026-11-23 上下对阵（用户定）：妖物在上半，主角团在下半，中间一条阵营界线。每边最多两排（前排挨着界线，后排和前排左右错开），
+  // 召唤物在我方前排上面再站一排。人的大小按画面高度算：能放下就尽量大，放不下就一起缩。开战时排一次，之后谁倒了位子空着，补上来的妖物站进空位，别人不挪
   const ar = $('#arena'); if (!ar || !B) return;
-  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + tb.offsetHeight + 4 : 0), pb = parseFloat(cs.paddingBottom) || 0;
-  const desk = innerWidth > 700, LBL = desk ? 56 : 46, SPH = 58;   // 名字、血条、状态三行的高度；一倍大小时小妖的身高
+  const cs = getComputedStyle(ar), tb = $('#turnbar'), pt = Math.max(parseFloat(cs.paddingTop) || 0, tb ? tb.offsetTop + tb.offsetHeight + 2 : 0), pb = Math.max(6, (parseFloat(cs.paddingBottom) || 0) - 20);
+  const desk = innerWidth > 700, LBL = desk ? 54 : 46, SPH = 58, BSH = 118;   // 名字、血条、状态三行的高度；一倍大小时小妖、首领的身高
+  const sa = $('#allies'), sf = $('#foes'); if (!sa || !sf) return;
+  for (const sd of [sa, sf]) { sd.classList.add('form', 'tb'); sd.style.transform = ''; }
+  const TOP = ar.clientHeight - pt - 8; if (TOP - pb <= 0 || !ar.clientWidth) return;   // 最上面的人头顶不能超过这里（出手顺序条下面）
   const put = (u, x, bot, z, zi) => { const el = document.getElementById('u-' + u.id); if (!el) return; el.style.left = x + '%'; el.style.bottom = Math.round(bot) + 'px'; el.style.setProperty('--uz', z.toFixed(2)); el.style.scale = ''; el.style.zIndex = String(zi); };
-  for (const side of ['p', 'e']) {
-    const sd = $(side === 'p' ? '#allies' : '#foes'); if (!sd) continue; sd.classList.add('form'); sd.style.transform = '';
-    const H = sd.clientHeight - pt - pb; if (H <= 0 || !sd.clientWidth) continue;
-    const Z = Math.max(0.6, Math.min(desk ? 1.35 : 0.86, (H / 3 - LBL) / SPH)), uh = LBL + SPH * Z, step = Math.min(desk ? 150 : 118, (H - uh) / 2);
-    const top0 = Math.max(0, (H - uh - 2 * step) / 2);   // 三排整体在画面里居中
-    const rowB = r => pb + top0 + r * step;               // 第 r 排（0 最下）离底边多高
-    if (side === 'p') {
-      const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
-      if (B._formP == null) {   // 开战排一次：你在前排最下面，前排伙伴往上；后排伙伴在后面一列
-        const front = main.filter(u => u.kind === 'hero' || (COMPANIONS[u.cid || u.comp || u.id] || {}).row === 'front'), back = main.filter(u => !front.includes(u));
-        front.sort((a, b) => (a.kind === 'hero' ? -1 : 0) - (b.kind === 'hero' ? -1 : 0));
-        const rows = n => n <= 1 ? [1] : n === 2 ? [0.5, 1.5] : n === 3 ? [0, 1, 2] : Array.from({ length: n }, (_, i) => i * 2 / (n - 1));
-        front.forEach((u, i) => { u._fc = 0; u._fr = rows(front.length)[i]; }); back.forEach((u, i) => { u._fc = 1; u._fr = rows(back.length)[i]; });
-        B._formP = 1; }
-      const hasM = mins.length > 0, cx = hasM ? [63, 27] : [main.some(u => u._fc === 1) ? 72 : 55, 30];   // 有召唤物：我方两列往后让，最前面多一列给召唤物
-      main.forEach(u => { if (u._fc == null) { u._fc = 1; u._fr = 1; } put(u, cx[u._fc], rowB(u._fr), Z, 20 - Math.round(u._fr * 3) - u._fc); });
-      const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });   // 召唤物各占一个位子，前面的倒了后面的也不挪
-      const MS = [1, 0, 2, 0.5, 1.5, 2.5, -0.5];   // 召唤物一列竖着站在最前面（原来贴地横着挤一排，名字叠在一起）
-      mins.forEach(u => { const r = MS[u._slot % MS.length]; put(u, 102 + (u._slot >= MS.length ? 14 : 0), rowB(Math.max(-0.3, Math.min(2.3, r))), Z * 0.8, 15 - Math.round(r * 3)); });
-      continue;
-    }
-    // 敌方：首领单独一列在最后面，其余按「中、下、上」的顺序先站前一列，再站第二列（和前一列错开半排）
-    const E = B.units.filter(u => u.side === 'e'), boss = E.filter(u => u.kind === 'boss'), rest = E.filter(u => u.kind !== 'boss');
-    const cols = boss.length ? [22, 48] : [30, 72];
-    const SL = [[0, 1], [0, 0], [0, 2], [1, 0.5], [1, 1.5], [1, 2.5], [1, -0.5]];   // [列, 排]
-    const taken = new Set(rest.filter(u => u.hp > 0 && u._fs != null).map(u => u._fs));
-    for (const u of rest) if (u._fs == null) { let k = 0; while (taken.has(k) && k < SL.length - 1) k++; u._fs = k; taken.add(k); }
-    for (const u of rest) { if (u.hp <= 0 && u._fs != null && rest.some(o => o !== u && o.hp > 0 && o._fs === u._fs)) continue;
-      const [c, r] = SL[u._fs]; put(u, cols[c], rowB(Math.max(-0.3, Math.min(2.3, r))), Z, 20 - Math.round(r * 3) - c * 4); }
-    boss.forEach((u, i) => { const n = boss.length, r = n === 1 ? 0.75 : i * 1.4; put(u, 74, rowB(r), Z, 8 - i); });
-  }
+  const P = B.units.filter(u => u.side === 'p'), main = P.filter(u => u.kind !== 'minion'), mins = P.filter(u => u.kind === 'minion' && !u.dead);
+  if (B._formP == null) {   // 我方：你站前排正中，前排伙伴分站左右；后排伙伴在下面一排，和前排错开
+    const front = main.filter(u => u.kind === 'hero' || (COMPANIONS[u.cid || u.comp || u.id] || {}).row === 'front'), back = main.filter(u => !front.includes(u));
+    front.sort((x, y) => (x.kind === 'hero' ? -1 : 0) - (y.kind === 'hero' ? -1 : 0));
+    front.forEach((u, i) => { u._fc = 0; u._fi = i; }); back.forEach((u, i) => { u._fc = 1; u._fi = i; });
+    B._formP = 1; }
+  main.forEach(u => { if (u._fc == null) { u._fc = 1; u._fi = main.filter(o => o._fc === 1 && o !== u).length; } });
+  const E = B.units.filter(u => u.side === 'e'), boss = E.filter(u => u.kind === 'boss'), rest = E.filter(u => u.kind !== 'boss');
+  const SL = boss.length === 1 ? [[0, 30], [0, 70], [1, 12], [1, 88], [0, 50], [0, 8], [0, 92]] : boss.length ? [[0, 50], [0, 12], [0, 88], [1, 8], [1, 92], [0, 31], [0, 69]] : [[0, 50], [0, 24], [0, 76], [1, 36], [1, 64], [1, 12], [1, 88]];   // [排, 横向%]；前排让开首领站的地方
+  const taken = new Set(rest.filter(u => u.hp > 0 && u._fs != null).map(u => u._fs));
+  for (const u of rest) if (u._fs == null) { let k = 0; while (taken.has(k) && k < SL.length - 1) k++; u._fs = k; taken.add(k); }
+  // 量一下每个人：字和血条那几行多高（lh）、一倍大小时身子多高（sb）——精英多一行词缀、首领和大块头身子高，各算各的
+  const zNow = el => parseFloat(el.style.getPropertyValue('--uz')) || 1;
+  const meas = u => { const el = document.getElementById('u-' + u.id), sp = el && el.querySelector('.sp'); if (!el || !sp || !el.offsetHeight) return { lh: LBL, sb: u.kind === 'boss' ? BSH : SPH }; const z = zNow(el), h = sp.offsetHeight; return { lh: Math.max(LBL - 8, el.offsetHeight - h), sb: h / z }; };
+  const M = new Map(); for (const u of [...main, ...mins, ...E]) M.set(u, meas(u));
+  const rowH = (L, z) => L.reduce((a, u) => { const m = M.get(u); return Math.max(a, m.lh + m.sb * z); }, 0);
+  const fA = main.filter(u => u._fc === 0), bA = main.filter(u => u._fc === 1), fE = rest.filter(u => SL[u._fs][0] === 0), bE = rest.filter(u => SL[u._fs][0] === 1);
+  const hasM = mins.length > 0, GAP0 = desk ? 24 : 16, wide = ar.clientWidth * 0.12 > (desk ? 104 : 76), OV = wide ? 0.5 : 0.86;   // 前后排左右错开，上下可以叠一点（宽屏错得开，叠一半）
+  const lay = Z => {   // 给定大小，从下往上排，返回各排离底边多高
+    const L = {}; L.A0 = pb; L.A1 = bA.length && !wide ? pb + rowH(bA, Z) * OV : pb; let top = L.A1 + rowH(wide ? main : fA, Z);
+    if (hasM && wide) { L.AM = L.A1; top = Math.max(top, L.A1 + rowH(mins, Z * 0.78)); }   // 宽屏：我方所有人（伙伴、召唤物）站成一排
+    else if (hasM) { L.AM = L.A1 + rowH(fA, Z) * OV; top = L.AM + rowH(mins, Z * 0.78); }
+    L.line = top; L.E0 = top + GAP0; const h0 = rowH(fE, Z); L.E1 = L.E0 + h0 * OV; L.B = L.E0 + (fE.length ? h0 * 0.55 : 0);
+    L.top = Math.max(L.E0 + h0, bE.length ? L.E1 + rowH(bE, Z) : 0, boss.length ? L.B + rowH(boss, Z * 0.92) : 0); return L; };
+  let Z = desk ? 1.3 : 0.86; while (Z > 0.5 && lay(Z).top > TOP) Z -= 0.02;
+  const L = lay(Z), extra = Math.max(0, TOP - L.top), mid = Math.min(extra * 0.8, desk ? 120 : 80), lift = Math.max(0, extra - mid) / 2;   // 有富余：先加宽中间的界线空隙，剩下的上下居中
+  for (const k of ['A0', 'A1', 'AM']) if (L[k] != null) L[k] += lift;
+  for (const k of ['E0', 'E1', 'B']) L[k] += lift + mid;
+  const LINE = L.line + lift + (GAP0 + mid) / 2;
+  let ln = $('#bline'); if (!ln) { ln = document.createElement('div'); ln.id = 'bline'; ln.innerHTML = '<i></i>'; ar.appendChild(ln); }
+  ln.style.bottom = Math.round(LINE) + 'px';
+  const FX = [[50, 24, 76, 6, 94], [36, 64, 14, 86, 50]];   // [前排, 后排] 依次站的横向位置（%）
+  const WX = [50, 39, 61, 28, 72, 17, 83, 6, 94, 44, 56, 33, 67], nF = fA.length;   // 宽屏一排：你在正中，往两边依次站
+  main.forEach(u => { const back = u._fc === 1; if (wide) put(u, WX[(back ? nF + u._fi : u._fi) % WX.length], L.A1, Z, 24); else put(u, FX[u._fc][u._fi % 5], back ? L.A0 : L.A1, Z, back ? 30 : 24); });
+  const used = new Set(mins.map(u => u._slot).filter(x => x != null)); mins.forEach(u => { if (u._slot == null) { let k = 0; while (used.has(k)) k++; u._slot = k; used.add(k); } });
+  const MX = [63, 37, 85, 15, 74, 26, 50, 95, 5];   // 召唤物：你头顶前面横着一排，各占一个位子，前面的倒了后面的也不挪
+  mins.forEach(u => put(u, wide ? WX[(main.length + u._slot) % WX.length] : MX[u._slot % MX.length], L.AM, Z * 0.78, 18));
+  for (const u of rest) { if (u.hp <= 0 && u._fs != null && rest.some(o => o !== u && o.hp > 0 && o._fs === u._fs)) continue;
+    const [r, x] = SL[u._fs]; put(u, x, r ? L.E1 : L.E0, Z, r ? 10 : 16); }
+  const BX = boss.length === 1 ? [50] : boss.length === 2 ? [32, 68] : [18, 50, 82];
+  boss.forEach((u, i) => put(u, BX[i % BX.length], L.B, Z * 0.92, 8 - i));
 }
 function applyStep(o, anim) {
   if (!B) return;
@@ -3169,15 +3206,16 @@ function endHTML() {
     const tl = r.timeLeft || 0, used = Math.round((r.clock || 0) / 100);
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
       <div><p>${r.world ? `用时 <b>${fmtClock(r.clock || 0)}</b> · 香还剩 <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `用时 <b>${used}</b> 回合 · 香还剩 <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · 倒下 ${r.deaths} 次` : ''}</p>
-      <p>${tl > 0 ? `${boxOpen() ? `灵玉可以升级 <b>${r.upg}</b> 次 · ` : ''}现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : `香烧完了：这一层不算过${boxOpen() ? '，灵玉只能升 1 次' : ''}`}</p>
+      <p>${tl > 0 ? `${boxOpen() ? r.upgPara ? '灵玉都满级了 · ' : `灵玉可以升级 <b>${r.upg}</b> 次 · ` : ''}现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : `香烧完了：这一层不算过${boxOpen() ? '，灵玉只能升 1 次' : ''}`}</p>
       ${r.bp ? `<p class="newslot">兵魄 <b>+${r.bp}</b>（现在 ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? '，够打一把专属兵器了：去找张大锤' : ''}）</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">新的装备位开了：<b>${r.newSlots.map(p => SLOT_NAME[p]).join('、')}</b>。去「人物」页看看；这一类装备从现在起会在幻境里掉。</p>` : ''}
       ${r.stat ? `<details class="bstat-d"><summary>这一局统计</summary>${statTable(r.stat)}</details>` : ''}
       ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${r.world ? '用时 ' + fmtClock(r.clock || 0) : used + ' 回合'}</p>` : ''}</div></div>`;
     if (boxOpen()) extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
-      ${SAVE.lgems.length ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级。</p>
+      ${r.upgPara ? `<p class="evres">灵玉都满 ${LGEM_CAP} 级了：${r.upgPara.n} 次升级机会换成修为经验 <b>+${fmtBig(r.upgPara.x)}</b>${r.upgPara.lv ? `（修为升了 ${r.upgPara.lv} 级）` : ''}</p>` : ''}
+      ${SAVE.lgems.length && !r.upgPara ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级，最高 ${LGEM_CAP} 级。</p>
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
-        <button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button></div>`).join('')}</div>` : ''}</div>`;
+        ${g.lv >= LGEM_CAP ? '<button class="btn sm" disabled>满级</button>' : `<button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button>`}</div>`).join('')}</div>` : ''}</div>`;
   }
   // 2026-11 一屏：上面标题，中间在框里滚，按钮固定在底部
   return `<div class="scene endv"><div class="panel endp"><div class="endtop"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 56, 'float') + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 50, null, 'float', 'stand') : '') : SPR.img('skeleton', 56)}</div><div><h2>${title}</h2>
@@ -3461,6 +3499,7 @@ const ACT = {
   modt: id => { const i = SAVE.mods.indexOf(id); if (i >= 0) SAVE.mods.splice(i, 1); else SAVE.mods.push(id); refresh(); },
   teamx: c => { TEAMX = TEAMX === c ? null : c; refresh(); },
   teamhelp: () => { const prev = MODALFN; openModal(teamHelpModal()); BACK = prev; },
+  defhelp: () => { const prev = MODALFN; openModal(defHelpModal()); BACK = prev; },
   teamopen: () => { BACK = null; openModal(teamModal()); },
   teamtog: c => { const T = teamOf(); if (T.includes(c)) SAVE.team = T.filter(x => x !== c); else if (T.length < teamSlots()) SAVE.team = [...T, c]; else return toast(`位置满了（${teamSlots()} 个），先取下一个`); save(); refresh(); },
   gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} 好感 +1 ♥（现在 ${r.v}）${r.v === 10 || r.v === 20 ? '：技能变强了！' : ''}`); save(); refresh(); },
@@ -3847,6 +3886,7 @@ render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次
+if (SAVE.lgCut) { const L = SAVE.lgCut; delete SAVE.lgCut; save(); setTimeout(() => toast(`灵玉等级上限改为 <b>${LGEM_CAP}</b> 级：${L.map(([n, v]) => `${n} ${v} → ${LGEM_CAP}`).join('、')}。都满级以后，幻境结算的升级机会会换成修为经验`, 7000), 900); }
 if (SAVE.paraUp2) { const [a0, a1] = SAVE.paraUp2; delete SAVE.paraUp2; save(); setTimeout(() => toast(`修为升级又快了一倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级。修为五个门派共用，多出来的点在「人物 · 修为」里加`, 6500), 1200); }
 if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`修为升级快了二十倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级，多出来的点在「修炼 · 修为」里加`, 6000), 1200); }
 if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }
