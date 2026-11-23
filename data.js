@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: '攻击', hp: '气血', armor: '护甲', crit: '暴击率', critDmg: '暴击伤害',
   spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
-  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', thornK: '反震倍率', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震',
+  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', thornK: '反震倍率', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震倍率',
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
   dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果', eva: '闪避', skd: '某一招伤害',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: '疾行（开战前两回合速度）', xKill: '贪狼（每杀一个敌人回复气血）', cdSkip: '招式不进冷却的几率', xLuck: '神兵掉率', xShield: '磐石（开战自带护体，按最大气血）',
   regenPct: '每回合回复气血', xCritNext: '会心（暴击后下一招伤害）', allyPct: '同伴、僵尸的伤害和气血',
 };
-const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['thorns', 'eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -76,7 +76,7 @@ const AFFIXES = [
   { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: '通灵的', slots: ['weapon', 'helm', 'amulet', 'offhand'] },
   { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: '养元的', slots: ['helm', 'chest', 'amulet', 'belt'] },
   { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: '回春的', no: ['offhand'] },
-  { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: '带刺的', no: ['offhand'] },
+  { k: 'thorns',  r: [10, 20], w: 4, g: 'd', st: 'thornK', p: '带刺的', no: ['offhand'] },   // 2026-11-24 改：原来是死数（每挨一下弹几十点，高层没用），现在是「反震倍率 +10–20%」= 每挨一下打按你攻击的这么多弹回去，吃伤害、术法、暴击、暴伤加成
   { k: 'mf',      r: [8, 20],  w: 4, p: '有福的' },
   { k: 'gf',      r: [10, 30], w: 4, p: '招财的' },
   // 2026-11 新加：pg＝通关后才会随掉落出（洗炼随时都能洗到）；st：算到哪个属性上
@@ -123,7 +123,7 @@ const LEGENDS = [
   { id: 'champion', n: '霸王盔',     slot: 'helm', ch: 6,   imp: { dmgPct: 8 },   fx: 'bossDmg',    d: '对精英和首领伤害 +35%' },
   { id: 'warden',   n: '镇岳冠',     slot: 'helm', ch: 1,   imp: { hpPct: 8 },    fx: 'startShield', d: '战斗开始时获得 25% 最大气血的护体真气' },
   { id: 'undying',  n: '不灭金身甲', slot: 'chest', ch: 8,  imp: { hpPct: 12 },   fx: 'cheatDeath', d: '每场战斗一次：受到致命伤害时保住一口气并恢复 30%' },
-  { id: 'throne',   n: '荆棘铠',     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: '反震倍率 +60%：每挨一下打，就按你攻击的 60% 弹回去' },
+  { id: 'throne',   n: '荆棘铠',     slot: 'chest', ch: 4,  imp: { thornK: 20 },  fx: 'thornsPct',  d: '反震倍率 +60%：每挨一下打，就按你攻击的 60% 弹回去' },
   { id: 'vampire',  n: '血蝠袍',     slot: 'chest', ch: 3,  imp: { leech: 3 },    fx: 'vampire',    d: '吸血效果翻倍' },
   { id: 'phoenix',  n: '凤羽霓裳',   slot: 'chest', ch: 9,  imp: { res: 12 },     fx: 'phoenix',    d: '每场战斗首次气血低于 30% 时浴火爆发，对所有敌人造成 300% 火焰伤害' },
   { id: 'looter',   n: '摸金手',     slot: 'gloves', ch: 1, imp: { gf: 50 },      fx: 'lootKill',   d: '击杀敌人时 12% 几率额外掉落一件装备' },

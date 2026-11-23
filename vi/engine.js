@@ -30,13 +30,13 @@ function newSave() {
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
-              riftMax: 0, rift: {}, riftCap: 3, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true,
+              riftMax: 0, rift: {}, riftCap: 3, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true, thv: 1,
               story: { cleared: { normal: 0, nightmare: 0, hell: 0 }, pages: {}, ended: false, seen: {} } };
   for (const c of CLASS_IDS) s.chars[c] = newChar();
   return s;
 }
 function migrate(s) {
-  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0, pv0 = s.pv || 0;
+  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0, pv0 = s.pv || 0, thv0 = s.thv || 0;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   for (const k in d.stats) if (s.stats[k] === undefined) s.stats[k] = 0;
   for (const c of CLASS_IDS) {
@@ -65,6 +65,13 @@ function migrate(s) {
   }
   s.pv = 2;
   if ((s.speed || 1) > 3) s.speed = 3;   // 2026-11-23 倍速最高 3 倍
+  if (!thv0) {   // 2026-11-24 反震词条从死数改成反震倍率：按原来在范围里的成色（q）落到 10–20%；荆棘铠自带的反震也改成反震倍率 +20%
+    walkItems(s, it => {
+      const gm = genMult(it);
+      for (const a of it.aff || []) if (a[0] === 'thorns') { const sc = 1 + (it.ilvl || 1) * 0.22, lo = 5 * sc * gm, hi = 8 * sc * gm, q = Math.max(0, Math.min(1, (a[1] - lo) / Math.max(1, hi - lo))); a[1] = Math.round((10 + q * 10) * gm); }
+      if (it.imp && it.imp.thorns != null) { const L = it.legend && LEGENDS.find(l => l.id === it.legend); if (L && L.imp.thornK) it.imp.thornK = L.imp.thornK; delete it.imp.thorns; }
+    });
+  }
   for (const g of s.lgems || []) if (LGEM_OLD[g.t]) { g.old = g.t; g.t = 'reforge'; }
   for (const g of s.lgems || []) if ((g.lv || 0) > LGEM_CAP) { (s.lgCut = s.lgCut || []).push([g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : (LGEMS[g.t] || {}).n || "Linh ngọc", g.lv]); g.lv = LGEM_CAP; }   // 等级上限 150：超出的降回来，进游戏提示一次   // 2026-11-23 删掉的五颗灵玉：等玩家挑新的（等级保留）
   if (s.flags && !s.flags.wpnForged) { const all = [...(s.stash || [])]; for (const c in s.chars || {}) for (const sl in s.chars[c].eq || {}) if (s.chars[c].eq[sl]) all.push(s.chars[c].eq[sl]);
@@ -312,7 +319,7 @@ const SPD_CAP = 90;   // 速度最多 100 + 90
 function scaleObj(o, m) { const r = {}; for (const k in o) r[k] = k === 'spd' ? o[k] : Math.round(o[k] * m); return r; }
 const affSc = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 1;   // 百分比词条不随装备等级涨（原来是 0.68 + ilvl / 22：第七章差不多翻倍）
 const affScOld = (a, ilvl) => a.fixed ? 1 : a.flat ? 1 + ilvl * 0.22 : 0.68 + ilvl / 22;   // 旧存档换算用
-const FLAT_STATS = new Set(['atk', 'hp', 'armor', 'regen', 'thorns']);   // 实数属性：随等级涨、吃强化
+const FLAT_STATS = new Set(['atk', 'hp', 'armor', 'regen']);   // 2026-11-24 反震改成百分比（反震倍率），不再随等级涨、吃强化   // 实数属性：随等级涨、吃强化
 const affOK = (a, slot) => !slot || ((!a.slots || a.slots.includes(slot)) && !(a.no && a.no.includes(slot)));
 const OFF_SLOTS = new Set(['weapon', 'gloves', 'ring', 'amulet', 'offhand']);
 const AFF_OFF_MAX = 2;   // 一件装备最多两条攻击类词条（攻击、伤害、术法、暴击、暴伤、速度、吸血）
@@ -659,7 +666,7 @@ const SUST = {
 const sustLv = lv => Math.min(1.4, 0.55 + (lv || 1) / 50);
 const sustV = (u, k) => (SUST[u.cls][k] || 0) * (1 + (u.sust || 0) / 100) * sustLv(u.lv);
 function power(s) {
-  const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100);
+  const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100 + (s.thornK || 0) / (s.cls === 'paladin' ? 150 : 400));   // 反震倍率也算输出（和尚挨打多，算得重一点）
   const san = s.sanN || 0;   // 散件流也算进战力，「一键换上最强」才不会把它拆了。按 +1.5%／层算：十件神兵两枚扳指 ×1.3，显示出来和同档的 6 件套差不多（实测略弱）
   const ehp = s.maxHp * (1 + s.armorT / 120) / (1 - s.res / 100 * 0.6) * (1 + s.dodge / 100) + s.regen * 25 + s.thorns * 8;
   let skb = 0; for (const k in s.sk) skb += s.sk[k];

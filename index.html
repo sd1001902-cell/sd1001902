@@ -1897,6 +1897,23 @@ html body .arena.sv .side.form.tb>.unit{pointer-events:auto}
 .bk2-g em{font-style:normal;font-size:10.5px;font-weight:400;padding:0 5px;border-radius:5px;line-height:15px}
 .bk2-g em.ga1{color:#ffc88a;border:1px solid #a06a2a}
 .bk2-g em.ga2{color:#ffb0a0;border:1px solid #d03a2a}
+
+/* 2026-11-24 战斗省电（用户定）：
+   1 常驻循环动画去掉——人物上下呼吸、武器摆动、神兵武器光晕、出手条当前那位的跳动（人物站姿两张图轮换的「换气」还在，vfx.js idleTick）
+   2 脚下阴影改成静态椭圆，不再用实时滤镜（滤镜里的东西一动就得整块重算）。精英、伙伴的描边在图片自己身上，照旧
+   3 状态光效（火苗、毒泡、冰壳、金星、护盾光罩、狂暴红光、鬼火）循环慢一半；灼烧泛红不再一闪一闪，改成固定的红色调
+   4 顶部横幅不用时不占图层；战斗里不铺全屏的底色晕染 */
+.unit .pose,.unit .wp,.unit.wr-legend .wp img{animation:none!important}
+.turnbar .tbu.me,.turnbar .me{animation:none}
+html body .arena.sv .unit .sp{filter:none}
+.arena.sv .unit .sp::after{content:"";position:absolute;left:22%;right:22%;bottom:-4px;height:8px;border-radius:50%;background:radial-gradient(ellipse at center,rgba(0,0,0,.5) 0,rgba(0,0,0,.25) 45%,transparent 72%);z-index:-1;pointer-events:none}
+.a-fire::before{animation-duration:.64s}.a-fire::after{animation-duration:2.2s}
+.a-tox::before{animation-duration:2.8s}.a-tox::after{animation-duration:2.4s}
+.a-ice{animation-duration:4s}.a-stun{animation-duration:2s}.a-shd{animation-duration:3.2s}
+.a-rage{animation-duration:1.4s}.a-cur::before,.a-cur::after{animation-duration:3.2s}
+html body .arena.sv .unit.st-burn .sp{animation:none!important;filter:sepia(.45) saturate(1.8) hue-rotate(-20deg) brightness(1.04)}
+#banner:not(.on),.flash:not(.on){display:none}
+body[data-view="battle"]::before{display:none}
 </style>
 </head>
 <body>

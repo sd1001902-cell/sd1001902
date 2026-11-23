@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: "Công", hp: "Khí huyết", armor: "Hộ giáp", crit: "Tỉ lệ chí mạng", critDmg: "ST chí mạng",
   spd: "Tốc độ", leech: "Hút máu", res: "Kháng toàn bộ", dmgPct: "Sát thương", elem: "ST thuật pháp",
-  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", thornK: "Bội số phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Phản chấn",
+  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", thornK: "Bội số phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Bội số phản chấn",
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
   regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };
-const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['thorns', 'eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -76,7 +76,7 @@ const AFFIXES = [
   { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: "thông linh", slots: ['weapon', 'helm', 'amulet', 'offhand'] },
   { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: "dưỡng nguyên", slots: ['helm', 'chest', 'amulet', 'belt'] },
   { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: "hồi xuân", no: ['offhand'] },
-  { k: 'thorns',  r: [5, 8],   ro: [3, 8],   flat: true, w: 4, g: 'd', p: "có gai", no: ['offhand'] },
+  { k: 'thorns',  r: [10, 20], w: 4, g: 'd', st: 'thornK', p: "có gai", no: ['offhand'] },   // 2026-11-24 改：原来是死数（每挨一下弹几十点，高层没用），现在是「反震倍率 +10–20%」= 每挨一下打按你攻击的这么多弹回去，吃伤害、术法、暴击、暴伤加成
   { k: 'mf',      r: [8, 20],  w: 4, p: "có phúc" },
   { k: 'gf',      r: [10, 30], w: 4, p: "chiêu tài" },
   // 2026-11 新加：pg＝通关后才会随掉落出（洗炼随时都能洗到）；st：算到哪个属性上
@@ -123,7 +123,7 @@ const LEGENDS = [
   { id: 'champion', n: "Bá Vương Khôi",     slot: 'helm', ch: 6,   imp: { dmgPct: 8 },   fx: 'bossDmg',    d: "Sát thương lên tinh anh và thủ lĩnh +35%" },
   { id: 'warden',   n: "Trấn Nhạc Quan",     slot: 'helm', ch: 1,   imp: { hpPct: 8 },    fx: 'startShield', d: "Đầu trận nhận hộ thể chân khí bằng 25% khí huyết tối đa" },
   { id: 'undying',  n: "Bất Diệt Kim Thân Giáp", slot: 'chest', ch: 8,  imp: { hpPct: 12 },   fx: 'cheatDeath', d: "Mỗi trận một lần: khi nhận đòn chí tử thì giữ lại một hơi và hồi 30%" },
-  { id: 'throne',   n: "Kinh Cức Khải",     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: "Bội số phản chấn +60%: mỗi lần bị đánh, bật lại 60% công kích của bạn" },
+  { id: 'throne',   n: "Kinh Cức Khải",     slot: 'chest', ch: 4,  imp: { thornK: 20 },  fx: 'thornsPct',  d: "Bội số phản chấn +60%: mỗi lần bị đánh, bật lại 60% công kích của bạn" },
   { id: 'vampire',  n: "Huyết Bức Bào",     slot: 'chest', ch: 3,  imp: { leech: 3 },    fx: 'vampire',    d: "Hiệu quả hút máu gấp đôi" },
   { id: 'phoenix',  n: "Phượng Vũ Nghê Thường",   slot: 'chest', ch: 9,  imp: { res: 12 },     fx: 'phoenix',    d: "Lần đầu khí huyết dưới 30% mỗi trận thì bùng lửa, gây 300% sát thương hỏa lên mọi kẻ địch" },
   { id: 'looter',   n: "Mô Kim Thủ",     slot: 'gloves', ch: 1, imp: { gf: 50 },      fx: 'lootKill',   d: "Giết địch có 12% tỉ lệ rơi thêm một món trang bị" },

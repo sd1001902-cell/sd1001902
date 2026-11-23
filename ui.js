@@ -687,7 +687,7 @@ function kitRow(cls) {
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ 存当前</button></div>`; }).join('')}</div>`;
 }
 // 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
-const KS_EXTRA = [['healPct', '治疗'], ['regen', '回血'], ['regenPct', '回血'], ['thorns', '反震'], ['xDr', '减伤'], ['xBoss', '首领伤'], ['xExec', '斩杀'], ['xDouble', '连斩'], ['xFirst', '先手'],
+const KS_EXTRA = [['healPct', '治疗'], ['regen', '回血'], ['regenPct', '回血'], ['thornK', '反震倍率'], ['xDr', '减伤'], ['xBoss', '首领伤'], ['xExec', '斩杀'], ['xDouble', '连斩'], ['xFirst', '先手'],
   ['xBreak', '破势'], ['xRage', '怒气'], ['xTen', '清神'], ['xLast', '不屈'], ['xHaste', '疾行'], ['xKill', '贪狼'], ['cdSkip', '免冷却'], ['xCritNext', '会心'], ['xShield', '磐石'],
   ['allyPct', '伙伴'], ['freeze', '定身'], ['poison', '附毒'], ['skd', '专招'], ['minion', '僵尸数'], ['minionPct', '僵尸'], ['gf', '银两'], ['xLuck', '神兵率']];
 function keyStats(cls) {
@@ -1518,7 +1518,7 @@ function showRes() {
 }
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
-  const wxl = T0 && T0.wx ? `<div class="wxl wx-${T0.wx}">${Array.from({ length: 14 }, () => `<i style="left:${Math.random() * 100}%;top:${Math.random() * 100}%;animation-delay:-${(Math.random() * 8).toFixed(1)}s;animation-duration:${(5 + Math.random() * 6).toFixed(1)}s"></i>`).join('')}</div>` : '';
+  const wxl = false && T0 && T0.wx ? `<div class="wxl wx-${T0.wx}">${Array.from({ length: 14 }, () => `<i style="left:${Math.random() * 100}%;top:${Math.random() * 100}%;animation-delay:-${(Math.random() * 8).toFixed(1)}s;animation-duration:${(5 + Math.random() * 6).toFixed(1)}s"></i>`).join('')}</div>` : '';
   const deco = [0.08, 0.3, 0.55, 0.8].map((x, i) => { const D = T.d[i % T.d.length]; return `<span class="svd" style="left:${x * 100}%">${SPR.img(D[0], 44 + i * 6, D[1])}</span>`; }).join('');
   return `${battleBar(run)}
     <div class="arena sv ${T0 ? 'k-' + T0.kind : ''}" id="arena" style="--bg:${T0 ? T0.bg : themeOf(run).bg};--g:${T.g};--p:${T.p}">${typeof GFX !== 'undefined' ? `<div class="sv-paint" style="background-image:url(${GFX.background(run.theme || (run.mode === 'rift' ? 'rift' + (themeOf(run).n || '') : 'gen'), T0 || { kind: T.kind || 'field', bg: themeOf(run).bg, g: T.g, p: T.p, wx: T.wx }, B && B.kind === 'boss')})"></div>` : ''}<div class="sv-back">${deco}</div>${wxl}
@@ -1892,7 +1892,7 @@ function applyStep(o, anim) {
       let pop = null, sum = 0;
       parts.forEach((v, k) => setTimeout(() => {
         const last = k === parts.length - 1, cr = c === 'crit' && last;
-        if (quiet) { if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr); return; }
+        if (quiet) { if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e') && (SP < 3 || cr)) VFX.onHit(id, cr); return; }   // 3 倍速：不跳字的小伤害也不冒命中火花（暴击照冒）
         if (!pop || !pop.isConnected) { const ix = popIdx[id] = (popIdx[id] || 0) + 1; pop = document.createElement('span'); pop.style.left = (36 + ((ix * 37) % 28)) + '%'; pop.style.marginTop = -((ix - 1) * 17) + 'px'; el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100 + parts.length * 90); }   // 同一次出手里一个比一个往上错开
         sum += dmgN ? +v : 0;
         pop.className = 'pop ' + c + tier(dmgN ? sum : 0) + (parts.length > 1 && !last ? ' tick' : '') + (parts.length > 1 && k > 0 ? ' re' : '') + (byAlly && dmgN && tu && tu.side === 'e' ? ' ally' : '');
@@ -1905,7 +1905,7 @@ function applyStep(o, anim) {
       if (anim && /^-\d+$/.test(txt) && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); }
       if (anim && /^-\d+$/.test(txt) && c === 'poison') bump(el, 'drip', 450);
       if (anim && /^\d+$/.test(txt) && el._shd) bump(el, 'crack', 320);
-      if (/^\d+$/.test(txt) && anim) { bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit') { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
+      if (/^\d+$/.test(txt) && anim) { if (SP < 3 || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit') { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
     }
     if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
