@@ -306,12 +306,13 @@ const riftRecTxt = R => R ? (R.s != null ? `Tầng ${R.lv} · mất ${fmtClock(R
 function xiangBarTxt(run) { const L = xiangLeft(run), G = run.riftDone ? null : RIFT_GRADES.find(g => g.min >= 0 && L >= g.min);
   return `${L > 0 ? `Một nén hương · còn ${xiangTxt(run)}${G ? ` · xong lúc này được “${G.n}”` : ''}` : "Hương đã tàn · vẫn đánh xong lấy đồ được, nhưng không tính kỷ lục"}${run.deaths ? ` · ngã ${run.deaths} lần` : ''}`; }
 // 幻境的香：在地图上按真实时间烧（开着窗口、对话、切到后台时不烧）；战斗里的时间由引擎按回合折算
-let RTICK = 0, RSAVE = 0;
+let RTICK = 0, RSAVE = 0, RDOM = 0;
 setInterval(() => {
   const run = typeof SAVE !== 'undefined' && SAVE && SAVE.run, now = performance.now();
   if (!run || !isRift(run) || run.riftDone || VIEW !== 'world' || DLG || MODALFN || document.hidden) { RTICK = 0; return; }
   if (RTICK) run.clock = (run.clock || 0) + Math.min(1000, now - RTICK);
   RTICK = now;
+  if (now - RDOM < 950) return; RDOM = now;   // 2026-11-24 省电：香条一秒更新一次（原来四分之一秒一次，还带 0.4 秒过渡动画，地图上一直在重排重画）
   const xb = document.querySelector('#xiangbar'), L = xiangLeft(run);
   if (xb) { xb.querySelector('i').style.width = L * 100 + '%'; xb.classList.toggle('low', L > 0 && L < 0.25); xb.classList.toggle('out', L <= 0); xb.querySelector('span').textContent = xiangBarTxt(run); }
   const xg = document.querySelector('#rbxiang'); if (xg) { xg.textContent = `Hương ${xiangTxt(run)}`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }

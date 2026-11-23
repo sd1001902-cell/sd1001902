@@ -4,7 +4,7 @@
 const GFX = (() => {
   const RM = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   let rzT = 0, clean = false;
-  let arena = null, cv = null, g = null, W = 0, H = 0, DPR = 1, raf = 0, lastT = 0, ts = 1, stopUntil = 0, slowUntil = 0;
+  let arena = null, cv = null, g = null, W = 0, H = 0, DPR = 1, raf = 0, lastT = 0, ts = 1, stopUntil = 0, slowUntil = 0, ufT = 0, ufAcc = 0;
   const P = [], FX = [];   // 粒子；整屏的东西（幕布、闪光、闪电、速度线）
   const lvl = () => (typeof SAVE !== 'undefined' && SAVE && SAVE.gfx != null) ? SAVE.gfx : 2;   // 0 低 1 中 2 高
   const dens = () => [0.35, 0.75, 1.2][lvl()];
@@ -217,12 +217,14 @@ const GFX = (() => {
   function loop(t) {
     raf = 0;
     if (!alive()) { P.length = 0; FX.length = 0; return; }
-    raf = requestAnimationFrame(loop);
-    if (t - lastT < (lvl() === 0 ? 48 : 31)) return;   // 省电：特效画布 30 帧（手机上看不出差别，耗电少一半）；特效「低」20 帧
+    // 2026-11-24 省电：原来每次屏幕刷新（60 次/秒）都叫醒一次，只是隔一帧才画；现在画完一帧，等够间隔再约下一帧，手机一秒只醒 30 次（低 20 次）。切到后台不跑
+    const iv = lvl() === 0 ? 48 : 31;
+    raf = -1; setTimeout(() => { raf = 0; if (!alive()) return; if (document.hidden) { setTimeout(() => { if (!raf) { lastT = now(); raf = requestAnimationFrame(loop); } }, 500); return; } raf = requestAnimationFrame(loop); }, Math.max(4, iv - 4));
+    if (t - lastT < iv - 6) return;
     let dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
     if (t - rzT > 500) { rzT = t; if (cv.width !== Math.round(arena.clientWidth * DPR) || cv.height !== Math.round(arena.clientHeight * DPR)) resize(); }   // 量尺寸会逼浏览器重排，半秒看一次就够
     const frozen = now() < stopUntil, k = (frozen ? 0 : dt) * (now() < slowUntil ? ts : 1) / Math.max(0.3, fac());
-    if (!frozen && !RM) { unitFx(dt, t); if (lvl() > 0) ambientTick(dt); }   // 特效「低」：不飘环境粒子
+    if (!frozen && !RM) { ufAcc += dt; if (t - ufT > 95) { ufT = t; unitFx(ufAcc, t); ufAcc = 0; } if (lvl() > 0) ambientTick(dt); }   // 特效「低」：不飘环境粒子；身上光环、蓄力这些要量人的位置，一秒量十次就够（原来三十次）
     if (!P.length && !FX.length) { if (!clean) { g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); clean = true; } return; }   // 没东西可画：画布已经是空的就别再动它
     clean = false;
     g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, W, H);
