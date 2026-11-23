@@ -921,10 +921,14 @@ function storeItem(run, it) {
   return it;
 }
 const topLevel = () => Math.max(...CLASS_IDS.map(c => SAVE.chars[c].level));
-function gamblePrice(cls) { return Math.round((40 + SAVE.chars[cls].level * 18) * (1 - bLv('merchant') * 0.08)); }
+// 赌石（2026-11-24 加价）：开了幻境之后按到过的最高层定底价（500 + 最高层 × 60）；连着赌每次 +10%，打完一局幻境回到底价。钱庄折扣照算
+const GB_BASE = 500, GB_PER = 60, GB_STEP = 0.1;
+const gambleBase = cls => rTop() > 0 ? GB_BASE + rTop() * GB_PER : 40 + SAVE.chars[cls].level * 18;
+const gambleN = () => rTop() > 0 ? SAVE.gbN || 0 : 0;
+function gamblePrice(cls) { return Math.round(gambleBase(cls) * (1 + GB_STEP * gambleN()) * (1 - bLv('merchant') * 0.08)); }
 function gamble(cls, slot) {
   const p = gamblePrice(cls); if (SAVE.gold < p) return null;
-  SAVE.gold -= p;
+  SAVE.gold -= p; if (rTop() > 0) SAVE.gbN = (SAVE.gbN || 0) + 1;
   return storeItem(null, makeItem({ slot, ilvl: SAVE.chars[cls].level + 2, rarity: rollRarity('gamble', 0, 0), cls }));
 }
 
@@ -1506,6 +1510,7 @@ function makeTestSave(cls, ch, inter) {
 // 秘境完成
 function riftGrade(run) { const tl = Math.max(0, 1 - (run.clock || 0) / riftLimit(run.riftLv)); return { tl, G: tl > 0 ? RIFT_GRADES.find(g => g.min >= 0 && tl >= g.min) : RIFT_GRADES[RIFT_GRADES.length - 1] }; }
 function riftComplete(run) {
+  SAVE.gbN = 0;   // 打完一局幻境：赌石回到底价
   const N = run.riftLv, { tl, G } = riftGrade(run);
   run.timeLeft = tl; run.grade = G.n; run.jump = G.jump;
   run.capBefore = SAVE.riftCap;

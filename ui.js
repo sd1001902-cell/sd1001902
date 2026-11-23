@@ -424,7 +424,8 @@ function bulkBody() {
 const bulkModal = () => `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">清点库房</h2>${bulkBody()}`;
 function gambleBody() {
   const cls = SAVE.cls, p = gamblePrice(cls);
-  return `<p class="help-p">花 <b>${p}</b> 两，赌一件${CLASSES[cls].n}能用的装备：部位你挑，品级看运气——多半是灵品、宝品，偶尔出套装，极少出神兵。</p>
+  const n = gambleN();
+  return `<p class="help-p">花 <b>${p}</b> 两${n ? `<small class="gb-up">（连赌第 ${n + 1} 次 +${Math.round(n * GB_STEP * 100)}%）</small>` : ''}，赌一件${CLASSES[cls].n}能用的装备：部位你挑，品级看运气${rTop() > 0 ? '<button class="qhelp sm" data-act="gbhelp" aria-label="说明">?</button>' : ''}</p>
     <div class="row wallet"><span class="pill gold">银两 ${SAVE.gold}</span></div>
     <div class="svc-slots">${SLOTS.filter(sl => !sl.type && slotOpen(sl.id)).map(sl => `<button class="btn sm" ${SAVE.gold >= p ? '' : 'disabled'} data-act="gamb" data-arg="${sl.id}">${sl.n}</button>`).join('')}</div>
     ${GAMBLE && SAVE.stash.includes(GAMBLE) ? `<div class="svc-res"><span class="sub">赌到了（已放进储物箱）：</span>${lootChips([GAMBLE])}</div>` : ''}`;
@@ -3785,6 +3786,7 @@ const ACT = {
   parareset: () => { resetPara(); toast('修为点已退回'); refresh(); },
   rune: a => { const [id, r] = split(a); setRune(ctxCls(), id, r); SFX.play('magic'); refresh(); },
   bldpick: i => { SAVE.chars[ctxCls()].bld = +i; refresh(); },
+  gbhelp: () => { const prev = MODALFN; openModal(() => `<h2 class="mh">赌石怎么算价</h2><p class="help-p">底价跟着你到过的幻境最高层走：${GB_BASE} + 最高层 × ${GB_PER} 两（现在 ${fmtBig(gambleBase(SAVE.cls))}）。钱多多钱庄每级便宜 8%。</p><p class="help-p">连着赌，每赌一次贵 ${GB_STEP * 100}%；打完一局幻境，回到底价。</p><p class="help-p">出货：灵品、宝品居多，偶尔套装，极少神兵。</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`); BACK = prev; },
   bcinfo: a => { const prev = MODALFN, h = bcInfoModal(ctxCls(), a); if (!h) return; openModal(() => h); BACK = prev; },
   sanhelp: () => { const prev = MODALFN, c = ctxCls(); openModal(() => sanModal(c)); BACK = prev; },
   bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');

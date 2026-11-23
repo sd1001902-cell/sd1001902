@@ -425,7 +425,8 @@ function bulkBody() {
 const bulkModal = () => `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Kiểm kê nhà kho</h2>${bulkBody()}`;
 function gambleBody() {
   const cls = SAVE.cls, p = gamblePrice(cls);
-  return `<p class="help-p">Bỏ <b>${p}</b> lượng, cược một món trang bị ${CLASSES[cls].n} dùng được: vị trí bạn chọn, phẩm cấp tùy vận may — phần nhiều là Linh phẩm, Bảo phẩm, thỉnh thoảng ra Bộ, rất hiếm khi ra Thần binh.</p>
+  const n = gambleN();
+  return `<p class="help-p">Bỏ <b>${p}</b> lượng${n ? `<small class="gb-up">(cược liền lần ${n + 1} +${Math.round(n * GB_STEP * 100)}%)</small>` : ''}, cược một món trang bị ${CLASSES[cls].n} dùng được: vị trí bạn chọn, phẩm cấp tùy vận may${rTop() > 0 ? "<button class=\"qhelp sm\" data-act=\"gbhelp\" aria-label=\"Giải thích\">?</button>" : ''}</p>
     <div class="row wallet"><span class="pill gold">Bạc ${SAVE.gold}</span></div>
     <div class="svc-slots">${SLOTS.filter(sl => !sl.type && slotOpen(sl.id)).map(sl => `<button class="btn sm" ${SAVE.gold >= p ? '' : 'disabled'} data-act="gamb" data-arg="${sl.id}">${sl.n}</button>`).join('')}</div>
     ${GAMBLE && SAVE.stash.includes(GAMBLE) ? `<div class="svc-res"><span class="sub">Cược được (đã cất vào kho):</span>${lootChips([GAMBLE])}</div>` : ''}`;
@@ -3786,6 +3787,7 @@ const ACT = {
   parareset: () => { resetPara(); toast("Đã hoàn lại điểm tu vi"); refresh(); },
   rune: a => { const [id, r] = split(a); setRune(ctxCls(), id, r); SFX.play('magic'); refresh(); },
   bldpick: i => { SAVE.chars[ctxCls()].bld = +i; refresh(); },
+  gbhelp: () => { const prev = MODALFN; openModal(() => `<h2 class="mh">Giá đổ thạch tính thế nào</h2><p class="help-p">Giá gốc theo tầng Ảo Cảnh cao nhất bạn từng tới: ${GB_BASE} + tầng cao nhất × ${GB_PER} lượng (hiện tại ${fmtBig(gambleBase(SAVE.cls))}). Tiền trang Tiền Đa Đa mỗi cấp rẻ hơn 8%.</p><p class="help-p">Cược liền tay, mỗi lần đắt thêm ${GB_STEP * 100}%; đánh xong một lượt Ảo Cảnh thì về giá gốc.</p><p class="help-p">Ra hàng: phần nhiều Linh phẩm, Bảo phẩm, thỉnh thoảng ra Bộ, rất hiếm khi ra Thần binh.</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">Hiểu rồi</button></div>`); BACK = prev; },
   bcinfo: a => { const prev = MODALFN, h = bcInfoModal(ctxCls(), a); if (!h) return; openModal(() => h); BACK = prev; },
   sanhelp: () => { const prev = MODALFN, c = ctxCls(); openModal(() => sanModal(c)); BACK = prev; },
   bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');
