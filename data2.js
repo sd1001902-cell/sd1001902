@@ -77,7 +77,7 @@ const LGV = {
   wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
   swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
   dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
-  jsSh: lv => 4 + lv * 0.05,                                    // 金身：反击时得护体（最大气血 %）
+  jsSh: lv => 3 + lv * 0.04,                                    // 金身：挨打反震时得护体（最大气血 %）。2026-11-24 反击并进反震，次数多了，数值降到原来的八成左右
   lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
   sgK: lv => 4 + lv * 0.12,                                     // 蚀骨：敌人身上每种状态 +x%
   xjK: lv => 15 + lv * 0.35, xjBoom: lv => 100 + lv * 1.5,      // 玄甲：有护体时伤害；护体打碎炸开
@@ -97,7 +97,7 @@ const LGEMS = {
   wuxing:  { n: '五行玉', c: '#c8a2ff', cls: 'mage', d: lv => `换一种五行出招时，${LGV.wxCh(lv).toFixed(0)}% 几率给目标挂上这种五行的状态（火灼烧、水冰冻、土破甲、木中毒、金眩晕）；「连」每层伤害再 +${(1.5 + lv * 0.06).toFixed(1)}%（归元、万符）`, st: lv => ({ lianPct: 1.5 + lv * 0.06 }) },
   shiwang: { n: '尸王玉', c: '#7fd08a', cls: 'necro', d: lv => `僵尸的伤害和气血 +${Math.round(20 + lv * 0.8)}%；尸位每空一个，你的中毒伤害 +${LGV.swPoi(lv).toFixed(0)}%（阴兵、五毒）`, st: lv => ({ minionPct: 20 + lv * 0.8 }) },
   duopo:   { n: '夺魄玉', c: '#a0a8ff', cls: 'assassin', d: lv => `杀意上限 +1；暗器（淬毒镖、冰魄针、漫天花雨）打中时 ${LGV.dpKi(lv).toFixed(0)}% 几率 +1 杀意；终结技伤害 +${LGV.dpFin(lv).toFixed(0)}%（七杀、千机）`, st: () => ({}) },
-  jinshen: { n: '金身玉', c: '#ffd76a', cls: 'paladin', d: lv => `反震倍率 +${Math.round(30 + lv)}%；每次反击，得到 ${LGV.jsSh(lv).toFixed(1)}% 最大气血的护体真气（罗汉、大日）`, st: lv => ({ thornK: 30 + lv }) },
+  jinshen: { n: '金身玉', c: '#ffd76a', cls: 'paladin', d: lv => `反震倍率 +${Math.round(30 + lv)}%；每次挨打反震，得到 ${LGV.jsSh(lv).toFixed(1)}% 最大气血的护体真气（罗汉、大日）`, st: lv => ({ thornK: 30 + lv }) },
   // ---- 打法玉：不绑门派，配对了套装才好用 ----
   lianhuan: { n: '连环玉', c: '#ffb060', d: lv => `群攻招式每多打中一个敌人，这一招伤害 +${LGV.lhK(lv).toFixed(1)}%（最多算 5 个）。配修罗不死、万符、千机、大日`, st: () => ({}) },
   shigu:    { n: '蚀骨玉', c: '#9ad86a', d: lv => `敌人身上每有一种状态，受到你的伤害 +${LGV.sgK(lv).toFixed(1)}%；你挂的状态多持续 1 回合。配万符、五毒、千机、归元`, st: () => ({}) },
@@ -135,7 +135,7 @@ const BUILDS = {
     { set: 'qianji', d: '先上毒，暗器铺满全场', sk: [['venom', 'b'], ['fan', 'b'], ['bingpo', 'b'], ['yandun', 'a'], ['deathmark', 'b']],
       leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['duopo', 'pain', 'shigu'] } ],
   paladin: [
-    { set: 'luohan', d: '狮子吼拉住所有妖物，挨一下弹一下、反击打全场，越打越硬', sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
+    { set: 'luohan', d: '狮子吼拉住所有妖物，挨一下弹一下、攒满金刚震打全场，越打越硬', sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
       leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['jinshen', 'guard', 'xuanjia'] },
     { set: 'dari', d: '护体养着，主动出招追佛光', sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
       leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['jinshen', 'xuanjia', 'tiangang'] } ],
@@ -282,9 +282,9 @@ SETS.push(
     b6: 'qiSha6', b6d: '终结技伤害 ×4；终结技杀死目标时，冷却立刻清零' },
   { id: 'luohan', n: '罗汉金身', cls: 'paladin', rift: true,
     pieces: [['helm', '罗汉僧帽'], ['chest', '罗汉袈裟'], ['gloves', '罗汉护腕'], ['boots', '罗汉僧鞋'], ['ring', '罗汉扳指'], ['amulet', '罗汉念珠']],
-    b2: { counter: 20, armorPct: 30, thornK: 100 }, b2d: '反击几率 +20%，护甲 +30%，反震倍率 +100%（反震 = 你的攻击 × 反震倍率，每挨一下打弹一下；伙伴晕住的妖物也吃一次，妖物打伙伴你替他弹一半）',
-    b4: 'luoHan4', b4d: '反击打所有敌人，伤害从 80% 提高到 200%；被护体挡下的攻击也会反击；狮子吼嘲讽期间反震翻倍',
-    b6: 'luoHan6', b6d: '反击几率再 +15%；每次反击（反震一半几率）叠一层「佛怒」（这场战斗内，最多 10 层）：每层伤害 +30%，受到的伤害 -4%；反震伤害的一成回给自己' },
+    b2: { armorPct: 30, thornK: 150 }, b2d: '护甲 +30%，反震倍率 +150%（反震 = 你的攻击 × 反震倍率，每挨一下打弹一下；伙伴晕住的妖物也吃一次，妖物打伙伴你替他弹一半）',
+    b4: 'luoHan4', b4d: '狮子吼嘲讽期间：反震翻倍，每次反震攒两层「震」（金刚震来得快一倍）',
+    b6: 'luoHan6', b6d: '每次反震叠一层「佛怒」（这场战斗内，最多 10 层）：每层伤害 +30%，受到的伤害 -4%；反震伤害的一成回给自己' },
 );
 // 第二套幻境套装：RSET2_LV 层起掉。上面那五套是把本门的招牌机制推到头；这五套换一种打法，用的是上面不碰的招式
 const RSET2_LV = 30;
@@ -322,7 +322,7 @@ SETS.push(
 );
 STAT_NAMES.furyGain = STAT_NAMES.furyGain || '怒意获得';
 STAT_NAMES.lianPct = STAT_NAMES.lianPct || '每层「连」伤害';
-STAT_NAMES.counter = STAT_NAMES.counter || '反击几率';
+// 2026-11-24 反击并进反震，反击几率这个属性没有了
 
 // 镇妖录：幻境里收服妖物的精魄。一章一页，层数越高精魄品级越高（一品到十品）
 // 一品 1–19 层，二品 20–39，三品 40–59，四品 60–79，五品 80–103；往上每 24 层一品：六品 104，七品 128，八品 152，九品 176，十品 200

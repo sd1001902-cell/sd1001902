@@ -687,7 +687,7 @@ function kitRow(cls) {
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ 存当前</button></div>`; }).join('')}</div>`;
 }
 // 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
-const KS_EXTRA = [['healPct', '治疗'], ['regen', '回血'], ['regenPct', '回血'], ['thornK', '反震倍率'], ['xDr', '减伤'], ['xBoss', '首领伤'], ['xExec', '斩杀'], ['xDouble', '连斩'], ['xFirst', '先手'],
+const KS_EXTRA = [['healPct', '治疗'], ['regen', '回血'], ['regenPct', '回血'], ['thornK', '反震倍率'], ['thornDmg', '反震伤害'], ['xDr', '减伤'], ['xBoss', '首领伤'], ['xExec', '斩杀'], ['xDouble', '连斩'], ['xFirst', '先手'],
   ['xBreak', '破势'], ['xRage', '怒气'], ['xTen', '清神'], ['xLast', '不屈'], ['xHaste', '疾行'], ['xKill', '贪狼'], ['cdSkip', '免冷却'], ['xCritNext', '会心'], ['xShield', '磐石'],
   ['allyPct', '伙伴'], ['freeze', '定身'], ['poison', '附毒'], ['skd', '专招'], ['minion', '僵尸数'], ['minionPct', '僵尸'], ['gf', '银两'], ['xLuck', '神兵率']];
 function keyStats(cls) {
@@ -762,7 +762,7 @@ const CLS_MECH = {
   mage: ['五行流转', '每换一种五行出招，叠一层「连」（最多 5 层），每层伤害 +8%，不用管顺序；同一种五行连着放，不加也不掉。每招是哪一行，招式名旁边写着；普攻灵符是木。'],
   necro: ['尸阵', '开战时僵尸已经按尸阵列好（基础尸位 3），它们的攻击和气血按你的属性算。镇魂钉钉中的敌人，僵尸优先去咬。僵尸倒了，用摇铃唤尸补回来。'],
   assassin: ['杀意', '淬毒镖、冰魄针这些招式出手攒杀意（最多 5 点），终结技一次花光：夺命印每点伤害 +25%，影杀每点多刺一下。开战你先出手。'],
-  paladin: ['金刚反击', '挨打时有 15% 几率格挡并反击（80% 佛光伤害）；身上有护体真气时再 +15%。每回合自己回一点气血。'],
+  paladin: ['反震 · 金刚震', '挨打必定反震：佛光伤害 = 攻击 × 反震倍率（自带 30%，堆装备、罗汉套往上加）。每反震一次攒一层「震」，攒满 10 层自动放「金刚震」，佛光打所有敌人。挨打反震还会回一点气血。'],
 };
 // 招式现在算哪一行：道士有的变招会改五行
 const effWx = (cls, k) => featureOn('runes') ? runeWx(k, (SAVE.chars[cls].runes || {})[k.id]) : k.wx;
@@ -1088,7 +1088,7 @@ const INTER = { 3: ['幕间一', '醉仙楼重新开张', '热闹', '天黑了�
 const hasProgress = () => !!(SAVE.run || storyCleared('normal') > 0 || CLASS_IDS.some(c => SAVE.chars[c].level > 1) || Object.keys(SAVE.world || {}).length);
 // 开局挑门派：五张卡，写明打法和上手难度；底下说清楚以后能换、哪些东西五门共用
 let CPICK = null;
-const CLS_PICK = [['berserker', '近战', '血厚皮糙，越打越疯；血越少，伤害越高', '★', '上手最容易'], ['paladin', '近战', '最耐打：挨打时格挡反击，还会自己回血', '★', '容易'],
+const CLS_PICK = [['berserker', '近战', '血厚皮糙，越打越疯；血越少，伤害越高', '★', '上手最容易'], ['paladin', '近战', '最耐打：挨打必反震，攒满了金刚震打全场，还会自己回血', '★', '容易'],
   ['mage', '法术', '画符念咒，群攻挂状态再引爆；身板最薄', '★★', '中等'], ['assassin', '暗器', '最快最狠，专杀一个；群攻弱', '★★★', '较难'], ['necro', '召唤', '摇铃驱使僵尸作战，自己躲在后面', '★★★', '较难']];
 const clsPickModal = () => `<h2 class="mh">选一个门派</h2><p class="sub cpk-sub">一共五个门派，先挑一个顺手的。以后在营地顶上点头像随时换人；银两、储物箱、修为、幻境层数五门共用，等级各练各的。</p>
   <div class="cpick">${CLS_PICK.map(([id, tag, d, st, hard]) => `<button class="cpk" data-act="clspick" data-arg="${id}"><span class="cpk-a">${heroSpr(id, 46)}</span>
@@ -1547,7 +1547,7 @@ const ST_INFO = {
   shadow: ['无影', '#b9a0ff', 1, '闪避大增，下一次攻击必定暴击。'],
   smoke: ['烟遁', '#b9a0ff', 1, '敌人打不中你。'],
   butui: ['不退', '#ff9a5a', 1, '受到的伤害 -50%，挨打攒双倍怒意。'],
-  chan: ['禅', '#fff2b0', 1, '反击几率 +40%，反击必定让敌人眩晕。'],
+  chan: ['禅', '#fff2b0', 1, '受到的伤害 -45%，反震倍率 +50%。'],
   renew: ['回春', '#5df07a', 1, '每回合回 6% 气血。'],
   shield: ['护体', '#ffe58a', 1, '护体真气：先挡伤害，挡完才掉血。'],
   charging: ['蓄力', '#ff5a3a', 0, '首领在憋大招，下一招很重。打晕它能打断，必杀也能打断。'],
@@ -1734,14 +1734,14 @@ function updBattle(o, anim) {
   }
   applyStep(o, anim);
 }
-// 职业资源：怒意、连、杀意、尸位、反击
+// 职业资源：怒意、连、杀意、尸位、震
 function resChip(P) {
   const R = CLASSES[P.cls].res; if (!R) return '';
   if (P.cls === 'berserker') return `<span class="rchip fury ${P.fury >= 50 ? 'hot' : ''}">怒意 <i style="--w:${Math.round(P.fury || 0)}%"></i><b>${Math.round(P.fury || 0)}</b></span>`;
   if (P.cls === 'mage') { const lw = P.lastWx; return `<span class="rchip lian" title="换一种五行出招 +1">连 <b>${P.lian || 0}</b>${lw ? `<em style="color:${WX[lw].c}">${WX[lw].n}</em>` : ''}</span>`; }
   if (P.cls === 'assassin') return `<span class="rchip ki">杀意 ${Array.from({ length: P.kiMax }, (_, i) => `<i class="${i < P.ki ? 'on' : ''}"></i>`).join('')}</span>`;
   if (P.cls === 'necro') return `<span class="rchip">尸位 <b>${zombiesOf(B).filter(z => !ZOMBIES[z.zt].ult).length}/${P.minionCap}</b></span>`;
-  if (P.cls === 'paladin') return `<span class="rchip">反击 <b>${Math.min(85, P.counter + (P.shield > 0 ? 15 : 0) + (P.st.chan ? 40 : 0))}%</b></span>`;
+  if (P.cls === 'paladin') { const n = jzNeed(P), z = Math.min(n, P.zhen || 0); return `<span class="rchip zhen ${z >= n - 2 ? 'hot' : ''}" title="攒满放金刚震">震 <i style="--w:${Math.round(z / n * 100)}%"></i><b>${z}/${n}</b></span>`; }
   return '';
 }
 // 出手顺序条：接下来 6 次谁出手；头像下面是速度
@@ -1913,6 +1913,7 @@ function applyStep(o, anim) {
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
       if (el && mv) { const t = document.createElement('span'); t.className = 'pop move'; t.textContent = mv; el.appendChild(t); setTimeout(() => t.remove(), 1000); bump(el, 'acting', 600); }
     }
+    if (anim && o.jzz) { VFX.onJinzhen(); SFX.play('react'); }
     if (anim && o.react) { o.react.forEach(R => VFX.onReact(R.id, R.n, (STATES[R.s] || {}).c || '#e8b0ff')); SFX.play('react'); if (!SAVE.flags.combo1) { SAVE.flags.combo1 = 1; setTimeout(() => toast(`打出连招「${o.react[0].n}」！先用起手技能给敌人挂状态，再用收招技能打，就有额外效果。去「修炼 · 武学」看看搭配`), 600); } }
     if (anim && o.cast) {
       const e = o.cast.elem;

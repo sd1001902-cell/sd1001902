@@ -858,7 +858,7 @@ const VFX = (() => {
       for (let k = 1; k <= 3; k++) { const rr = R * k / 3, aa = a0 + (Math.random() - 0.5) * 0.6; x = Math.cos(aa) * rr; y = Math.sin(aa) * rr; d += ` L${x.toFixed(1)},${y.toFixed(1)}`; } }
     spawn('cracks', p.x, p.y, Math.round(620 * fac()), { s: size + 'px', c }, `<svg viewBox="${-R} ${-R} ${size} ${size}"><path d="${d}" stroke="${c}" stroke-width="3" fill="none" stroke-linejoin="round"/><path d="${d}" stroke="#fff" stroke-width="1" fill="none"/></svg>`); }
   const iceshell = (p, size) => p && spawn('iceshell', p.x, p.y, Math.round(520 * fac()), { s: (size || 90) + 'px' });
-  const banner = (name, c, c2) => arena && spawn('cbanner', arena.clientWidth / 2, arena.clientHeight * 0.16, Math.round(1100 * fac()), { c, c2: c2 || c }, `<small>连招</small><b>${name}</b>`);
+  const banner = (name, c, c2, lab) => arena && spawn('cbanner', arena.clientWidth / 2, arena.clientHeight * 0.16, Math.round(1100 * fac()), { c, c2: c2 || c }, `<small>${lab || '连招'}</small><b>${name}</b>`);
   const REACT_FX = {
     破军(p) { slash(p, '#fff', -45, 130, 360 * fac()); slash(p, '#d8a05a', 45, 130, 360 * fac()); parts(p, 16, '#d8a05a', 80, 700 * fac(), { cls: 'shard', size: 8 }); cracks(p, '#d8a05a', 120); },
     饮火(p) { flames(p, 14, '#ff6a2a', 50, 800 * fac()); pillar(p, '#ff3a1a', 700 * fac()); ink(p, 10, 70, 700 * fac(), BLOOD); boom(p, '#ff6a2a', 140, 500 * fac()); },
@@ -886,6 +886,14 @@ const VFX = (() => {
     parts(p, 10, c, 60, 700 * f, { cls: 'ember', rise: -40 });
     shake(5);
   }
+  // 金刚震：和尚攒满「震」，佛光从身上炸开扫过全场（一阵子才一次，特效可以足一点）
+  function onJinzhen() {
+    const h = pos('P'); if (!h) return; const f = fac();
+    banner('金刚震', GOLD, '#fff2b0', '反震');
+    spawn('swastika', h.x, h.y, Math.round(800 * f), { c: GOLD }); ring(h, GOLD, 300, Math.round(650 * f), 6);
+    foesAlive().forEach((q, i) => later(() => { boom(q, GOLD, 110, Math.round(420 * f)); parts(q, 6, '#fff2b0', 50, 600 * f, { cls: 'ember', rise: -30 }); }, (120 + i * 50) * f));
+    shake(5);
+  }
   function onBlock(id) { const p = pos(id); if (p) { ring(p, GOLD, 70, 300 * fac(), 3); } }
   function onCrit(id) { const p = pos(id); if (p) { boom(p, '#fff6c0', 80, 280 * fac()); ink(p, 4, 40, 400 * fac(), BLOOD); shake(3); } }
   // 克制道具生效：道具从主角身上飞出去，金色「破」字落在妖物身上
@@ -901,5 +909,5 @@ const VFX = (() => {
   function onShieldBreak(id) { const p = pos(id); if (p) { parts(p, 16, '#ffe58a', 70, 600 * fac(), { cls: 'shard', size: 6 }); ring(p, GOLD, 120, 420 * fac(), 4); shake(3); } }
   function onFlare(id) { const p = pos(id); if (p) { flames(p, 6, '#ffb02a', 26, 520 * fac()); parts(p, 4, '#3a2a20', 24, 800 * fac(), { cls: 'ash', rise: -50 }); } }
   function shakeNow(pw) { const o = OFF; OFF = 0; try { shake(pw); } finally { OFF = o; } }
-  return { setup, setSpeed, shakeNow, setPose, play, onDeath, onHeal, onCrit, onBlock, onReact, onFoil, onThaw, onShieldBreak, onFlare, onHit, onLand, victory, rigHTML, idleCls, fac, lastMv: () => lastMv };
+  return { setup, setSpeed, shakeNow, setPose, play, onDeath, onHeal, onCrit, onBlock, onReact, onJinzhen, onFoil, onThaw, onShieldBreak, onFlare, onHit, onLand, victory, rigHTML, idleCls, fac, lastMv: () => lastMv };
 })();

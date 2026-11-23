@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: '攻击', hp: '气血', armor: '护甲', crit: '暴击率', critDmg: '暴击伤害',
   spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
-  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', thornK: '反震倍率', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震倍率',
+  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', thornK: '反震倍率', thornDmg: '反震伤害', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震伤害',
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
   dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果', eva: '闪避', skd: '某一招伤害',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: '疾行（开战前两回合速度）', xKill: '贪狼（每杀一个敌人回复气血）', cdSkip: '招式不进冷却的几率', xLuck: '神兵掉率', xShield: '磐石（开战自带护体，按最大气血）',
   regenPct: '每回合回复气血', xCritNext: '会心（暴击后下一招伤害）', allyPct: '同伴、僵尸的伤害和气血',
 };
-const PCT_STATS = new Set(['thorns', 'eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['thorns', 'eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'thornDmg', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -76,7 +76,7 @@ const AFFIXES = [
   { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: '通灵的', slots: ['weapon', 'helm', 'amulet', 'offhand'] },
   { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: '养元的', slots: ['helm', 'chest', 'amulet', 'belt'] },
   { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: '回春的', no: ['offhand'] },
-  { k: 'thorns',  r: [10, 20], w: 4, g: 'd', st: 'thornK', p: '带刺的', no: ['offhand'] },   // 2026-11-24 改：原来是死数（每挨一下弹几十点，高层没用），现在是「反震倍率 +10–20%」= 每挨一下打按你攻击的这么多弹回去，吃伤害、术法、暴击、暴伤加成
+  { k: 'thorns',  r: [5, 10], w: 4, g: 'd', st: 'thornDmg', p: '带刺的', no: ['offhand'] },   // 2026-11-24 再改：「反震伤害 +5–10%」，最后乘上去（反震、金刚震都吃），不会被罗汉套、金身玉的大底子稀释。老装备的「反震倍率 +10–20%」按成色对半折过来
   { k: 'mf',      r: [8, 20],  w: 4, p: '有福的' },
   { k: 'gf',      r: [10, 30], w: 4, p: '招财的' },
   // 2026-11 新加：pg＝通关后才会随掉落出（洗炼随时都能洗到）；st：算到哪个属性上
@@ -137,7 +137,7 @@ const LEGENDS = [
   { id: 'greed',    n: '聚宝扳指',   slot: 'ring', ch: 6,   imp: { gf: 40, mf: 25 }, fx: 'lucky',   d: '精英和首领额外掉落 1 件装备' },
   { id: 'surge',    n: '五行扳指',   slot: 'ring', ch: 7,   imp: { elem: 10 },    fx: 'elemSurge',  d: '术法伤害有 20% 几率翻倍' },
   { id: 'abyssEye', n: '九幽之眼',   slot: 'amulet', ch: 9, imp: { critDmg: 30 }, fx: 'critStack',  d: '每次暴击使本场伤害 +5%，最多 10 层' },
-  { id: 'avenger',  n: '睚眦佩',     slot: 'amulet', ch: 5, imp: { armorPct: 15 },fx: 'revenge',    d: '受到攻击时 30% 几率立刻反击' },
+  { id: 'avenger',  n: '睚眦佩',     slot: 'amulet', ch: 5, imp: { armorPct: 15 },fx: 'revenge',    d: '受到攻击时 30% 几率立刻还手' },
   { id: 'hourglass',n: '光阴玉',     slot: 'amulet', ch: 10, imp: { spd: 5 },      fx: 'cdr',        d: '所有技能冷却 -1' },
   { id: 'deadcharm',n: '养尸玉',     slot: 'amulet', ch: 7, imp: { hpPct: 6 },    fx: 'undeadAlly', d: '每场战斗开始时唤出一具僵尸助战（所有职业）' },
   // ---------- 通关后的通用神兵（pg：通关后才进掉落池）：不求强，求有意思。攻、守、辅、刷宝都有 ----------
@@ -202,8 +202,8 @@ const LEGENDS = [
   { id: 'wuyingnang', n: '无影囊',   slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { spd: 6 },     fx: 'wuyingOff',   d: '闪开一次攻击后恢复 4% 最大气血，冷却最长的那一招冷却 -1' },
   { id: 'qianjidai',  n: '千机带',   slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'qianjiBelt',  d: '暗器招式（淬毒镖、冰魄针、漫天花雨）每打中 5 次，所有招式冷却 -1' },
   { id: 'baidunang',  n: '百毒镖囊', slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { crit: 5 },    fx: 'baiduOff',    d: '中毒的敌人对你造成的伤害 -20%；带毒的敌人死去时，毒传给另一个敌人' },
-  { id: 'fumodai',    n: '伏魔带',   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'fumoBelt',    d: '反击有 30% 几率眩晕对方；「佛怒」上限从 10 层提高到 15 层' },
-  { id: 'muyu',       n: '镇心木鱼', slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: '每次反击恢复 2% 最大气血，并给同伴恢复 5%' },
+  { id: 'fumodai',    n: '伏魔带',   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'fumoBelt',    d: '金刚震打中的敌人 30% 几率晕住；「佛怒」上限从 10 层提高到 15 层' },
+  { id: 'muyu',       n: '镇心木鱼', slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: '每次挨打反震恢复 1.5% 最大气血，并给同伴恢复 4%' },
   { id: 'daridai',    n: '大日带',   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'dariBelt',    d: '护体真气的上限从最大气血的 50% 提高到 80%（要配大日如来 4 件）' },
   { id: 'zijinbo',    n: '紫金钵',   slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'zijinOff',    d: '施放般若心经、甘露时，对所有敌人造成 150% 佛光伤害' },
   // 2026-11：专属兵器（w: 1）。每条幻境套装路线一把，直接改写主力招式；自带攻击比普通神兵高三成，每强化 +1 特效再涨 3%。
@@ -216,7 +216,7 @@ const LEGENDS = [
   { id: 'wandufan',   n: '万毒幡',     slot: 'weapon', cls: 'necro',     ch: 9, w: 1, set: 'duxing',  imp: { elem: 20 },     fx: 'wWandu',   d: '敌人身上的毒不再随回合消退；尸毒蔓、土遁葬的毒发结算 +100%' },
   { id: 'qishabi',    n: '七杀匕',     slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qisha',   imp: { critDmg: 40 },  fx: 'wQisha',   d: '杀意上限 +1；终结技打死敌人时，溢出的伤害转给下一个敌人' },
   { id: 'lihuaxia',   n: '暴雨梨花匣', slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qianji',  imp: { crit: 8 },      fx: 'wLihua',   d: '暗器招式每次命中有 30% 几率追加一根冰魄针（60% 伤害，并冰冻）' },
-  { id: 'fumozhang',  n: '伏魔禅杖',   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'luohan',  imp: { hpPct: 12 },    fx: 'wFumo',    d: '反击伤害 +100%' },
+  { id: 'fumozhang',  n: '伏魔禅杖',   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'luohan',  imp: { hpPct: 12 },    fx: 'wFumo',    d: '金刚震伤害 +100%' },
   { id: 'darilun',    n: '大日金轮',   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'dari',    imp: { dmgPct: 12 },   fx: 'wDari',    d: '大日如来追加的佛光伤害 +75%，每打中一个敌人恢复 2% 最大气血' },
   // 其他部位再添几件门派神兵（正常掉落；穿了幻境套装的可以收进乾坤袋用）
   { id: 'duanyue',    n: '断岳护腕',   slot: 'gloves', cls: 'berserker', ch: 7, imp: { atk: 10 },     fx: 'duanyue',    d: '断骨打中的敌人同时破甲和灼烧' },
@@ -253,7 +253,7 @@ const LEGENDS = [
   { id: 'wanfoguan',   n: '万佛冠',   slot: 'helm',    cls: 'paladin',   ch: 9, pg: 1, imp: { dmgPct: 8 },   fx: 'cJudge',     d: '万佛朝宗冷却 -2，打中的敌人 30% 眩晕；身上有护体真气时伤害 +50%' },
   { id: 'luohanjie',   n: '金刚指环', slot: 'ring',    cls: 'paladin',   ch: 9, pg: 1, imp: { armorPct: 12 }, fx: 'cHoly',     d: '每次出招后，顺手补一记罗汉拳（100% 佛光，不占出手），并给你 3% 最大气血的护体真气（最多叠到 50%）' },
   { id: 'jinshendai',  n: '金身带',   slot: 'belt',    cls: 'paladin',   ch: 9, pg: 1, x: 1, imp: { hpPct: 8 }, fx: 'cShieldDmg', d: '身上有护体真气时，伤害 +20%' },
-  { id: 'jinganglingo', n: '金刚铃',  slot: 'offhand', cls: 'paladin',   ch: 9, pg: 1, x: 1, imp: { healPct: 12 }, fx: 'cCounter', d: '反击几率 +10%，反击伤害 +50%' },
+  { id: 'jinganglingo', n: '金刚铃',  slot: 'offhand', cls: 'paladin',   ch: 9, pg: 1, x: 1, imp: { healPct: 12 }, fx: 'cCounter', d: '攒满 8 层「震」就放金刚震（原来 10 层），金刚震伤害 +30%' },
   { id: 'luohanbu',    n: '罗汉步',   slot: 'boots',   cls: 'paladin',   ch: 9, pg: 1, imp: { armorPct: 12 }, fx: 'cHalf',     d: '每次挨打有 25% 几率只受一半伤害' },
   { id: 'putizi',      n: '菩提子',   slot: 'amulet',  cls: 'paladin',   ch: 9, pg: 1, imp: { healPct: 12 }, fx: 'cBodhi',     d: '同伴受到的伤害 -30%；你回血时，同伴也回同样比例的气血' },
 ];
@@ -374,9 +374,9 @@ const CLASSES = {
       { id: 'kiUp',     n: '杀心',   d: '终结技每点杀意的加成 +5%', max: 5, st: { kiPct: 5 } },
       { id: 'reap',     n: '夺魂',   d: '被夺命印标记的敌人额外受到 +50% 伤害；杀意上限 +1', max: 1, fx: 'deathMarkPlus' } ] } },
   paladin: {
-    n: '金刚武僧', d: '少林外家功夫，最耐打，输出最低。挨打时有 15% 几率格挡并反击（佛光伤害），身上有护体真气时再 +15%；还会给自己回血。带伙伴时「护法金身」：伙伴晕住、冻住的妖物，跳过回合时照样吃你一次反震；妖物打伙伴，你替伙伴反震一半。', spr: 'monk',
+    n: '金刚武僧', d: '少林外家功夫，最耐打，输出最低。挨打必定反震（佛光伤害 = 攻击 × 反震倍率，自带 30%），还会给自己回血；每反震一次攒一层「震」，攒满 10 层放「金刚震」，佛光扫过全场。带伙伴时「护法金身」：伙伴晕住、冻住的妖物，跳过回合时照样吃你一次反震；妖物打伙伴，你替伙伴反震一半。', spr: 'monk',
     base: { hp: 130, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 10 }, per: { hp: 12.5, atk: 2.9, armor: 1.7 },
-    res: { n: '反击' },
+    res: { n: '震' },
     skills: [
       { id: 'aegis',     n: '金钟罩',   lv: 1,  cd: 6, wx: 'jin', d: '获得 20% 最大气血的护体真气' },
       { id: 'hammer',    n: '降魔杵',   lv: 3,  cd: 3, wx: 'jin', d: '造成 190% 佛光伤害' },
@@ -385,11 +385,11 @@ const CLASSES = {
       { id: 'prayer',    n: '般若心经', lv: 12, cd: 5, wx: 'mu', d: '气血低于 70% 时恢复 16% 最大气血' },
       { id: 'budong',    n: '不动明王', lv: 16, cd: 5, wx: 'tu',   k: 'aoe', m: 0.9, shield: 0.11, d: '对所有敌人造成 90% 伤害，并获得 11% 气血的护体' },
       { id: 'judgement', n: '万佛朝宗', lv: 20, cd: 6, wx: 'huo', d: '对所有敌人造成 200% 佛光伤害' },
-      { id: 'chanhou',   n: '狮子吼·禅', lv: 16, cd: 6, wx: 'tu', d: '嘲讽所有敌人 3 回合：它们只能打你（首领也一样）。这期间受到的伤害 -30%，反震倍率 +50%，反击几率 +40%，反击必定让敌人眩晕' },
+      { id: 'chanhou',   n: '狮子吼·禅', lv: 16, cd: 6, wx: 'tu', d: '嘲讽所有敌人 3 回合：它们只能打你（首领也一样）。这期间受到的伤害 -45%，反震倍率 +50%' },
       { id: 'holy',      n: '罗汉拳',   lv: 1,  cd: 0, wx: 'tu', d: '造成 115% 佛光伤害' },
     ],
     tree: { n: '禅心', t: [
-      { id: 'counterUp', n: '铁壁',   d: '反击几率 +3%', max: 5, st: { counter: 3 } },
+      { id: 'counterUp', n: '铁壁',   d: '反震倍率 +10%', max: 5, st: { thornK: 10 } },
       { id: 'hammerUp',  n: '降魔',   d: '降魔杵伤害 +15%', max: 5, st: { sk_hammer: 15 } },
       { id: 'healUp',    n: '慈悲',   d: '治疗效果 +10%', max: 5, st: { healPct: 10 } },
       { id: 'divine',    n: '佛法无边', d: '般若心经同时对所有敌人造成 100% 佛光伤害；护体真气上限 +30%', max: 1, fx: 'divine' } ] } },

@@ -77,7 +77,7 @@ const LGV = {
   wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
   swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
   dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
-  jsSh: lv => 4 + lv * 0.05,                                    // 金身：反击时得护体（最大气血 %）
+  jsSh: lv => 3 + lv * 0.04,                                    // 金身：挨打反震时得护体（最大气血 %）。2026-11-24 反击并进反震，次数多了，数值降到原来的八成左右
   lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
   sgK: lv => 4 + lv * 0.12,                                     // 蚀骨：敌人身上每种状态 +x%
   xjK: lv => 15 + lv * 0.35, xjBoom: lv => 100 + lv * 1.5,      // 玄甲：有护体时伤害；护体打碎炸开
@@ -97,7 +97,7 @@ const LGEMS = {
   wuxing:  { n: "Ngũ Hành Ngọc", c: '#c8a2ff', cls: 'mage', d: lv => `Khi đổi sang hành khác để ra chiêu, ${LGV.wxCh(lv).toFixed(0)}% tỉ lệ gắn lên mục tiêu trạng thái của hành đó (Hỏa thiêu đốt, Thủy băng đông, Thổ phá giáp, Mộc trúng độc, Kim choáng); mỗi tầng “Liên” sát thương thêm +${(1.5 + lv * 0.06).toFixed(1)}% (Quy Nguyên, Vạn Phù)`, st: lv => ({ lianPct: 1.5 + lv * 0.06 }) },
   shiwang: { n: "Thi Vương Ngọc", c: '#7fd08a', cls: 'necro', d: lv => `Sát thương và khí huyết của cương thi +${Math.round(20 + lv * 0.8)}%; mỗi thi vị còn trống, sát thương trúng độc của bạn +${LGV.swPoi(lv).toFixed(0)}% (Âm Binh, Ngũ Độc)`, st: lv => ({ minionPct: 20 + lv * 0.8 }) },
   duopo:   { n: "Đoạt Phách Ngọc", c: '#a0a8ff', cls: 'assassin', d: lv => `Giới hạn Sát ý +1; ám khí (Tiêu Tẩm Độc, Băng Phách Châm, Mạn Thiên Hoa Vũ) trúng thì ${LGV.dpKi(lv).toFixed(0)}% tỉ lệ +1 Sát ý; sát thương đòn kết liễu +${LGV.dpFin(lv).toFixed(0)}% (Thất Sát, Thiên Cơ)`, st: () => ({}) },
-  jinshen: { n: "Kim Thân Ngọc", c: '#ffd76a', cls: 'paladin', d: lv => `Bội số phản chấn +${Math.round(30 + lv)}%; mỗi lần phản kích, nhận hộ thể chân khí bằng ${LGV.jsSh(lv).toFixed(1)}% khí huyết tối đa (La Hán, Đại Nhật)`, st: lv => ({ thornK: 30 + lv }) },
+  jinshen: { n: "Kim Thân Ngọc", c: '#ffd76a', cls: 'paladin', d: lv => `Bội số phản chấn +${Math.round(30 + lv)}%; mỗi lần bị đánh phản chấn, nhận hộ thể chân khí bằng ${LGV.jsSh(lv).toFixed(1)}% khí huyết tối đa (La Hán, Đại Nhật)`, st: lv => ({ thornK: 30 + lv }) },
   // ---- 打法玉：不绑门派，配对了套装才好用 ----
   lianhuan: { n: "Liên Hoàn Ngọc", c: '#ffb060', d: lv => `Chiêu đánh lan mỗi khi trúng thêm một kẻ địch, chiêu đó sát thương +${LGV.lhK(lv).toFixed(1)}% (tính tối đa 5 kẻ). Hợp với Tu La Bất Tử, Vạn Phù, Thiên Cơ, Đại Nhật`, st: () => ({}) },
   shigu:    { n: "Thực Cốt Ngọc", c: '#9ad86a', d: lv => `Trên người kẻ địch mỗi có một loại trạng thái, sát thương nó nhận từ bạn +${LGV.sgK(lv).toFixed(1)}%; trạng thái bạn gắn kéo dài thêm 1 hiệp. Hợp với Vạn Phù, Ngũ Độc, Thiên Cơ, Quy Nguyên`, st: () => ({}) },
@@ -135,7 +135,7 @@ const BUILDS = {
     { set: 'qianji', d: "Hạ độc trước, rồi ám khí phủ kín cả sân", sk: [['venom', 'b'], ['fan', 'b'], ['bingpo', 'b'], ['yandun', 'a'], ['deathmark', 'b']],
       leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['duopo', 'pain', 'shigu'] } ],
   paladin: [
-    { set: 'luohan', d: "Sư Tử Hống giữ chân mọi yêu vật, bị đánh một cái bật lại một cái, phản kích đánh cả trận, càng đánh càng cứng", sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
+    { set: 'luohan', d: "Sư Tử Hống giữ chân mọi yêu vật, bị đánh một cái bật lại một cái, tích đủ thì Kim Cương Chấn quét cả sân, càng đánh càng cứng", sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
       leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['jinshen', 'guard', 'xuanjia'] },
     { set: 'dari', d: "Nuôi hộ thể, chủ động ra chiêu để bồi Phật quang", sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
       leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['jinshen', 'xuanjia', 'tiangang'] } ],
@@ -282,9 +282,9 @@ SETS.push(
     b6: 'qiSha6', b6d: "Sát thương đòn kết liễu ×4; đòn kết liễu giết được mục tiêu thì hồi chiêu ngay lập tức" },
   { id: 'luohan', n: "La Hán Kim Thân", cls: 'paladin', rift: true,
     pieces: [['helm', "La Hán Tăng Mạo"], ['chest', "La Hán Cà Sa"], ['gloves', "La Hán Hộ Uyển"], ['boots', "La Hán Tăng Hài"], ['ring', "La Hán Ban Chỉ"], ['amulet', "La Hán Niệm Châu"]],
-    b2: { counter: 20, armorPct: 30, thornK: 100 }, b2d: "Tỉ lệ phản kích +20%, hộ giáp +30%, bội số phản chấn +100% (phản chấn = công kích của bạn × bội số phản chấn, bị đánh một cái bật lại một cái; yêu vật bị đồng hành làm choáng cũng ăn một lần, yêu vật đánh đồng hành thì bạn bật thay một nửa)",
-    b4: 'luoHan4', b4d: "Phản kích đánh mọi kẻ địch, sát thương từ 80% lên 200%; đòn bị hộ thể đỡ cũng phản kích; trong lúc Sư Tử Hống khiêu khích, phản chấn nhân đôi",
-    b6: 'luoHan6', b6d: "Tỉ lệ phản kích thêm +15%; mỗi lần phản kích (phản chấn có nửa tỉ lệ) cộng một tầng “Phật nộ” (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải nhận -4%; một phần mười sát thương phản chấn hồi cho bạn" },
+    b2: { armorPct: 30, thornK: 150 }, b2d: "Hộ giáp +30%, bội số phản chấn +150% (phản chấn = công kích của bạn × bội số phản chấn, bị đánh một cái bật lại một cái; yêu vật bị đồng hành làm choáng cũng ăn một lần, yêu vật đánh đồng hành thì bạn bật thay một nửa)",
+    b4: 'luoHan4', b4d: "Trong lúc Sư Tử Hống khiêu khích: phản chấn gấp đôi, mỗi lần phản chấn tích hai tầng «Chấn» (Kim Cương Chấn đến nhanh gấp đôi)",
+    b6: 'luoHan6', b6d: "Mỗi lần phản chấn chồng một tầng «Phật nộ» (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải chịu -4%; một phần mười sát thương phản chấn hồi lại cho bản thân" },
 );
 // 第二套幻境套装：RSET2_LV 层起掉。上面那五套是把本门的招牌机制推到头；这五套换一种打法，用的是上面不碰的招式
 const RSET2_LV = 30;
@@ -322,7 +322,7 @@ SETS.push(
 );
 STAT_NAMES.furyGain = STAT_NAMES.furyGain || "Nộ ý nhận được";
 STAT_NAMES.lianPct = STAT_NAMES.lianPct || "Sát thương mỗi tầng “Liên”";
-STAT_NAMES.counter = STAT_NAMES.counter || "Tỉ lệ phản kích";
+// 2026-11-24 反击并进反震，反击几率这个属性没有了
 
 // 镇妖录：幻境里收服妖物的精魄。一章一页，层数越高精魄品级越高（一品到十品）
 // 一品 1–19 层，二品 20–39，三品 40–59，四品 60–79，五品 80–103；往上每 24 层一品：六品 104，七品 128，八品 152，九品 176，十品 200

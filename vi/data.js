@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: "Công", hp: "Khí huyết", armor: "Hộ giáp", crit: "Tỉ lệ chí mạng", critDmg: "ST chí mạng",
   spd: "Tốc độ", leech: "Hút máu", res: "Kháng toàn bộ", dmgPct: "Sát thương", elem: "ST thuật pháp",
-  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", thornK: "Bội số phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Bội số phản chấn",
+  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", thornK: "Bội số phản chấn", thornDmg: "Sát thương phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Sát thương phản chấn",
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
   regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };
-const PCT_STATS = new Set(['thorns', 'eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['thorns', 'eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'thornDmg', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -76,7 +76,7 @@ const AFFIXES = [
   { k: 'elem',    r: [10, 18], ro: [6, 18],  w: 5, g: 'o', p: "thông linh", slots: ['weapon', 'helm', 'amulet', 'offhand'] },
   { k: 'hpPct',   r: [6, 10],  ro: [4, 10],  w: 6, g: 'd', p: "dưỡng nguyên", slots: ['helm', 'chest', 'amulet', 'belt'] },
   { k: 'regen',   r: [2, 3],   ro: [1, 3],   flat: true, w: 5, g: 'd', p: "hồi xuân", no: ['offhand'] },
-  { k: 'thorns',  r: [10, 20], w: 4, g: 'd', st: 'thornK', p: "có gai", no: ['offhand'] },   // 2026-11-24 改：原来是死数（每挨一下弹几十点，高层没用），现在是「反震倍率 +10–20%」= 每挨一下打按你攻击的这么多弹回去，吃伤害、术法、暴击、暴伤加成
+  { k: 'thorns',  r: [5, 10], w: 4, g: 'd', st: 'thornDmg', p: "có gai", no: ['offhand'] },   // 2026-11-24 再改：「反震伤害 +5–10%」，最后乘上去（反震、金刚震都吃），不会被罗汉套、金身玉的大底子稀释。老装备的「反震倍率 +10–20%」按成色对半折过来
   { k: 'mf',      r: [8, 20],  w: 4, p: "có phúc" },
   { k: 'gf',      r: [10, 30], w: 4, p: "chiêu tài" },
   // 2026-11 新加：pg＝通关后才会随掉落出（洗炼随时都能洗到）；st：算到哪个属性上
@@ -137,7 +137,7 @@ const LEGENDS = [
   { id: 'greed',    n: "Tụ Bảo Ban Chỉ",   slot: 'ring', ch: 6,   imp: { gf: 40, mf: 25 }, fx: 'lucky',   d: "Tinh anh và thủ lĩnh rơi thêm 1 món trang bị" },
   { id: 'surge',    n: "Ngũ Hành Ban Chỉ",   slot: 'ring', ch: 7,   imp: { elem: 10 },    fx: 'elemSurge',  d: "Sát thương thuật pháp có 20% tỉ lệ gấp đôi" },
   { id: 'abyssEye', n: "Cửu U Chi Nhãn",   slot: 'amulet', ch: 9, imp: { critDmg: 30 }, fx: 'critStack',  d: "Mỗi đòn chí mạng tăng 5% sát thương trong trận, tối đa 10 tầng" },
-  { id: 'avenger',  n: "Nhai Tí Bội",     slot: 'amulet', ch: 5, imp: { armorPct: 15 },fx: 'revenge',    d: "Khi bị đánh có 30% tỉ lệ phản kích ngay" },
+  { id: 'avenger',  n: "Nhai Tí Bội",     slot: 'amulet', ch: 5, imp: { armorPct: 15 },fx: 'revenge',    d: "Khi bị tấn công có 30% tỉ lệ đánh trả ngay" },
   { id: 'hourglass',n: "Quang Âm Ngọc",     slot: 'amulet', ch: 10, imp: { spd: 5 },      fx: 'cdr',        d: "Mọi kỹ năng hồi chiêu -1" },
   { id: 'deadcharm',n: "Dưỡng Thi Ngọc",     slot: 'amulet', ch: 7, imp: { hpPct: 6 },    fx: 'undeadAlly', d: "Đầu mỗi trận gọi ra một cương thi trợ chiến (mọi môn phái)" },
   // ---------- 通关后的通用神兵（pg：通关后才进掉落池）：不求强，求有意思。攻、守、辅、刷宝都有 ----------
@@ -202,8 +202,8 @@ const LEGENDS = [
   { id: 'wuyingnang', n: "Túi Vô Ảnh",   slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { spd: 6 },     fx: 'wuyingOff',   d: "Né được một đòn thì hồi 4% khí huyết tối đa, chiêu đang hồi lâu nhất hồi chiêu -1" },
   { id: 'qianjidai',  n: "Thiên Cơ Đai",   slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'qianjiBelt',  d: "Chiêu ám khí (Tiêu Tẩm Độc, Băng Phách Châm, Mạn Thiên Hoa Vũ) cứ trúng 5 lần thì mọi chiêu hồi chiêu -1" },
   { id: 'baidunang',  n: "Túi Tiêu Bách Độc", slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { crit: 5 },    fx: 'baiduOff',    d: "Kẻ địch trúng độc gây sát thương lên bạn -20%; kẻ địch mang độc chết thì độc truyền sang một kẻ địch khác" },
-  { id: 'fumodai',    n: "Phục Ma Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'fumoBelt',    d: "Phản kích có 30% tỉ lệ làm đối phương choáng; giới hạn “Phật nộ” từ 10 tầng lên 15 tầng" },
-  { id: 'muyu',       n: "Mõ Trấn Tâm", slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: "Mỗi lần phản kích hồi 2% khí huyết tối đa, và hồi cho đồng hành 5%" },
+  { id: 'fumodai',    n: "Phục Ma Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'fumoBelt',    d: "Kẻ địch trúng Kim Cương Chấn có 30% tỉ lệ bị choáng; giới hạn «Phật nộ» tăng từ 10 lên 15 tầng" },
+  { id: 'muyu',       n: "Mõ Trấn Tâm", slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { healPct: 12 }, fx: 'muyuOff',    d: "Mỗi lần bị đánh phản chấn hồi 1.5% khí huyết tối đa, và hồi cho đồng hành 4%" },
   { id: 'daridai',    n: "Đại Nhật Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'dariBelt',    d: "Giới hạn hộ thể chân khí từ 50% lên 80% khí huyết tối đa (cần Đại Nhật Như Lai 4 món)" },
   { id: 'zijinbo',    n: "Bát Tử Kim",   slot: 'offhand', cls: 'paladin',   ch: 9, x: 1, imp: { dmgPct: 8 },  fx: 'zijinOff',    d: "Khi dùng Bát Nhã Tâm Kinh, Cam Lộ thì gây 150% sát thương Phật quang lên mọi kẻ địch" },
   // 2026-11：专属兵器（w: 1）。每条幻境套装路线一把，直接改写主力招式；自带攻击比普通神兵高三成，每强化 +1 特效再涨 3%。
@@ -216,7 +216,7 @@ const LEGENDS = [
   { id: 'wandufan',   n: "Vạn Độc Phan",     slot: 'weapon', cls: 'necro',     ch: 9, w: 1, set: 'duxing',  imp: { elem: 20 },     fx: 'wWandu',   d: "Độc trên kẻ địch không còn tan theo lượt; phần kết toán độc phát của Thi Độc Lan, Thổ Độn Táng +100%" },
   { id: 'qishabi',    n: "Thất Sát Chủy",     slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qisha',   imp: { critDmg: 40 },  fx: 'wQisha',   d: "Giới hạn Sát ý +1; đòn kết liễu giết địch thì sát thương dư chuyển sang kẻ địch kế" },
   { id: 'lihuaxia',   n: "Bạo Vũ Lê Hoa Hạp", slot: 'weapon', cls: 'assassin',  ch: 9, w: 1, set: 'qianji',  imp: { crit: 8 },      fx: 'wLihua',   d: "Chiêu ám khí mỗi lần trúng có 30% tỉ lệ bồi thêm một cây Băng Phách Châm (60% sát thương, kèm đóng băng)" },
-  { id: 'fumozhang',  n: "Phục Ma Thiền Trượng",   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'luohan',  imp: { hpPct: 12 },    fx: 'wFumo',    d: "Sát thương phản kích +100%" },
+  { id: 'fumozhang',  n: "Phục Ma Thiền Trượng",   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'luohan',  imp: { hpPct: 12 },    fx: 'wFumo',    d: "Sát thương Kim Cương Chấn +100%" },
   { id: 'darilun',    n: "Đại Nhật Kim Luân",   slot: 'weapon', cls: 'paladin',   ch: 9, w: 1, set: 'dari',    imp: { dmgPct: 12 },   fx: 'wDari',    d: "Phật quang bồi thêm của Đại Nhật Như Lai sát thương +75%, mỗi kẻ địch trúng đòn hồi 2% khí huyết tối đa" },
   // 其他部位再添几件门派神兵（正常掉落；穿了幻境套装的可以收进乾坤袋用）
   { id: 'duanyue',    n: "Đoạn Nhạc Hộ Uyển",   slot: 'gloves', cls: 'berserker', ch: 7, imp: { atk: 10 },     fx: 'duanyue',    d: "Kẻ địch trúng Đoạn Cốt đồng thời bị phá giáp và thiêu đốt" },
@@ -253,7 +253,7 @@ const LEGENDS = [
   { id: 'wanfoguan',   n: "Vạn Phật Quan",   slot: 'helm',    cls: 'paladin',   ch: 9, pg: 1, imp: { dmgPct: 8 },   fx: 'cJudge',     d: "Vạn Phật Triều Tông hồi chiêu -2, kẻ địch trúng đòn 30% bị choáng; khi có hộ thể chân khí sát thương +50%" },
   { id: 'luohanjie',   n: "Nhẫn Kim Cương", slot: 'ring',    cls: 'paladin',   ch: 9, pg: 1, imp: { armorPct: 12 }, fx: 'cHoly',     d: "Mỗi lần ra chiêu, tiện tay bồi một đòn La Hán Quyền (100% Phật quang, không chiếm lượt), và cho bạn hộ thể chân khí bằng 3% khí huyết tối đa (tối đa cộng dồn tới 50%)" },
   { id: 'jinshendai',  n: "Kim Thân Đai",   slot: 'belt',    cls: 'paladin',   ch: 9, pg: 1, x: 1, imp: { hpPct: 8 }, fx: 'cShieldDmg', d: "Khi có hộ thể chân khí, sát thương +20%" },
-  { id: 'jinganglingo', n: "Kim Cương Linh",  slot: 'offhand', cls: 'paladin',   ch: 9, pg: 1, x: 1, imp: { healPct: 12 }, fx: 'cCounter', d: "Tỉ lệ phản kích +10%, sát thương phản kích +50%" },
+  { id: 'jinganglingo', n: "Kim Cương Linh",  slot: 'offhand', cls: 'paladin',   ch: 9, pg: 1, x: 1, imp: { healPct: 12 }, fx: 'cCounter', d: "Tích đủ 8 tầng «Chấn» là tung Kim Cương Chấn (vốn 10 tầng), sát thương Kim Cương Chấn +30%" },
   { id: 'luohanbu',    n: "La Hán Bộ",   slot: 'boots',   cls: 'paladin',   ch: 9, pg: 1, imp: { armorPct: 12 }, fx: 'cHalf',     d: "Mỗi lần trúng đòn có 25% tỉ lệ chỉ nhận một nửa sát thương" },
   { id: 'putizi',      n: "Bồ Đề Tử",   slot: 'amulet',  cls: 'paladin',   ch: 9, pg: 1, imp: { healPct: 12 }, fx: 'cBodhi',     d: "Đồng hành nhận sát thương -30%; khi bạn hồi máu, đồng hành cũng hồi cùng tỉ lệ khí huyết" },
 ];
@@ -374,9 +374,9 @@ const CLASSES = {
       { id: 'kiUp',     n: "Sát Tâm",   d: "Đòn kết liễu: mỗi điểm Sát ý tăng thêm +5%", max: 5, st: { kiPct: 5 } },
       { id: 'reap',     n: "Đoạt Hồn",   d: "Địch mang Đoạt Mệnh Ấn nhận thêm +50% sát thương; giới hạn Sát ý +1", max: 1, fx: 'deathMarkPlus' } ] } },
   paladin: {
-    n: "Võ Tăng Kim Cương", d: "Ngoại gia công phu Thiếu Lâm, chịu đòn giỏi nhất, sát thương thấp nhất. Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (sát thương Phật quang), đang có hộ thể chân khí thì thêm +15%; còn tự hồi máu được. Khi dẫn đồng hành có «Hộ Pháp Kim Thân»: yêu vật bị đồng hành đánh choáng, đóng băng mà mất lượt vẫn ăn một lần phản chấn của bạn; yêu vật đánh đồng hành, bạn phản chấn thay họ một nửa.", spr: 'monk',
+    n: "Võ Tăng Kim Cương", d: "Ngoại gia công phu Thiếu Lâm, chịu đòn giỏi nhất, sát thương thấp nhất. Bị đánh chắc chắn phản chấn (sát thương Phật quang = công kích × bội số phản chấn, sẵn có 30%), còn tự hồi máu được; mỗi lần phản chấn tích một tầng «Chấn», đủ 10 tầng tung «Kim Cương Chấn», Phật quang quét cả sân. Khi dẫn đồng hành có «Hộ Pháp Kim Thân»: yêu vật bị đồng hành đánh choáng, đóng băng mà mất lượt vẫn ăn một lần phản chấn của bạn; yêu vật đánh đồng hành, bạn phản chấn thay họ một nửa.", spr: 'monk',
     base: { hp: 130, atk: 12, armor: 10, crit: 5, critDmg: 150, res: 10 }, per: { hp: 12.5, atk: 2.9, armor: 1.7 },
-    res: { n: "Phản kích" },
+    res: { n: "Chấn" },
     skills: [
       { id: 'aegis',     n: "Kim Chung Tráo",   lv: 1,  cd: 6, wx: 'jin', d: "Nhận hộ thể chân khí bằng 20% khí huyết tối đa" },
       { id: 'hammer',    n: "Hàng Ma Xử",   lv: 3,  cd: 3, wx: 'jin', d: "Gây 190% sát thương Phật quang" },
@@ -385,11 +385,11 @@ const CLASSES = {
       { id: 'prayer',    n: "Bát Nhã Tâm Kinh", lv: 12, cd: 5, wx: 'mu', d: "Khí huyết dưới 70% thì hồi 16% khí huyết tối đa" },
       { id: 'budong',    n: "Bất Động Minh Vương", lv: 16, cd: 5, wx: 'tu',   k: 'aoe', m: 0.9, shield: 0.11, d: "Gây 90% sát thương lên mọi kẻ địch và nhận hộ thể bằng 11% khí huyết" },
       { id: 'judgement', n: "Vạn Phật Triều Tông", lv: 20, cd: 6, wx: 'huo', d: "Gây 200% sát thương Phật quang lên mọi kẻ địch" },
-      { id: 'chanhou',   n: "Sư Tử Hống · Thiền", lv: 16, cd: 6, wx: 'tu', d: "Khiêu khích mọi kẻ địch 3 hiệp: chúng chỉ đánh được bạn (thủ lĩnh cũng vậy). Trong lúc đó sát thương phải nhận -30%, bội số phản chấn +50%, tỉ lệ phản kích +40%, phản kích chắc chắn làm địch choáng" },
+      { id: 'chanhou',   n: "Sư Tử Hống · Thiền", lv: 16, cd: 6, wx: 'tu', d: "Khiêu khích mọi kẻ địch 3 lượt: chúng chỉ đánh được bạn (thủ lĩnh cũng vậy). Trong thời gian này sát thương phải chịu -45%, bội số phản chấn +50%" },
       { id: 'holy',      n: "La Hán Quyền",   lv: 1,  cd: 0, wx: 'tu', d: "Gây 115% sát thương Phật quang" },
     ],
     tree: { n: "Thiền Tâm", t: [
-      { id: 'counterUp', n: "Thiết Bích",   d: "Tỉ lệ phản kích +3%", max: 5, st: { counter: 3 } },
+      { id: 'counterUp', n: "Thiết Bích",   d: "Bội số phản chấn +10%", max: 5, st: { thornK: 10 } },
       { id: 'hammerUp',  n: "Hàng Ma",   d: "Sát thương Hàng Ma Xử +15%", max: 5, st: { sk_hammer: 15 } },
       { id: 'healUp',    n: "Từ Bi",   d: "Hiệu quả trị liệu +10%", max: 5, st: { healPct: 10 } },
       { id: 'divine',    n: "Phật Pháp Vô Biên", d: "Bát Nhã Tâm Kinh đồng thời gây 100% sát thương Phật quang lên mọi kẻ địch; giới hạn hộ thể chân khí +30%", max: 1, fx: 'divine' } ] } },

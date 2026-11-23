@@ -688,7 +688,7 @@ function kitRow(cls) {
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ Lưu bộ này</button></div>`; }).join('')}</div>`;
 }
 // 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
-const KS_EXTRA = [['healPct', "Trị liệu"], ['regen', "Hồi máu"], ['regenPct', "Hồi máu"], ['thornK', "Bội số phản chấn"], ['xDr', "Giảm ST"], ['xBoss', "ST thủ lĩnh"], ['xExec', "Trảm sát"], ['xDouble', "Liên trảm"], ['xFirst', "Tiên thủ"],
+const KS_EXTRA = [['healPct', "Trị liệu"], ['regen', "Hồi máu"], ['regenPct', "Hồi máu"], ['thornK', "Bội số phản chấn"], ['thornDmg', "Sát thương phản chấn"], ['xDr', "Giảm ST"], ['xBoss', "ST thủ lĩnh"], ['xExec', "Trảm sát"], ['xDouble', "Liên trảm"], ['xFirst', "Tiên thủ"],
   ['xBreak', "Phá thế"], ['xRage', "Nộ khí"], ['xTen', "Thanh thần"], ['xLast', "Bất khuất"], ['xHaste', "Tật hành"], ['xKill', "Tham lang"], ['cdSkip', "Miễn hồi chiêu"], ['xCritNext', "Hội tâm"], ['xShield', "Bàn thạch"],
   ['allyPct', "Đồng hành"], ['freeze', "Bất động"], ['poison', "Kèm độc"], ['skd', "Chiêu riêng"], ['minion', "Số cương thi"], ['minionPct', "Cương thi"], ['gf', "Bạc"], ['xLuck', "Tỉ lệ thần binh"]];
 function keyStats(cls) {
@@ -763,7 +763,7 @@ const CLS_MECH = {
   mage: ["Ngũ hành lưu chuyển", "Mỗi lần đổi sang một hành khác để ra chiêu, chồng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%, không cần theo thứ tự; cùng một hành ra liên tiếp thì không tăng cũng không mất. Mỗi chiêu thuộc hành nào được ghi cạnh tên chiêu; đòn thường Linh Phù là Mộc."],
   necro: ["Thi trận", "Vào trận cương thi đã xếp sẵn theo Thi trận (thi vị cơ bản 3), công và khí huyết của chúng tính theo chỉ số của bạn. Kẻ địch bị Trấn Hồn Đinh đóng trúng sẽ bị cương thi ưu tiên cắn. Cương thi ngã thì dùng Rung Chuông Gọi Xác gọi lại."],
   assassin: ["Sát ý", "Tiêu Tẩm Độc, Băng Phách Châm và các chiêu như vậy khi ra đòn sẽ tích Sát ý (tối đa 5 điểm), đòn kết liễu tiêu sạch một lần: Đoạt Mệnh Ấn mỗi điểm sát thương +25%, Ảnh Sát mỗi điểm đâm thêm một nhát. Vào trận bạn ra tay trước."],
-  paladin: ["Kim Cương phản kích", "Khi bị đánh có 15% tỉ lệ đỡ đòn và phản kích (80% sát thương Phật quang); đang có hộ thể chân khí thì thêm +15%. Mỗi lượt tự hồi một ít khí huyết."],
+  paladin: ["Phản chấn · Kim Cương Chấn", "Bị đánh chắc chắn phản chấn: sát thương Phật quang = công kích × bội số phản chấn (sẵn có 30%, đồ và bộ La Hán cộng thêm). Mỗi lần phản chấn tích một tầng «Chấn», đủ 10 tầng tự tung «Kim Cương Chấn», Phật quang đánh mọi kẻ địch. Bị đánh phản chấn còn hồi chút khí huyết."],
 };
 // 招式现在算哪一行：道士有的变招会改五行
 const effWx = (cls, k) => featureOn('runes') ? runeWx(k, (SAVE.chars[cls].runes || {})[k.id]) : k.wx;
@@ -1089,7 +1089,7 @@ const INTER = { 3: ["Màn chuyển 1", "Túy Tiên Lâu mở cửa lại", "Náo
 const hasProgress = () => !!(SAVE.run || storyCleared('normal') > 0 || CLASS_IDS.some(c => SAVE.chars[c].level > 1) || Object.keys(SAVE.world || {}).length);
 // 开局挑门派：五张卡，写明打法和上手难度；底下说清楚以后能换、哪些东西五门共用
 let CPICK = null;
-const CLS_PICK = [['berserker', "Cận chiến", "Máu dày da cứng, càng đánh càng điên; máu càng ít, sát thương càng cao", '★', "Dễ chơi nhất"], ['paladin', "Cận chiến", "Chịu đòn giỏi nhất: bị đánh thì đỡ và phản đòn, còn tự hồi máu", '★', "Dễ"],
+const CLS_PICK = [['berserker', "Cận chiến", "Máu dày da cứng, càng đánh càng điên; máu càng ít, sát thương càng cao", '★', "Dễ chơi nhất"], ['paladin', "Cận chiến", "Chịu đòn giỏi nhất: bị đánh là phản chấn, tích đủ thì Kim Cương Chấn quét cả sân, còn tự hồi máu", '★', "Dễ"],
   ['mage', "Pháp thuật", "Vẽ bùa niệm chú, đánh lan gắn trạng thái rồi kích nổ; thân thể yếu nhất", '★★', "Trung bình"], ['assassin', "Ám Khí", "Nhanh nhất, hiểm nhất, chuyên giết một mục tiêu; đánh lan yếu", '★★★', "Khó"], ['necro', "Triệu hồi", "Lắc chuông điều khiển cương thi chiến đấu, bản thân núp phía sau", '★★★', "Khó"]];
 const clsPickModal = () => `<h2 class="mh">Chọn một môn phái</h2><p class="sub cpk-sub">Có tất cả năm môn phái, chọn trước một phái hợp tay. Sau này chạm vào hình đầu ở trên cùng doanh trại để đổi người bất cứ lúc nào; bạc, rương đồ, tu vi, số tầng Ảo Cảnh năm phái dùng chung, cấp độ thì phái nào luyện phái nấy.</p>
   <div class="cpick">${CLS_PICK.map(([id, tag, d, st, hard]) => `<button class="cpk" data-act="clspick" data-arg="${id}"><span class="cpk-a">${heroSpr(id, 46)}</span>
@@ -1548,7 +1548,7 @@ const ST_INFO = {
   shadow: ["Vô Ảnh", '#b9a0ff', 1, "Né tránh tăng mạnh, đòn kế tiếp chắc chắn chí mạng."],
   smoke: ["Yên Độn", '#b9a0ff', 1, "Kẻ địch đánh không trúng bạn."],
   butui: ["Bất Thoái", '#ff9a5a', 1, "Sát thương phải nhận -50%, bị đánh tích gấp đôi nộ ý."],
-  chan: ["Thiền", '#fff2b0', 1, "Tỷ lệ phản kích +40%, phản kích chắc chắn làm địch choáng."],
+  chan: ["Thiền", '#fff2b0', 1, "Sát thương phải chịu -45%, bội số phản chấn +50%."],
   renew: ["Hồi xuân", '#5df07a', 1, "Mỗi lượt hồi 6% khí huyết."],
   shield: ["Hộ Thể", '#ffe58a', 1, "Chân khí hộ thể: chặn sát thương trước, chặn hết mới mất máu."],
   charging: ["Tụ lực", '#ff5a3a', 0, "Thủ lĩnh đang tụ lực, chiêu sau rất nặng. Làm nó choáng là cắt được, tuyệt kỹ cũng cắt được."],
@@ -1735,14 +1735,14 @@ function updBattle(o, anim) {
   }
   applyStep(o, anim);
 }
-// 职业资源：怒意、连、杀意、尸位、反击
+// 职业资源：怒意、连、杀意、尸位、震
 function resChip(P) {
   const R = CLASSES[P.cls].res; if (!R) return '';
   if (P.cls === 'berserker') return `<span class="rchip fury ${P.fury >= 50 ? 'hot' : ''}">Nộ ý <i style="--w:${Math.round(P.fury || 0)}%"></i><b>${Math.round(P.fury || 0)}</b></span>`;
   if (P.cls === 'mage') { const lw = P.lastWx; return `<span class="rchip lian" title="Đổi sang một hành khác để ra chiêu +1">Liên <b>${P.lian || 0}</b>${lw ? `<em style="color:${WX[lw].c}">${WX[lw].n}</em>` : ''}</span>`; }
   if (P.cls === 'assassin') return `<span class="rchip ki">Sát ý ${Array.from({ length: P.kiMax }, (_, i) => `<i class="${i < P.ki ? 'on' : ''}"></i>`).join('')}</span>`;
   if (P.cls === 'necro') return `<span class="rchip">Thi vị <b>${zombiesOf(B).filter(z => !ZOMBIES[z.zt].ult).length}/${P.minionCap}</b></span>`;
-  if (P.cls === 'paladin') return `<span class="rchip">Phản kích <b>${Math.min(85, P.counter + (P.shield > 0 ? 15 : 0) + (P.st.chan ? 40 : 0))}%</b></span>`;
+  if (P.cls === 'paladin') { const n = jzNeed(P), z = Math.min(n, P.zhen || 0); return `<span class="rchip zhen ${z >= n - 2 ? 'hot' : ''}" title="Tích đủ thì tung Kim Cương Chấn">Chấn <i style="--w:${Math.round(z / n * 100)}%"></i><b>${z}/${n}</b></span>`; }
   return '';
 }
 // 出手顺序条：接下来 6 次谁出手；头像下面是速度
@@ -1914,6 +1914,7 @@ function applyStep(o, anim) {
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
       if (el && mv) { const t = document.createElement('span'); t.className = 'pop move'; t.textContent = mv; el.appendChild(t); setTimeout(() => t.remove(), 1000); bump(el, 'acting', 600); }
     }
+    if (anim && o.jzz) { VFX.onJinzhen(); SFX.play('react'); }
     if (anim && o.react) { o.react.forEach(R => VFX.onReact(R.id, R.n, (STATES[R.s] || {}).c || '#e8b0ff')); SFX.play('react'); if (!SAVE.flags.combo1) { SAVE.flags.combo1 = 1; setTimeout(() => toast(`Ra được liên chiêu “${o.react[0].n}”! Dùng chiêu mở đòn gây trạng thái cho địch trước, rồi đánh bằng chiêu kết đòn là có thêm hiệu ứng. Vào “Tu luyện · Võ học” xem cách phối hợp`), 600); } }
     if (anim && o.cast) {
       const e = o.cast.elem;

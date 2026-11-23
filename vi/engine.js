@@ -30,7 +30,7 @@ function newSave() {
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
-              riftMax: 0, rift: {}, riftCap: 3, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true, thv: 1,
+              riftMax: 0, rift: {}, riftCap: 3, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true, thv: 2,
               story: { cleared: { normal: 0, nightmare: 0, hell: 0 }, pages: {}, ended: false, seen: {} } };
   for (const c of CLASS_IDS) s.chars[c] = newChar();
   return s;
@@ -72,6 +72,8 @@ function migrate(s) {
       if (it.imp && it.imp.thorns != null) { const L = it.legend && LEGENDS.find(l => l.id === it.legend); if (L && L.imp.thornK) it.imp.thornK = L.imp.thornK; delete it.imp.thorns; }
     });
   }
+  if (thv0 < 2) walkItems(s, it => { for (const a of it.aff || []) if (a[0] === 'thorns') a[1] = Math.max(1, Math.round(a[1] / 2)); });   // 2026-11-24 反震词条改成「反震伤害 +5–10%」：原来的反震倍率 +10–20% 对半折
+  s.thv = 2;
   for (const g of s.lgems || []) if (LGEM_OLD[g.t]) { g.old = g.t; g.t = 'reforge'; }
   for (const g of s.lgems || []) if ((g.lv || 0) > LGEM_CAP) { (s.lgCut = s.lgCut || []).push([g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : (LGEMS[g.t] || {}).n || "Linh ngọc", g.lv]); g.lv = LGEM_CAP; }   // 等级上限 150：超出的降回来，进游戏提示一次   // 2026-11-23 删掉的五颗灵玉：等玩家挑新的（等级保留）
   if (s.flags && !s.flags.wpnForged) { const all = [...(s.stash || [])]; for (const c in s.chars || {}) for (const sl in s.chars[c].eq || {}) if (s.chars[c].eq[sl]) all.push(s.chars[c].eq[sl]);
@@ -595,6 +597,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.atk = C.base.atk + C.per.atk * (level - 1);
   s.armor = C.base.armor + C.per.armor * (level - 1);
   s.crit = C.base.crit; s.critDmg = C.base.critDmg; s.spd = C.base.spd || 0; s.res = C.base.res || 0;
+  if (clsId === 'paladin') s.thornK = MONK_THK;   // 和尚自带反震倍率
   const fx = new Set(), setCount = {}; let nLeg = 0;
   const add = (k, v) => { if (k.startsWith('sk_')) s.sk[k.slice(3)] = (s.sk[k.slice(3)] || 0) + v; else s[k] = (s[k] || 0) + v; };
   for (const sl of POS_IDS) {
@@ -660,13 +663,13 @@ const SUST = {
   mage:     { n: "Thủy hành hộ thể", d: "Mỗi lần nối thêm một tầng “Liên”, trên người thêm một lớp hộ thể ({a}% khí huyết tối đa, cộng dồn tối đa {cap}%)", a: 6.5, cap: 45 },
   necro:    { n: "Thế mạng", d: "Sát thương phải chịu -{dr}%; khi trên sân có cương thi, thêm {a}% do cương thi gánh thay; cương thi ngã xuống thì bạn hồi {b}% khí huyết tối đa", a: 17, b: 6, dr: 7 },
   assassin: { n: "Thân Pháp", d: "Sát thương phải chịu -{dr}%, né tránh +{a}%; mỗi lần né được hồi {b}% khí huyết tối đa, hạ gục kẻ địch hồi {c}%", a: 25, b: 18, c: 22, dr: 12 },
-  paladin:  { n: "Kim Cương Bất Hoại", d: "Sát thương phải chịu -{dr}%; mỗi lần phản kích hồi {a}% khí huyết tối đa; mỗi lượt hồi thêm {b}%", a: 6, b: 1.5, dr: 19 },
+  paladin:  { n: "Kim Cương Bất Hoại", d: "Sát thương phải chịu -{dr}%; mỗi lần bị đánh phản chấn hồi {a}% khí huyết tối đa; mỗi lượt hồi thêm {b}%", a: 4.5, b: 1.5, dr: 19 },
 };
 // 等级越高，气血倍数越大，吸血缩水得越厉害，所以续航也跟着等级涨：10 级约 0.75 倍，23 级 1 倍，43 级起 1.4 倍封顶
 const sustLv = lv => Math.min(1.4, 0.55 + (lv || 1) / 50);
 const sustV = (u, k) => (SUST[u.cls][k] || 0) * (1 + (u.sust || 0) / 100) * sustLv(u.lv);
 function power(s) {
-  const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100 + (s.thornK || 0) / (s.cls === 'paladin' ? 150 : 400));   // 反震倍率也算输出（和尚挨打多，算得重一点）
+  const off = s.atk * (1 + s.dmgPct / 100 + s.elem / 250) * (1 + s.crit / 100 * (s.critDmg / 100 - 1)) * (1 + s.spd / 100 + (s.thornK || 0) / (s.cls === 'paladin' ? 150 : 400) * (1 + (s.thornDmg || 0) / 100));   // 反震倍率也算输出（和尚挨打多，算得重一点）
   const san = s.sanN || 0;   // 散件流也算进战力，「一键换上最强」才不会把它拆了。按 +1.5%／层算：十件神兵两枚扳指 ×1.3，显示出来和同档的 6 件套差不多（实测略弱）
   const ehp = s.maxHp * (1 + s.armorT / 120) / (1 - s.res / 100 * 0.6) * (1 + s.dodge / 100) + s.regen * 25 + s.thorns * 8;
   let skb = 0; for (const k in s.sk) skb += s.sk[k];
@@ -1730,7 +1733,7 @@ function startBattle(run, kind) {
               gDr: s.gDr || 0, regenPct: s.regenPct || 0, allyPct: s.allyPct || 0, cdSkip: s.cdSkip || 0,
               xDouble: s.xDouble || 0, xRage: s.xRage || 0, xTen: s.xTen || 0, xDr: s.xDr || 0, xLast: s.xLast || 0, xHaste: s.xHaste || 0, hasteN: s.xHaste ? 2 : 0, xKill: s.xKill || 0, xCritNext: s.xCritNext || 0,
               lgv: s.lgv || {}, lowHpK: s.lowHpK || 0, thornK: (s.thornK || 0) + (s.fx.has('thornsPct') ? 60 : 0), ssN: 0,
-              counter: run.cls === 'paladin' ? 15 + (s.counter || 0) + (s.fx.has('luoHan6') ? 15 : 0) : 0, yi: yiOf(ch), fonu: 0, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
+              zhen: 0, thornDmg: s.thornDmg || 0, yi: yiOf(ch), fonu: 0, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
               fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: 25 };
   const encU = run.encUnits; delete run.encUnits;
   const b = { kind, P, units: [P, ...(encU || makeEncounter(run, kind, cell))], corpses: 0, turn: 0, over: false, win: false,
@@ -2684,7 +2687,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (V.tiangang != null && src.st.tg) d *= 1 + LGV.tgK(V.tiangang) / 100;
     if (V.duopo != null && b.castSk && b.castSk.fin && !opt.proc) d *= 1 + LGV.dpFin(V.duopo) / 100;
   }
-  if (tgt === b.P && tgt.st.chan) d *= 0.7;   // 狮子吼：嘲讽期间受到的伤害 -30%
+  if (tgt === b.P && tgt.st.chan) d *= 1 - CHAN_DR / 100;   // 狮子吼：嘲讽期间受到的伤害 -45%（2026-11-24 原来 -30%，反击晕人取消后补的）
   if (tgt.phShield && tgt.shield > 0) d *= R_BOSS_PH[2];                          // 守关妖王 70% 血的护体真气：打破之前伤害减半
   if (src.fmD) d *= 1 + src.fmD / 100;                                           // 阵法：号位伤害
   if (src.fmStD && tgt.st && stHas(tgt, 'any')) d *= 1 + src.fmStD / 100;          // 蛇蟠阵 1 号：打身上有状态的
@@ -2845,7 +2848,6 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (d <= 0) {
       out.pops.push([tgt.id, "Khiên", 'miss']);
       if (shieldThorns && src.hp > 0) { const r = Math.round(dPre * 0.3); src.hp -= r; out.pops.push([src.id, "Phản thương" + r, 'thorn']); }
-      if (tfx && tfx.has('luoHan4')) counterHit(b, tgt, src, out, opt);   // 罗汉金身：护体挡下的攻击也反击
       thornHit(b, tgt, src, out, opt);
       return 0;
     }
@@ -2862,7 +2864,6 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   if (tgt.kind === 'hero' && src.side === 'e' && tgt.cls === 'berserker') tgt.fury = Math.min(100, (tgt.fury || 0) + 8 * (tgt.st.butui ? 2 : 1) * (1 + (tgt.furyGain || 0) / 100));
   if (tgt.thornsP && src.side === 'e' && src.hp > 0) { const r = Math.max(1, Math.round(d * tgt.thornsP)); src.hp -= r; out.pops.push([src.id, "Phản chấn" + r, 'thorn']); }
-  counterHit(b, tgt, src, out, opt);
   thornHit(b, tgt, src, out, opt);
   if (tgt.kind === 'hero' && tgt.yi && src.side === 'e' && !opt.proc) {
     if (tgt.yi.shimo && src.hp > 0 && tgt.hp > 0 && RNG.ch((15 + tgt.yi.shimo * 5) / 100)) { out.pops.push([tgt.id, "Dung Tâm", 'fire']); out.yi = 'shimo'; hit(b, tgt, src, 0.8 + tgt.yi.shimo * 0.3, 'fire', out, { proc: 1 }); stSet(tgt, src, 'burn', out); }
@@ -2951,43 +2952,41 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   return d;
 }
-// 反震（2026-11-23 重做）：不再是死数。每挨一下打（被护体挡下的也算），对出手的敌人打一下 = 你的攻击 × 反震倍率，
-// 吃伤害加成和佛怒。和尚的狮子吼嘲讽期间反震倍率 +50%；罗汉金身 2 件 +100%、4 件嘲讽期间翻倍、6 件反震也叠佛怒并回一成血
-const THORN_TAUNT = 50;
-// 护法金身（2026-11-24）：和尚的伤害八成靠挨打，带控场伙伴、妖物去打伙伴都会少挨打。所以：
-//   伙伴晕住/冻住的妖物，跳过回合时照样吃和尚一次完整反震（act 里，opt.thf）；妖物打伙伴，和尚替伙伴反震一半（HUFA_K）。
-//   和尚自己晕住的不算（单刷强度不变）；反击不动，还是得真挨打
-const HUFA_K = 0.5;
+// 反震（2026-11-24 和反击合并）：和尚没有「反击」了，挨打只有反震——每挨一下打（被护体挡下的也算）必定弹一下：
+//   伤害 = 攻击 × 反震倍率 × (1 + 反震伤害%)，佛光，吃伤害加成和佛怒。和尚自带反震倍率 +MONK_THK%（calcStats），狮子吼嘲讽期间再 +50%。
+//   和尚每反震一次攒一层「震」（罗汉 4 件：狮子吼期间攒两层），攒满 JZ_N 层（金刚铃 8 层）自动放「金刚震」：佛光打所有敌人 = 攻击 × 反震倍率 × JZ_K。
+//   真挨打的反震（不算定身、护法）才回血（金刚不坏）、给金身玉护体、木鱼回血
+// 护法金身：伙伴晕住/冻住的妖物，跳过回合时照样吃和尚一次完整反震（act 里，opt.thf）；妖物打伙伴，和尚替伙伴反震一半（HUFA_K）。和尚自己晕住的不算
+const CHAN_DR = 45, THORN_TAUNT = 50, HUFA_K = 0.5, MONK_THK = 30, JZ_N = 10;
+let JZ_K = 0.7;   // 2026-11-24 模拟定的：罗汉单刷强度和改前差不多（快一成多），控场队快两成、高层胜率高一成
+const jzNeed = P => P && P.fx && P.fx.has('cCounter') ? 8 : JZ_N;
 function thornHit(b, tgt, src, out, opt) {
-  let f = opt.thf || 1;
-  if (tgt !== b.P && tgt.kind === 'ally' && b.P && b.P.cls === 'paladin') { f *= HUFA_K; tgt = b.P; }
+  let f = opt.thf || 1, real = !opt.thf;
+  if (tgt !== b.P && tgt.kind === 'ally' && b.P && b.P.cls === 'paladin') { f *= HUFA_K; tgt = b.P; real = false; }
   if (tgt !== b.P || src.side !== 'e' || src.hp <= 0 || tgt.hp <= 0 || opt.refl) return;
-  const tfx = tgt.fx, chan = !!tgt.st.chan;
-  let K = (tgt.thornK || 0) + (chan && tgt.cls === 'paladin' ? THORN_TAUNT : 0); if (K <= 0) return;
-  if (chan && tfx && tfx.has('luoHan4')) K *= 2;
-  K *= f;
-  const d = hit(b, tgt, src, K / 100, 'holy', out, { proc: 1, refl: 1 });
-  if (d > 0 && tfx && tfx.has('luoHan6')) {
-    if (tgt.fonu < (tfx.has('fumoBelt') ? 15 : 10) && RNG.ch(0.5)) { tgt.fonu++; out.pops.push([tgt.id, "Phật nộ " + tgt.fonu, 'buff']); }
-    heal(tgt, d * 0.1, out, true);
+  const tfx = tgt.fx || new Set(), chan = !!tgt.st.chan, monk = tgt.cls === 'paladin', lh4 = chan && tfx.has('luoHan4');
+  let K = (tgt.thornK || 0) + (chan && monk ? THORN_TAUNT : 0); if (K <= 0) return;
+  if (lh4) K *= 2;
+  K *= 1 + (tgt.thornDmg || 0) / 100;
+  const d = hit(b, tgt, src, K * f / 100, 'holy', out, { proc: 1, refl: 1 });
+  if (!monk) return;
+  if (real) {
+    heal(tgt, tgt.maxHp * sustV(tgt, 'a') / 100, out, true);   // 金刚不坏：挨打反震回血
+    if (tgt.lgv && tgt.lgv.jinshen != null) { const capS = tgt.maxHp * 0.5; if ((tgt.shield || 0) < capS) tgt.shield = Math.round(Math.min(capS, (tgt.shield || 0) + tgt.maxHp * LGV.jsSh(tgt.lgv.jinshen) / 100)); }   // 金身玉：挨打反震给自己护体
+    if (tfx.has('muyuOff')) { heal(tgt, tgt.maxHp * 0.015, out, true); b.units.filter(u => u.kind === 'ally' && u.hp > 0).forEach(u => heal(u, u.maxHp * 0.04, out, true)); }   // 镇心木鱼
   }
+  if (tfx.has('luoHan6')) {
+    if (tgt.fonu < (tfx.has('fumoBelt') ? 15 : 10)) { tgt.fonu++; out.pops.push([tgt.id, "Phật nộ " + tgt.fonu, 'buff']); }
+    if (d > 0) heal(tgt, d * 0.1, out, true);
+  }
+  tgt.zhen = (tgt.zhen || 0) + (lh4 ? 2 : 1);
+  if (tgt.zhen >= jzNeed(tgt)) { tgt.zhen = 0; jinZhen(b, tgt, K, out); }
 }
-// 金刚武僧：挨打时有几率格挡反击
-function counterHit(b, tgt, src, out, opt) {
-  if (!(tgt.kind === 'hero' && tgt.counter && src.side === 'e' && src.hp > 0 && tgt.hp > 0 && !opt.proc && !b.inCounter)) return;
-  const tfx = tgt.fx, ch = (tgt.counter + (tgt.shield > 0 ? 15 : 0) + (tgt.st.chan ? 40 : 0) + (tfx && tfx.has('cCounter') ? 10 : 0)) / 100;   // 金刚铃 +10
-  if (!RNG.ch(Math.min(0.85, ch))) return;
-  b.inCounter = true; out.pops.push([tgt.id, "Phản kích", 'buff']);
-  if (tgt.cls === 'paladin') heal(tgt, tgt.maxHp * sustV(tgt, 'a') / 100, out, true);
-  if (tgt.lgv && tgt.lgv.jinshen != null) { const capS = tgt.maxHp * 0.5; if ((tgt.shield || 0) < capS) tgt.shield = Math.round(Math.min(capS, (tgt.shield || 0) + tgt.maxHp * LGV.jsSh(tgt.lgv.jinshen) / 100)); }   // 金身玉：反击时给自己护体
-  const lh = tfx && tfx.has('luoHan4');
-  const wf = (tfx && tfx.has('wFumo') ? 1 + tgt.wpK : 1) * (tfx && tfx.has('cCounter') ? 1.5 : 1);
-  (lh ? aliveOf(b, 'e') : [src]).forEach(f => hit(b, tgt, f, (lh ? 2 : 0.8) * wf, 'holy', out, { proc: 1, aoe: lh ? 1 : 0 }));
-  if (tgt.st.chan && src.hp > 0) freezeU(src, out, "Choáng");
-  if (tfx && tfx.has('fumoBelt') && src.hp > 0 && RNG.ch(0.3)) freezeU(src, out, "Choáng");
-  if (tfx && tfx.has('muyuOff')) { heal(tgt, tgt.maxHp * 0.02, out, true); b.units.filter(u => u.kind === 'ally' && u.hp > 0).forEach(u => heal(u, u.maxHp * 0.05, out, true)); }
-  if (tfx && tfx.has('luoHan6') && tgt.fonu < (tfx.has('fumoBelt') ? 15 : 10)) { tgt.fonu++; out.pops.push([tgt.id, "Phật nộ " + tgt.fonu, 'buff']); }
-  b.inCounter = false;
+// 金刚震：攒满「震」自动放，佛光扫过全场。伏魔禅杖伤害 +100%（随兵器成色），金刚铃 +30%，伏魔带打中的 30% 几率晕住
+function jinZhen(b, P, K, out) {
+  const tfx = P.fx, m = K / 100 * JZ_K * (tfx.has('wFumo') ? 1 + P.wpK : 1) * (tfx.has('cCounter') ? 1.3 : 1);
+  out.jzz = 1; out.lines.push("Kim Cương Chấn! Phật quang quét qua cả sân");
+  aliveOf(b, 'e').forEach(f => { hit(b, P, f, m, 'holy', out, { proc: 1, aoe: 1, refl: 1 }); if (tfx.has('fumoBelt') && f.hp > 0 && RNG.ch(0.3)) freezeU(f, out, "Choáng"); });
 }
 function resolveDeaths(b, out) {
   const run = b.run, P = b.P;
