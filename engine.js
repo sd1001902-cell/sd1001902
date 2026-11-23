@@ -1593,9 +1593,7 @@ function makeMonster(def, lv, run, kind, affs) {
   return u;
 }
 // 地图上一只精英的词缀：第一次看见它的时候摇好，存在它身上，进战斗照用
-const R_AFF_HI = [150, 250, 200];   // 高层精英：150 层起多一个词缀，250 层起再多一个；200 层起小怪也带词缀（200 层一半带一个，250 层起都带）
-const PACK_AFFS = ['fiery', 'cold', 'vamp', 'enraged', 'fast', 'shielded', 'venom'];   // 小怪能带的：不带分身、铜皮、反震（一群一起来，太折腾）
-const packAffs = N => N >= R_AFF_HI[1] || (N >= R_AFF_HI[2] && RNG.ch(0.5)) ? [RNG.pick(PACK_AFFS)] : [];
+const R_AFF_HI = [150, 250];   // 高层精英：150 层起多一个词缀，250 层起再多一个（小怪不带词缀：用户定）
 function eliteAffsOf(run, mn) {
   if (mn.affs) return mn.affs;
   const rift = run.mode === 'rift';

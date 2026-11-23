@@ -1369,7 +1369,7 @@ function rPrep(run, enc) {
   }
   run.theme = R.c - 1;
   const F = CHAPTERS[R.c - 1], Z = rSanitize(R.c, R.sc), nAff = 1 + (run.riftLv >= 20 ? 1 : 0) + (run.riftLv >= 45 ? 1 : 0), el = [], no = [];
-  const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal', packAffs(run.riftLv)); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; return u; };
+  const norm = (def, lv) => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0] * tK); u.atk *= R_NORM[1]; return u; };
   for (const id of enc.ids) { const mn = D.mons.find(o => o.id === id); if (!mn) continue; const def = F.mons[mn.m] || F.mons[0];
     if (mn.elite) {
       const affs = eliteAffsOf(run, mn), e = makeMonster(def, mn.lv + (riftNewbie(run) ? 0 : 1), run, 'elite', affs);

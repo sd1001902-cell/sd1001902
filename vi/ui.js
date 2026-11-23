@@ -642,7 +642,7 @@ const goHelpModal = () => () => {
     <p class="help-p">Trên bản đồ hương cháy theo thời gian thật; trong trận tính theo lượt (một vòng tính 3 giây), mở tốc độ mấy hay bỏ qua trận đều như nhau.</p>
     <p class="help-p">Thần binh, đồ Bộ rơi ra có tỉ lệ là Thượng Cổ (từ tầng 30, tầng càng cao càng dễ ra), từ tầng 90 còn có thể là Thái Cổ. Từ tầng ${RSET_LV} rơi đồ Bộ Ảo Cảnh, từ tầng ${RSET2_LV} rơi cả hai bộ. Phẩm của tinh phách theo số tầng, thu vào Trấn Yêu Lục.</p>
     <p class="help-p">Khi dẫn đồng hành, yêu vật cũng mạnh lên theo: tiểu yêu nhiều máu hơn, thủ lĩnh mang theo hộ pháp.</p>
-    <p class="help-p">Từ tầng ${R_HI[0]} trở lên yêu vật mạnh lên nhanh hơn; tinh anh từ tầng ${R_AFF_HI[0]} thêm một đặc tính, từ tầng ${R_AFF_HI[1]} thêm một nữa; từ tầng ${R_AFF_HI[2]} tiểu yêu cũng mang đặc tính (từ tầng ${R_AFF_HI[1]} con nào cũng có).</p>`
+    <p class="help-p">Từ tầng ${R_HI[0]} trở lên yêu vật mạnh lên nhanh hơn; tinh anh từ tầng ${R_AFF_HI[0]} thêm một đặc tính, từ tầng ${R_AFF_HI[1]} thêm một nữa.</p>`
     : `<p class="help-p">Mỗi chương một bản đồ lớn: đi đường gặp quái, tìm chìa khóa, làm nhiệm vụ, cuối cùng đánh thủ lĩnh. Thủ lĩnh có manh mối và chìa khóa khắc chế riêng, tìm được chìa khóa rồi đánh sẽ nhẹ nhàng hơn nhiều. Ngã xuống thì đồ đã nhặt đều được giữ, bạn sẽ tỉnh lại bên đống lửa trại gần nhất.</p>`}
     ${featureOn('mods') ? `<h4 class="sub-h">Tăng độ khó</h4><div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}
     <button class="btn ghost" data-act="close">Xong</button>`;

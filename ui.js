@@ -641,7 +641,7 @@ const goHelpModal = () => () => {
     <p class="help-p">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
     <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
     <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>
-    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个；${R_AFF_HI[2]} 层起小怪也带词缀（${R_AFF_HI[1]} 层起每只都带）。</p>`
+    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个。</p>`
     : `<p class="help-p">一章一张大地图：走路遇怪、找钥匙、做任务，最后打首领。首领有专门克制它的线索和钥匙，先找钥匙再打会轻松很多。倒下了得到的东西都会保留，会在最近的篝火边醒来。</p>`}
     ${featureOn('mods') ? `<h4 class="sub-h">加难度</h4><div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}
     <button class="btn ghost" data-act="close">好了</button>`;
