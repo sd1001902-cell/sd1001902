@@ -308,7 +308,7 @@ const riftHelpModal = () => `<h2 class="mh">幻境换了打法</h2>
   <p class="help-p"><b>拉怪合战</b>：撞上一群妖物，旁边三格内的会一起卷进来，一场最多四群。群攻的招式在这里最值钱。</p>
   <p class="help-p"><b>进度</b>：斩妖攒进度，精英给得多，倒下后还会掉一颗精魄，要走过去捡。进度满了，守关妖王就在你身边现身。</p>
   <p class="help-p"><b>换层</b>：每层进度不封顶，想在这一层打到底、还是去远处的传送阵换下一层，你自己定。越往下越肥：妖物高一级，每只给的进度更多（第二层 +15%，第三层 +30%，第四层 +50%），精英也多一只。每层还有一座塔，踩上去有三场战斗的加成。</p>
-  <p class="help-p"><b>一炷香</b>：十二分钟。在地图上按真实时间烧；战斗里按回合折算，一轮算三秒，开几倍速、跳不跳过战斗都一样。</p>
+  <p class="help-p"><b>一炷香</b>：十三分钟。在地图上按真实时间烧；战斗里按回合折算，一轮算三秒，开几倍速、跳不跳过战斗都一样。</p>
   <p class="help-p"><b>久战破绽</b>：一场打到第 10 轮（妖王战第 20 轮），妖物不再回血，之后每轮多受 10% 伤害——再能回血的妖物也拖不成死局。会回血的妖物在幻境里每回合只回 2%，灼烧、中毒都压得住。</p>\n  <p class="help-p">掉的装备都记在这一局里，打完一起看；中途不会停下来结算。</p>
   <div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`;
 function xiangBar(run) {
@@ -1373,6 +1373,7 @@ function endBattle() {
     return setTimeout(() => { if (BRES && VIEW === 'battle') battleContinue(); }, 500);
   }
   save(); showRes();
+  if (!BRES.win && isRift(SAVE.run) && WAUTO && RDEATH < 1) setTimeout(() => { if (BRES && !BRES.win && VIEW === 'battle' && WAUTO) battleContinue(); }, 2400);   // 自动闯关：第一次倒下自己爬起来
   if (!BRES.win && !(WKEY && WKEY.key && WKEY.key.scripted)) SFX.play('lose');
   else if (BRES.items.some(i => i.anc || i.rarity === 'legend' || i.rarity === 'set')) SFX.play('legend');
   else if (BRES.levels) SFX.play('level');
@@ -1813,6 +1814,7 @@ function battleContinue() {
 
 // ---------- 大地图 ----------
 let WGEN = 0, WDRAWT = 0, WF = 1, WMOVING = false;   // 地图重画：代数、上一帧时间、这一帧相当于几个 60 帧、这一帧有没有东西在动
+let MAPGOAL = null, RDEATH = 0, RARMED = null;   // 小地图点的目的地；自动闯关连着倒下几次；这一局已经按记忆开过自动
 let WALK = null, WAUTO = false, WAUTOZ = null, WKEY = null, WLOOP = 0, WCAM = null, WHERO = null, WMONP = {}, WTAP = null, WTRK = false, JOY = null, WGOAL = null, WPART = [], WTRAIL = [];
 const WTS = () => (window.innerWidth < 700 ? 42 : 52), W_STEP = 150;
 const wch = () => SAVE.run.chapter;
@@ -1837,7 +1839,7 @@ function riftWorldHTML() {
     <div class="wmap" id="wmap"><canvas id="wcv"></canvas><div class="wzone" id="wzone">${esc(zoneName())}</div>
       <div class="wfol">${''}</div>
       ${SAVE.joy ? '<div class="joy" id="joy"><i></i></div>' : ''}</div>
-    <div class="wctl"><button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? '寻妖中…' : '自动寻妖'}</button>
+    <div class="wctl"><button class="btn ${WAUTO ? '' : 'ghost'} wauto" data-act="wauto">${WAUTO ? '闯关中…' : '自动闯关'}</button>
       <button class="btn ghost" data-act="wmini">地图</button>
       <button class="btn ghost" data-act="bag">人物${talentInfo(run.cls).free ? ` <b class="upn">${talentInfo(run.cls).free}</b>` : ''}</button>
       <button class="btn ghost" data-act="rquit">离开</button></div>
@@ -1873,6 +1875,8 @@ function wSetup() {
   if (!WHERO || WHERO.ch !== wch() || WHERO.sc !== S.sc) { WHERO = { ch: wch(), sc: S.sc, x: S.pos.x, y: S.pos.y, flip: false, t: 0 }; WMONP = {}; WCAM = null; WPART = []; WTRAIL = []; }
   WHERO.x = S.pos.x; WHERO.y = S.pos.y;
   if (!WCAM) WCAM = { x: S.pos.x, y: S.pos.y };
+  if (isRift(SAVE.run) && SAVE.rAuto && RARMED !== SAVE.run && !SAVE.run.riftDone) { RARMED = SAVE.run; RDEATH = 0;   // 上次开着自动闯关：进门（或刷新后接着打）就自己开始
+    setTimeout(() => { if (VIEW === 'world' && !WAUTO && !WALK && isRift(SAVE.run)) wStartAuto(); }, 900); }
   cancelAnimationFrame(WLOOP); clearTimeout(WLOOP); const gen = ++WGEN; WDRAWT = 0;
   // 省电：有东西在动（走路、镜头、妖物挪步、点地涟漪）才 60 帧；静止时约 20 帧，只剩火光、呼吸这些小动静
   const loop = t => { if (gen !== WGEN || VIEW !== 'world' || !$('#wcv') || !SAVE.run || !SAVE.run.world) return; wDraw(cv, dpr, ts, t);
@@ -2129,6 +2133,7 @@ function wDraw(cv, dpr, ts, t) {
   }
   // 路径预览
   if (WALK && WALK.path) { g.fillStyle = 'rgba(255,215,140,.45)'; for (const p of WALK.path.slice(WALK.i)) { g.beginPath(); g.arc(ox + (p.x + 0.5) * ts, oy + (p.y + 0.5) * ts, 3, 0, 7); g.fill(); } }
+  if (MAPGOAL && MAPGOAL.sc === S.sc) { g.strokeStyle = `rgba(255,215,140,${(0.6 + 0.3 * Math.sin(t / 220)).toFixed(2)})`; g.lineWidth = 2; g.beginPath(); g.arc(ox + (MAPGOAL.x + 0.5) * ts, oy + (MAPGOAL.y + 0.5) * ts, ts * 0.38, 0, 7); g.stroke(); }
   if (WTAP && t - WTAP.t < 400) { g.strokeStyle = `rgba(255,215,140,${1 - (t - WTAP.t) / 400})`; g.lineWidth = 2; g.beginPath(); g.arc(ox + (WTAP.x + 0.5) * ts, oy + (WTAP.y + 0.5) * ts, ts * 0.45, 0, 7); g.stroke(); } else if (WTAP && !WTAP.t) WTAP.t = t;
   // 跟在身后的人
   const fol = [S.flags.ngocFollow ? ['ngoc'] : null, S.flags.zhenFollow ? ['constable'] : null, S.flags.escort ? [(SPEAKERS[S.flags.escort] || {}).spr || 'villager', (SPEAKERS[S.flags.escort] || {}).pal] : null].filter(Boolean);
@@ -2224,7 +2229,7 @@ function wTap(px, py, cv, ts) {
   const ch = wch(), m = wmap(ch);
   const x = Math.floor((px - WCAM.ox) / ts), y = Math.floor((py - WCAM.oy) / ts);
   if (x < 0 || y < 0 || x >= m.W || y >= m.H) return;
-  WTAP = { x, y, t: 0 }; wStopAuto(); WGOAL = null;
+  WTAP = { x, y, t: 0 }; wStopAuto(); WGOAL = null; MAPGOAL = null;
   const S = wstate(ch);
   if (x === S.pos.x && y === S.pos.y) { const P = wPt(ch, x, y); if (P && P.t === 'camp') openModal(campModal(P)); return; }
   if (wBoxAt(ch, x, y)) { const dx = x - S.pos.x, dy = y - S.pos.y; if (Math.abs(dx) + Math.abs(dy) === 1) return wDirStep(dx, dy); return qtoast('走到冰块旁边，往要推的方向点它'); }
@@ -2317,7 +2322,7 @@ function wStepLoop() {
   if (r.cont) { for (const a of r.acts) { if (a.toast) qtoast(a.toast); if (a.sfx) SFX.play(a.sfx); } }
   else if (r.acts.length) { WALK = null; save(); return wRun(r.acts); }
   // 自动探索时：有醒着的妖物靠近、或者找到了要找的东西，就停下
-  if (WAUTO) {
+  if (WAUTO && !isRift(SAVE.run)) {   // 剧情里：醒着的妖物靠近就停；幻境里本来就是去找妖物打，撞上去就开打
     if (wScene(ch).mons.some(mn => mn.beh !== 'sleep' && wInSight(ch, mn.x, mn.y) && wdist(mn, S.pos) <= 3)) { WALK = null; wStopAuto(); qtoast('前面有妖物，自动探索先停下'); return; }
     const found = wTracker(ch).find(q => q.find && (() => { const t = wMarkPos(ch, q); return t && !t.area && t.sc === S.sc && wInSight(ch, t.x, t.y); })());
     if (found) { WALK = null; wStopAuto(); WGOAL = null; qtoast(`那边好像有东西——「${found.t}」`); SFX.play('rare'); return; }
@@ -2332,7 +2337,10 @@ function wAutoStep() {
   const ch = wch(), run = SAVE.run;
   if (isRift(run)) {   // 幻境：妖王 > 精魄球 > 最近的一群妖物；这一层打空了就去传送阵
     const S = wstate(ch), D = wScene(ch), m = wmap(ch), near = L => L.slice().sort((a, b) => wdist(a, S.pos) - wdist(b, S.pos));
-    const boss = D.mons.find(o => o.boss), cands = boss ? [boss] : (D.orbs && D.orbs.length && !rCapped(run)) ? near(D.orbs) : (D.mons.length && !rCapped(run)) ? near(D.mons).slice(0, 6) : (m.pts['2'] || []);
+    // 自动闯关：妖王 > 精魄和精英优先（近处的精魄当顺路捡，精英比同样远的小妖先打）> 最近的一群；这一层攒够了就去传送阵
+    const boss = D.mons.find(o => o.boss), sc = o => wdist(o, S.pos) - (o.orb ? 16 : o.rare ? 32 : o.elite ? 24 : 0);   // 精英远一点也先去：一只精英连精魄 8 分，顶得上一大群小妖
+    const pool = rCapped(run) ? [] : [...(D.orbs || []).map(o => ({ x: o.x, y: o.y, orb: 1 })), ...D.mons];
+    const cands = boss ? [boss] : pool.length ? pool.sort((a, b) => sc(a) - sc(b)).slice(0, 6) : (m.pts['2'] || []);
     let path = null; for (const c of cands) { path = wPath(ch, c.x, c.y); if (path && path.length) break; }
     if (!path || !path.length) { wStopAuto(); return qtoast('附近找不到妖物了，自己走走看'); }
     WALK = { path: path.slice(0, 12), i: 0 }; return wStepLoop();
@@ -2345,8 +2353,8 @@ function wAutoStep() {
     return qtoast(loose ? '路都走过了——地上发光的地方还没看，点一下试试' : z ? '这一带都找遍了，换个地方看看' : '附近都探索过了'); }
   WALK = { path: path.slice(0, 10), i: 0 }; wStepLoop();
 }
-function wStopAuto() { WAUTOZ = null; if (!WAUTO) return; WAUTO = false; const b = document.querySelector('.wauto'); if (b) { b.classList.add('ghost'); b.textContent = isRift(SAVE.run) ? '自动寻妖' : '自动探索'; } }
-function wStartAuto(zone) { if (wWatchBlock(wch())) return qtoast('这里有人巡逻，自动探索不管用——自己摸过去'); WAUTO = true; WAUTOZ = zone || null; const b = document.querySelector('.wauto'); if (b) { b.classList.remove('ghost'); b.textContent = isRift(SAVE.run) ? '寻妖中…' : '探索中…'; } wAutoStep(); }
+function wStopAuto() { WAUTOZ = null; if (!WAUTO) return; WAUTO = false; const b = document.querySelector('.wauto'); if (b) { b.classList.add('ghost'); b.textContent = isRift(SAVE.run) ? '自动闯关' : '自动探索'; } }
+function wStartAuto(zone) { if (wWatchBlock(wch())) return qtoast('这里有人巡逻，自动探索不管用——自己摸过去'); WAUTO = true; WAUTOZ = zone || null; const b = document.querySelector('.wauto'); if (b) { b.classList.remove('ghost'); b.textContent = isRift(SAVE.run) ? '闯关中…' : '探索中…'; } MAPGOAL = null; wAutoStep(); }
 // 等级和经验条：手机上副标题是收起来的，等级要单独露出来
 let XPLV = null;
 function xpInfo(cls) {
@@ -2400,7 +2408,7 @@ function wRun(acts, i = 0) {
   if (doCommon(a, next)) return;
   if (a.enter) { WHERO = null; WMONP = {}; render(); const D = WMAPS[wch()].scenes[a.enter]; banner(D.n, '', 1100); SFX.play('door'); return setTimeout(next, 350); }
   if (a.fight) { WKEY = { key: a.key, rest: acts.slice(i + 1) }; return beginWorldBattle(a.fight); }
-  if (a.rboss) { wStopAuto(); WALK = null; render(); banner('守关妖王现身', `${a.rboss} · ${a.d || ''}`, 2200); SFX.play('gong'); return setTimeout(next, 600); }
+  if (a.rboss) { WALK = null; render();   /* 自动闯关开着就接着去打妖王 */ banner('守关妖王现身', `${a.rboss} · ${a.d || ''}`, 2200); SFX.play('gong'); return setTimeout(next, 600); }
   if (a.rdone) { const run = SAVE.run; riftComplete(run); SFX.play('legend'); return finishRunView(run, 'win'); }
   if (a.chest) { const run = SAVE.run; run.encCell = { lv: wmap(wch()).zoneAt(wstate(wch()).pos.x, wstate(wch()).pos.y).lv };
     CHEST = openChest(run, a.q); VIEW = 'chest'; SFX.play('loot'); WKEY = { rest: acts.slice(i + 1) }; return render(); }
@@ -2449,6 +2457,9 @@ const bossHelpModal = id => () => {
 // 一键前往跨场景时：进门之后接着走
 function wResume() {
   if (WGOAL && !DLG && !MODALFN && VIEW === 'world') { const id = WGOAL.id; if (++WGOAL.hops > 10) { WGOAL = null; return; } setTimeout(() => { if (WGOAL && WGOAL.id === id && !WALK && !DLG && !MODALFN) ACT.wgo(id, null, true); }, 350); }
+  else if (MAPGOAL && !DLG && !MODALFN && VIEW === 'world') { const G = MAPGOAL, S = wstate(wch());
+    if (G.sc !== S.sc || (G.x === S.pos.x && G.y === S.pos.y) || ++G.hops > 12) { MAPGOAL = null; return; }
+    setTimeout(() => { if (MAPGOAL === G && !WALK && !DLG && !MODALFN && VIEW === 'world' && !wWalkTo(G.x, G.y, () => { if (MAPGOAL === G) MAPGOAL = null; })) MAPGOAL = null; }, 350); }
   else if (WAUTO) setTimeout(wAutoStep, 400);
 }
 function beginWorldBattle(enc) {
@@ -2464,9 +2475,14 @@ function beginWorldBattle(enc) {
 function riftBattleContinue() {
   const run = SAVE.run, k = WKEY || {}; WKEY = null;
   if (!BRES.win) {
-    const pen = riftRevive(run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; wStopAuto(); WHERO = null; save(); render();
-    banner('你倒下了', `幻境把你吐回了这一层的入口 · 香烧掉 ${fmtClock(pen)}`, 1800); return;
+    const auto = WAUTO, keep = auto && ++RDEATH < 2;   // 自动闯关：倒下一次爬起来接着打；连着倒两次就停，免得白白烧香
+    const pen = riftRevive(run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; MAPGOAL = null; wStopAuto(); WHERO = null; save(); render();
+    banner('你倒下了', `幻境把你吐回了这一层的入口 · 香烧掉 ${fmtClock(pen)}`, 1800);
+    if (keep) setTimeout(() => { if (VIEW === 'world' && !WAUTO && isRift(SAVE.run)) wStartAuto(); }, 2000);
+    else if (auto) qtoast('连着倒下两次，自动闯关先停下：换身装备，或者降一层再来');
+    return;
   }
+  RDEATH = 0; if (B && B.kind === 'boss') wStopAuto();   // 打完妖王停在结算
   B = null; VIEW = 'world'; save(); render();
   wRun(wFightWon(RCH, k.key || {}, run).concat(k.rest || []));
 }
@@ -2479,7 +2495,7 @@ function worldBattleContinue() {
   }
   if (!BRES.win) {
     const bid = k.key && k.key.boss, S0 = wstate(ch); if (bid) S0.pz.bl = (S0.pz.bl || 0) + 1;
-    const r = wDefeat(ch, run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; wStopAuto(); WHERO = null; save(); render();
+    const r = wDefeat(ch, run); B = null; VIEW = 'world'; WALK = null; WGOAL = null; MAPGOAL = null; wStopAuto(); WHERO = null; save(); render();
     // 同一个首领输到第二次（以后每隔一次）：直接说清它哪招要用什么克，并给一个「前往」
     const help = bid && S0.pz.bl >= 2 && S0.pz.bl % 2 === 0 && DOSSIER[bid] && DOSSIER[bid].items.some(it => it.key && !wkeys()[it.key]);
     playDialog([['narr', `你倒下了……迷迷糊糊中，有人把你拖回了篝火边。${r.lost ? `钱袋轻了 ${r.lost} 两。` : ''}`], ...(r.msg ? [['narr', r.msg]] : [])], null, help ? () => openModal(bossHelpModal(bid)) : undefined);
@@ -2598,7 +2614,7 @@ function wDemoKey(ch) {
   return null;
 }
 function wDemoCheck() {
-  if (VIEW !== 'world' || DLG || MODALFN || WKEY || !SAVE.run || !SAVE.run.world) return; const qz = document.querySelector('#quiz'); if (qz && !qz.hidden) return;
+  if (VIEW !== 'world' || DLG || MODALFN || WKEY || !SAVE.run || !SAVE.run.world || isRift(SAVE.run)) return; const qz = document.querySelector('#quiz');   // 幻境里冰面不滑、岩浆毒沼不伤人：这些机关说明不弹（原来会弹，还会打断自动闯关、把剧情里该看的说明提前标成看过） if (qz && !qz.hidden) return;
   let k = null; try { k = wDemoKey(wch()); } catch (e) { return; } if (!k) return;
   SAVE.demos = SAVE.demos || {}; SAVE.demos[k] = 1; save();
   wStopAuto(); if (WALK) { clearTimeout(WALK.h); WALK = null; } WGOAL = null; SFX.play('click'); openModal(demoModal(k));
@@ -2978,16 +2994,18 @@ function regionSVG(ch) {
   return svg + '</svg>';
 }
 const miniModal = () => () => {
-  if (isRift(SAVE.run)) { const S0 = wstate(RCH);
+  if (isRift(SAVE.run)) { const S0 = wstate(RCH), D0 = wScene(RCH), m0 = wmap(RCH), bs = D0.mons.find(o => o.boss), ex = !m0.def.rift.last && (m0.pts['2'] || [])[0], orb = (D0.orbs || []).length;
+    const go = bs ? '<button class="btn sm" data-act="minigo" data-arg="boss">去打守关妖王</button>' : `${ex ? '<button class="btn sm" data-act="minigo" data-arg="exit">去传送阵</button>' : ''}${orb ? `<button class="btn sm ghost" data-act="minigo" data-arg="orb">捡精魄（${orb}）</button>` : ''}`;
     return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">${esc(WMAPS[RCH].scenes[S0.sc].n)}</h2><canvas id="minicv" class="minicv"></canvas>
-    <p class="sub" style="text-align:center">紫框是传送阵，青框是塔，红点是妖物，橙点是精英，亮紫点是精魄，大红块是守关妖王</p>`; }
+    ${go ? `<div class="row mgo">${go}</div>` : ''}
+    <p class="sub" style="text-align:center"><b>点地图上任意一处，直接走过去</b>。紫框是传送阵，青框是塔，红点是妖物，橙点是精英，亮紫点是精魄，大红块是守关妖王</p>`; }
   const ch = wch(), S = wstate(ch), vis = Object.keys(S.sd).map(sc => WMAPS[ch].scenes[sc].n);
   const tabs = `<div class="row mtabs"><button class="btn sm ${MAPTAB === 'all' ? '' : 'ghost'}" data-act="maptab" data-arg="all">全章</button><button class="btn sm ${MAPTAB === 'here' ? '' : 'ghost'}" data-act="maptab" data-arg="here">这一带</button></div>`;
   if (MAPTAB === 'all') { const blk = wTeleBlock(ch);
     return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">${esc(chTitle(ch))}</h2>${tabs}${regionSVG(ch)}
       <p class="sub" style="text-align:center">${blk ? `<b style="color:var(--blood2)">${esc(blk)}</b>` : '点有 🔥 的地方，直接传送到那里的篝火'}　·　★ 主线　● 支线</p>`; }
   return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">${esc(WMAPS[ch].scenes[S.sc].n)}</h2>${tabs}<canvas id="minicv" class="minicv"></canvas>
-  <p class="sub" style="text-align:center">金框是任务目标，橙色是篝火，黄点是出入口，红点是附近的妖物</p>
+  <p class="sub" style="text-align:center"><b>点地图上任意一处，直接走过去</b>。金框是任务目标，橙色是篝火，黄点是出入口，红点是附近的妖物</p>
   <p class="sub" style="text-align:center">去过的地方：${vis.map(esc).join(' · ')}</p>`;
 };
 function drawMini() {
@@ -3007,6 +3025,22 @@ function drawMini() {
   if (m.def.rift) { for (const o of wScene(ch).orbs || []) { g.fillStyle = '#d8a8ff'; g.fillRect(o.x * k + k / 5, o.y * k + k / 5, k * 0.6, k * 0.6); }
     for (const [c, col] of [['2', '#a07aff'], ['3', '#6ad8e8']]) for (const p of m.pts[c] || []) { if (c === '3' && S.got[wgk(S.sc, p.x, p.y)]) continue; g.strokeStyle = col; g.lineWidth = 2; g.strokeRect(p.x * k - 2, p.y * k - 2, k + 4, k + 4); } }
   g.fillStyle = '#fff'; g.fillRect(S.pos.x * k, S.pos.y * k, k, k);
+  if (MAPGOAL && MAPGOAL.sc === S.sc) { g.strokeStyle = '#ffd78c'; g.lineWidth = 2; g.beginPath(); g.arc((MAPGOAL.x + 0.5) * k, (MAPGOAL.y + 0.5) * k, Math.max(4, k * 0.9), 0, 7); g.stroke(); }
+  cv.onclick = e => { const r = cv.getBoundingClientRect(); if (!r.width) return; miniGo(Math.floor((e.clientX - r.left) / r.width * m.W), Math.floor((e.clientY - r.top) / r.height * m.H)); };
+}
+// 小地图点哪走哪：点到墙或没去过的地方，就近找一格走得到的；路上撞到妖物照样开打，打完接着走
+function miniGo(x, y) {
+  const ch = wch(); let T = null;
+  for (let r = 0; r <= 2 && !T; r++) for (let dy = -r; dy <= r && !T; dy++) for (let dx = -r; dx <= r && !T; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const tx = x + dx, ty = y + dy; if (wSeen(ch, tx, ty) && wPassHero(ch, tx, ty)) T = { x: tx, y: ty }; }
+  if (!T) return qtoast(wSeen(ch, x, y) ? '那里走不过去' : '那里还没去过，先探一探');
+  miniWalk(T.x, T.y);
+}
+function miniWalk(x, y) {
+  const ch = wch(), S = wstate(ch); closeModal(); wStopAuto(); WGOAL = null;
+  if (x === S.pos.x && y === S.pos.y) { MAPGOAL = null; return; }
+  const G = MAPGOAL = { sc: S.sc, x, y, hops: 0 };
+  if (!wWalkTo(x, y, () => { if (MAPGOAL === G) MAPGOAL = null; })) { MAPGOAL = null; qtoast('从这里走不到那边'); }
 }
 // ---- 摇杆 / 方向键 ----
 function wJoySetup() {
@@ -3034,7 +3068,7 @@ function wDirTarget(dx, dy) {
 }
 function wDirStep(dx, dy) {
   if (WALK || DLG || MODALFN || VIEW !== 'world') return;
-  WGOAL = null;
+  WGOAL = null; MAPGOAL = null;
   const T = wDirTarget(dx, dy); if (!T) return;
   if (T.act) return T.act();
   const P = wPt(wch(), T.x, T.y);
@@ -3579,14 +3613,17 @@ const ACT = {
   eat: id => { const F = wEat(SAVE.run, id); closeModal(); if (F) { SFX.play('buff'); qtoast(`吃了「${esc(F.n)}」：${esc(F.d)}（管到下次休息）`); } save(); refresh(); },
   wtalkc: () => { const ch = wch(), cc = wCompNow(ch); if (!cc) return; wStopAuto(); wRun(wTalk(ch, cc, SAVE.run)); },
   wyin: () => { WALK = null; wStopAuto(); wRun(wYinToggle(wch())); },
-  wauto: () => { WGOAL = null; if (WAUTO) return wStopAuto(); wStartAuto(); },
+  wauto: () => { WGOAL = null; MAPGOAL = null; if (isRift(SAVE.run)) { SAVE.rAuto = !WAUTO; RDEATH = 0; save(); } if (WAUTO) return wStopAuto(); wStartAuto(); },
   rquit: () => { wStopAuto(); openModal(() => `<h2 class="mh">离开幻境？</h2><p class="help-p">这一局就到这儿：已经拿到的装备、经验都留着，但没有灵玉升级，也不算纪录。</p>
     <div class="row" style="justify-content:center"><button class="btn" data-act="rquitgo">离开</button><button class="btn ghost" data-act="close">接着打</button></div>`); },
   rquitgo: () => { const r = SAVE.run; BACK = null; closeModal(); WALK = null; finishRunView(r, 'retreat'); },
   wlog: () => { wStopAuto(); BACK = null; openModal(questModal()); },
   wrecap: () => { const ch = wch(); closeModal(); playDialog(recapLines(ch), null); },
   wreplay: i => { const ch = wch(), m = WQ[ch].main[+i]; if (!m) return; const L = [...(wLines(ch, m.lines) || []), ...(wLines(ch, m.after) || [])]; closeModal(); if (L.length) playDialog([['narr', `【回看 · ${m.t}】`], ...L], null); },
-  wmini: () => { wStopAuto(); BACK = null; openModal(miniModal()); drawMini(); },
+  wmini: () => { if (!isRift(SAVE.run)) wStopAuto(); BACK = null; openModal(miniModal()); drawMini(); },   // 幻境里看一眼地图不打断自动闯关（关上接着走）
+  minigo: k => { const ch = wch(), S = wstate(ch), D = wScene(ch), m = wmap(ch);
+    const T = k === 'boss' ? D.mons.find(o => o.boss) : k === 'exit' ? (m.pts['2'] || [])[0] : (D.orbs || []).slice().sort((a, b) => wdist(a, S.pos) - wdist(b, S.pos))[0];
+    if (!T) return qtoast('现在没有可去的地方'); miniWalk(T.x, T.y); },
   maptab: k => { MAPTAB = k; if (MODALFN) { sheet.innerHTML = MODALFN(); drawMini(); } },
   mapgo: sc => {
     const ch = wch(), S = wstate(ch), blk = wTeleBlock(ch); if (blk) return toast(blk);

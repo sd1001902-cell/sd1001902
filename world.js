@@ -1232,6 +1232,7 @@ function wPrepBattle(run, enc) {
 // 幻境用一个假的章节号 RCH：地图是从别的章节抄来、抹掉机关和人物的；任务表是空的。
 const RCH = 99;
 var R_NORM = [1.3, 0.8], R_ELITE = [3.2, 1.25], R_BOSS = [2.6, 2.2];
+var R_BOSS_UP = 1.6;   // 守关妖王本身的血再 ×1.6（护法、小妖不动）：原来首领三四十手就倒，不像最后一关。香相应加了 1 分钟
 // 50 层以后精英涨得比小怪慢一点（每层 +6% 气血、+3.5% 攻击，小怪和妖王是 +8%、+5%）：实测精英战比小怪群、妖王战早二三十层就打不过，只能绕着走
 var R_ELITE_LIN = [0.06, 0.035];
 function rEliteEase(N) { const k = Math.max(0, N - R_LIN[0]); return [(1 + R_ELITE_LIN[0] * k) / (1 + R_LIN[1] * k), (1 + R_ELITE_LIN[1] * k) / (1 + R_LIN[2] * k)]; }   // 幻境妖物在 makeMonster 基础上再乘的 [气血, 攻击]
@@ -1354,7 +1355,7 @@ function rPrep(run, enc) {
   const nT = (run.team || []).length, tK = 1 + R_TEAM[0] * nT, tKB = 1 + R_TEAM[5] * nT;   // 组队：每带一个伙伴，小怪精英血量 +10%，首领 +4%（首领另外带护法）
   if (enc.kind === 'boss') {
     run.theme = enc.c - 1;
-    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB); u.atk *= R_BOSS[1]; });
+    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB * (u.kind === 'boss' ? R_BOSS_UP : 1)); u.atk *= R_BOSS[1]; });
     if (nT) {   // 首领也带帮手：伙伴几个，护法几个（本章妖物的精英，各带一条精英词缀）；半血时再喊一波小妖
       const F0 = CHAPTERS[enc.c - 1], B0 = units.find(u => u.kind === 'boss') || units[0], ez = rEliteEase(run.riftLv), lv = enc.lv;
       const okA = ['fiery', 'cold', 'vamp', 'enraged', 'tough', 'fast', 'shielded', 'venom'];   // 不给分身、反震
