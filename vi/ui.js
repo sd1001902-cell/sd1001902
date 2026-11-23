@@ -659,18 +659,21 @@ function bountyHTML() {
       ${Bn.bonus ? "<span class=\"sub\">Đã nhận</span>" : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">Nhận rương lớn</button>`}</div></section>`;
 }
 // 配装：三套，一键切换
+const gemMissTxt = L => { const c = {}; for (const g of L) c[g] = (c[g] || 0) + 1; return Object.keys(c).map(g => gemName(g) + (c[g] > 1 ? ' ×' + c[g] : '')).join(", "); };
+const kitGemSum = k => { if (!k || !k.gems) return ''; const c = {}; for (const p in k.gems) for (const g of k.gems[p]) c[gemT(g)] = (c[gemT(g)] || 0) + 1;   // 这套用了几颗什么玉：赤 3 黄 2 青 5
+  return Object.keys(GEM_TYPES).filter(t => c[t]).map(t => `<i style="color:${GEM_TYPES[t].c}">${GEM_TYPES[t].n.slice(0, 1)}${c[t]}</i>`).join(''); };
 const kitNamesOf = it => { const L = []; for (const c of CLASS_IDS) for (const k of (SAVE.chars[c].kits || [])) if (k && Object.values(k.eq).includes(it.id)) L.push(k.n); return L; };
 function kitBar(cls) {
   const K = kitsOf(cls), ch = SAVE.chars[cls], busy = SAVE.run && SAVE.run.cls === cls;
-  return `<section class="panel kitp"><h3>Phối đồ <small>Lưu cả một bộ: trang bị, Túi Càn Khôn, chiêu thức và biến chiêu, linh ngọc, Dịch Sứ, điểm Tâm pháp. Chạm một lần là thay cả bộ (Tâm pháp cộng lại miễn phí)</small></h3>
+  return `<section class="panel kitp"><h3>Phối đồ <small>Lưu cả một bộ: trang bị và ngọc khảm trên đó, Túi Càn Khôn, chiêu thức và biến chiêu, linh ngọc, Dịch Sứ, điểm Tâm pháp. Chạm một lần là thay cả bộ (Tâm pháp cộng lại miễn phí; ngọc bị lấy đi sẽ tự bù lại, miễn phí)</small></h3>
     <div class="kits">${K.map((k, i) => { const on = k && kitSame(cls, i);
-      return `<div class="kit ${on ? 'on' : ''} ${k ? '' : 'empty'}">${k ? `<button class="kitb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}"><b>${esc(k.n)}</b><small>${on ? "Đang mặc" : "Chạm để thay"}</small></button>`
+      return `<div class="kit ${on ? 'on' : ''} ${k ? '' : 'empty'}">${k ? `<button class="kitb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}"><b>${esc(k.n)}</b><small>${on ? "Đang mặc" : "Chạm để thay"}</small>${kitGemSum(k) ? `<span class="kgs">${kitGemSum(k)}</span>` : ''}</button>`
         : `<button class="kitb" data-act="kitedit" data-arg="${i}"><b>Ô trống</b><small>Lưu bộ đang mặc vào đây</small></button>`}
         ${k ? `<button class="mini" data-act="kitedit" data-arg="${i}">Lưu</button>` : ''}</div>`; }).join('')}</div>
     ${busy ? "<p class=\"sub\">Đang ở ngoài không thay được, về thành rồi thay.</p>" : ''}</section>`;
 }
 const kitModal = i => () => { const k = kitsOf(SAVE.cls)[i];
-  return `<h2 class="mh">${k ? "Ghi đè" : "Lưu thành"} phối đồ ${i + 1}</h2><p class="help-p">Lưu bộ đang mặc của ${CLASSES[SAVE.cls].n} vào đây: trang bị ở từng ô, Túi Càn Khôn, chiêu thức mang theo và biến chiêu, Hộp Linh Ngọc, Dịch Sứ, điểm Tâm pháp. ${k ? `Sẽ ghi đè lên “${esc(k.n)}” cũ.` : ''}</p>
+  return `<h2 class="mh">${k ? "Ghi đè" : "Lưu thành"} phối đồ ${i + 1}</h2><p class="help-p">Lưu bộ đang mặc của ${CLASSES[SAVE.cls].n} vào đây: trang bị ở từng ô và ngọc khảm, Túi Càn Khôn, chiêu thức mang theo và biến chiêu, Hộp Linh Ngọc, Dịch Sứ, điểm Tâm pháp. Ngọc của mỗi bộ ghi riêng: khi đổi sang bộ này, ngọc bị bộ khác lấy đi sẽ tự bù lại từ túi ngọc và rương đồ (miễn phí). ${k ? `Sẽ ghi đè lên “${esc(k.n)}” cũ.` : ''}</p>
     <label class="kitn">Tên <input id="kitn" maxlength="12" value="${esc(k ? k.n : `Phối đồ ${i + 1}`)}"></label>
     <div class="row" style="gap:8px;margin-top:10px"><button class="btn" data-act="kitsave" data-arg="${i}">Lưu</button>${k ? `<button class="btn ghost" data-act="kitdel" data-arg="${i}">Xóa bộ này</button>` : ''}<button class="btn ghost" data-act="close">Hủy</button></div>`; };
 // 人物页（2026-11 一屏）：上面四个小页签。「身上」是配装、关键属性、装备格；点哪一格就跳到储物箱里只看这一类
@@ -678,7 +681,7 @@ let GVIEW = 'body';
 function kitRow(cls) {
   const K = kitsOf(cls), busy = SAVE.run && SAVE.run.cls === cls;
   return `<div class="kitrow"><span class="sub">Phối đồ</span>${K.map((k, i) => { const on = k && kitSame(cls, i);
-    return k ? `<div class="kp ${on ? 'on' : ''}"><button class="kpb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}">${esc(k.n)}</button><button class="kpe" data-act="kitedit" data-arg="${i}" aria-label="Lưu">Lưu</button></div>`
+    return k ? `<div class="kp ${on ? 'on' : ''}"><button class="kpb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}">${esc(k.n)}${kitGemSum(k) ? `<span class="kgs">${kitGemSum(k)}</span>` : ''}</button><button class="kpe" data-act="kitedit" data-arg="${i}" aria-label="Lưu">Lưu</button></div>`
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ Lưu bộ này</button></div>`; }).join('')}</div>`;
 }
 // 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
@@ -3685,9 +3688,9 @@ const ACT = {
     if (!plan.length) return toast("Đã là bộ mạnh nhất rồi");
     if (ni.length && !inFightNow()) return openModal(() => bestModal(cls, plan));
     ACT.bestgo('0'); },
-  bestgo: a => { const cls = ctxCls(); bestGear.left = []; const r = bestApply(cls, a === '1'), left = (bestGear.left || []).filter(x => SAVE.stash.includes(x));
+  bestgo: a => { const cls = ctxCls(); bestGear.left = []; bestGear.gm = 0; const r = bestApply(cls, a === '1'), left = (bestGear.left || []).filter(x => SAVE.stash.includes(x)), gm = bestGear.gm || 0;
     closeModal(); if (r.n) SFX.play(r.inh ? 'forge' : 'loot');
-    toast(r.n ? `Đã thay ${r.n} món mạnh hơn${r.inh ? `, trong đó ${r.inh} món đã truyền thừa` : ''}${r.skip ? `; ${r.skip} món không đủ bạc hoặc hồn tinh để truyền thừa nên giữ nguyên` : ''}${left.length ? `. Món vừa thay ra “${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}” ${left.length > 1 ? ` và ${left.length} món khác` : ''}còn cường hóa hoặc ngọc, có thể tìm Trương Đại Chùy “truyền thừa” sang đồ mới` : ''}` : (r.skip ? "Không đủ bạc hoặc hồn tinh để truyền thừa" : "Nếu không truyền thừa thì đồ đang mặc đã là mạnh nhất"));
+    toast(r.n ? `Đã mặc ${r.n} món mạnh hơn${r.inh ? `, trong đó ${r.inh} món đã truyền thừa` : ''}${r.skip ? `; ${r.skip} món không đủ bạc hoặc hồn tinh để truyền thừa nên giữ nguyên` : ''}${gm ? `; ngọc chuyển theo ${gm} viên` : ''}${left.length ? `. Món thay ra "${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}"${left.length > 1 ? ` và ${left.length} món khác` : ''} còn cường hóa, có thể tìm Trương Đại Chùy "Truyền thừa" sang trang bị mới` : ''}` : (r.skip ? "Không đủ bạc hoặc hồn tinh để truyền thừa" : "Nếu không truyền thừa thì đồ đang mặc đã là mạnh nhất"));
     refresh(); achToast(checkAch()); },
   inheq: id => { const cls = ctxCls(), f = findItem(id); if (!f || f.where !== 'stash' || inFightNow()) return;
     const pos = posFor(cls, f.it, gpos(f.it)), cur = SAVE.chars[cls].eq[pos], base = power(charStats(cls));
@@ -3830,7 +3833,7 @@ const ACT = {
   kitsave: i => { const el = document.getElementById('kitn'); const k = kitSave(SAVE.cls, +i, el && el.value.trim()); SFX.play('buff'); closeModal(); save(); refresh(); toast(`Đã lưu: <b>${esc(k.n)}</b>`); },
   kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast("Đã xóa bộ phối đồ này (trang bị vẫn còn)"); },
   kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
-    const k = kitsOf(SAVE.cls)[+i]; toast(`Đã thay “<b>${esc(k.n)}</b>”${r.miss.length ? `. Không tìm thấy: ${r.miss.join(", ")} (các ô này giữ nguyên)` : ''}${r.away.length ? `. Có trang bị đang mặc trên người ${r.away.join(", ")}, không lấy qua` : ''}`); },
+    const k = kitsOf(SAVE.cls)[+i]; toast(`Đã thay "<b>${esc(k.n)}</b>"${r.miss.length ? `. Không tìm thấy: ${r.miss.join(", ")} (các ô này giữ nguyên)` : ''}${r.away.length ? `. Có trang bị đang mặc trên người ${r.away.join(", ")}, không lấy qua` : ''}${r.gmiss && r.gmiss.length ? `. Thiếu ${r.gmiss.length} viên ngọc: ${gemMissTxt(r.gmiss)} (lỗ để trống)` : ''}`); },
   skip: () => skipBattle(),
   bcont: () => battleContinue(),
   choice: i => { EVRES = resolveEvent(SAVE.run, curCell(SAVE.run).ev, +i); if (!EVRES.fight) clearCell(SAVE.run); SFX.play(EVRES.items && EVRES.items.length ? 'loot' : 'magic'); refresh(); },

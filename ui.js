@@ -658,18 +658,21 @@ function bountyHTML() {
       ${Bn.bonus ? '<span class="sub">已领取</span>' : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">领取大箱</button>`}</div></section>`;
 }
 // 配装：三套，一键切换
+const gemMissTxt = L => { const c = {}; for (const g of L) c[g] = (c[g] || 0) + 1; return Object.keys(c).map(g => gemName(g) + (c[g] > 1 ? ' ×' + c[g] : '')).join('、'); };
+const kitGemSum = k => { if (!k || !k.gems) return ''; const c = {}; for (const p in k.gems) for (const g of k.gems[p]) c[gemT(g)] = (c[gemT(g)] || 0) + 1;   // 这套用了几颗什么玉：赤 3 黄 2 青 5
+  return Object.keys(GEM_TYPES).filter(t => c[t]).map(t => `<i style="color:${GEM_TYPES[t].c}">${GEM_TYPES[t].n.slice(0, 1)}${c[t]}</i>`).join(''); };
 const kitNamesOf = it => { const L = []; for (const c of CLASS_IDS) for (const k of (SAVE.chars[c].kits || [])) if (k && Object.values(k.eq).includes(it.id)) L.push(k.n); return L; };
 function kitBar(cls) {
   const K = kitsOf(cls), ch = SAVE.chars[cls], busy = SAVE.run && SAVE.run.cls === cls;
-  return `<section class="panel kitp"><h3>配装 <small>存下一整身：装备、乾坤袋、招式和变招、灵玉、役使、心法点。点一下整套换上（心法免费重加）</small></h3>
+  return `<section class="panel kitp"><h3>配装 <small>存下一整身：装备和上面镶的玉、乾坤袋、招式和变招、灵玉、役使、心法点。点一下整套换上（心法免费重加；玉被挪走了自动补回来，免费）</small></h3>
     <div class="kits">${K.map((k, i) => { const on = k && kitSame(cls, i);
-      return `<div class="kit ${on ? 'on' : ''} ${k ? '' : 'empty'}">${k ? `<button class="kitb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}"><b>${esc(k.n)}</b><small>${on ? '穿着' : '点一下换上'}</small></button>`
+      return `<div class="kit ${on ? 'on' : ''} ${k ? '' : 'empty'}">${k ? `<button class="kitb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}"><b>${esc(k.n)}</b><small>${on ? '穿着' : '点一下换上'}</small>${kitGemSum(k) ? `<span class="kgs">${kitGemSum(k)}</span>` : ''}</button>`
         : `<button class="kitb" data-act="kitedit" data-arg="${i}"><b>空位</b><small>把现在这身存进来</small></button>`}
         ${k ? `<button class="mini" data-act="kitedit" data-arg="${i}">存</button>` : ''}</div>`; }).join('')}</div>
     ${busy ? '<p class="sub">出门在外换不了，回城再换。</p>' : ''}</section>`;
 }
 const kitModal = i => () => { const k = kitsOf(SAVE.cls)[i];
-  return `<h2 class="mh">${k ? '覆盖' : '存成'}配装 ${i + 1}</h2><p class="help-p">把${CLASSES[SAVE.cls].n}现在这一身存进来：身上每个格子的装备、乾坤袋、带的招式和变招、灵玉匣、役使、心法点。${k ? `会覆盖原来的「${esc(k.n)}」。` : ''}</p>
+  return `<h2 class="mh">${k ? '覆盖' : '存成'}配装 ${i + 1}</h2><p class="help-p">把${CLASSES[SAVE.cls].n}现在这一身存进来：身上每个格子的装备和镶的玉、乾坤袋、带的招式和变招、灵玉匣、役使、心法点。每套的玉各记各的：换到这一套时，玉被别的配装挪走了，会从玉石包、储物箱里自动补回来（免费）。${k ? `会覆盖原来的「${esc(k.n)}」。` : ''}</p>
     <label class="kitn">名字 <input id="kitn" maxlength="12" value="${esc(k ? k.n : `配装 ${i + 1}`)}"></label>
     <div class="row" style="gap:8px;margin-top:10px"><button class="btn" data-act="kitsave" data-arg="${i}">存下</button>${k ? `<button class="btn ghost" data-act="kitdel" data-arg="${i}">删掉这一套</button>` : ''}<button class="btn ghost" data-act="close">取消</button></div>`; };
 // 人物页（2026-11 一屏）：上面四个小页签。「身上」是配装、关键属性、装备格；点哪一格就跳到储物箱里只看这一类
@@ -677,7 +680,7 @@ let GVIEW = 'body';
 function kitRow(cls) {
   const K = kitsOf(cls), busy = SAVE.run && SAVE.run.cls === cls;
   return `<div class="kitrow"><span class="sub">配装</span>${K.map((k, i) => { const on = k && kitSame(cls, i);
-    return k ? `<div class="kp ${on ? 'on' : ''}"><button class="kpb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}">${esc(k.n)}</button><button class="kpe" data-act="kitedit" data-arg="${i}" aria-label="存">存</button></div>`
+    return k ? `<div class="kp ${on ? 'on' : ''}"><button class="kpb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}">${esc(k.n)}${kitGemSum(k) ? `<span class="kgs">${kitGemSum(k)}</span>` : ''}</button><button class="kpe" data-act="kitedit" data-arg="${i}" aria-label="存">存</button></div>`
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ 存当前</button></div>`; }).join('')}</div>`;
 }
 // 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
@@ -3684,9 +3687,9 @@ const ACT = {
     if (!plan.length) return toast('已经是最强搭配了');
     if (ni.length && !inFightNow()) return openModal(() => bestModal(cls, plan));
     ACT.bestgo('0'); },
-  bestgo: a => { const cls = ctxCls(); bestGear.left = []; const r = bestApply(cls, a === '1'), left = (bestGear.left || []).filter(x => SAVE.stash.includes(x));
+  bestgo: a => { const cls = ctxCls(); bestGear.left = []; bestGear.gm = 0; const r = bestApply(cls, a === '1'), left = (bestGear.left || []).filter(x => SAVE.stash.includes(x)), gm = bestGear.gm || 0;
     closeModal(); if (r.n) SFX.play(r.inh ? 'forge' : 'loot');
-    toast(r.n ? `换上了 ${r.n} 件更强的装备${r.inh ? `，其中 ${r.inh} 件做了传承` : ''}${r.skip ? `；${r.skip} 件银两或魂晶不够传承，没动` : ''}${left.length ? `。换下来的「${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}」${left.length > 1 ? `等 ${left.length} 件` : ''}上有强化或玉，可以找张大锤「传承」到新装备上` : ''}` : (r.skip ? '银两或魂晶不够传承' : '不传承的话，身上已经是最强搭配'));
+    toast(r.n ? `换上了 ${r.n} 件更强的装备${r.inh ? `，其中 ${r.inh} 件做了传承` : ''}${r.skip ? `；${r.skip} 件银两或魂晶不够传承，没动` : ''}${gm ? `；玉石跟着搬过去了 ${gm} 颗` : ''}${left.length ? `。换下来的「${esc(left[0].name)}${left[0].plus ? ' +' + left[0].plus : ''}」${left.length > 1 ? `等 ${left.length} 件` : ''}上有强化，可以找张大锤「传承」到新装备上` : ''}` : (r.skip ? '银两或魂晶不够传承' : '不传承的话，身上已经是最强搭配'));
     refresh(); achToast(checkAch()); },
   inheq: id => { const cls = ctxCls(), f = findItem(id); if (!f || f.where !== 'stash' || inFightNow()) return;
     const pos = posFor(cls, f.it, gpos(f.it)), cur = SAVE.chars[cls].eq[pos], base = power(charStats(cls));
@@ -3829,7 +3832,7 @@ const ACT = {
   kitsave: i => { const el = document.getElementById('kitn'); const k = kitSave(SAVE.cls, +i, el && el.value.trim()); SFX.play('buff'); closeModal(); save(); refresh(); toast(`存好了：<b>${esc(k.n)}</b>`); },
   kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast('删掉了这一套配装（装备还在）'); },
   kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
-    const k = kitsOf(SAVE.cls)[+i]; toast(`换上了「<b>${esc(k.n)}</b>」${r.miss.length ? `。找不到：${r.miss.join('、')}（这些格子没动）` : ''}${r.away.length ? `。有装备穿在${r.away.join('、')}身上，没拿过来` : ''}`); },
+    const k = kitsOf(SAVE.cls)[+i]; toast(`换上了「<b>${esc(k.n)}</b>」${r.miss.length ? `。找不到：${r.miss.join('、')}（这些格子没动）` : ''}${r.away.length ? `。有装备穿在${r.away.join('、')}身上，没拿过来` : ''}${r.gmiss && r.gmiss.length ? `。玉石缺 ${r.gmiss.length} 颗：${gemMissTxt(r.gmiss)}（孔先空着）` : ''}`); },
   skip: () => skipBattle(),
   bcont: () => battleContinue(),
   choice: i => { EVRES = resolveEvent(SAVE.run, curCell(SAVE.run).ev, +i); if (!EVRES.fight) clearCell(SAVE.run); SFX.play(EVRES.items && EVRES.items.length ? 'loot' : 'magic'); refresh(); },

@@ -694,7 +694,7 @@ function bestPlan(cls) {
     for (const it of SAVE.stash) {
       if (it.slot !== slotType(sl) || !canEquip(it, cls) || (taken(it) && !(plan[sl] && plan[sl].it === it))) continue;
       if (it.slot === 'ring' && sameRing(it, eq[sl === 'ring' ? 'ring2' : 'ring'])) continue;
-      const sim = inheritSim(it, ch.eq[sl]), pr = P({ ...eq, [sl]: it }), ps = sim === it ? pr : P({ ...eq, [sl]: sim });
+      const sim = inheritSim(it, ch.eq[sl]), pr = P({ ...eq, [sl]: gemSim(it, ch.eq[sl]) }), ps = sim === it ? pr : P({ ...eq, [sl]: sim });   // 不传承也会把玉搬过来（免费）
       const inh = ps > pr, p = Math.max(pr, ps);
       if (p > bestP) { bestP = p; best = { it, sl, inh, sim: inh ? sim : it, cost: inh ? inheritCost(it, ch.eq[sl]) : null }; }
     }
@@ -708,8 +708,10 @@ function bestApply(cls, useInh) {
   const ch = SAVE.chars[cls]; let n = 0, ni = 0, skip = 0;
   for (const e of bestPlan(cls)) {
     if (!SAVE.stash.includes(e.it)) continue;
-    if (e.inh) { const r = inheritFrom(e.it, ch.eq[e.sl]); if (r.err) { if (powerWith(cls, e.it) <= power(calcStats(cls, ch.eq, ch.level, null, ch))) { skip++; continue; } } else ni++; }
-    if (equipItem(cls, e.it.id, e.sl)) n++;
+    let did = false;
+    if (e.inh) { const r = inheritFrom(e.it, ch.eq[e.sl]); if (r.err) { if (power(calcStats(cls, { ...ch.eq, [e.sl]: gemSim(e.it, ch.eq[e.sl]) }, ch.level, null, ch)) <= power(calcStats(cls, ch.eq, ch.level, null, ch))) { skip++; continue; } } else { ni++; did = true; } }
+    const old = ch.eq[e.sl];
+    if (equipItem(cls, e.it.id, e.sl)) { n++; if (!did && old) bestGear.gm = (bestGear.gm || 0) + moveGems(old, e.it); }
   }
   return { n, inh: ni, skip };
 }
@@ -781,12 +783,66 @@ function kitSave(cls, i, name) {
   const ch = SAVE.chars[cls], K = kitsOf(cls), eq = {};
   for (const p of POS_IDS) eq[p] = ch.eq[p] ? ch.eq[p].id : null;
   K[i] = { n: (name || (K[i] && K[i].n) || `配装 ${i + 1}`).slice(0, 12), eq, cube: jcopy(ch.cube || []), lgs: jcopy(ch.lgs || []), yi: jcopy(ch.yi || []), tal: jcopy(ch.tal || {}),
-    runes: jcopy(ch.runes || {}), loadout: jcopy(ch.loadout || null), loadoutManual: ch.loadoutManual || 0, unequipped: jcopy(ch.unequipped || {}), order: jcopy(ch.order || null), off: jcopy(ch.off || {}), t: Date.now() };
+    runes: jcopy(ch.runes || {}), loadout: jcopy(ch.loadout || null), loadoutManual: ch.loadoutManual || 0, unequipped: jcopy(ch.unequipped || {}), order: jcopy(ch.order || null), off: jcopy(ch.off || {}),
+    gems: kitGemsNow(ch), t: Date.now() };
+  ch.kitOn = i;
   return K[i];
+}
+// ---- 配装的玉石（2026-11-23）：每套记下每件装备镶的玉，各镶各的。换到这一套时，玉不对就自动补齐（免费）：
+// 先从玉石包拿，再从储物箱里没穿着的装备上拆（多半是别的配装的，那套换回去时再从这边拆回去）；找不到同样的，就拿同一种玉里品级最高的；实在没有，列出缺哪几颗
+const gemT = k => k.split('_')[0], gemTier = k => +k.split('_')[1];
+const plainGems = it => (it && it.gems || []).filter(g => !g.startsWith('L:'));
+function kitGemsNow(ch) { const G = {}; for (const p of POS_IDS) if (ch.eq[p]) G[p] = plainGems(ch.eq[p]); return G; }
+function kitGemsSnap(cls) {   // 穿着某套时改了玉（升级、换玉），换走之前记下来：只记装备还是这套里那件的格子
+  const ch = SAVE.chars[cls], K = kitsOf(cls), k = ch.kitOn != null ? K[ch.kitOn] : null; if (!k) return;
+  k.gems = k.gems || {}; for (const p of POS_IDS) if (ch.eq[p] && k.eq[p] === ch.eq[p].id) k.gems[p] = plainGems(ch.eq[p]);
+}
+function kitGemsFill(cls, k) {
+  const ch = SAVE.chars[cls], miss = []; if (!k.gems || !featureOn('gems')) return miss;
+  const ps = POS_IDS.filter(p => ch.eq[p] && k.eq[p] === ch.eq[p].id && k.gems[p]);
+  const need = {};
+  // 1. 每件装备：留下记录里有的（同一颗，或同一种玉），多出来的卸回玉石包
+  for (const p of ps) {
+    const it = ch.eq[p], want = [...k.gems[p]], have = plainGems(it), keep = [];
+    for (const g of [...have]) { const j = want.indexOf(g); if (j >= 0) { want.splice(j, 1); keep.push(g); have.splice(have.indexOf(g), 1); } }
+    for (const g of [...have]) { const j = want.findIndex(w => gemT(w) === gemT(g)); if (j >= 0) { want.splice(j, 1); keep.push(g); have.splice(have.indexOf(g), 1); } }
+    for (const g of have) addGem(g);
+    it.gems = [...(it.gems || []).filter(g => g.startsWith('L:')), ...keep]; need[p] = want;
+  }
+  // 2. 缺的补上
+  const onOthers = new Set(); for (const c of CLASS_IDS) for (const q in SAVE.chars[c].eq) if (SAVE.chars[c].eq[q]) onOthers.add(SAVE.chars[c].eq[q]);
+  const donors = () => SAVE.stash.filter(x => !onOthers.has(x) && plainGems(x).length);
+  const take = w => {
+    if (SAVE.gems[w] > 0) { if (--SAVE.gems[w] <= 0) delete SAVE.gems[w]; return w; }
+    for (const d of donors()) { const j = d.gems.indexOf(w); if (j >= 0) { d.gems.splice(j, 1); return w; } }
+    let best = null, src = null;   // 同一种玉里品级最高的：先看玉石包，再看储物箱
+    for (const g in SAVE.gems) if (SAVE.gems[g] > 0 && gemT(g) === gemT(w) && (!best || gemTier(g) > gemTier(best))) { best = g; src = null; }
+    for (const d of donors()) for (const g of plainGems(d)) if (gemT(g) === gemT(w) && (!best || gemTier(g) > gemTier(best))) { best = g; src = d; }
+    if (!best) return null;
+    if (src) src.gems.splice(src.gems.indexOf(best), 1); else if (--SAVE.gems[best] <= 0) delete SAVE.gems[best];
+    return best;
+  };
+  for (const p of ps) { const it = ch.eq[p];
+    for (const w of need[p]) { if ((it.gems || []).length >= (it.sockets || 0)) { miss.push(w); continue; } const g = take(w); if (g) it.gems.push(g); else miss.push(w); } }
+  return miss;
+}
+// 一键换装时玉跟着走（免费）：换下来那件上的玉搬到新装备上，孔不够的退回玉石包
+function gemSim(it, old) {
+  const og = plainGems(old); if (!og.length || !it) return it;
+  const free = Math.max(0, (it.sockets || 0) - (it.gems || []).length); if (!free) return it;
+  return { ...it, gems: [...(it.gems || []), ...og.slice(0, free)] };
+}
+function moveGems(old, it) {
+  const og = plainGems(old); if (!og.length || !it) return 0; let n = 0;
+  old.gems = (old.gems || []).filter(g => g.startsWith('L:')); it.gems = it.gems || [];
+  for (const g of og) { if (it.gems.length < (it.sockets || 0)) { it.gems.push(g); n++; } else addGem(g); }
+  return n;
 }
 // 现在身上这身和第 i 套是不是一样（只比装备、乾坤袋、招式）
 function kitSame(cls, i) { const ch = SAVE.chars[cls], k = kitsOf(cls)[i]; if (!k) return false;
-  return POS_IDS.every(p => (ch.eq[p] ? ch.eq[p].id : null) === (k.eq[p] || null)) && JSON.stringify(ch.cube || []) === JSON.stringify(k.cube || []) && JSON.stringify(ch.loadout || null) === JSON.stringify(k.loadout || null) && JSON.stringify(ch.tal || {}) === JSON.stringify(k.tal || {}); }
+  const gs = L => [...(L || [])].sort().join(',');   // 玉也要一样（同一身装备、两套玉的情况）
+  return POS_IDS.every(p => (ch.eq[p] ? ch.eq[p].id : null) === (k.eq[p] || null)) && JSON.stringify(ch.cube || []) === JSON.stringify(k.cube || []) && JSON.stringify(ch.loadout || null) === JSON.stringify(k.loadout || null) && JSON.stringify(ch.tal || {}) === JSON.stringify(k.tal || {})
+    && (!k.gems || !featureOn('gems') || POS_IDS.every(p => !ch.eq[p] || !k.gems[p] || gs(plainGems(ch.eq[p])) === gs(k.gems[p]))); }
 // 哪些装备在本角色的配装里（分解、出售时跳过）
 function kitIds() { const S = new Set(); if (!SAVE) return S; for (const c of CLASS_IDS) for (const k of (SAVE.chars[c] && SAVE.chars[c].kits) || []) if (k) for (const p in k.eq) if (k.eq[p]) S.add(k.eq[p]); return S; }
 const inKit = it => !!it && kitIds().has(it.id);
@@ -794,6 +850,7 @@ function kitUse(cls, i) {
   const k = kitsOf(cls)[i]; if (!k) return { err: '这一套还没存' };
   if (SAVE.run && SAVE.run.cls === cls) return { err: '出门在外换不了，回城再换' };
   const ch = SAVE.chars[cls], before = runMaxHpIf(cls), miss = [], away = [];
+  if (ch.kitOn !== i) kitGemsSnap(cls);   // 换走之前：现在这套的玉有改动，先记下
   // 1. 装备：先把要换下的放回储物箱，再穿上这套的。找不到的那一件，格子保持原样
   const mine = new Map(); for (const p of POS_IDS) if (ch.eq[p]) mine.set(ch.eq[p].id, p);
   const where = id => SAVE.stash.find(x => x.id === id) || (mine.has(id) ? ch.eq[mine.get(id)] : null);
@@ -816,8 +873,10 @@ function kitUse(cls, i) {
   // 4. 招式和变招
   ch.runes = jcopy(k.runes || {}); if (k.loadout) ch.loadout = k.loadout.filter(id => CLASSES[cls].skills.some(x => x.id === id && x.lv <= ch.level));
   ch.loadoutManual = k.loadoutManual || 0; ch.unequipped = jcopy(k.unequipped || {}); ch.order = jcopy(k.order); ch.off = jcopy(k.off || {});
+  if (!k.gems) k.gems = kitGemsNow(ch);   // 老配装没记过玉：就按现在装备上的记下
+  const gmiss = kitGemsFill(cls, k);   // 5. 玉石：按这套记下的补齐
   ch.kitOn = i; fixRunHp(cls, before); checkSet4(cls);
-  return { ok: true, miss: miss.map(p => SLOT_NAME[p] || p), away: [...new Set(away)] };
+  return { ok: true, miss: miss.map(p => SLOT_NAME[p] || p), away: [...new Set(away)], gmiss };
 }
 function sellJunk() {
   let g = 0, n = 0;
@@ -830,10 +889,12 @@ function bestGear(cls) {
     let bestP = power(calcStats(cls, ch.eq, ch.level, null, ch)), best = null;
     for (const it of SAVE.stash) {
       if (it.slot !== slotType(sl) || !canEquip(it, cls) || (it.slot === 'ring' && sameRing(it, ch.eq[sl === 'ring' ? 'ring2' : 'ring']))) continue;
-      const p = power(calcStats(cls, { ...ch.eq, [sl]: it }, ch.level, null, ch));
+      const p = power(calcStats(cls, { ...ch.eq, [sl]: gemSim(it, ch.eq[sl]) }, ch.level, null, ch));   // 换下来那件的玉会跟过来
       if (p > bestP) { bestP = p; best = it; }
     }
-    if (best) { SAVE.stash.splice(SAVE.stash.indexOf(best), 1); if (ch.eq[sl]) { SAVE.stash.push(ch.eq[sl]); if ((ch.eq[sl].plus || 0) > 0 || (ch.eq[sl].gems && ch.eq[sl].gems.length)) bestGear.left = (bestGear.left || []).concat([ch.eq[sl]]); } ch.eq[sl] = best; changed++; }
+    if (best) { SAVE.stash.splice(SAVE.stash.indexOf(best), 1); const old = ch.eq[sl];
+      if (old) { SAVE.stash.push(old); bestGear.gm = (bestGear.gm || 0) + moveGems(old, best); if ((old.plus || 0) > 0) bestGear.left = (bestGear.left || []).concat([old]); }
+      ch.eq[sl] = best; changed++; }
   }
   fixRunHp(cls, before); checkSet4(cls); return changed;
 }
