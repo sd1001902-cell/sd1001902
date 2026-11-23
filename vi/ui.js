@@ -642,7 +642,8 @@ const goHelpModal = () => () => {
     <p class="help-p">Trên bản đồ hương cháy theo thời gian thật; trong trận tính theo lượt (một vòng tính 3 giây), mở tốc độ mấy hay bỏ qua trận đều như nhau.</p>
     <p class="help-p">Thần binh, đồ Bộ rơi ra có tỉ lệ là Thượng Cổ (từ tầng 30, tầng càng cao càng dễ ra), từ tầng 90 còn có thể là Thái Cổ. Từ tầng ${RSET_LV} rơi đồ Bộ Ảo Cảnh, từ tầng ${RSET2_LV} rơi cả hai bộ. Phẩm của tinh phách theo số tầng, thu vào Trấn Yêu Lục.</p>
     <p class="help-p">Khi dẫn đồng hành, yêu vật cũng mạnh lên theo: tiểu yêu nhiều máu hơn, thủ lĩnh mang theo hộ pháp.</p>
-    <p class="help-p">Từ tầng ${R_HI[0]} trở lên yêu vật mạnh lên nhanh hơn; tinh anh từ tầng ${R_AFF_HI[0]} thêm một đặc tính, từ tầng ${R_AFF_HI[1]} thêm một nữa.</p>`
+    <p class="help-p">Từ tầng ${R_HI[0]} trở lên yêu vật mạnh lên nhanh hơn; tinh anh từ tầng ${R_AFF_HI[0]} thêm một đặc tính, từ tầng ${R_AFF_HI[1]} thêm một nữa.</p>
+    <p class="help-p">Yêu vương giữ ải: tầng càng cao ra tay càng nhanh; từ tầng ${R_BOSS_AFF.join(", ")} mỗi mốc thêm một đặc tính; từ tầng ${R_BOSS_DUO[0]} cứ ra tay ${R_BOSS_DUO[1]} lần thì liên động một lần. Đánh xuống bảy phần máu nó dựng lên hộ thể chân khí (chưa phá thì đánh nó chỉ còn một nửa), ba phần rưỡi máu thì bạo nộ, gọi trợ thủ. Một đòn của nó tối đa lấy sáu phần khí huyết của bạn.</p>`
     : `<p class="help-p">Mỗi chương một bản đồ lớn: đi đường gặp quái, tìm chìa khóa, làm nhiệm vụ, cuối cùng đánh thủ lĩnh. Thủ lĩnh có manh mối và chìa khóa khắc chế riêng, tìm được chìa khóa rồi đánh sẽ nhẹ nhàng hơn nhiều. Ngã xuống thì đồ đã nhặt đều được giữ, bạn sẽ tỉnh lại bên đống lửa trại gần nhất.</p>`}
     ${featureOn('mods') ? `<h4 class="sub-h">Tăng độ khó</h4><div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}
     <button class="btn ghost" data-act="close">Xong</button>`;
@@ -1554,13 +1555,17 @@ const ST_INFO = {
   cocoon: ["Kén tơ", '#e8e0d0', 0, "Nhả tơ bọc lấy mình, chặn sát thương. Dùng thiêu đốt có thể đốt thủng kén tơ."],
   silver: ["Giáp bạc", '#cfd8e8', 0, "Một lớp giáp bạc chặn sát thương. Dùng phá giáp có thể đánh vỡ."],
   hufa: ["Hộ pháp", '#ff9a5a', 0, "Trợ thủ của thủ lĩnh: bạn mang bao nhiêu đồng hành, thủ lĩnh mang bấy nhiêu hộ pháp."],
-  call: ["Quát lớn", '#ff9a5a', 0, "Khi máu thủ lĩnh còn một nửa, nó sẽ gọi một đợt tiểu yêu xông lên."],
+  call: ["Quát lớn", '#ff9a5a', 0, "Khi máu thủ lĩnh còn một nửa (yêu vương giữ ải Ảo Cảnh là lúc bạo nộ), sẽ gọi một bầy tiểu yêu xông lên."],
+  phsh: ["Hộ thể chân khí", '#9ad0ff', 0, "Hộ thể chân khí yêu vương giữ ải dựng lên khi còn bảy phần máu: chưa phá thì đánh nó chỉ còn một nửa."],
+  rageB: ["Bạo nộ", '#ff3a2a', 0, "Yêu vương giữ ải bạo nộ khi còn ba phần rưỡi máu: công kích +20%."],
+  duo: ["Liên động", '#ffb04a', 0, "Yêu vương giữ ải (từ tầng 150 Ảo Cảnh): cứ ra tay năm lần, liền ra thêm một chiêu."],
   stacks: ["Cửu U", '#ffd23a', 1, "Bộ Cửu U: mỗi lần chí mạng chồng một tầng, sát thương càng đánh càng cao."] };
 function unitSts(u) {
   const L = [], add = (k, t, extra) => { const I = ST_INFO[k]; if (I) L.push({ k, n: I[0] + (t ? ' ' + t : ''), c: I[1], good: !!I[2], ...(extra || {}) }); };
   if (!u || u.hp <= 0) return L;
   if (u.charging) add('charging'); if (u.ghostForm) add('ghost'); if (u.cocoon && u.shield > 0) add('cocoon'); if (u.silver && u.shield > 0) add('silver');
   if (u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)) add('enraged');
+  if (u.phShield && u.shield > 0) add('phsh'); if (u.rageB) add('rageB'); if (u.duo) add('duo');
   for (const k of ['frozen', 'slow', 'melt', 'burn', 'poison', 'curse', 'mark', 'warcry', 'kangG', 'liuDr', 'tieArm', 'shadow', 'smoke', 'butui', 'chan', 'renew']) {
     const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, t > 0 && t < 99 ? t : ''); }
   if (u.shield > 0 && !u.cocoon && !u.silver) add('shield', fmtBig(Math.round(u.shield * uK(u))));
@@ -1857,7 +1862,7 @@ function applyStep(o, anim) {
     el.classList.toggle('st-burn', alive && !!u.st.burn); el.classList.toggle('st-tox', alive && !!u.st.poison);
     el.classList.toggle('st-ice', alive && !!u.st.slow); el.classList.toggle('st-stun', alive && !!u.st.frozen);
     el.classList.toggle('st-shd', alive && u.shield > 0); el.classList.toggle('st-cur', alive && !!u.st.curse);
-    el.classList.toggle('st-rage', alive && !!(u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)));
+    el.classList.toggle('st-rage', alive && !!(u.enraged || u.rageB || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)));
     if (anim) { if (el._ice && !u.st.slow) VFX.onThaw(u.id); if (el._shd && !(u.shield > 0) && alive) VFX.onShieldBreak(u.id); }
     el._ice = !!u.st.slow; el._shd = u.shield > 0;
     if (u.side === 'e' && u.kind === 'boss' && alive && u.charging && !el._chg && anim) { const ar = $('#arena'); if (ar) { const w = document.createElement('div'); w.className = 'bwarn'; w.textContent = "⚠ Nó đang tụ lực — chiêu sau rất nặng"; ar.appendChild(w); setTimeout(() => w.remove(), 1800); } SFX.play('gong'); }

@@ -1981,7 +1981,7 @@ let BNOW = null;
 const riftB = b => !!(b && b.run && b.run.mode === 'rift' && b.run.world);
 // 幻境守关的蓄力大招（惊堂木、喷火、吞噬这些）：剧情里有道具能克，幻境里没得克，再乘上守关的攻击 ×2.2，满血一下就没（僵尸县令的惊堂木平均打掉 87%，最高 137%）。
 // 幻境里这类大招每下最多打掉目标一半气血：还是要命（后面接着眩晕和普攻），但不会满血秒人
-var R_CAP_HIT = 0.5;
+var R_CAP_HIT = 0.5, R_BOSS_CAP = 0.6;
 const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'boss' ? 2 : 0] + 1) : 0;
 // ---------------- 小队统计：输出、控制、治疗、护体挡下、承伤、挡刀（按人分；僵尸合一行） ----------------
 const stKey = u => !u ? null : u.kind === 'minion' ? 'Z' : u.side === 'p' && u.kind !== 'ward' ? u.id : null;
@@ -2003,8 +2003,15 @@ function battleStep(b) {
   for (const u of live) u.g += bt * spdOf(u);
   actor.g = 0; out.actor = actor.id; out.dt = bt; b.curActor = actor;
   if (b.run && b.run.mode === 'rift' && !b.run.riftDone) b.run.clock = (b.run.clock || 0) + bt * (b.run.world ? R_BT_MS : 1);
-  act(b, actor, out);
-  for (const u of b.units) if (u.callU && u.hp > 0 && u.hp / u.maxHp < 0.5) {   // 幻境组队：首领半血喊小妖
+  b.capAcc = actor.kind === 'boss' ? {} : null;   // 守关妖王这一手打了谁多少（封顶用）
+  act(b, actor, out); b.capAcc = null;
+  if (actor.duo && actor.hp > 0 && out.actor && !b.over && ++actor.nAct % actor.duo === 0) { actor.g = 100; out.pops.push([actor.id, '连动', 'crit']); out.lines.push(`${actor.name}身形一晃，紧跟着又是一招！`); }   // 守关妖王连动：马上再出一招
+  for (const u of b.units) if (u.hp > 0 && u.kind === 'boss') {   // 守关妖王换阶段
+    if (u.ph1 && u.hp / u.maxHp < R_BOSS_PH[0]) { delete u.ph1; u.shield = Math.max(u.shield || 0, Math.round(u.maxHp * R_BOSS_PH[1])); u.phShield = true; out.pops.push([u.id, '护体真气', 'buff']); out.lines.push(`${u.name}周身腾起一层护体真气——打破之前，伤它只有一半！`); }
+    if (u.phShield && !(u.shield > 0)) { delete u.phShield; out.pops.push([u.id, '护体破了', 'react']); out.lines.push(`${u.name}的护体真气被打散了！`); }
+    if (u.ph2 && u.hp / u.maxHp < R_BOSS_PH[3]) { delete u.ph2; u.atk *= R_BOSS_PH[4]; u.rageB = true; out.pops.push([u.id, '暴怒', 'crit']); out.lines.push(`${u.name}暴怒了：出手更狠！`); }
+  }
+  for (const u of b.units) if (u.callU && u.hp > 0 && (u.ph2 != null || u.rageB ? !!u.rageB : u.hp / u.maxHp < 0.5)) {   // 幻境组队：首领喊小妖（守关妖王暴怒时喊；没有阶段的照旧半血喊）
     const L = u.callU; delete u.callU; L.forEach(x => { x.g = RNG.i(0, 40); b.units.push(x); });
     out.pops.push([u.id, '呼喝', 'crit']); out.lines.push(`${u.name}一声呼喝，又有 ${L.length} 只妖物冲了上来！`); }
   resolveDeaths(b, out);
@@ -2669,6 +2676,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (V.duopo != null && b.castSk && b.castSk.fin && !opt.proc) d *= 1 + LGV.dpFin(V.duopo) / 100;
   }
   if (tgt === b.P && tgt.st.chan) d *= 0.7;   // 狮子吼：嘲讽期间受到的伤害 -30%
+  if (tgt.phShield && tgt.shield > 0) d *= R_BOSS_PH[2];                          // 守关妖王 70% 血的护体真气：打破之前伤害减半
   if (src.fmD) d *= 1 + src.fmD / 100;                                           // 阵法：号位伤害
   if (src.fmStD && tgt.st && stHas(tgt, 'any')) d *= 1 + src.fmStD / 100;          // 蛇蟠阵 1 号：打身上有状态的
   if (tgt.fmR) d *= 1 - tgt.fmR / 100;                                           // 阵法：号位受到的伤害
@@ -2806,6 +2814,8 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src.side === 'e' && tgt.kind === 'hero' && elem !== 'phys' && b.run && b.run.mode === 'story' && b.run.world) d *= (W_TUNE[b.run.chapter] || [])[4] || 1;
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
   if (b.capHit && src.side === 'e' && tgt.side === 'p' && d > tgt.maxHp * b.capHit) d = Math.round(tgt.maxHp * b.capHit);   // 幻境守关蓄力的大招：一下最多打掉一半气血，不会满血被秒
+  else if (src.kind === 'boss' && tgt.side === 'p' && riftB(b) && b.capAcc) {   // 守关妖王出一次手（连带词缀的追击）对同一个人最多打掉六成气血，不会满血被秒
+    const used = b.capAcc[tgt.id] || 0, room = Math.max(0, Math.round(tgt.maxHp * R_BOSS_CAP) - used); if (d > room) d = Math.max(1, room); b.capAcc[tgt.id] = used + d; }
   if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, '护驾', 'miss']); }
   if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分
     const Z = zombiesOf(b).sort((x, y) => (y.taunt ? 1 : 0) - (x.taunt ? 1 : 0) || y.hp - x.hp)[0];

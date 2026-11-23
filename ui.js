@@ -641,7 +641,8 @@ const goHelpModal = () => () => {
     <p class="help-p">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
     <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
     <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>
-    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个。</p>`
+    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个。</p>
+    <p class="help-p">守关妖王：层数越高出手越快；${R_BOSS_AFF.join('、')} 层起各多带一条词缀；${R_BOSS_DUO[0]} 层起每出手 ${R_BOSS_DUO[1]} 次连动一次。打到七成血腾起护体真气（打破之前伤它只有一半），三成半血暴怒、喊帮手。它一下最多打掉你六成气血。</p>`
     : `<p class="help-p">一章一张大地图：走路遇怪、找钥匙、做任务，最后打首领。首领有专门克制它的线索和钥匙，先找钥匙再打会轻松很多。倒下了得到的东西都会保留，会在最近的篝火边醒来。</p>`}
     ${featureOn('mods') ? `<h4 class="sub-h">加难度</h4><div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}
     <button class="btn ghost" data-act="close">好了</button>`;
@@ -1553,13 +1554,17 @@ const ST_INFO = {
   cocoon: ['丝茧', '#e8e0d0', 0, '吐丝裹住自己，挡伤害。用灼烧能把丝茧烧穿。'],
   silver: ['银甲', '#cfd8e8', 0, '一层银甲挡伤害。用破甲能打碎。'],
   hufa: ['护法', '#ff9a5a', 0, '首领的帮手：你带几个伙伴，首领就带几个护法。'],
-  call: ['呼喝', '#ff9a5a', 0, '首领血量掉到一半时，会喊一波小妖冲上来。'],
+  call: ['呼喝', '#ff9a5a', 0, '首领血量掉到一半时（幻境守关妖王是暴怒时），会喊一波小妖冲上来。'],
+  phsh: ['护体真气', '#9ad0ff', 0, '守关妖王打到七成血时腾起的护体真气：打破之前，伤它只有一半。'],
+  rageB: ['暴怒', '#ff3a2a', 0, '守关妖王打到三成半血时暴怒：攻击 +20%。'],
+  duo: ['连动', '#ffb04a', 0, '守关妖王（幻境 150 层起）：每出手五次，紧跟着再出一招。'],
   stacks: ['九幽', '#ffd23a', 1, '九幽套装：每次暴击叠一层，伤害越打越高。'] };
 function unitSts(u) {
   const L = [], add = (k, t, extra) => { const I = ST_INFO[k]; if (I) L.push({ k, n: I[0] + (t ? ' ' + t : ''), c: I[1], good: !!I[2], ...(extra || {}) }); };
   if (!u || u.hp <= 0) return L;
   if (u.charging) add('charging'); if (u.ghostForm) add('ghost'); if (u.cocoon && u.shield > 0) add('cocoon'); if (u.silver && u.shield > 0) add('silver');
   if (u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)) add('enraged');
+  if (u.phShield && u.shield > 0) add('phsh'); if (u.rageB) add('rageB'); if (u.duo) add('duo');
   for (const k of ['frozen', 'slow', 'melt', 'burn', 'poison', 'curse', 'mark', 'warcry', 'kangG', 'liuDr', 'tieArm', 'shadow', 'smoke', 'butui', 'chan', 'renew']) {
     const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, t > 0 && t < 99 ? t : ''); }
   if (u.shield > 0 && !u.cocoon && !u.silver) add('shield', fmtBig(Math.round(u.shield * uK(u))));
@@ -1856,7 +1861,7 @@ function applyStep(o, anim) {
     el.classList.toggle('st-burn', alive && !!u.st.burn); el.classList.toggle('st-tox', alive && !!u.st.poison);
     el.classList.toggle('st-ice', alive && !!u.st.slow); el.classList.toggle('st-stun', alive && !!u.st.frozen);
     el.classList.toggle('st-shd', alive && u.shield > 0); el.classList.toggle('st-cur', alive && !!u.st.curse);
-    el.classList.toggle('st-rage', alive && !!(u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)));
+    el.classList.toggle('st-rage', alive && !!(u.enraged || u.rageB || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)));
     if (anim) { if (el._ice && !u.st.slow) VFX.onThaw(u.id); if (el._shd && !(u.shield > 0) && alive) VFX.onShieldBreak(u.id); }
     el._ice = !!u.st.slow; el._shd = u.shield > 0;
     if (u.side === 'e' && u.kind === 'boss' && alive && u.charging && !el._chg && anim) { const ar = $('#arena'); if (ar) { const w = document.createElement('div'); w.className = 'bwarn'; w.textContent = '⚠ 它在蓄力——下一招很重'; ar.appendChild(w); setTimeout(() => w.remove(), 1800); } SFX.play('gong'); }

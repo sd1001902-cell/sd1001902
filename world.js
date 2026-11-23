@@ -1232,6 +1232,20 @@ function wPrepBattle(run, enc) {
 // 幻境用一个假的章节号 RCH：地图是从别的章节抄来、抹掉机关和人物的；任务表是空的。
 const RCH = 99;
 var R_NORM = [1.3, 0.8], R_ELITE = [3.2, 1.25], R_BOSS = [2.6, 2.2];
+// 2026-11-23 守关妖王加强（用户定 A、B、C；主线首领不动）：
+// A 速度每 50 层 +6%（最多 +30%），150 层起每出手 5 次连动一次；B 100/200/300 层起各多一条精英词缀（不给分身、铜皮、神行）；
+// C 打到 70% 血上一层护体真气（最大气血 15%，没打破之前受到的伤害减半），35% 血暴怒（攻击 ×1.2），组队时这时候喊小妖（原来半血喊）
+var R_BOSS_SPD = [50, 0.06, 0.3], R_BOSS_DUO = [150, 5], R_BOSS_AFF = [100, 200, 300], R_BOSS_PH = [0.7, 0.15, 0.5, 0.35, 1.2];   // 第一版（每 50 层 +10%、四招连动、暴怒 ×1.3）200 层妖王比小怪群还难一大截，收一收
+function rBossUp(run, u) {
+  const N = run.riftLv || 0;
+  u.spd *= 1 + Math.min(R_BOSS_SPD[2], R_BOSS_SPD[1] * Math.floor(N / R_BOSS_SPD[0]));
+  if (N >= R_BOSS_DUO[0]) u.duo = R_BOSS_DUO[1];
+  const n = R_BOSS_AFF.filter(x => N >= x).length;
+  if (n) { const pool = ELITE_AFFIXES.map(a => a.id).filter(a => !['split', 'tough', 'fast'].includes(a) && !(u.aff || []).includes(a)), add = RNG.shuffle(pool).slice(0, n);
+    u.aff = [...(u.aff || []), ...add];
+    if (add.includes('shielded')) u.shield = Math.max(u.shield || 0, Math.round(u.maxHp * 0.3)); }
+  u.ph1 = true; u.ph2 = true; u.nAct = 0;
+}
 var R_BOSS_UP = 1.6;   // 守关妖王本身的血再 ×1.6（护法、小妖不动）：原来首领三四十手就倒，不像最后一关。香相应加了 1 分钟
 // 50 层以后精英涨得比小怪慢一点（每层 +6% 气血、+3.5% 攻击，小怪和妖王是 +8%、+5%）：实测精英战比小怪群、妖王战早二三十层就打不过，只能绕着走
 var R_ELITE_LIN = [0.06, 0.035];
@@ -1355,7 +1369,7 @@ function rPrep(run, enc) {
   const nT = (run.team || []).length, tK = 1 + R_TEAM[0] * nT, tKB = 1 + R_TEAM[5] * nT;   // 组队：每带一个伙伴，小怪精英血量 +10%，首领 +4%（首领另外带护法）
   if (enc.kind === 'boss') {
     run.theme = enc.c - 1;
-    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB * (u.kind === 'boss' ? R_BOSS_UP : 1)); u.atk *= R_BOSS[1]; });
+    const units = makeEncounter(run, 'boss', run.encCell); units.forEach(u => { u.maxHp = u.hp = Math.round(u.hp * R_BOSS[0] * tKB * (u.kind === 'boss' ? R_BOSS_UP : 1)); u.atk *= R_BOSS[1]; if (u.kind === 'boss') rBossUp(run, u); });
     if (nT) {   // 首领也带帮手：伙伴几个，护法几个（本章妖物的精英，各带一条精英词缀）；半血时再喊一波小妖
       const F0 = CHAPTERS[enc.c - 1], B0 = units.find(u => u.kind === 'boss') || units[0], ez = rEliteEase(run.riftLv), lv = enc.lv;
       const okA = ['fiery', 'cold', 'vamp', 'enraged', 'tough', 'fast', 'shielded', 'venom'];   // 不给分身、反震
