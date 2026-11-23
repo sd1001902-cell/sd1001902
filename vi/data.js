@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: "Công", hp: "Khí huyết", armor: "Hộ giáp", crit: "Tỉ lệ chí mạng", critDmg: "ST chí mạng",
   spd: "Tốc độ", leech: "Hút máu", res: "Kháng toàn bộ", dmgPct: "Sát thương", elem: "ST thuật pháp",
-  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", regen: "Hồi khí huyết mỗi lượt", thorns: "Phản chấn",
+  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", thornK: "Bội số phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Phản chấn",
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
   regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };
-const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -123,7 +123,7 @@ const LEGENDS = [
   { id: 'champion', n: "Bá Vương Khôi",     slot: 'helm', ch: 6,   imp: { dmgPct: 8 },   fx: 'bossDmg',    d: "Sát thương lên tinh anh và thủ lĩnh +35%" },
   { id: 'warden',   n: "Trấn Nhạc Quan",     slot: 'helm', ch: 1,   imp: { hpPct: 8 },    fx: 'startShield', d: "Đầu trận nhận hộ thể chân khí bằng 25% khí huyết tối đa" },
   { id: 'undying',  n: "Bất Diệt Kim Thân Giáp", slot: 'chest', ch: 8,  imp: { hpPct: 12 },   fx: 'cheatDeath', d: "Mỗi trận một lần: khi nhận đòn chí tử thì giữ lại một hơi và hồi 30%" },
-  { id: 'throne',   n: "Kinh Cức Khải",     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: "Phản chấn gây thêm sát thương bằng 25% hộ giáp" },
+  { id: 'throne',   n: "Kinh Cức Khải",     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: "Bội số phản chấn +60%: mỗi lần bị đánh, bật lại 60% công kích của bạn" },
   { id: 'vampire',  n: "Huyết Bức Bào",     slot: 'chest', ch: 3,  imp: { leech: 3 },    fx: 'vampire',    d: "Hiệu quả hút máu gấp đôi" },
   { id: 'phoenix',  n: "Phượng Vũ Nghê Thường",   slot: 'chest', ch: 9,  imp: { res: 12 },     fx: 'phoenix',    d: "Lần đầu khí huyết dưới 30% mỗi trận thì bùng lửa, gây 300% sát thương hỏa lên mọi kẻ địch" },
   { id: 'looter',   n: "Mô Kim Thủ",     slot: 'gloves', ch: 1, imp: { gf: 50 },      fx: 'lootKill',   d: "Giết địch có 12% tỉ lệ rơi thêm một món trang bị" },
@@ -385,7 +385,7 @@ const CLASSES = {
       { id: 'prayer',    n: "Bát Nhã Tâm Kinh", lv: 12, cd: 5, wx: 'mu', d: "Khí huyết dưới 70% thì hồi 16% khí huyết tối đa" },
       { id: 'budong',    n: "Bất Động Minh Vương", lv: 16, cd: 5, wx: 'tu',   k: 'aoe', m: 0.9, shield: 0.11, d: "Gây 90% sát thương lên mọi kẻ địch và nhận hộ thể bằng 11% khí huyết" },
       { id: 'judgement', n: "Vạn Phật Triều Tông", lv: 20, cd: 6, wx: 'huo', d: "Gây 200% sát thương Phật quang lên mọi kẻ địch" },
-      { id: 'chanhou',   n: "Sư Tử Hống · Thiền", lv: 25, cd: 6, wx: 'tu', d: "Trong 3 lượt tỉ lệ phản kích +40%, phản kích chắc chắn làm địch choáng" },
+      { id: 'chanhou',   n: "Sư Tử Hống · Thiền", lv: 16, cd: 6, wx: 'tu', d: "Khiêu khích mọi kẻ địch 3 hiệp: chúng chỉ đánh được bạn (thủ lĩnh cũng vậy). Trong lúc đó sát thương phải nhận -30%, bội số phản chấn +50%, tỉ lệ phản kích +40%, phản kích chắc chắn làm địch choáng" },
       { id: 'holy',      n: "La Hán Quyền",   lv: 1,  cd: 0, wx: 'tu', d: "Gây 115% sát thương Phật quang" },
     ],
     tree: { n: "Thiền Tâm", t: [

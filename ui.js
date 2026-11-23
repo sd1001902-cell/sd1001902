@@ -254,16 +254,30 @@ function stashBody(cls, D) {
     <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `储物箱里没有可以换的${SLOT_NAME[slotType(GSLOT)]}。` : '这里没有符合条件的装备。'}</div>`}</div>
     <p class="sub" style="margin:8px 0 0">右边数字是换上后的战力变化。储物箱 ${SAVE.stash.length}/${stashMax()}，各角色共用。</p>`;
 }
+// 灵玉一行：名字、等级、说明；本命玉标上是哪个门派的
+function lgemRow(g, btn) { const G = LGEMS[g.t] || LGEMS.reforge;
+  return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : G.n}</b> ${g.lv} 级${G.cls ? ` <em class="lgcls">${CLASSES[G.cls].n}本命</em>` : ''} <small>${G.d(g.lv)}</small></span>${btn || ''}</div>`; }
+// 灵玉重铸：老存档里被删的五颗（战神、长生、疾风、破军、回春）挑一颗新的换，等级原样保留
+let LGRE = null;
+const lgReModal = () => {
+  const todo = SAVE.lgems.filter(g => g.t === 'reforge'); if (!todo.length) return `<h2 class="mh">灵玉重铸</h2><p class="help-p">都换好了。</p><div class="row"><button class="btn" data-act="close">好</button></div>`;
+  const g = todo.find(x => x.id === LGRE) || todo[0], owned = new Set(SAVE.lgems.map(x => x.t)), opts = Object.keys(LGEMS).filter(t => !LGEMS[t].hide && !owned.has(t));
+  const sorted = [...opts.filter(t => LGEMS[t].cls === SAVE.cls), ...opts.filter(t => LGEMS[t].cls && LGEMS[t].cls !== SAVE.cls), ...opts.filter(t => !LGEMS[t].cls)];
+  return `<button class="btn sm ghost x" data-act="close">以后再说</button><h2 class="mh">灵玉重铸 <small>还剩 ${todo.length} 颗</small></h2>
+    <p class="help-p">灵玉改版了：<b>${LGEM_OLD[g.old] || '这颗灵玉'}</b>（${g.lv} 级）只是普通属性，效果删掉了。给它挑一颗新的，<b>等级原样保留</b>。每个门派有一颗只有本门能用的「本命灵玉」，别的灵玉谁都能用。</p>
+    <div class="lgre" data-scroll="lgre">${sorted.map(t => { const G = LGEMS[t]; return `<button class="lgre-o" data-act="lgreforge" data-arg="${g.id}|${t}"><b style="color:${G.c}">${G.n}${G.cls ? ` <em class="lgcls">${CLASSES[G.cls].n}本命</em>` : ''}</b><small>${G.d(g.lv)}</small></button>`; }).join('')}</div>`;
+};
 // 灵玉匣：三个孔，灵玉全账号共用，每个角色各挑三颗
 function boxBody(cls) {
   const L = boxOf(cls), bs = boxStat(SAVE.riftMax), inBox = new Set(L.filter(Boolean)), rest = SAVE.lgems.filter(g => !inBox.has(g.id));
-  const gemRow = (g, btn) => { const G = LGEMS[g.t]; return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${G.n}</b> ${g.lv} 级 <small>${G.d(g.lv)}</small></span>${btn}</div>`; };
+  const gemRow = (g, btn) => lgemRow(g, btn);
   return `<div class="gcur2"><div class="gcur-h"><span class="sub">灵玉匣</span><button class="btn sm ghost" data-act="gsl" data-arg="box">收起</button></div>
       <p class="help-p">匣子自带：最大气血 +${bs}%，伤害 +${bs}%（幻境最高纪录每过 10 层，各再 +1%）。三个孔只镶灵玉。灵玉全账号共用：每个角色各挑三颗，换角色不用拆。</p>
       <div class="gems">${L.map((gid, i) => { const g = gid && SAVE.lgems.find(x => x.id === gid);
         return g ? gemRow(g, `<button class="btn sm ghost" data-act="boxoff" data-arg="${i}">取下</button>`) : `<div class="gemrow lg empty"><span class="nm"><i>第 ${i + 1} 孔 · 空着</i></span></div>`; }).join('')}</div></div>
     <h4 class="sub-h gcur-t">还能放进去的灵玉</h4>
-    <div class="gems">${rest.length ? rest.map(g => gemRow(g, `<button class="btn sm" data-act="boxput" data-arg="${g.id}">放进匣里</button>`)).join('') : `<div class="empty-note">${SAVE.lgems.length ? '手上的灵玉都在匣里了。' : '还没有灵玉。去九幽幻境打败守关妖王吧。'}</div>`}</div>`;
+    ${SAVE.lgems.some(g => g.t === 'reforge') ? `<button class="btn sm lgref" data-act="lgreopen">有 ${SAVE.lgems.filter(g => g.t === 'reforge').length} 颗灵玉待重铸：挑新的（等级保留）›</button>` : ''}
+    <div class="gems">${rest.length ? rest.map(g => { const G = LGEMS[g.t]; return gemRow(g, G.cls && G.cls !== cls ? `<button class="btn sm ghost" disabled>${CLASSES[G.cls].n}专用</button>` : g.t === 'reforge' ? '<button class="btn sm" data-act="lgreopen">重铸</button>' : `<button class="btn sm" data-act="boxput" data-arg="${g.id}">放进匣里</button>`); }).join('') : `<div class="empty-note">${SAVE.lgems.length ? '手上的灵玉都在匣里了。' : '还没有灵玉。去九幽幻境打败守关妖王吧。'}</div>`}</div>`;
 }
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
@@ -3567,6 +3581,9 @@ const ACT = {
   boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast('三个孔都满了，先取下一颗'); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
   boxoff: i => { const r = boxSet(ctxCls(), +i, null); if (r.err) return toast(r.err); SFX.play('click'); refresh(); },
   gemup: a => { const [id, i] = split(a); const r = upgradeSocketed(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('rare'); toast('升成了 ' + gemName(r.key)); refresh(); },
+  lgreopen: () => { LGRE = null; BACK = null; openModal(lgReModal); },
+  lgreforge: a => { const [gid, t] = split(a), g = SAVE.lgems.find(x => x.id === gid); if (!g || g.t !== 'reforge' || !LGEMS[t] || LGEMS[t].hide || SAVE.lgems.some(x => x.t === t)) return;
+    g.t = t; delete g.old; save(); SFX.play('rare'); toast(`换成了 ${LGEMS[t].n}（${g.lv} 级）`); if (SAVE.lgems.some(x => x.t === 'reforge')) refresh(); else { closeModal(); refresh(); } },
   ungem: a => { const [id, i] = split(a); const r = unsocket(findOwned(id), +i); if (r.err) return toast(r.err); toast('玉石已取下'); refresh(); },
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast('洗炼完成'); refresh(); },
@@ -3829,6 +3846,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次
 if (SAVE.paraUp2) { const [a0, a1] = SAVE.paraUp2; delete SAVE.paraUp2; save(); setTimeout(() => toast(`修为升级又快了一倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级。修为五个门派共用，多出来的点在「人物 · 修为」里加`, 6500), 1200); }
 if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`修为升级快了二十倍，以前刷的经验已按新标准补上：<b>${a0}</b> 级 → <b>${a1}</b> 级，多出来的点在「修炼 · 修为」里加`, 6000), 1200); }
 if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }

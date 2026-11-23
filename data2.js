@@ -26,7 +26,7 @@ const RUNES = {
   ganlu:      [{ n: '净世', d: '伤害 +80%' }, { n: '甘霖', d: '回血翻倍，不再伤敌' }],
   fuhu:       [{ n: '降龙', d: '对眩晕的敌人必定暴击' }, { n: '卸劲', d: '打中的敌人 3 回合内伤害 -30%' }],
   budong:     [{ n: '明王怒', d: '伤害 +60%' }, { n: '金身', d: '护体翻倍，冷却 +1' }],
-  chanhou:    [{ n: '当头棒喝', d: '施放时 50% 几率眩晕每个敌人' }, { n: '禅定', d: '期间每次反击恢复 3% 最大气血' }],
+  chanhou:    [{ n: '当头棒喝', d: '施放时 50% 几率眩晕每个敌人' }, { n: '禅定', d: '嘲讽多 1 回合' }],
   whirl:      [{ n: '血旋', d: '每击中一个敌人恢复 2% 最大气血' }, { n: '飓风刀', d: '伤害 +50%，冷却 +1' }],
   warcry:     [{ n: '震慑', d: '同时震慑所有敌人 3 回合（伤害 -30%）' }, { n: '血战令', d: '狮子吼期间吸血 +10%' }],
   bloodlust:  [{ n: '斩首', d: '对气血低于 40% 的敌人伤害翻倍' }, { n: '鲸吞', d: '恢复量提高到伤害的 100%' }],
@@ -49,20 +49,45 @@ const RUNES = {
 };
 
 // 灵玉（原传奇宝石）：只在九幽幻境的守关妖王身上掉落，可以无限升级
+// 灵玉 2026-11-23 重做：删掉只是普通属性的五颗（战神、长生、疾风、破军、回春）；留六颗特色玉；
+// 每个门派一颗本命玉（cls：只有本门能放进灵玉匣），两套幻境套装都吃得到；另外五颗不绑门派、绑一种打法。
+// st：直接加到属性上的部分；机制部分在战斗里按 P.lgv[类型] = 等级 读（LGV 里的公式）
+const LGV = {
+  zhLow: lv => 1 + lv * 0.05, zhHalf: lv => 10 + lv * 0.5,     // 战魂：气血每少 10%，伤害再 +x%；怒意过半时伤害 +x%
+  wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
+  swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
+  dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
+  jsSh: lv => 4 + lv * 0.05,                                    // 金身：反击时得护体（最大气血 %）
+  lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
+  sgK: lv => 4 + lv * 0.12,                                     // 蚀骨：敌人身上每种状态 +x%
+  xjK: lv => 15 + lv * 0.35, xjBoom: lv => 100 + lv * 1.5,      // 玄甲：有护体时伤害；护体打碎炸开
+  ssK: lv => 15 + lv * 0.3, ssHeal: lv => 1 + lv * 0.02,       // 嗜杀：每层下一招伤害；杀一个回血
+  tgK: lv => 30 + lv * 0.6,                                     // 天罡：放完必杀后的伤害
+};
 const LGEMS = {
+  // ---- 留下的六颗特色玉 ----
   pain:  { n: '血煞玉', c: '#ff4a4a', d: lv => `攻击附带中毒：每回合 ${20 + lv}% 攻击`, st: lv => ({ poison: 20 + lv }) },
-  power: { n: '战神玉', c: '#ffb02a', d: lv => `伤害 +${(10 + lv * 0.5).toFixed(1)}%`, st: lv => ({ dmgPct: 10 + lv * 0.5 }) },
-  life:  { n: '长生玉', c: '#5df07a', d: lv => `最大气血 +${(8 + lv * 0.4).toFixed(1)}%`, st: lv => ({ hpPct: 8 + lv * 0.4 }) },
   ice:   { n: '寒髓玉', c: '#8fd0ff', d: lv => `定身几率 +${(5 + lv * 0.2).toFixed(1)}%，对定身敌人伤害 +${20 + lv}%`, st: lv => ({ freeze: 5 + lv * 0.2, frozenDmg: 20 + lv }) },
   greed: { n: '招财玉', c: '#f1c94a', d: lv => `银两获取 +${30 + lv * 2}%，福缘 +${10 + lv}%`, st: lv => ({ gf: 30 + lv * 2, mf: 10 + lv }) },
-  zeal:  { n: '疾风玉', c: '#c39cff', d: lv => `速度 +${(6 + lv * 0.3).toFixed(1)}`, st: lv => ({ spd: 6 + lv * 0.3 }) },
-  // 2026-11 加的五颗：两颗守、两颗辅、一颗攻
   guard: { n: '金钟玉', c: '#e8c13a', d: lv => `受到的伤害 -${(6 + lv * 0.3).toFixed(1)}%；气血低于 30% 时效果翻倍`, st: lv => ({ gDr: 6 + lv * 0.3 }) },
-  renew: { n: '回春玉', c: '#7fe0b0', d: lv => `每回合回复 ${(1.5 + lv * 0.05).toFixed(2)}% 气血；治疗效果 +${10 + lv}%`, st: lv => ({ regenPct: 1.5 + lv * 0.05, healPct: 10 + lv }) },
   bond:  { n: '同心玉', c: '#ff9ad0', d: lv => `同伴、Ngoc、僵尸的伤害和气血 +${15 + lv}%`, st: lv => ({ allyPct: 15 + lv }) },
   flow:  { n: '流光玉', c: '#9ae8ff', d: lv => `有冷却的招式放出后，${Math.min(CDSKIP_CAP, 10 + lv * 0.4).toFixed(1)}% 几率不进冷却（各处加起来最多 ${CDSKIP_CAP}%）`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
-  slay:  { n: '破军玉', c: '#ff7a3a', d: lv => `对精英和妖王伤害 +${(12 + lv * 0.5).toFixed(1)}%`, st: lv => ({ xBoss: 12 + lv * 0.5 }) },
+  // ---- 本命玉：每门一颗 ----
+  zhanhun: { n: '战魂玉', c: '#ff6a3a', cls: 'berserker', d: lv => `怒意获得 +${Math.round(20 + lv)}%；怒意过半时伤害 +${LGV.zhHalf(lv).toFixed(0)}%；气血每少 10%，伤害再 +${LGV.zhLow(lv).toFixed(1)}%（血海、修罗不死）`, st: lv => ({ furyGain: 20 + lv, lowHpK: LGV.zhLow(lv) }) },
+  wuxing:  { n: '五行玉', c: '#c8a2ff', cls: 'mage', d: lv => `换一种五行出招时，${LGV.wxCh(lv).toFixed(0)}% 几率给目标挂上这种五行的状态（火灼烧、水冰冻、土破甲、木中毒、金眩晕）；「连」每层伤害再 +${(1.5 + lv * 0.06).toFixed(1)}%（归元、万符）`, st: lv => ({ lianPct: 1.5 + lv * 0.06 }) },
+  shiwang: { n: '尸王玉', c: '#7fd08a', cls: 'necro', d: lv => `僵尸的伤害和气血 +${Math.round(20 + lv * 0.8)}%；尸位每空一个，你的中毒伤害 +${LGV.swPoi(lv).toFixed(0)}%（阴兵、五毒）`, st: lv => ({ minionPct: 20 + lv * 0.8 }) },
+  duopo:   { n: '夺魄玉', c: '#a0a8ff', cls: 'assassin', d: lv => `杀意上限 +1；暗器（淬毒镖、冰魄针、漫天花雨）打中时 ${LGV.dpKi(lv).toFixed(0)}% 几率 +1 杀意；终结技伤害 +${LGV.dpFin(lv).toFixed(0)}%（七杀、千机）`, st: () => ({}) },
+  jinshen: { n: '金身玉', c: '#ffd76a', cls: 'paladin', d: lv => `反震倍率 +${Math.round(30 + lv)}%；每次反击，得到 ${LGV.jsSh(lv).toFixed(1)}% 最大气血的护体真气（罗汉、大日）`, st: lv => ({ thornK: 30 + lv }) },
+  // ---- 打法玉：不绑门派，配对了套装才好用 ----
+  lianhuan: { n: '连环玉', c: '#ffb060', d: lv => `群攻招式每多打中一个敌人，这一招伤害 +${LGV.lhK(lv).toFixed(1)}%（最多算 5 个）。配修罗不死、万符、千机、大日`, st: () => ({}) },
+  shigu:    { n: '蚀骨玉', c: '#9ad86a', d: lv => `敌人身上每有一种状态，受到你的伤害 +${LGV.sgK(lv).toFixed(1)}%；你挂的状态多持续 1 回合。配万符、五毒、千机、归元`, st: () => ({}) },
+  xuanjia:  { n: '玄甲玉', c: '#8ab0d8', d: lv => `身上有护体时伤害 +${LGV.xjK(lv).toFixed(0)}%；护体被打碎时炸开，对所有敌人造成 ${LGV.xjBoom(lv).toFixed(0)}% 伤害（两回合最多一次）。配大日、罗汉、五行道士`, st: () => ({}) },
+  shisha:   { n: '嗜杀玉', c: '#e05a5a', d: lv => `每有一个敌人倒下：回复 ${LGV.ssHeal(lv).toFixed(1)}% 气血，下一招伤害 +${LGV.ssK(lv).toFixed(0)}%（最多叠 3 层，出招后清空）。配七杀、修罗不死、阴兵`, st: () => ({}) },
+  tiangang: { n: '天罡玉', c: '#ffe08a', d: lv => `必杀蓄得快 ${Math.round(30 + lv * 0.5)}%；放完必杀后两招伤害 +${LGV.tgK(lv).toFixed(0)}%。配血海、大日这些靠必杀的打法`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
+  // 老存档里被删的灵玉：先放在这里，等玩家挑一颗新的换（等级保留）
+  reforge:  { n: '待重铸的灵玉', c: '#8a8070', d: () => '这颗灵玉的效果删掉了：去「灵玉 · 重铸」挑一颗新的，等级原样保留', st: () => ({}), hide: true },
 };
+const LGEM_OLD = { power: '战神玉', life: '长生玉', zeal: '疾风玉', slay: '破军玉', renew: '回春玉' };
 // 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
 const BOX_SLOTS = 3;
 const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
@@ -71,29 +96,29 @@ const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
 const BUILDS = {
   berserker: [
     { set: 'xuehai', d: '攒满怒意，霸王卸甲一刀定音，打妖王最快', sk: [['liedi', 'a'], ['bawang', 'a'], ['hanren', 'a'], ['warcry', 'b'], ['bloodlust', 'b']],
-      leg: ['bawangdai', 'nutaoqiao'], cube: ['butcher', 'champion', 'yinxuejie'], gems: ['power', 'slay', 'guard'] },
+      leg: ['bawangdai', 'nutaoqiao'], cube: ['butcher', 'champion', 'yinxuejie'], gems: ['zhanhun', 'tiangang', 'guard'] },
     { set: 'busi', d: '压着血线转旋风刀，越残越疯，清群怪最快', sk: [['liedi', 'b'], ['whirl', 'a'], ['bloodlust', 'b'], ['warcry', 'a'], ['butui', 'b']],
-      leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['power', 'guard', 'life'] } ],
+      leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['zhanhun', 'guard', 'lianhuan'] } ],
   mage: [
     { set: 'guiyuan', d: '木火土金水一圈圈接下去，「连」满了每招三倍', sk: [['chain', 'b'], ['fireball', 'b'], ['luoshi', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
-      leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['power', 'flow', 'guard'] },
+      leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['wuxing', 'guard', 'shigu'] },
     { set: 'wanfu', d: '不管顺序，把状态挂满全场再引爆', sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
-      leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['power', 'flow', 'renew'] } ],
+      leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
     { set: 'yinbing', d: '尸群碾压：僵尸替你挨打，倒下还会炸', sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['corpse', 'a']],
-      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['bond', 'power', 'life'] },
+      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shisha'] },
     { set: 'duxing', d: '不带尸，一个人叠毒，再一次结算', sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
-      leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['pain', 'guard', 'power'] } ],
+      leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['shiwang', 'pain', 'shigu'] } ],
   assassin: [
     { set: 'qisha', d: '攒杀意，终结技点杀；杀一个，刷新一次', sk: [['venom', 'a'], ['shadowstep', 'a'], ['dici', 'a'], ['deathmark', 'a'], ['shadowkill', 'b']],
-      leg: ['cangfengdai', 'wuyingnang'], cube: ['duoming', 'yingsha', 'abyssEye'], gems: ['power', 'slay', 'zeal'] },
+      leg: ['cangfengdai', 'wuyingnang'], cube: ['duoming', 'yingsha', 'abyssEye'], gems: ['duopo', 'guard', 'tiangang'] },
     { set: 'qianji', d: '先上毒，暗器铺满全场', sk: [['venom', 'b'], ['fan', 'b'], ['bingpo', 'b'], ['yandun', 'a'], ['deathmark', 'b']],
-      leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['pain', 'power', 'flow'] } ],
+      leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['duopo', 'pain', 'shigu'] } ],
   paladin: [
-    { set: 'luohan', d: '站着挨打，反击打全场，越打越硬', sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
-      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['guard', 'life', 'renew'] },
+    { set: 'luohan', d: '狮子吼拉住所有妖物，挨一下弹一下、反击打全场，越打越硬', sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
+      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['jinshen', 'guard', 'xuanjia'] },
     { set: 'dari', d: '护体养着，主动出招追佛光', sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
-      leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['power', 'renew', 'flow'] } ],
+      leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['jinshen', 'xuanjia', 'tiangang'] } ],
 };
 // 改五行的变招（只有道士用得上）
 const RUNE_WX = { luoshi: { a: 'jin' }, jinguang: { a: 'shui' }, lunzhuan: { a: 'tu' }, wulei: { a: 'mu' } };
@@ -237,9 +262,9 @@ SETS.push(
     b6: 'qiSha6', b6d: '终结技伤害 ×4；终结技杀死目标时，冷却立刻清零' },
   { id: 'luohan', n: '罗汉金身', cls: 'paladin', rift: true,
     pieces: [['helm', '罗汉僧帽'], ['chest', '罗汉袈裟'], ['gloves', '罗汉护腕'], ['boots', '罗汉僧鞋'], ['ring', '罗汉扳指'], ['amulet', '罗汉念珠']],
-    b2: { counter: 20, armorPct: 30 }, b2d: '反击几率 +20%，护甲 +30%',
-    b4: 'luoHan4', b4d: '反击打所有敌人，伤害从 80% 提高到 200%；被护体挡下的攻击也会反击',
-    b6: 'luoHan6', b6d: '反击几率再 +15%；每次反击叠一层「佛怒」（这场战斗内，最多 10 层）：每层伤害 +30%，受到的伤害 -4%' },
+    b2: { counter: 20, armorPct: 30, thornK: 100 }, b2d: '反击几率 +20%，护甲 +30%，反震倍率 +100%（反震 = 你的攻击 × 反震倍率，每挨一下打弹一下）',
+    b4: 'luoHan4', b4d: '反击打所有敌人，伤害从 80% 提高到 200%；被护体挡下的攻击也会反击；狮子吼嘲讽期间反震翻倍',
+    b6: 'luoHan6', b6d: '反击几率再 +15%；每次反击（反震一半几率）叠一层「佛怒」（这场战斗内，最多 10 层）：每层伤害 +30%，受到的伤害 -4%；反震伤害的一成回给自己' },
 );
 // 第二套幻境套装：RSET2_LV 层起掉。上面那五套是把本门的招牌机制推到头；这五套换一种打法，用的是上面不碰的招式
 const RSET2_LV = 30;

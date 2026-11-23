@@ -26,7 +26,7 @@ const RUNES = {
   ganlu:      [{ n: "Tịnh Thế", d: "Sát thương +80%" }, { n: "Cam Lâm", d: "Hồi máu gấp đôi, không còn gây sát thương" }],
   fuhu:       [{ n: "Hàng Long", d: "Chắc chắn chí mạng lên kẻ địch đang choáng" }, { n: "Tá Kình", d: "Kẻ địch trúng đòn trong 3 lượt sát thương -30%" }],
   budong:     [{ n: "Minh Vương Nộ", d: "Sát thương +60%" }, { n: "Kim Thân", d: "Hộ thể gấp đôi, hồi chiêu +1" }],
-  chanhou:    [{ n: "Đương Đầu Bổng Hát", d: "Khi dùng có 50% tỉ lệ gây choáng mỗi kẻ địch" }, { n: "Thiền Định", d: "Trong lúc đó mỗi lần phản kích hồi 3% khí huyết tối đa" }],
+  chanhou:    [{ n: "Đương Đầu Bổng Hát", d: "Khi dùng có 50% tỉ lệ gây choáng mỗi kẻ địch" }, { n: "Thiền Định", d: "Khiêu khích thêm 1 hiệp" }],
   whirl:      [{ n: "Huyết Toàn", d: "Mỗi lần đánh trúng một kẻ địch hồi 2% khí huyết tối đa" }, { n: "Phi Phong Đao", d: "Sát thương +50%, hồi chiêu +1" }],
   warcry:     [{ n: "Chấn Nhiếp", d: "Đồng thời chấn nhiếp mọi kẻ địch 3 lượt (sát thương -30%)" }, { n: "Huyết Chiến Lệnh", d: "Trong lúc Sư Tử Hống hút máu +10%" }],
   bloodlust:  [{ n: "Trảm Thủ", d: "Sát thương lên địch dưới 40% khí huyết gấp đôi" }, { n: "Kình Thôn", d: "Lượng hồi tăng lên bằng 100% sát thương" }],
@@ -49,20 +49,45 @@ const RUNES = {
 };
 
 // 灵玉（原传奇宝石）：只在九幽幻境的守关妖王身上掉落，可以无限升级
+// 灵玉 2026-11-23 重做：删掉只是普通属性的五颗（战神、长生、疾风、破军、回春）；留六颗特色玉；
+// 每个门派一颗本命玉（cls：只有本门能放进灵玉匣），两套幻境套装都吃得到；另外五颗不绑门派、绑一种打法。
+// st：直接加到属性上的部分；机制部分在战斗里按 P.lgv[类型] = 等级 读（LGV 里的公式）
+const LGV = {
+  zhLow: lv => 1 + lv * 0.05, zhHalf: lv => 10 + lv * 0.5,     // 战魂：气血每少 10%，伤害再 +x%；怒意过半时伤害 +x%
+  wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
+  swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
+  dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
+  jsSh: lv => 4 + lv * 0.05,                                    // 金身：反击时得护体（最大气血 %）
+  lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
+  sgK: lv => 4 + lv * 0.12,                                     // 蚀骨：敌人身上每种状态 +x%
+  xjK: lv => 15 + lv * 0.35, xjBoom: lv => 100 + lv * 1.5,      // 玄甲：有护体时伤害；护体打碎炸开
+  ssK: lv => 15 + lv * 0.3, ssHeal: lv => 1 + lv * 0.02,       // 嗜杀：每层下一招伤害；杀一个回血
+  tgK: lv => 30 + lv * 0.6,                                     // 天罡：放完必杀后的伤害
+};
 const LGEMS = {
+  // ---- 留下的六颗特色玉 ----
   pain:  { n: "Huyết Sát Ngọc", c: '#ff4a4a', d: lv => `Đòn đánh gây trúng độc: mỗi lượt ${20 + lv}% công`, st: lv => ({ poison: 20 + lv }) },
-  power: { n: "Chiến Thần Ngọc", c: '#ffb02a', d: lv => `Sát thương +${(10 + lv * 0.5).toFixed(1)}%`, st: lv => ({ dmgPct: 10 + lv * 0.5 }) },
-  life:  { n: "Trường Sinh Ngọc", c: '#5df07a', d: lv => `Khí huyết tối đa +${(8 + lv * 0.4).toFixed(1)}%`, st: lv => ({ hpPct: 8 + lv * 0.4 }) },
   ice:   { n: "Hàn Tủy Ngọc", c: '#8fd0ff', d: lv => `Tỉ lệ bất động +${(5 + lv * 0.2).toFixed(1)}%, sát thương lên địch bất động +${20 + lv}%`, st: lv => ({ freeze: 5 + lv * 0.2, frozenDmg: 20 + lv }) },
   greed: { n: "Chiêu Tài Ngọc", c: '#f1c94a', d: lv => `Thu hoạch bạc +${30 + lv * 2}%, phúc duyên +${10 + lv}%`, st: lv => ({ gf: 30 + lv * 2, mf: 10 + lv }) },
-  zeal:  { n: "Tật Phong Ngọc", c: '#c39cff', d: lv => `Tốc độ +${(6 + lv * 0.3).toFixed(1)}`, st: lv => ({ spd: 6 + lv * 0.3 }) },
-  // 2026-11 加的五颗：两颗守、两颗辅、一颗攻
   guard: { n: "Kim Chung Ngọc", c: '#e8c13a', d: lv => `Sát thương phải nhận -${(6 + lv * 0.3).toFixed(1)}%; khí huyết dưới 30% thì hiệu quả gấp đôi`, st: lv => ({ gDr: 6 + lv * 0.3 }) },
-  renew: { n: "Hồi Xuân Ngọc", c: '#7fe0b0', d: lv => `Mỗi lượt hồi ${(1.5 + lv * 0.05).toFixed(2)}% khí huyết; hiệu quả trị liệu +${10 + lv}%`, st: lv => ({ regenPct: 1.5 + lv * 0.05, healPct: 10 + lv }) },
   bond:  { n: "Đồng Tâm Ngọc", c: '#ff9ad0', d: lv => `Sát thương và khí huyết của đồng hành, Ngoc, cương thi +${15 + lv}%`, st: lv => ({ allyPct: 15 + lv }) },
   flow:  { n: "Lưu Quang Ngọc", c: '#9ae8ff', d: lv => `Chiêu có hồi chiêu sau khi tung ra có ${Math.min(CDSKIP_CAP, 10 + lv * 0.4).toFixed(1)}% tỉ lệ không vào hồi chiêu (cộng mọi nguồn tối đa ${CDSKIP_CAP}%)`, st: lv => ({ cdSkip: 10 + lv * 0.4 }) },
-  slay:  { n: "Phá Quân Ngọc", c: '#ff7a3a', d: lv => `Sát thương lên tinh anh và yêu vương +${(12 + lv * 0.5).toFixed(1)}%`, st: lv => ({ xBoss: 12 + lv * 0.5 }) },
+  // ---- 本命玉：每门一颗 ----
+  zhanhun: { n: "Chiến Hồn Ngọc", c: '#ff6a3a', cls: 'berserker', d: lv => `Nộ ý nhận được +${Math.round(20 + lv)}%; nộ ý quá nửa thì sát thương +${LGV.zhHalf(lv).toFixed(0)}%; khí huyết mỗi lần thiếu 10%, sát thương thêm +${LGV.zhLow(lv).toFixed(1)}% (Huyết Hải, Tu La Bất Tử)`, st: lv => ({ furyGain: 20 + lv, lowHpK: LGV.zhLow(lv) }) },
+  wuxing:  { n: "Ngũ Hành Ngọc", c: '#c8a2ff', cls: 'mage', d: lv => `Khi đổi sang hành khác để ra chiêu, ${LGV.wxCh(lv).toFixed(0)}% tỉ lệ gắn lên mục tiêu trạng thái của hành đó (Hỏa thiêu đốt, Thủy băng đông, Thổ phá giáp, Mộc trúng độc, Kim choáng); mỗi tầng “Liên” sát thương thêm +${(1.5 + lv * 0.06).toFixed(1)}% (Quy Nguyên, Vạn Phù)`, st: lv => ({ lianPct: 1.5 + lv * 0.06 }) },
+  shiwang: { n: "Thi Vương Ngọc", c: '#7fd08a', cls: 'necro', d: lv => `Sát thương và khí huyết của cương thi +${Math.round(20 + lv * 0.8)}%; mỗi thi vị còn trống, sát thương trúng độc của bạn +${LGV.swPoi(lv).toFixed(0)}% (Âm Binh, Ngũ Độc)`, st: lv => ({ minionPct: 20 + lv * 0.8 }) },
+  duopo:   { n: "Đoạt Phách Ngọc", c: '#a0a8ff', cls: 'assassin', d: lv => `Giới hạn Sát ý +1; ám khí (Tiêu Tẩm Độc, Băng Phách Châm, Mạn Thiên Hoa Vũ) trúng thì ${LGV.dpKi(lv).toFixed(0)}% tỉ lệ +1 Sát ý; sát thương đòn kết liễu +${LGV.dpFin(lv).toFixed(0)}% (Thất Sát, Thiên Cơ)`, st: () => ({}) },
+  jinshen: { n: "Kim Thân Ngọc", c: '#ffd76a', cls: 'paladin', d: lv => `Bội số phản chấn +${Math.round(30 + lv)}%; mỗi lần phản kích, nhận hộ thể chân khí bằng ${LGV.jsSh(lv).toFixed(1)}% khí huyết tối đa (La Hán, Đại Nhật)`, st: lv => ({ thornK: 30 + lv }) },
+  // ---- 打法玉：不绑门派，配对了套装才好用 ----
+  lianhuan: { n: "Liên Hoàn Ngọc", c: '#ffb060', d: lv => `Chiêu đánh lan mỗi khi trúng thêm một kẻ địch, chiêu đó sát thương +${LGV.lhK(lv).toFixed(1)}% (tính tối đa 5 kẻ). Hợp với Tu La Bất Tử, Vạn Phù, Thiên Cơ, Đại Nhật`, st: () => ({}) },
+  shigu:    { n: "Thực Cốt Ngọc", c: '#9ad86a', d: lv => `Trên người kẻ địch mỗi có một loại trạng thái, sát thương nó nhận từ bạn +${LGV.sgK(lv).toFixed(1)}%; trạng thái bạn gắn kéo dài thêm 1 hiệp. Hợp với Vạn Phù, Ngũ Độc, Thiên Cơ, Quy Nguyên`, st: () => ({}) },
+  xuanjia:  { n: "Huyền Giáp Ngọc", c: '#8ab0d8', d: lv => `Khi có hộ thể, sát thương +${LGV.xjK(lv).toFixed(0)}%; hộ thể bị đánh vỡ thì nổ tung, gây ${LGV.xjBoom(lv).toFixed(0)}% sát thương lên mọi kẻ địch (hai hiệp tối đa một lần). Hợp với Đại Nhật, La Hán, Đạo Sĩ Ngũ Hành`, st: () => ({}) },
+  shisha:   { n: "Thị Sát Ngọc", c: '#e05a5a', d: lv => `Mỗi khi có một kẻ địch ngã xuống: hồi ${LGV.ssHeal(lv).toFixed(1)}% khí huyết, chiêu kế tiếp sát thương +${LGV.ssK(lv).toFixed(0)}% (cộng dồn tối đa 3 tầng, ra chiêu xong thì xóa). Hợp với Thất Sát, Tu La Bất Tử, Âm Binh`, st: () => ({}) },
+  tiangang: { n: "Thiên Cương Ngọc", c: '#ffe08a', d: lv => `Tuyệt kỹ tích nhanh hơn ${Math.round(30 + lv * 0.5)}%; tung tuyệt kỹ xong, hai chiêu sau sát thương +${LGV.tgK(lv).toFixed(0)}%. Hợp với Huyết Hải, Đại Nhật và các lối đánh dựa vào tuyệt kỹ`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
+  // 老存档里被删的灵玉：先放在这里，等玩家挑一颗新的换（等级保留）
+  reforge:  { n: "Linh ngọc chờ tái luyện", c: '#8a8070', d: () => "Hiệu quả của viên linh ngọc này đã bị xóa: vào “Linh ngọc · Tái luyện” chọn một viên mới, cấp giữ nguyên", st: () => ({}), hide: true },
 };
+const LGEM_OLD = { power: "Chiến Thần Ngọc", life: "Trường Sinh Ngọc", zeal: "Tật Phong Ngọc", slay: "Phá Quân Ngọc", renew: "Hồi Xuân Ngọc" };
 // 灵玉匣：通关后每个角色一个，不是掉出来的装备。自带一点气血和伤害（跟着幻境最高纪录涨），三个孔镶灵玉
 const BOX_SLOTS = 3;
 const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
@@ -71,29 +96,29 @@ const boxStat = riftMax => 5 + Math.floor((riftMax || 0) / 10);
 const BUILDS = {
   berserker: [
     { set: 'xuehai', d: "Tích đầy Nộ ý, Bá Vương Giải Giáp một đao định đoạt, đánh yêu vương nhanh nhất", sk: [['liedi', 'a'], ['bawang', 'a'], ['hanren', 'a'], ['warcry', 'b'], ['bloodlust', 'b']],
-      leg: ['bawangdai', 'nutaoqiao'], cube: ['butcher', 'champion', 'yinxuejie'], gems: ['power', 'slay', 'guard'] },
+      leg: ['bawangdai', 'nutaoqiao'], cube: ['butcher', 'champion', 'yinxuejie'], gems: ['zhanhun', 'tiangang', 'guard'] },
     { set: 'busi', d: "Giữ máu thấp mà xoay Toàn Phong Đao, càng tàn càng điên, dọn bầy nhanh nhất", sk: [['liedi', 'b'], ['whirl', 'a'], ['bloodlust', 'b'], ['warcry', 'a'], ['butui', 'b']],
-      leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['power', 'guard', 'life'] } ],
+      leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['zhanhun', 'guard', 'lianhuan'] } ],
   mage: [
     { set: 'guiyuan', d: "Mộc Hỏa Thổ Kim Thủy nối hết vòng này sang vòng khác, “Liên” đầy thì mỗi chiêu gấp ba", sk: [['chain', 'b'], ['fireball', 'b'], ['luoshi', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
-      leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['power', 'flow', 'guard'] },
+      leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['wuxing', 'guard', 'shigu'] },
     { set: 'wanfu', d: "Không cần thứ tự, treo đầy trạng thái lên cả sân rồi kích nổ", sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
-      leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['power', 'flow', 'renew'] } ],
+      leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
     { set: 'yinbing', d: "Bầy xác nghiền nát: cương thi chịu đòn thay bạn, ngã xuống còn nổ", sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['corpse', 'a']],
-      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['bond', 'power', 'life'] },
+      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shisha'] },
     { set: 'duxing', d: "Không mang xác, một mình chồng độc rồi kết toán một lần", sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
-      leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['pain', 'guard', 'power'] } ],
+      leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['shiwang', 'pain', 'shigu'] } ],
   assassin: [
     { set: 'qisha', d: "Tích Sát ý, đòn kết liễu hạ từng tên; giết một tên là hồi chiêu ngay", sk: [['venom', 'a'], ['shadowstep', 'a'], ['dici', 'a'], ['deathmark', 'a'], ['shadowkill', 'b']],
-      leg: ['cangfengdai', 'wuyingnang'], cube: ['duoming', 'yingsha', 'abyssEye'], gems: ['power', 'slay', 'zeal'] },
+      leg: ['cangfengdai', 'wuyingnang'], cube: ['duoming', 'yingsha', 'abyssEye'], gems: ['duopo', 'guard', 'tiangang'] },
     { set: 'qianji', d: "Hạ độc trước, rồi ám khí phủ kín cả sân", sk: [['venom', 'b'], ['fan', 'b'], ['bingpo', 'b'], ['yandun', 'a'], ['deathmark', 'b']],
-      leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['pain', 'power', 'flow'] } ],
+      leg: ['qianjidai', 'baidunang'], cube: ['qianzhen', 'huoyannang', 'momentum'], gems: ['duopo', 'pain', 'shigu'] } ],
   paladin: [
-    { set: 'luohan', d: "Đứng chịu đòn, phản kích đánh cả sân, càng đánh càng cứng", sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
-      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['guard', 'life', 'renew'] },
+    { set: 'luohan', d: "Sư Tử Hống giữ chân mọi yêu vật, bị đánh một cái bật lại một cái, phản kích đánh cả trận, càng đánh càng cứng", sk: [['aegis', 'a'], ['chanhou', 'b'], ['budong', 'b'], ['hammer', 'a'], ['prayer', 'a']],
+      leg: ['fumodai', 'muyu'], cube: ['avenger', 'throne', 'budongxiang'], gems: ['jinshen', 'guard', 'xuanjia'] },
     { set: 'dari', d: "Nuôi hộ thể, chủ động ra chiêu để bồi Phật quang", sk: [['hammer', 'b'], ['fuhu', 'a'], ['ganlu', 'a'], ['budong', 'a'], ['prayer', 'b']],
-      leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['power', 'renew', 'flow'] } ],
+      leg: ['daridai', 'zijinbo'], cube: ['jingangchu', 'ganluping', 'hourglass'], gems: ['jinshen', 'xuanjia', 'tiangang'] } ],
 };
 // 改五行的变招（只有道士用得上）
 const RUNE_WX = { luoshi: { a: 'jin' }, jinguang: { a: 'shui' }, lunzhuan: { a: 'tu' }, wulei: { a: 'mu' } };
@@ -237,9 +262,9 @@ SETS.push(
     b6: 'qiSha6', b6d: "Sát thương đòn kết liễu ×4; đòn kết liễu giết được mục tiêu thì hồi chiêu ngay lập tức" },
   { id: 'luohan', n: "La Hán Kim Thân", cls: 'paladin', rift: true,
     pieces: [['helm', "La Hán Tăng Mạo"], ['chest', "La Hán Cà Sa"], ['gloves', "La Hán Hộ Uyển"], ['boots', "La Hán Tăng Hài"], ['ring', "La Hán Ban Chỉ"], ['amulet', "La Hán Niệm Châu"]],
-    b2: { counter: 20, armorPct: 30 }, b2d: "Tỉ lệ phản kích +20%, hộ giáp +30%",
-    b4: 'luoHan4', b4d: "Phản kích đánh mọi kẻ địch, sát thương từ 80% lên 200%; đòn bị hộ thể đỡ cũng phản kích",
-    b6: 'luoHan6', b6d: "Tỉ lệ phản kích thêm +15%; mỗi lần phản kích cộng một tầng “Phật nộ” (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải nhận -4%" },
+    b2: { counter: 20, armorPct: 30, thornK: 100 }, b2d: "Tỉ lệ phản kích +20%, hộ giáp +30%, bội số phản chấn +100% (phản chấn = công kích của bạn × bội số phản chấn, bị đánh một cái bật lại một cái)",
+    b4: 'luoHan4', b4d: "Phản kích đánh mọi kẻ địch, sát thương từ 80% lên 200%; đòn bị hộ thể đỡ cũng phản kích; trong lúc Sư Tử Hống khiêu khích, phản chấn nhân đôi",
+    b6: 'luoHan6', b6d: "Tỉ lệ phản kích thêm +15%; mỗi lần phản kích (phản chấn có nửa tỉ lệ) cộng một tầng “Phật nộ” (trong trận này, tối đa 10 tầng): mỗi tầng sát thương +30%, sát thương phải nhận -4%; một phần mười sát thương phản chấn hồi cho bạn" },
 );
 // 第二套幻境套装：RSET2_LV 层起掉。上面那五套是把本门的招牌机制推到头；这五套换一种打法，用的是上面不碰的招式
 const RSET2_LV = 30;

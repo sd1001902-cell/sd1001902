@@ -254,16 +254,30 @@ function stashBody(cls, D) {
     <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `Trong kho không có ${SLOT_NAME[slotType(GSLOT)]} nào để thay.` : "Không có trang bị nào phù hợp."}</div>`}</div>
     <p class="sub" style="margin:8px 0 0">Số bên phải là lực chiến thay đổi sau khi mặc. Kho ${SAVE.stash.length}/${stashMax()}, dùng chung cho mọi nhân vật.</p>`;
 }
+// 灵玉一行：名字、等级、说明；本命玉标上是哪个门派的
+function lgemRow(g, btn) { const G = LGEMS[g.t] || LGEMS.reforge;
+  return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${g.t === 'reforge' && LGEM_OLD[g.old] ? LGEM_OLD[g.old] : G.n}</b> cấp ${g.lv}${G.cls ? ` <em class="lgcls">bản mệnh ${CLASSES[G.cls].n}</em>` : ''} <small>${G.d(g.lv)}</small></span>${btn || ''}</div>`; }
+// 灵玉重铸：老存档里被删的五颗（战神、长生、疾风、破军、回春）挑一颗新的换，等级原样保留
+let LGRE = null;
+const lgReModal = () => {
+  const todo = SAVE.lgems.filter(g => g.t === 'reforge'); if (!todo.length) return `<h2 class="mh">Tái luyện linh ngọc</h2><p class="help-p">Đã đổi xong hết.</p><div class="row"><button class="btn" data-act="close">Được</button></div>`;
+  const g = todo.find(x => x.id === LGRE) || todo[0], owned = new Set(SAVE.lgems.map(x => x.t)), opts = Object.keys(LGEMS).filter(t => !LGEMS[t].hide && !owned.has(t));
+  const sorted = [...opts.filter(t => LGEMS[t].cls === SAVE.cls), ...opts.filter(t => LGEMS[t].cls && LGEMS[t].cls !== SAVE.cls), ...opts.filter(t => !LGEMS[t].cls)];
+  return `<button class="btn sm ghost x" data-act="close">Để sau</button><h2 class="mh">Tái luyện linh ngọc <small>còn ${todo.length} viên</small></h2>
+    <p class="help-p">Linh ngọc đổi phiên bản: <b>${LGEM_OLD[g.old] || "Viên linh ngọc này"}</b> (cấp ${g.lv}) chỉ là chỉ số thường, hiệu quả đã bị xóa. Chọn cho nó một viên mới, <b>cấp giữ nguyên</b>. Mỗi môn phái có một viên “linh ngọc bản mệnh” chỉ phái đó dùng được, các linh ngọc khác ai cũng dùng được.</p>
+    <div class="lgre" data-scroll="lgre">${sorted.map(t => { const G = LGEMS[t]; return `<button class="lgre-o" data-act="lgreforge" data-arg="${g.id}|${t}"><b style="color:${G.c}">${G.n}${G.cls ? ` <em class="lgcls">bản mệnh ${CLASSES[G.cls].n}</em>` : ''}</b><small>${G.d(g.lv)}</small></button>`; }).join('')}</div>`;
+};
 // 灵玉匣：三个孔，灵玉全账号共用，每个角色各挑三颗
 function boxBody(cls) {
   const L = boxOf(cls), bs = boxStat(SAVE.riftMax), inBox = new Set(L.filter(Boolean)), rest = SAVE.lgems.filter(g => !inBox.has(g.id));
-  const gemRow = (g, btn) => { const G = LGEMS[g.t]; return `<div class="gemrow lg">${SPR.img('gem', 26, { G: G.c }, 'glow')}<span class="nm"><b style="color:${G.c}">${G.n}</b> cấp ${g.lv} <small>${G.d(g.lv)}</small></span>${btn}</div>`; };
+  const gemRow = (g, btn) => lgemRow(g, btn);
   return `<div class="gcur2"><div class="gcur-h"><span class="sub">Hộp Linh Ngọc</span><button class="btn sm ghost" data-act="gsl" data-arg="box">Thu gọn</button></div>
       <p class="help-p">Hộp có sẵn: khí huyết tối đa +${bs}%, sát thương +${bs}% (kỷ lục Ảo Cảnh cứ qua 10 tầng, mỗi thứ thêm +1%). Ba lỗ chỉ khảm linh ngọc. Linh ngọc dùng chung cả tài khoản: mỗi nhân vật tự chọn ba viên, đổi nhân vật không cần tháo.</p>
       <div class="gems">${L.map((gid, i) => { const g = gid && SAVE.lgems.find(x => x.id === gid);
         return g ? gemRow(g, `<button class="btn sm ghost" data-act="boxoff" data-arg="${i}">Tháo</button>`) : `<div class="gemrow lg empty"><span class="nm"><i>Lỗ ${i + 1} · đang trống</i></span></div>`; }).join('')}</div></div>
     <h4 class="sub-h gcur-t">Linh ngọc còn đặt vào được</h4>
-    <div class="gems">${rest.length ? rest.map(g => gemRow(g, `<button class="btn sm" data-act="boxput" data-arg="${g.id}">Đặt vào hộp</button>`)).join('') : `<div class="empty-note">${SAVE.lgems.length ? "Linh ngọc đang có đều ở trong hộp rồi." : "Chưa có linh ngọc. Hãy vào Ảo Cảnh Cửu U đánh bại yêu vương giữ ải."}</div>`}</div>`;
+    ${SAVE.lgems.some(g => g.t === 'reforge') ? `<button class="btn sm lgref" data-act="lgreopen">Có ${SAVE.lgems.filter(g => g.t === 'reforge').length} viên linh ngọc chờ tái luyện: chọn viên mới (giữ cấp) ›</button>` : ''}
+    <div class="gems">${rest.length ? rest.map(g => { const G = LGEMS[g.t]; return gemRow(g, G.cls && G.cls !== cls ? `<button class="btn sm ghost" disabled>Riêng ${CLASSES[G.cls].n}</button>` : g.t === 'reforge' ? "<button class=\"btn sm\" data-act=\"lgreopen\">Tái luyện</button>" : `<button class="btn sm" data-act="boxput" data-arg="${g.id}">Đặt vào hộp</button>`); }).join('') : `<div class="empty-note">${SAVE.lgems.length ? "Linh ngọc đang có đều ở trong hộp rồi." : "Chưa có linh ngọc. Hãy vào Ảo Cảnh Cửu U đánh bại yêu vương giữ ải."}</div>`}</div>`;
 }
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
@@ -3568,6 +3582,9 @@ const ACT = {
   boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast("Ba lỗ đều đầy, tháo một viên trước đã"); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
   boxoff: i => { const r = boxSet(ctxCls(), +i, null); if (r.err) return toast(r.err); SFX.play('click'); refresh(); },
   gemup: a => { const [id, i] = split(a); const r = upgradeSocketed(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('rare'); toast("Đã nâng thành " + gemName(r.key)); refresh(); },
+  lgreopen: () => { LGRE = null; BACK = null; openModal(lgReModal); },
+  lgreforge: a => { const [gid, t] = split(a), g = SAVE.lgems.find(x => x.id === gid); if (!g || g.t !== 'reforge' || !LGEMS[t] || LGEMS[t].hide || SAVE.lgems.some(x => x.t === t)) return;
+    g.t = t; delete g.old; save(); SFX.play('rare'); toast(`Đã đổi thành ${LGEMS[t].n} (cấp ${g.lv})`); if (SAVE.lgems.some(x => x.t === 'reforge')) refresh(); else { closeModal(); refresh(); } },
   ungem: a => { const [id, i] = split(a); const r = unsocket(findOwned(id), +i); if (r.err) return toast(r.err); toast("Đã gỡ ngọc"); refresh(); },
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast("Tẩy luyện xong"); refresh(); },
@@ -3830,6 +3847,7 @@ VIEW = 'title';
 render();
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
+if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次
 if (SAVE.paraUp2) { const [a0, a1] = SAVE.paraUp2; delete SAVE.paraUp2; save(); setTimeout(() => toast(`Tu vi lên cấp lại nhanh gấp đôi, kinh nghiệm cày trước đây đã được bù theo chuẩn mới: cấp <b>${a0}</b> → cấp <b>${a1}</b>. Tu vi năm môn phái dùng chung, điểm dư ra hãy cộng ở 「Nhân vật · Tu vi」`, 6500), 1200); }
 if (SAVE.paraUp) { const [a0, a1] = SAVE.paraUp; delete SAVE.paraUp; save(); setTimeout(() => toast(`Tu vi lên cấp nhanh gấp hai mươi lần, kinh nghiệm cày trước đây đã được bù theo chuẩn mới: cấp <b>${a0}</b> → cấp <b>${a1}</b>, điểm dư cộng ở “Tu luyện · Tu vi”`, 6000), 1200); }
 if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { markSeen('boxnote'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(boxNoteModal); }, 1400); }

@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: '攻击', hp: '气血', armor: '护甲', crit: '暴击率', critDmg: '暴击伤害',
   spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
-  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', regen: '每回合回复气血', thorns: '反震',
+  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', thornK: '反震倍率', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震',
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
   dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果', eva: '闪避', skd: '某一招伤害',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
@@ -42,7 +42,7 @@ const STAT_NAMES = {
   xHaste: '疾行（开战前两回合速度）', xKill: '贪狼（每杀一个敌人回复气血）', cdSkip: '招式不进冷却的几率', xLuck: '神兵掉率', xShield: '磐石（开战自带护体，按最大气血）',
   regenPct: '每回合回复气血', xCritNext: '会心（暴击后下一招伤害）', allyPct: '同伴、僵尸的伤害和气血',
 };
-const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
+const PCT_STATS = new Set(['eva', 'skd', 'crit', 'critDmg', 'leech', 'res', 'dmgPct', 'elem', 'hpPct', 'armorPct', 'atkPct', 'thornK', 'lowHpK', 'mf', 'gf', 'freeze', 'dodge', 'poison', 'minionPct', 'healPct', 'xBoss', 'xExec', 'xBreak',
   'xDouble', 'xRage', 'xTen', 'xDr', 'xLast', 'xHaste', 'xKill', 'cdSkip', 'xLuck', 'xShield', 'regenPct', 'xCritNext', 'allyPct']);
 
 const BASES = {
@@ -123,7 +123,7 @@ const LEGENDS = [
   { id: 'champion', n: '霸王盔',     slot: 'helm', ch: 6,   imp: { dmgPct: 8 },   fx: 'bossDmg',    d: '对精英和首领伤害 +35%' },
   { id: 'warden',   n: '镇岳冠',     slot: 'helm', ch: 1,   imp: { hpPct: 8 },    fx: 'startShield', d: '战斗开始时获得 25% 最大气血的护体真气' },
   { id: 'undying',  n: '不灭金身甲', slot: 'chest', ch: 8,  imp: { hpPct: 12 },   fx: 'cheatDeath', d: '每场战斗一次：受到致命伤害时保住一口气并恢复 30%' },
-  { id: 'throne',   n: '荆棘铠',     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: '反震额外造成相当于护甲 25% 的伤害' },
+  { id: 'throne',   n: '荆棘铠',     slot: 'chest', ch: 4,  imp: { thorns: 20 },  fx: 'thornsPct',  d: '反震倍率 +60%：每挨一下打，就按你攻击的 60% 弹回去' },
   { id: 'vampire',  n: '血蝠袍',     slot: 'chest', ch: 3,  imp: { leech: 3 },    fx: 'vampire',    d: '吸血效果翻倍' },
   { id: 'phoenix',  n: '凤羽霓裳',   slot: 'chest', ch: 9,  imp: { res: 12 },     fx: 'phoenix',    d: '每场战斗首次气血低于 30% 时浴火爆发，对所有敌人造成 300% 火焰伤害' },
   { id: 'looter',   n: '摸金手',     slot: 'gloves', ch: 1, imp: { gf: 50 },      fx: 'lootKill',   d: '击杀敌人时 12% 几率额外掉落一件装备' },
@@ -385,7 +385,7 @@ const CLASSES = {
       { id: 'prayer',    n: '般若心经', lv: 12, cd: 5, wx: 'mu', d: '气血低于 70% 时恢复 16% 最大气血' },
       { id: 'budong',    n: '不动明王', lv: 16, cd: 5, wx: 'tu',   k: 'aoe', m: 0.9, shield: 0.11, d: '对所有敌人造成 90% 伤害，并获得 11% 气血的护体' },
       { id: 'judgement', n: '万佛朝宗', lv: 20, cd: 6, wx: 'huo', d: '对所有敌人造成 200% 佛光伤害' },
-      { id: 'chanhou',   n: '狮子吼·禅', lv: 25, cd: 6, wx: 'tu', d: '3 回合内反击几率 +40%，反击必定让敌人眩晕' },
+      { id: 'chanhou',   n: '狮子吼·禅', lv: 16, cd: 6, wx: 'tu', d: '嘲讽所有敌人 3 回合：它们只能打你（首领也一样）。这期间受到的伤害 -30%，反震倍率 +50%，反击几率 +40%，反击必定让敌人眩晕' },
       { id: 'holy',      n: '罗汉拳',   lv: 1,  cd: 0, wx: 'tu', d: '造成 115% 佛光伤害' },
     ],
     tree: { n: '禅心', t: [
