@@ -365,6 +365,7 @@ function townHTML() {
 }
 function npcList() {
   const c = storyCleared('normal');
+  if (!c && riftPath()) return [['ngoc', 'ngoc'], ...['kang', 'smith', 'tiedan', 'yujiang', 'lei'].filter(id => svcFns(id).length).map(id => [id, id])];   // 幻境路线：Ngoc 带路，镇上的师傅按开到哪儿陆续露面
   if (!c) { const w1 = SAVE.world && SAVE.world[wk(1)]; if (!w1 || w1.main < WQ[1].main.findIndex(m => m.id === 'm10')) return []; }   // 第一章还没走进青石镇：镇上的人还不认识
   let L = wTownNpcs().map(id => [id, id]);
   if (c >= 9) L = L.filter(([id]) => id !== 'long');   // 第九章，龙道长提着灯走上了坑口
@@ -541,7 +542,8 @@ function goTab() {
         </div>
         <button class="charr" data-act="chnav" data-arg="1" ${k < maxCh ? '' : 'disabled'} aria-label="下一章">›</button>
       </div>
-      <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>`;
+      <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>
+      ${!SAVE.story.ended && !riftPath() ? '<button class="linkbtn topath" data-act="topath">不想看剧情？改走「幻境挑战」 ›</button>' : ''}`;
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
     const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id)), ar = ancRate(SAVE.riftLv);
@@ -551,6 +553,7 @@ function goTab() {
         <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <div class="rinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+      ${riftPath() && !SAVE.story.ended ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">追赶中：战斗经验 <b>×${cuTxt(cu)}</b>（比最高的角色低 ${topLevel() - SAVE.chars[cls].level} 级）</p>` : ''}
       ${teamRow()}
       <div class="yirow" data-act="zyopen"><span class="sub">役使</span>${[0, 1].map(i => { const id = yi[i], d = id && yiBoss(id), g = id && yiGrade(id);
@@ -562,6 +565,56 @@ function goTab() {
   return `${npcRow()}<section class="panel gopanel"><div class="gotop">${modeSel}${mods}<button class="qhelp" data-act="gohelp" aria-label="说明">?</button></div>
     <div class="gobody" data-scroll="gobody">${body}${compSel}</div>
     <div class="gostart"><button class="btn big" data-act="start">${mode === 'rift' ? `进入九幽幻境 ${SAVE.riftLv} 层` : `出发：${chTitle(SAVE.chapter)}`}</button></div></section>`;
+}
+// ---------- 幻境路线：开局选「幻境挑战」的人，按幻境打通的最高层一样样开（幻境之路），每开一样有人来说一声、写明去哪儿用 ----------
+const RIFT_STEPS = [
+  { lv: 0, n: '九幽幻境 · Ngoc 同行', d: '一炷香里打通一层，就能往下挑战更深的一层。前十层妖物不会比你高太多。', where: '出征页 → 进入九幽幻境' },
+  { lv: 3, n: '强化 · 升阶 · 珍姑娘', d: '张大锤给装备强化，旧装备的强化和玉能挪到新装备上；铁蛋给旧装备升阶；珍姑娘来当伙伴。', where: '出征页最上面点张大锤、铁蛋；伙伴在幻境页的「伙伴」里换',
+    lines: [['smith', '啊？你是从幻境里爬出来的那个？大声点！'], ['smith', '强化找我！旧家伙身上的强化，也能挪到新家伙上！'], ['tiedan', '旧刀别扔！拿来回一回炉，跟新的一样硬——这叫升阶！'], ['zhen', '幻境里的东西越来越多，捕快房坐不住了。'], ['zhen', '下一趟，我跟你下去。']] },
+  { lv: 5, n: '淬炼洗炼 · 打孔镶玉', d: '铁蛋帮你把不顺眼的词条洗掉；玉掌柜给装备打孔、镶玉、合成玉石。', where: '出征页最上面点铁蛋、玉掌柜；玉石在「人物 → 玉石」',
+    lines: [['tiedan', '你身上那件，词条不行啊！拿来，我给你洗一洗！'], ['yujiang', '路上捡的那些亮晶晶的石头，别扔。拿来，我给你镶上。']] },
+  { lv: 7, n: '龙道长 · 变招', d: '龙道长来当伙伴，还教你给招式换一种打法（变招）。', where: '「修炼 → 武学」里给招式选变招',
+    lines: [['long', '兄台！在下夜观天象，九幽之下妖气冲天——'], ['long', '在下这就随你下去。顺便教你一手：同一招，换个打法，威力大不一样。']] },
+  { lv: 8, n: '乾坤袋', d: '把神兵的特效收进乾坤袋，永久学会：不穿那件，特效也在。', where: '「人物 → 乾坤袋」',
+    lines: [['ngoc', '这个袋子给你。打到神兵别急着卖——把它的本事收进来，就一直是你的了。']] },
+  { lv: 10, n: '悬赏 · 赏银柜 · 康总管', d: '雷老虎每天挂悬赏，打完领赏银、在柜上换好东西；康总管来当伙伴；幻境开始掉更多种词条和神兵。', where: '出征页最上面点雷老虎',
+    lines: [['lei', '榜上的活儿天天换！打完来领赏银，攒够了柜上换好东西！'], ['kang', '库房的账我替你记着。……下一趟，算我一个。']] },
+  { lv: 12, n: '灵玉匣', d: '打通一层就可能得到一颗灵玉，镶进灵玉匣；打得越快，能升的级越多。', where: '「人物 → 身上」最后一格：灵玉匣',
+    lines: [['yujiang', '幻境里出来的灵玉，普通的孔镶不住。给你一个匣子，专门放它。']] },
+  { lv: 15, n: '修为 · 加难度', d: '满级（50 级）以后，经验变成修为点，加在属性上；幻境可以自己加难度，换更多奖励。', where: '「修炼 → 修为」；幻境页右上「加难度」',
+    lines: [['ngoc', '你已经走得够深了。等你到了五十级，往后的每一点经验都会变成修为。'], ['ngoc', '嫌不够凶？自己给幻境加点难度。']] },
+  { lv: 20, n: '幻境套装', d: '20 层起掉幻境套装，30 层起两套都掉。', where: '出征页幻境信息里的「套装」',
+    lines: [['ngoc', '二十层以下，有前人留下的整套装备。凑齐了，比什么都管用。']] },
+];
+const rpNext = () => RIFT_STEPS.find(x => rTop() < x.lv);
+function rpathRow() {
+  const nx = rpNext(); if (!nx) return '';
+  return `<button class="rpath" data-act="rpath"><span class="sub">幻境之路</span><b>打通第 ${nx.lv} 层</b><small>开：${esc(nx.n)}</small><em>›</em></button>`;
+}
+const rpathModal = () => { const t = rTop(), nx = rpNext();
+  return `<h2 class="mh">幻境之路 <small>已经打通 ${t} 层</small></h2><p class="sub">打通第几层，镇上就开什么。剧情随时可以在出征页切到「主线剧情」去看。</p>
+    <ol class="rpl">${RIFT_STEPS.map(x => { const ok = t >= x.lv, cur = x === nx;
+      return `<li class="${ok ? 'ok' : cur ? 'nx' : ''}"><b>${x.lv ? `第 ${x.lv} 层` : '开局'}</b><div><span>${ok ? '✓ ' : ''}${esc(x.n)}</span><small>${esc(x.d)}</small>${ok ? `<em>在哪：${esc(x.where)}</em>` : cur ? `<em>还差 ${x.lv - t} 层</em>` : ''}</div></li>`; }).join('')}</ol>
+    <p class="help-p">其他伙伴：${['lei', 'liu', 'tie'].map(c => `${COMPANIONS[c].n}（${COMPANIONS[c].lock}）`).join('、')}，十层以后陆续能认识。</p>
+    <div class="sheet-act"><button class="btn ghost" data-act="close">好了</button></div>`; };
+const toPathModal = () => `<h2 class="mh">改走「幻境挑战」？</h2><p class="help-p">剧情进度都保留，随时可以切回「主线剧情」接着打。</p>
+  <p class="help-p">幻境从第 1 层打起，打得越深，镇上开的东西越多：强化、洗炼、镶玉、乾坤袋、悬赏、伙伴……每开一样都会有人告诉你去哪儿用。</p>
+  <div class="sheet-act"><button class="btn" data-act="setpath">改走幻境</button><button class="btn ghost" data-act="close">算了</button></div>`;
+function playRiftIntro(sw) {
+  markSeen('rpIntro'); markSeen('prologue'); save();
+  setTimeout(() => playDialog([
+    ...(sw ? [] : [['narr', '青石镇。一座建在古老回廊之上的边陲小镇。'], ['narr', '回廊最深处，有一片幻境：一炷香的工夫，妖物一层比一层凶，掉的东西一层比一层好。']]),
+    ['ngoc', '想变强？进幻境。死不了，顶多被它吐出来。'],
+    ['ngoc', '我陪你下去。你打得越深，镇上肯帮你的人就越多。'],
+    ['narr', sw ? '（下一步做什么，看幻境页的「幻境之路」，或者点镇上的 Ngoc。）' : '（在最上面选一个职业，再点「进入九幽幻境」。下一步做什么，看幻境页的「幻境之路」，或者点镇上的 Ngoc。）'],
+  ], null), 400);
+}
+// 回到镇上：幻境路线刚开的东西，让对应的人来说一声
+function riftPathCheck() {
+  if (VIEW !== 'town' || !riftPath() || (SAVE.story && SAVE.story.ended) || DLG || MODALFN) return;
+  SAVE.flags = SAVE.flags || {}; const st = RIFT_STEPS.filter(x => x.lv > 0 && rTop() >= x.lv && !SAVE.flags['rp' + x.lv]); if (!st.length) return;
+  st.forEach(x => { SAVE.flags['rp' + x.lv] = 1; }); save();
+  setTimeout(() => { if (DLG || VIEW === 'battle') return; playDialog(st.flatMap(x => [...(x.lines || []), ['narr', `（幻境之路 · 第 ${x.lv} 层：新开放「${x.n}」。在哪：${x.where}）`]]), null, () => refresh()); }, 600);
 }
 // 出征页的说明（原来整段摊在页面上，现在点「?」才出来）
 const goHelpModal = () => () => {
@@ -799,12 +852,13 @@ function teamRow() {
 }
 let TEAMX = null;   // 伙伴弹窗里展开看详情的那位
 const teamModal = () => () => {
-  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen), LK = Object.keys(COMP_LOCK).filter(c => !compOpen(c));
+  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen), LK = Object.keys(COMPANIONS).filter(c => !compOpen(c) && (COMP_LOCK[c] || (riftPath() && RIFT_COMP[c] != null)));
   const row = (c, lock) => { const C = COMPANIONS[c], v = wAffOf(c), on = T.includes(c), cost = giftCost(c), x = TEAMX === c;
     const head = `<div class="tmh" data-act="teamx" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : C.spr, 36, null, '', 'head')}<span><b>${c === 'ngoc' ? 'Ngoc（九尾）' : C.n}</b>${rowTag(c)}<small>${C.role}${lock ? '' : ` · 好感 ${v}/${COMP_AFF_MAX}`}</small></span>
       ${lock ? `<em class="tml">🔒</em>` : `<button class="btn sm ${on ? '' : 'ghost'}" data-act="teamtog" data-arg="${c}">${on ? '取下' : '带上'}</button>`}</div>`;
     if (!x) return `<div class="tmc ${on ? 'on' : ''} ${lock ? 'lock' : ''}">${head}</div>`;
-    if (lock) { const [h, n] = COMP_LOCK[c](); return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">还没认识：${C.lock}${SAVE.story && SAVE.story.ended ? `（${Math.min(h, n)}/${n}）` : '（通关后）'}</div></div>`; }
+    if (lock) { if (!COMP_LOCK[c]) return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">还没认识：幻境打通第 ${RIFT_COMP[c]} 层（现在 ${rTop()} 层）</div></div>`;
+      const [h, n] = COMP_LOCK[c](); return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">还没认识：${C.lock}${pgOr(0) ? `（${Math.min(h, n)}/${n}）` : '（通关后）'}</div></div>`; }
     return `<div class="tmc x ${on ? 'on' : ''}">${head}<p>${C.d}</p>
       <div class="tmaff">好感 <b>${v}</b>/${COMP_AFF_MAX}（气血、攻击 +${v * 4}%）<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `送礼 ${fmtBig(cost)} 两` : '满了'}</button></div>
       ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; };
@@ -934,8 +988,9 @@ function titleHTML() {
     <div class="tl-sky"><i class="tl-moon"></i><i class="tl-mtn a"></i><i class="tl-mtn b"></i><i class="tl-town"></i><i class="tl-fog a"></i><i class="tl-fog b"></i>${emb}</div>
     <div class="tl-head"><h1>九幽回廊</h1><p>三百年前，五人为钉，天狐为锁。</p></div>
     <div class="tl-menu">
-      ${prog ? `<button class="btn big" data-act="tcont">继续游戏<small>${esc(CLASSES[cls].n)} ${lv} 级 · ${esc(chTitle(ch))}${SAVE.test ? ' · 试玩角色' : ''}</small></button>
-        <button class="btn ghost" data-act="tnew">重新开始</button>` : `<button class="btn big" data-act="tcont">开始游戏</button>`}
+      ${prog ? `<button class="btn big" data-act="tcont">继续游戏<small>${esc(CLASSES[cls].n)} ${lv} 级 · ${riftPath() && !SAVE.run && !storyCleared('normal') ? `九幽幻境 · 最高 ${rTop()} 层` : esc(chTitle(ch))}${SAVE.test ? ' · 试玩角色' : ''}</small></button>
+        <button class="btn ghost" data-act="tnew">重新开始</button>` : `<button class="btn big" data-act="tpath" data-arg="story">主线剧情<small>跟着故事走，一章一章解锁 · 第一次玩推荐</small></button>
+        <button class="btn big tl-rift" data-act="tpath" data-arg="rift">幻境挑战<small>跳过剧情直接刷，打得越深，开的东西越多</small></button>`}
       <div class="tl-row"><button class="btn ghost" data-act="tsave">存档</button><button class="btn ghost" data-act="tset">设置</button></div>
     </div>
     <p class="tl-sign">涂与豪作品</p>
@@ -2954,7 +3009,8 @@ function wDirStep(dx, dy) {
   WALK = { path: [{ x: T.x, y: T.y }], i: 0, joy: true, onArrive: P && P.t === 'camp' ? () => openModal(campModal(P)) : null }; wStepLoop();
 }
 // 镇上：带任务的人
-function townCh() { if (SAVE.run && SAVE.run.world && !isRift(SAVE.run)) return SAVE.run.chapter; const c = SAVE.chapter || 1; return wHas(c) && WMAPS[c].scenes.town ? c : wHas(1) ? 1 : 0; }
+function townCh() { if (SAVE.run && SAVE.run.world && !isRift(SAVE.run)) return SAVE.run.chapter; if (riftPath() && !storyCleared('normal') && !(SAVE.world && SAVE.world[1])) return 0;   // 幻境路线还没碰过剧情：镇上的人不挂剧情任务
+  const c = SAVE.chapter || 1; return wHas(c) && WMAPS[c].scenes.town ? c : wHas(1) ? 1 : 0; }
 
 // ---------- 奇遇 / 货郎 / 篝火 / 宝箱 / 结算 / 片尾 ----------
 function sceneWrap(art, inner) { return `${runBar(SAVE.run)}<div class="scene"><div class="panel"><div class="art">${art}</div>${inner}</div></div>`; }
@@ -3000,12 +3056,12 @@ function endHTML() {
     const tl = r.timeLeft || 0, used = Math.round((r.clock || 0) / 100);
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
       <div><p>${r.world ? `用时 <b>${fmtClock(r.clock || 0)}</b> · 香还剩 <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `用时 <b>${used}</b> 回合 · 香还剩 <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · 倒下 ${r.deaths} 次` : ''}</p>
-      <p>${tl > 0 ? `灵玉可以升级 <b>${r.upg}</b> 次 · 现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : '香烧完了：这一层不算过，灵玉只能升 1 次'}</p>
+      <p>${tl > 0 ? `${boxOpen() ? `灵玉可以升级 <b>${r.upg}</b> 次 · ` : ''}现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : `香烧完了：这一层不算过${boxOpen() ? '，灵玉只能升 1 次' : ''}`}</p>
       ${r.bp ? `<p class="newslot">兵魄 <b>+${r.bp}</b>（现在 ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? '，够打一把专属兵器了：去找张大锤' : ''}）</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">新的装备位开了：<b>${r.newSlots.map(p => SLOT_NAME[p]).join('、')}</b>。去「人物」页看看；这一类装备从现在起会在幻境里掉。</p>` : ''}
       ${r.stat ? `<details class="bstat-d"><summary>这一局统计</summary>${statTable(r.stat)}</details>` : ''}
       ${r.record ? `<p class="evres">${CLASSES[r.cls].n}的新纪录：${r.riftLv} 层 · ${r.world ? '用时 ' + fmtClock(r.clock || 0) : used + ' 回合'}</p>` : ''}</div></div>`;
-    extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
+    if (boxOpen()) extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${SAVE.lgems.length ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级。</p>
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
         <button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button></div>`).join('')}</div>` : ''}</div>`;
@@ -3281,6 +3337,7 @@ const ACT = {
   gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} 好感 +1 ♥（现在 ${r.v}）${r.v === 10 || r.v === 20 ? '：技能变强了！' : ''}`); save(); refresh(); },
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast('Ngoc：「早就该带上我了。」'); else toast('Ngoc：「……那你早点回来。」'); },
   npc: id => {
+    if (id === 'ngoc' && riftPath() && !storyCleared('normal') && !SAVE.run) return openModal(rpathModal);   // 幻境路线：点 Ngoc 看「幻境之路」
     const qc = townCh();
     if (!(qc && wNpcMark(qc, id)) && WS_NPC[id] && svcFns(id).length) return wsOpen(WS_NPC[id], null);   // 三位师傅：都通到养成台，停在他的那一页
     if (!(qc && wNpcMark(qc, id)) && svcFns(id).length) { NPCV = { id, fn: null, item: null }; GAMBLE = null; BULKX = new Set(); BULKARM = false; BACK = null; return openModal(npcModal); }   // 没有任务要说：开他的铺子
@@ -3583,7 +3640,11 @@ const ACT = {
     persist(); BACK = null; closeModal(); VIEW = 'town'; TT = 'set'; render(); toast('已回到你自己的存档');
   },
   reset: () => openModal(resetModal()),
-  doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'town'; TT = 'go'; render(); toast('已重新开始'); playPrologue(); },
+  doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'title'; render(); toast('已重新开始：选一条路'); },
+  tpath: p => { SAVE.path = p === 'rift' ? 'rift' : 'story'; if (p === 'rift') { SAVE.mode = 'rift'; SAVE.riftLv = 1; } save(); closeModal(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); if (p === 'rift') playRiftIntro(); else playPrologue(); },
+  topath: () => openModal(toPathModal),
+  setpath: () => { SAVE.path = 'rift'; SAVE.mode = 'rift'; save(); closeModal(); refresh(); playRiftIntro(true); },
+  rpath: () => openModal(rpathModal),
 };
 let musicStarted = false;
 // 音量滑条：拖动时马上生效，松手时存档
@@ -3629,7 +3690,7 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   const keepS = {}; app.querySelectorAll('[data-scroll]').forEach(e => { keepS[e.dataset.scroll] = e.scrollTop; });   // 框里滚到哪儿，重画以后还在哪儿
   app.innerHTML = html;
-  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep(); fitKstats();
+  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep(); fitKstats(); riftPathCheck();
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast('你收服过首领的精魄，可以带两只<b>役使</b>上阵（幻境面板里的「役使」空位）。带上以后它们会跟在你身边，本事触发时会闪一下。'), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`新伙伴：<b>${COMPANIONS[c].n}</b>（${COMPANIONS[c].role}）愿意跟你进幻境了。去幻境面板的「伙伴」里带上。`), 600 + i * 2800)); } }

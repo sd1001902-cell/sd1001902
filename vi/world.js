@@ -1290,8 +1290,8 @@ function newRiftRun(cls, riftLv) {
     matsGot: 0, kills: 0, t0: Date.now(), lvStart: SAVE.chars[cls].level, paraStart: SAVE.para.lv, hp: 0, ended: null, rooms: 0, xpMul: 1.75, prog: 0, clock: 0, pts: 0, fights: 0,
     maze: { v: 2, cells: [], maxDist: 1 }, pos: 0, hasKey: true, theme: floors[0].c - 1,
     rw: { floors, f: 0, bossC: RNG.i(1, 10), boss: 0 } };
-  run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
-  if (SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
+  run.ngoc = pgOr(0) && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
+  if (pgOr(0)) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
   rBuild(run);
   if (SAVE.world) delete SAVE.world[RCH];
   const prev = SAVE.run; SAVE.run = run; wstate(RCH).flags.rfree = 1; SAVE.run = prev;
@@ -1349,8 +1349,8 @@ let R_TEAM = [0.1, 0.5, 0.5, 5, 0.35, 0.04];   // [每个伙伴小怪精英加�
 function rPrep(run, enc) {
   const ch = RCH, D = wScene(ch), R = rFloorOf(ch);
   run.encCell = { lv: enc.lv };
-  run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
-  if (SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
+  run.ngoc = pgOr(0) && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
+  if (pgOr(0)) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
   const nT = (run.team || []).length, tK = 1 + R_TEAM[0] * nT, tKB = 1 + R_TEAM[5] * nT;   // 组队：每带一个伙伴，小怪精英血量 +10%，首领 +4%（首领另外带护法）
   if (enc.kind === 'boss') {
     run.theme = enc.c - 1;

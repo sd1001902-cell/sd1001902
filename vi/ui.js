@@ -366,6 +366,7 @@ function townHTML() {
 }
 function npcList() {
   const c = storyCleared('normal');
+  if (!c && riftPath()) return [['ngoc', 'ngoc'], ...['kang', 'smith', 'tiedan', 'yujiang', 'lei'].filter(id => svcFns(id).length).map(id => [id, id])];   // 幻境路线：Ngoc 带路，镇上的师傅按开到哪儿陆续露面
   if (!c) { const w1 = SAVE.world && SAVE.world[wk(1)]; if (!w1 || w1.main < WQ[1].main.findIndex(m => m.id === 'm10')) return []; }   // 第一章还没走进青石镇：镇上的人还不认识
   let L = wTownNpcs().map(id => [id, id]);
   if (c >= 9) L = L.filter(([id]) => id !== 'long');   // 第九章，龙道长提着灯走上了坑口
@@ -542,7 +543,8 @@ function goTab() {
         </div>
         <button class="charr" data-act="chnav" data-arg="1" ${k < maxCh ? '' : 'disabled'} aria-label="Chương sau">›</button>
       </div>
-      <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>`;
+      <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>
+      ${!SAVE.story.ended && !riftPath() ? "<button class=\"linkbtn topath\" data-act=\"topath\">Không muốn xem cốt truyện? Đổi sang “Thử thách Ảo Cảnh” ›</button>" : ''}`;
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
     const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id)), ar = ancRate(SAVE.riftLv);
@@ -552,6 +554,7 @@ function goTab() {
         <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <div class="rinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+      ${riftPath() && !SAVE.story.ended ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">Đang đuổi theo: kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (thấp hơn nhân vật cao nhất ${topLevel() - SAVE.chars[cls].level} cấp)</p>` : ''}
       ${teamRow()}
       <div class="yirow" data-act="zyopen"><span class="sub">Dịch Sứ</span>${[0, 1].map(i => { const id = yi[i], d = id && yiBoss(id), g = id && yiGrade(id);
@@ -563,6 +566,56 @@ function goTab() {
   return `${npcRow()}<section class="panel gopanel"><div class="gotop">${modeSel}${mods}<button class="qhelp" data-act="gohelp" aria-label="Giải thích">?</button></div>
     <div class="gobody" data-scroll="gobody">${body}${compSel}</div>
     <div class="gostart"><button class="btn big" data-act="start">${mode === 'rift' ? `Vào Ảo Cảnh Cửu U tầng ${SAVE.riftLv}` : `Xuất phát: ${chTitle(SAVE.chapter)}`}</button></div></section>`;
+}
+// ---------- 幻境路线：开局选「幻境挑战」的人，按幻境打通的最高层一样样开（幻境之路），每开一样有人来说一声、写明去哪儿用 ----------
+const RIFT_STEPS = [
+  { lv: 0, n: "Ảo Cảnh Cửu U · Ngoc đồng hành", d: "Trong một nén hương đánh thông một tầng là có thể khiêu chiến tầng sâu hơn. Mười tầng đầu yêu vật không cao hơn bạn quá nhiều.", where: "Trang xuất chinh → vào Ảo Cảnh Cửu U" },
+  { lv: 3, n: "Cường hóa · Thăng giai · cô Trân", d: "Trương Đại Chùy cường hóa trang bị, chuyển cường hóa và ngọc từ đồ cũ sang đồ mới; Thiết Đản thăng giai đồ cũ; cô Trân đến làm đồng hành.", where: "Trên cùng trang xuất chinh chạm Trương Đại Chùy, Thiết Đản; đổi đồng hành ở mục “Đồng hành” trong trang Ảo Cảnh",
+    lines: [['smith', "Hả? Ngươi là cái đứa bò ra từ Ảo Cảnh đó à? Nói to lên!"], ['smith', "Cường hóa thì tìm ta! Cường hóa trên đồ cũ cũng chuyển sang đồ mới được!"], ['tiedan', "Đao cũ đừng vứt! Đem đây nung lại một lượt, cứng như đồ mới — cái này gọi là thăng giai!"], ['zhen', "Đồ trong Ảo Cảnh càng lúc càng nhiều, nha môn ngồi không yên nữa rồi."], ['zhen', "Chuyến sau, ta xuống cùng ngươi."]] },
+  { lv: 5, n: "Tôi luyện tẩy luyện · Đục lỗ khảm ngọc", d: "Thiết Đản giúp bạn tẩy đi những từ khóa không vừa mắt; Chưởng quầy Ngọc đục lỗ, khảm ngọc, hợp thành ngọc cho trang bị.", where: "Trên cùng trang xuất chinh chạm Thiết Đản, Chưởng quầy Ngọc; ngọc nằm ở “Nhân vật → Ngọc”",
+    lines: [['tiedan', "Món trên người ngươi, từ khóa tệ quá! Đem đây, ta tẩy cho!"], ['yujiang', "Mấy viên đá lấp lánh nhặt dọc đường đừng vứt. Đem đây, ta khảm cho."]] },
+  { lv: 7, n: "Long đạo trưởng · Biến chiêu", d: "Long đạo trưởng đến làm đồng hành, còn dạy bạn đổi cách đánh cho chiêu thức (biến chiêu).", where: "Chọn biến chiêu cho chiêu thức trong “Tu luyện → Võ học”",
+    lines: [['long', "Huynh đài! Tại hạ đêm xem thiên tượng, yêu khí dưới Cửu U ngút trời —"], ['long', "Tại hạ xuống cùng ngươi ngay. Tiện thể dạy ngươi một tay: cùng một chiêu, đổi cách đánh, uy lực khác hẳn."]] },
+  { lv: 8, n: "Túi Càn Khôn", d: "Thu hiệu ứng của thần binh vào Túi Càn Khôn, học vĩnh viễn: không mặc món đó, hiệu ứng vẫn còn.", where: "“Nhân vật → Túi Càn Khôn”",
+    lines: [['ngoc', "Cái túi này cho ngươi. Nhặt được thần binh đừng vội bán — thu bản lĩnh của nó vào đây, nó sẽ mãi là của ngươi."]] },
+  { lv: 10, n: "Truy nã · Quầy tiền thưởng · quản gia Khang", d: "Lôi Lão Hổ ngày nào cũng treo truy nã, đánh xong lĩnh tiền thưởng, đổi đồ tốt ở quầy; quản gia Khang đến làm đồng hành; Ảo Cảnh bắt đầu rơi nhiều loại từ khóa và thần binh hơn.", where: "Trên cùng trang xuất chinh chạm Lôi Lão Hổ",
+    lines: [['lei', "Việc trên bảng ngày nào cũng đổi! Đánh xong đến lĩnh thưởng, gom đủ thì đổi đồ tốt ở quầy!"], ['kang', "Sổ sách kho ta ghi giúp ngươi. …Chuyến sau, tính cả ta."]] },
+  { lv: 12, n: "Hộp Linh Ngọc", d: "Đánh thông một tầng là có thể được một viên linh ngọc, khảm vào Hộp Linh Ngọc; đánh càng nhanh, nâng được càng nhiều cấp.", where: "Ô cuối cùng ở “Nhân vật → Đang mặc”: Hộp Linh Ngọc",
+    lines: [['yujiang', "Linh ngọc từ Ảo Cảnh ra, lỗ thường không giữ nổi. Cho ngươi một cái hộp, chuyên để nó."]] },
+  { lv: 15, n: "Tu vi · Tăng độ khó", d: "Sau khi đầy cấp (cấp 50), kinh nghiệm biến thành điểm tu vi, cộng vào chỉ số; Ảo Cảnh có thể tự tăng độ khó để đổi thêm phần thưởng.", where: "“Tu luyện → Tu vi”; góc trên phải trang Ảo Cảnh “Tăng độ khó”",
+    lines: [['ngoc', "Ngươi đã đi đủ sâu rồi. Đợi ngươi đến cấp năm mươi, từ đó mỗi điểm kinh nghiệm đều sẽ thành tu vi."], ['ngoc', "Chê chưa đủ dữ? Tự thêm chút độ khó cho Ảo Cảnh đi."]] },
+  { lv: 20, n: "Bộ Ảo Cảnh", d: "Từ tầng 20 rơi bộ Ảo Cảnh, từ tầng 30 rơi cả hai bộ.", where: "Mục “Bộ” trong thông tin Ảo Cảnh ở trang xuất chinh",
+    lines: [['ngoc', "Dưới tầng hai mươi có cả bộ trang bị người xưa để lại. Gom đủ bộ thì hơn mọi thứ."]] },
+];
+const rpNext = () => RIFT_STEPS.find(x => rTop() < x.lv);
+function rpathRow() {
+  const nx = rpNext(); if (!nx) return '';
+  return `<button class="rpath" data-act="rpath"><span class="sub">Đường Ảo Cảnh</span><b>Thông tầng ${nx.lv}</b><small>Mở: ${esc(nx.n)}</small><em>›</em></button>`;
+}
+const rpathModal = () => { const t = rTop(), nx = rpNext();
+  return `<h2 class="mh">Đường Ảo Cảnh <small>đã thông ${t} tầng</small></h2><p class="sub">Thông đến tầng mấy, trấn trên mở thứ đó. Cốt truyện lúc nào cũng có thể chuyển sang “Cốt truyện chính” ở trang xuất chinh để xem.</p>
+    <ol class="rpl">${RIFT_STEPS.map(x => { const ok = t >= x.lv, cur = x === nx;
+      return `<li class="${ok ? 'ok' : cur ? 'nx' : ''}"><b>${x.lv ? `Tầng ${x.lv}` : "Mở đầu"}</b><div><span>${ok ? '✓ ' : ''}${esc(x.n)}</span><small>${esc(x.d)}</small>${ok ? `<em>Ở đâu: ${esc(x.where)}</em>` : cur ? `<em>Còn thiếu ${x.lv - t} tầng</em>` : ''}</div></li>`; }).join('')}</ol>
+    <p class="help-p">Đồng hành khác: ${['lei', 'liu', 'tie'].map(c => `${COMPANIONS[c].n} (${COMPANIONS[c].lock})`).join(", ")}, sau tầng mười lần lượt quen được.</p>
+    <div class="sheet-act"><button class="btn ghost" data-act="close">Được rồi</button></div>`; };
+const toPathModal = () => `<h2 class="mh">Đổi sang “Thử thách Ảo Cảnh”?</h2><p class="help-p">Tiến độ cốt truyện vẫn giữ nguyên, lúc nào cũng có thể chuyển lại “Cốt truyện chính” đánh tiếp.</p>
+  <p class="help-p">Ảo Cảnh đánh từ tầng 1, càng sâu trấn trên mở càng nhiều: cường hóa, tẩy luyện, khảm ngọc, Túi Càn Khôn, truy nã, đồng hành… mỗi thứ mở ra đều có người chỉ bạn dùng ở đâu.</p>
+  <div class="sheet-act"><button class="btn" data-act="setpath">Đổi sang Ảo Cảnh</button><button class="btn ghost" data-act="close">Thôi</button></div>`;
+function playRiftIntro(sw) {
+  markSeen('rpIntro'); markSeen('prologue'); save();
+  setTimeout(() => playDialog([
+    ...(sw ? [] : [['narr', "Trấn Thanh Thạch. Một trấn nhỏ nơi biên ải, dựng trên một hồi lang cổ xưa."], ['narr', "Sâu nhất trong hồi lang có một vùng ảo cảnh: trong một nén hương, yêu vật tầng sau dữ hơn tầng trước, đồ rơi tầng sau tốt hơn tầng trước."]]),
+    ['ngoc', "Muốn mạnh lên? Vào Ảo Cảnh. Không chết được đâu, cùng lắm bị nó nhả ra thôi."],
+    ['ngoc', "Ta xuống cùng ngươi. Ngươi đánh càng sâu, người trong trấn chịu giúp ngươi càng nhiều."],
+    ['narr', sw ? "(Bước tiếp theo làm gì, xem “Đường Ảo Cảnh” ở trang Ảo Cảnh, hoặc chạm Ngoc trong trấn.)" : "(Chọn một nghề ở hàng trên cùng, rồi bấm “Vào Ảo Cảnh Cửu U”. Bước tiếp theo làm gì, xem “Đường Ảo Cảnh” ở trang Ảo Cảnh, hoặc chạm Ngoc trong trấn.)"],
+  ], null), 400);
+}
+// 回到镇上：幻境路线刚开的东西，让对应的人来说一声
+function riftPathCheck() {
+  if (VIEW !== 'town' || !riftPath() || (SAVE.story && SAVE.story.ended) || DLG || MODALFN) return;
+  SAVE.flags = SAVE.flags || {}; const st = RIFT_STEPS.filter(x => x.lv > 0 && rTop() >= x.lv && !SAVE.flags['rp' + x.lv]); if (!st.length) return;
+  st.forEach(x => { SAVE.flags['rp' + x.lv] = 1; }); save();
+  setTimeout(() => { if (DLG || VIEW === 'battle') return; playDialog(st.flatMap(x => [...(x.lines || []), ['narr', `(Đường Ảo Cảnh · tầng ${x.lv}: mới mở “${x.n}”. Ở đâu: ${x.where})`]]), null, () => refresh()); }, 600);
 }
 // 出征页的说明（原来整段摊在页面上，现在点「?」才出来）
 const goHelpModal = () => () => {
@@ -800,12 +853,13 @@ function teamRow() {
 }
 let TEAMX = null;   // 伙伴弹窗里展开看详情的那位
 const teamModal = () => () => {
-  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen), LK = Object.keys(COMP_LOCK).filter(c => !compOpen(c));
+  const T = teamOf(), N = teamSlots(), L = Object.keys(COMPANIONS).filter(compOpen), LK = Object.keys(COMPANIONS).filter(c => !compOpen(c) && (COMP_LOCK[c] || (riftPath() && RIFT_COMP[c] != null)));
   const row = (c, lock) => { const C = COMPANIONS[c], v = wAffOf(c), on = T.includes(c), cost = giftCost(c), x = TEAMX === c;
     const head = `<div class="tmh" data-act="teamx" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : C.spr, 36, null, '', 'head')}<span><b>${c === 'ngoc' ? "Ngoc (Cửu Vĩ)" : C.n}</b>${rowTag(c)}<small>${C.role}${lock ? '' : ` · Hảo cảm ${v}/${COMP_AFF_MAX}`}</small></span>
       ${lock ? `<em class="tml">🔒</em>` : `<button class="btn sm ${on ? '' : 'ghost'}" data-act="teamtog" data-arg="${c}">${on ? "Cho nghỉ" : "Dẫn theo"}</button>`}</div>`;
     if (!x) return `<div class="tmc ${on ? 'on' : ''} ${lock ? 'lock' : ''}">${head}</div>`;
-    if (lock) { const [h, n] = COMP_LOCK[c](); return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">Chưa quen: ${C.lock}${SAVE.story && SAVE.story.ended ? ` (${Math.min(h, n)}/${n})` : " (sau khi thông quan)"}</div></div>`; }
+    if (lock) { if (!COMP_LOCK[c]) return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">Chưa quen: thông Ảo Cảnh tầng ${RIFT_COMP[c]} (hiện ${rTop()} tầng)</div></div>`;
+      const [h, n] = COMP_LOCK[c](); return `<div class="tmc lock x">${head}<p>${C.d}</p><div class="tmaff">Chưa quen: ${C.lock}${pgOr(0) ? ` (${Math.min(h, n)}/${n})` : " (sau khi thông quan)"}</div></div>`; }
     return `<div class="tmc x ${on ? 'on' : ''}">${head}<p>${C.d}</p>
       <div class="tmaff">Hảo cảm <b>${v}</b>/${COMP_AFF_MAX} (khí huyết, công +${v * 4}%)<button class="btn sm ghost" ${v < COMP_AFF_MAX && SAVE.gold >= cost ? '' : 'disabled'} data-act="gift" data-arg="${c}">${v < COMP_AFF_MAX ? `Tặng quà ${fmtBig(cost)} lượng` : "Đầy rồi"}</button></div>
       ${(C.up || []).map((t, i) => `<div class="tmup ${v >= (i + 1) * 10 ? 'ok' : ''}">${v >= (i + 1) * 10 ? '✓' : '·'} ${t}</div>`).join('')}</div>`; };
@@ -935,8 +989,9 @@ function titleHTML() {
     <div class="tl-sky"><i class="tl-moon"></i><i class="tl-mtn a"></i><i class="tl-mtn b"></i><i class="tl-town"></i><i class="tl-fog a"></i><i class="tl-fog b"></i>${emb}</div>
     <div class="tl-head"><h1>Cửu U Hồi Lang</h1><p>Ba trăm năm trước, năm người làm đinh, thiên hồ làm khóa.</p></div>
     <div class="tl-menu">
-      ${prog ? `<button class="btn big" data-act="tcont">Tiếp tục<small>${esc(CLASSES[cls].n)} cấp ${lv} · ${esc(chTitle(ch))}${SAVE.test ? " · nhân vật chơi thử" : ''}</small></button>
-        <button class="btn ghost" data-act="tnew">Chơi lại từ đầu</button>` : `<button class="btn big" data-act="tcont">Bắt đầu</button>`}
+      ${prog ? `<button class="btn big" data-act="tcont">Tiếp tục<small>${esc(CLASSES[cls].n)} cấp ${lv} · ${riftPath() && !SAVE.run && !storyCleared('normal') ? `Ảo Cảnh Cửu U · cao nhất tầng ${rTop()}` : esc(chTitle(ch))}${SAVE.test ? " · nhân vật chơi thử" : ''}</small></button>
+        <button class="btn ghost" data-act="tnew">Chơi lại từ đầu</button>` : `<button class="btn big" data-act="tpath" data-arg="story">Cốt truyện chính<small>Đi theo câu chuyện, mở khóa từng chương · Khuyên chơi lần đầu</small></button>
+        <button class="btn big tl-rift" data-act="tpath" data-arg="rift">Thử thách Ảo Cảnh<small>Bỏ qua cốt truyện, cày thẳng; càng sâu mở càng nhiều</small></button>`}
       <div class="tl-row"><button class="btn ghost" data-act="tsave">Lưu trữ</button><button class="btn ghost" data-act="tset">Cài đặt</button></div>
     </div>
     <p class="tl-sign">Tác phẩm của Đồ Dữ Hào</p>
@@ -2955,7 +3010,8 @@ function wDirStep(dx, dy) {
   WALK = { path: [{ x: T.x, y: T.y }], i: 0, joy: true, onArrive: P && P.t === 'camp' ? () => openModal(campModal(P)) : null }; wStepLoop();
 }
 // 镇上：带任务的人
-function townCh() { if (SAVE.run && SAVE.run.world && !isRift(SAVE.run)) return SAVE.run.chapter; const c = SAVE.chapter || 1; return wHas(c) && WMAPS[c].scenes.town ? c : wHas(1) ? 1 : 0; }
+function townCh() { if (SAVE.run && SAVE.run.world && !isRift(SAVE.run)) return SAVE.run.chapter; if (riftPath() && !storyCleared('normal') && !(SAVE.world && SAVE.world[1])) return 0;   // 幻境路线还没碰过剧情：镇上的人不挂剧情任务
+  const c = SAVE.chapter || 1; return wHas(c) && WMAPS[c].scenes.town ? c : wHas(1) ? 1 : 0; }
 
 // ---------- 奇遇 / 货郎 / 篝火 / 宝箱 / 结算 / 片尾 ----------
 function sceneWrap(art, inner) { return `${runBar(SAVE.run)}<div class="scene"><div class="panel"><div class="art">${art}</div>${inner}</div></div>`; }
@@ -3001,12 +3057,12 @@ function endHTML() {
     const tl = r.timeLeft || 0, used = Math.round((r.clock || 0) / 100);
     extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
       <div><p>${r.world ? `Mất <b>${fmtClock(r.clock || 0)}</b> · hương còn <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `Mất <b>${used}</b> lượt · hương còn <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · ngã ${r.deaths} lần` : ''}</p>
-      <p>${tl > 0 ? `Linh ngọc được nâng <b>${r.upg}</b> lần · giờ thử thách tối đa tầng <b>${SAVE.riftCap}</b>${SAVE.riftCap > (r.capBefore || 0) ? " (đã mở lên trên)" : ''}` : "Hương tàn: tầng này không tính qua, linh ngọc chỉ nâng được 1 lần"}</p>
+      <p>${tl > 0 ? `${boxOpen() ? `Linh ngọc nâng cấp được <b>${r.upg}</b> lần · ` : ''}Hiện tối đa khiêu chiến được <b>${SAVE.riftCap}</b> tầng${SAVE.riftCap > (r.capBefore || 0) ? " (đã mở lên trên)" : ''}` : `Hương cháy hết rồi: tầng này không tính qua${boxOpen() ? ", linh ngọc chỉ nâng được 1 lần" : ''}`}</p>
       ${r.bp ? `<p class="newslot">Binh phách <b>+${r.bp}</b> (hiện ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? ", đủ đúc một binh khí chuyên thuộc rồi: tìm Trương Đại Chùy" : ''})</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">Mở ô trang bị mới: <b>${r.newSlots.map(p => SLOT_NAME[p]).join(", ")}</b>. Vào trang “Nhân vật” xem; loại trang bị này từ giờ sẽ rơi trong Ảo Cảnh.</p>` : ''}
       ${r.stat ? `<details class="bstat-d"><summary>Thống kê ván này</summary>${statTable(r.stat)}</details>` : ''}
       ${r.record ? `<p class="evres">Kỷ lục mới của ${CLASSES[r.cls].n}: tầng ${r.riftLv} · ${r.world ? "mất " + fmtClock(r.clock || 0) : used + " lượt"}</p>` : ''}</div></div>`;
-    extra += `<div class="lgup"><h3>Linh ngọc</h3>${r.newGem ? `<p class="evres">Nhận linh ngọc mới: <b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
+    if (boxOpen()) extra += `<div class="lgup"><h3>Linh ngọc</h3>${r.newGem ? `<p class="evres">Nhận linh ngọc mới: <b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${SAVE.lgems.length ? `<p class="sub">Còn nâng được <b style="color:var(--gold2)">${r.upg}</b> lần. Tỉ lệ thành công tùy tầng Ảo Cảnh và cấp linh ngọc.</p>
       <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> cấp ${g.lv}<small>${LGEMS[g.t].d(g.lv)}</small></span>
         <button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">Nâng (${Math.round(lgemChance(g, r.riftLv) * 100)}%)</button></div>`).join('')}</div>` : ''}</div>`;
@@ -3282,6 +3338,7 @@ const ACT = {
   gift: c => { const r = giftComp(c); if (r.err) return toast(r.err); SFX.play('buff'); toast(`${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n} hảo cảm +1 ♥ (hiện ${r.v})${r.v === 10 || r.v === 20 ? ": kỹ năng mạnh lên rồi!" : ''}`); save(); refresh(); },
   ngoctog: () => { SAVE.ngocJoin = !SAVE.ngocJoin; refresh(); if (SAVE.ngocJoin) toast("Ngoc: “Đáng lẽ phải dẫn ta theo từ lâu rồi.”"); else toast("Ngoc: “…Vậy thì về sớm một chút.”"); },
   npc: id => {
+    if (id === 'ngoc' && riftPath() && !storyCleared('normal') && !SAVE.run) return openModal(rpathModal);   // 幻境路线：点 Ngoc 看「幻境之路」
     const qc = townCh();
     if (!(qc && wNpcMark(qc, id)) && WS_NPC[id] && svcFns(id).length) return wsOpen(WS_NPC[id], null);   // 三位师傅：都通到养成台，停在他的那一页
     if (!(qc && wNpcMark(qc, id)) && svcFns(id).length) { NPCV = { id, fn: null, item: null }; GAMBLE = null; BULKX = new Set(); BULKARM = false; BACK = null; return openModal(npcModal); }   // 没有任务要说：开他的铺子
@@ -3584,7 +3641,11 @@ const ACT = {
     persist(); BACK = null; closeModal(); VIEW = 'town'; TT = 'set'; render(); toast("Đã về bản lưu của bạn");
   },
   reset: () => openModal(resetModal()),
-  doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'town'; TT = 'go'; render(); toast("Đã chơi lại từ đầu"); playPrologue(); },
+  doreset: () => { clearOverlays(); SAVE = newSave(); ensureBounties(); persist(); BACK = null; closeModal(); VIEW = 'title'; render(); toast("Đã bắt đầu lại: chọn một con đường"); },
+  tpath: p => { SAVE.path = p === 'rift' ? 'rift' : 'story'; if (p === 'rift') { SAVE.mode = 'rift'; SAVE.riftLv = 1; } save(); closeModal(); VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); if (p === 'rift') playRiftIntro(); else playPrologue(); },
+  topath: () => openModal(toPathModal),
+  setpath: () => { SAVE.path = 'rift'; SAVE.mode = 'rift'; save(); closeModal(); refresh(); playRiftIntro(true); },
+  rpath: () => openModal(rpathModal),
 };
 let musicStarted = false;
 // 音量滑条：拖动时马上生效，松手时存档
@@ -3630,7 +3691,7 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   const keepS = {}; app.querySelectorAll('[data-scroll]').forEach(e => { keepS[e.dataset.scroll] = e.scrollTop; });   // 框里滚到哪儿，重画以后还在哪儿
   app.innerHTML = html;
-  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep(); fitKstats();
+  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep(); fitKstats(); riftPathCheck();
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast("Bạn đã thu phục tinh phách thủ lĩnh, có thể mang hai <b>Dịch Sứ</b> ra trận (ô “Dịch Sứ” trong bảng Ảo Cảnh). Mang rồi chúng sẽ theo bên cạnh bạn, khi bản lĩnh kích hoạt sẽ lóe sáng."), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`Đồng hành mới: <b>${COMPANIONS[c].n}</b> (${COMPANIONS[c].role}) đồng ý theo bạn vào Ảo Cảnh. Vào mục “Đồng hành” trong bảng Ảo Cảnh để mang theo.`), 600 + i * 2800)); } }

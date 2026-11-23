@@ -67,7 +67,7 @@ function migrate(s) {
   if (!s.comps) s.comps = { ngoc: 1 };
   if (!s.comp) s.comp = 'ngoc';
   if (s.run && !s.run.world && (!s.run.maze || s.run.maze.v !== 2)) s.run = null;
-  if (!(s.story && s.story.ended)) s.mods = [];
+  if (!(s.story && s.story.ended) && !(s.path === 'rift' && (s.riftMax || 0) >= 15)) s.mods = [];
   if (!s.story.cleared) s.story = d.story;
   if (s.run && (!s.run.maze || !s.run.mode)) s.run = null;
   if (s.run && s.run.mode === 'rift' && !(s.run.world && s.run.rw)) s.run = null;   // 旧的点格子幻境：进行到一半的那一局作废
@@ -234,11 +234,19 @@ function saveBrief(S) {
 // ---------------- 剧情进度与解锁 ----------------
 const storyCleared = diff => (SAVE && SAVE.story && SAVE.story.cleared[diff || 'normal']) || 0;
 const POSTGAME = new Set(['rift', 'para', 'lgem', 'bounty', 'mods', 'nightmare', 'enhance', 'sockets', 'gems', 'reroll']);   // 装备养成（强化、打孔镶玉、淬炼洗炼、传承升阶）通关后才开：剧情里装备每章都换，专心看故事
-const featureOn = key => POSTGAME.has(key) ? !!(SAVE && SAVE.story && SAVE.story.ended) : storyCleared('normal') >= (FEATURE_CH[key] || 0) || (key === 'runes' && typeof wPast === 'function' && wPast(7, 'runes7'));   // 变招：第七章龙道长教过就开
-const bldOpen = B => storyCleared('normal') >= (B.ch || 0);
+// 两条路：主线（看剧情，一章一章开）/ 幻境（开头选「幻境挑战」：跳过剧情直接刷，按幻境打到的最高层一样样开）。两条路共用一个存档，主线随时能回去打
+const riftPath = () => !!(typeof SAVE !== 'undefined' && SAVE && SAVE.path === 'rift');
+const rTop = () => (SAVE && SAVE.riftMax) || 0;
+const RIFT_UNLOCK = { rift: 0, enhance: 3, reroll: 5, sockets: 5, gems: 5, runes: 7, cube: 8, bounty: 10, lgem: 12, para: 15, mods: 15 };
+const RIFT_COMP = { ngoc: 0, zhen: 3, long: 7, kang: 10 };   // 幻境路线：伙伴陆续来
+const pgOr = lv => !!(SAVE && SAVE.story && SAVE.story.ended) || (riftPath() && rTop() >= lv);   // 通关了，或者幻境路线打到了 lv 层
+const featureOn = key => (riftPath() && RIFT_UNLOCK[key] != null && rTop() >= RIFT_UNLOCK[key]) || featureOn0(key);
+const featureOn0 = key => POSTGAME.has(key) ? !!(SAVE && SAVE.story && SAVE.story.ended) : storyCleared('normal') >= (FEATURE_CH[key] || 0) || (key === 'runes' && typeof wPast === 'function' && wPast(7, 'runes7'));   // 变招：第七章龙道长教过就开
+const pgCh = () => Math.max(storyCleared('normal'), riftPath() ? Math.min(10, Math.floor(rTop() / 2)) : 0);   // 营地建筑按「相当于打到第几章」：幻境路线两层算一章
+const bldOpen = B => pgCh() >= (B.ch || 0);
 
 // ---------------- 营地建筑 ----------------
-const bLv = id => { const B = BUILDINGS.find(x => x.id === id); return B && SAVE && SAVE.story ? Math.min(B.max, Math.floor(storyCleared('normal') * (B.max + 1) / 11)) : 0; };
+const bLv = id => { const B = BUILDINGS.find(x => x.id === id); return B && SAVE && SAVE.story ? Math.min(B.max, Math.floor(pgCh() * (B.max + 1) / 11)) : 0; };
 const stashMax = () => 120 + bLv('warehouse') * 40;
 const smithMax = () => Math.min(ENHANCE_MAX, 5 + bLv('smith'));
 const gemCap = () => Math.min(4, 2 + bLv('jewel'));
@@ -262,9 +270,9 @@ const curChapter = () => (typeof SAVE !== 'undefined' && SAVE && SAVE.run && SAV
 // 本章装备的等级上限（任务奖励、宝箱不会超过本章）
 function chIlvl(ch, lv) { const B = CH_BAND[Math.min(10, Math.max(1, ch))]; return Math.max(B[0], Math.min(B[1], lv)) + 1; }
 // 通关后的新位置：腰带、副手、第二枚扳指，按幻境最高纪录逐个开；灵玉匣通关即得
-const slotOpen = pos => { const S = SLOTS.find(x => x.id === pos); return !!S && (!S.rift || !!(SAVE && SAVE.story && SAVE.story.ended && (SAVE.riftMax || 0) >= S.rift)); };
+const slotOpen = pos => { const S = SLOTS.find(x => x.id === pos); return !!S && (!S.rift || !!(pgOr(0) && (SAVE.riftMax || 0) >= S.rift)); };
 const eqSlots = () => POS_IDS.filter(slotOpen);
-const boxOpen = () => !!(SAVE && SAVE.story && SAVE.story.ended);
+const boxOpen = () => pgOr(RIFT_UNLOCK.lgem);
 // 同一件神兵、同一套的扳指，只能戴一枚
 const sameRing = (a, b) => !!a && !!b && a !== b && ((a.legend && a.legend === b.legend) || (a.set && a.set === b.set));
 // 这件装备穿到哪个位置：扳指有两个位置（空的优先；都满了换掉更值得换的那枚），别的装备只有自己那个位置
@@ -306,7 +314,7 @@ const AFF_ST = Object.fromEntries(AFFIXES.filter(a => a.st).map(a => [a.k, a.st]
 const SKD_EX = new Set(['warcry', 'butui', 'summon', 'jihuo', 'yangshi', 'curse', 'shadowstep', 'yandun', 'aegis', 'prayer', 'chanhou']);
 let AFF_CLS = null;   // 掉落、洗炼时这件装备算哪个职业的（挑「某一招」用）
 function skdKey(cls) { const C = CLASSES[cls || AFF_CLS || (SAVE && SAVE.run && SAVE.run.cls) || (SAVE && SAVE.cls)] || CLASSES.berserker; return 'sk_' + RNG.pick(C.skills.filter(x => !SKD_EX.has(x.id))).id; }
-const affPgOK = a => !a.pg || !!(SAVE && SAVE.story && SAVE.story.ended);
+const affPgOK = a => !a.pg || pgOr(10);
 function affixValue(a, ilvl, mult, max) {
   const sc = affSc(a, ilvl);
   return Math.max(1, Math.round((max ? a.r[1] : RNG.f(a.r[0], a.r[1])) * sc * mult));
@@ -386,7 +394,7 @@ function ancientize(it) {
 }
 const primalOK = () => !!(SAVE && SAVE.run && SAVE.run.mode === 'rift' && SAVE.run.riftLv >= PRIMAL_FROM);
 // 通关后掉的装备按新的词条数（主线照旧，已有的装备不动）：宝品 2 条；神兵、套装 3 条；上古 3–4 条；太古 4–5 条
-const PG_AFF = () => !!(SAVE && SAVE.story && SAVE.story.ended);
+const PG_AFF = () => pgOr(10);
 function addAffixes(it, n) { const L = it.legend && LEGENDS.find(l => l.id === it.legend), ex = [...it.aff.map(a => a[0]), ...(L ? Object.keys(L.imp) : [])];
   AFF_CLS = it.cls || ownerCls(it); const more = rollAffixes(n, it.ilvl, affMult(it), ex, it.anc === 2, it.slot); AFF_CLS = null;
   while (more.length < n) {   // 副手这种格子攻击类词条多、又封顶两条：凑不够就放开封顶，保证上古 3–4、太古 4–5 条
@@ -409,7 +417,7 @@ function makeItem({ slot, ilvl, rarity, cls, setId, noSocket, legendId }) {
   ilvl = Math.max(1, Math.min(70, Math.round(ilvl)));
   if (rarity === 'legend') {
     const cc = Math.max(tierOf(ilvl), 1);
-    const ok = l => (!slot || l.slot === slot) && (!l.cls || l.cls === cls) && (l.ch || 1) <= cc && (!l.pg || (SAVE && SAVE.story && SAVE.story.ended)) && (!l.x || (slotOpen(l.slot) && (slot === l.slot || dropSlots().includes(l.slot))));
+    const ok = l => (!slot || l.slot === slot) && (!l.cls || l.cls === cls) && (l.ch || 1) <= cc && (!l.pg || pgOr(10)) && (!l.x || (slotOpen(l.slot) && (slot === l.slot || dropSlots().includes(l.slot))));
     const mine = LEGENDS.filter(l => ok(l) && l.cls), gen = LEGENDS.filter(l => ok(l) && !l.cls);
     const forced = legendId && LEGENDS.find(l => l.id === legendId);
     const pool = forced ? [forced] : (mine.length && (RNG.ch(0.6) || !gen.length) ? mine : gen).filter(l => !l.w);   // 专属兵器不走普通掉落
@@ -698,7 +706,7 @@ const xpNeed = L => Math.round(40 * Math.pow(L, 1.75));
 // 通关后的小号追赶：比账号里等级最高的角色低多少级，战斗经验就翻多少倍（差得越多追得越快），追平了就没有。
 // 最高的还没满级时，差 1 级不算——免得两个号互相垫着爬
 function catchUpMul(cls) {
-  if (!SAVE.story || !SAVE.story.ended) return 1;
+  if (!pgOr(0)) return 1;
   const top = topLevel(), gap = top - SAVE.chars[cls].level;
   return gap > 0 && (top >= MAX_LV || gap >= 2) ? 3 + gap * 0.25 : 1;
 }
@@ -1171,10 +1179,10 @@ function newRun(cls, opts = {}) {
                 kills: 0, t0: Date.now(), lvStart: SAVE.chars[cls].level, paraStart: SAVE.para.lv, hp: 0, ended: null, rooms: 0, xpMul: 1.5, prog: 0 };
   for (const id of mods) { const M = DUNGEON_MODS.find(x => x.id === id); if (!M) continue;
     if (M.mf) run.buffs.mf = (run.buffs.mf || 0) + M.mf; if (M.gf) run.buffs.gf = (run.buffs.gf || 0) + M.gf; if (M.xp) run.xpMul += M.xp / 100; }
-  if (mode === 'rift') { run.theme = RNG.i(0, RIFT_THEMES.length - 1); run.xpMul += 0.25; run.ngoc = SAVE.story.ended && SAVE.ngocJoin ? 'fox' : null; }
+  if (mode === 'rift') { run.theme = RNG.i(0, RIFT_THEMES.length - 1); run.xpMul += 0.25; run.ngoc = pgOr(0) && SAVE.ngocJoin ? 'fox' : null; }
   else { const C = CHAPTERS[run.chapter - 1]; run.ngoc = C.ngoc === 'normal' ? 'normal' : C.ngoc === 'fox' ? 'fox' : null; }
   if (!run.ngoc) run.comp = (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
-  if (mode === 'rift' && SAVE.story.ended) { run.team = teamOf(); run.ngoc = null; run.comp = null; }
+  if (mode === 'rift' && pgOr(0)) { run.team = teamOf(); run.ngoc = null; run.comp = null; }
   genMaze(run);
   run.hp = runStats(run).maxHp;
   return run;
@@ -1673,10 +1681,12 @@ const COMP_LOCK = {   // 通关后才认识的伙伴：[现在多少, 要多少]
   lei: () => [(SAVE.stats && SAVE.stats.bounties) || 0, 10],
   liu: () => [zyPagesDone(), 3],
   tie: () => [SAVE.flags && SAVE.flags.wpnForged ? 1 : 0, 1] };
-const compOpen = c => !!COMPANIONS[c] && (COMP_LOCK[c] ? !!(SAVE.story && SAVE.story.ended) && (() => { const [a, n] = COMP_LOCK[c](); return a >= n; })()
-  : c === 'kang' ? !!(SAVE.story && SAVE.story.ended) : !!(SAVE.comps || {})[c]);
+const compOpen = c => { if (!COMPANIONS[c]) return false; const ended = !!(SAVE.story && SAVE.story.ended);
+  if (riftPath() && RIFT_COMP[c] != null && rTop() >= RIFT_COMP[c]) return true;   // 幻境路线：打到那一层就来
+  if (COMP_LOCK[c]) return (ended || riftPath()) && (() => { const [a, n] = COMP_LOCK[c](); return a >= n; })();
+  return c === 'kang' ? ended : !!(SAVE.comps || {})[c]; };
 // 新认识了伙伴：回城时提示一次
-function compMeetCheck() { if (!SAVE || !SAVE.story || !SAVE.story.ended) return []; SAVE.flags = SAVE.flags || {}; const got = [];
+function compMeetCheck() { if (!SAVE || !pgOr(0)) return []; SAVE.flags = SAVE.flags || {}; const got = [];
   for (const c in COMP_LOCK) if (!SAVE.flags['met_' + c] && compOpen(c)) { SAVE.flags['met_' + c] = 1; got.push(c); } return got; }
 function teamOf() { const T = (SAVE.team || []).filter(compOpen); return [...new Set(T)].slice(0, teamSlots()); }
 const giftCost = c => 5000 + 2000 * wAffOf(c);
