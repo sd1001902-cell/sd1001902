@@ -44,20 +44,21 @@ const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); if (n 
 const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
 // 跳字（2026-11-24 第三版）：游戏体粗数字 + 粗描边（后面垫一层描边字，前面是本色／暴击金色渐变）；头上「爆」出来，弹一下就往上飘、半程淡出，0.7 秒左右；
 // 暴击从三倍大旋着砸下来，炸一圈金环、画面抖一下；同一个目标的数字按中、左、右三条道轮流冒；站在最上排的（首领常在后排）数字放到身体中部
-const POP_KF = {   // 2026-11-24 第四版：不夸张——轻轻弹一下就往上飘、半程淡出
-  n: [[0, 6, .6, 0, 0], [.12, -3, 1.12, 1, 0], [.24, -6, 1, 1, 0], [.5, -16, 1, 1, 0], [1, -42, .95, 0, 0]],
-  b: [[0, 6, .6, 0, 0], [.12, -3, 1.22, 1, 0], [.26, -6, 1, 1, 0], [.5, -18, 1, 1, 0], [1, -46, .95, 0, 0]],
-  c: [[0, 0, 1.6, 0, 0], [.1, -3, .95, 1, 0], [.2, -6, 1.06, 1, 0], [.3, -8, 1, 1, 0], [.55, -16, 1, 1, 0], [1, -48, .95, 0, 0]],
-  h: [[0, 0, .6, 0, 0], [.12, -3, 1.12, 1, 0], [.24, -5, 1, 1, 0], [.55, -14, 1, 1, 0], [1, -36, 1, 0, 0]],
+const POP_KF = {   // 2026-11-24 第五版：冒出来、弹一下就往上淡出，整段更短（开倍速再缩）
+  n: [[0, 4, .6, 0, 0], [.14, -3, 1.12, 1, 0], [.28, -6, 1, 1, 0], [.45, -12, 1, 1, 0], [1, -34, .95, 0, 0]],
+  b: [[0, 4, .6, 0, 0], [.14, -3, 1.2, 1, 0], [.3, -6, 1, 1, 0], [.45, -12, 1, 1, 0], [1, -36, .95, 0, 0]],
+  c: [[0, 0, 1.5, 0, 0], [.12, -3, .95, 1, 0], [.24, -6, 1.05, 1, 0], [.34, -8, 1, 1, 0], [.5, -12, 1, 1, 0], [1, -38, .95, 0, 0]],
+  h: [[0, 0, .6, 0, 0], [.14, -3, 1.1, 1, 0], [.3, -5, 1, 1, 0], [.45, -10, 1, 1, 0], [1, -28, 1, 0, 0]],
 };
-const POP_MS = { n: 700, b: 750, c: 850, h: 650 };
-const popSpd = () => ({ 1: 1, 2: 0.8, 3: 0.65 }[SAVE.speed] || 1);
+const POP_MS = { n: 520, b: 560, c: 640, h: 480 };
+const popSpd = () => ({ 1: 1, 2: 0.72, 3: 0.55 }[SAVE.speed] || 1);
+const popMax = () => ({ 1: 3, 2: 2, 3: 1 }[SAVE.speed] || 3);   // 同一个目标同时留几个数字：倍速越高留得越少（3 倍速新数字直接顶掉旧的）
 const popHTML = h => `<i class="o">${h}</i><b>${h}</b>`;
 function popPut(el, cls, html, kind) {
   if (!el) return null;
   kind = kind || 'n';
   const side = / m[lr]\b/.test(cls);
-  const old = [...el.querySelectorAll(':scope > .pop' + (side ? (/ ml\b/.test(cls) ? '.ml' : '.mr') : ':not(.ml):not(.mr):not(.move)'))]; if (old.length >= 4) old[0].remove();
+  const old = [...el.querySelectorAll(':scope > .pop' + (side ? (/ ml\b/.test(cls) ? '.ml' : '.mr') : ':not(.ml):not(.mr):not(.move)'))]; for (let k = 0; k <= old.length - popMax(); k++) old[k].remove();
   const now = performance.now(); if (!el._lowT || now - el._lowT > 1500) { el._lowT = now; const ar = document.getElementById('arena'); el._low = !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; }
   const p = document.createElement('span'); p.className = cls + (el._low ? ' low' : ''); p.innerHTML = popHTML(html);
   if (!side) { const x = [0, -18, 18][(el._lane = (el._lane || 0) + 1) % 3]; if (x) p.style.left = `calc(50% + ${x}px)`; }
@@ -1992,7 +1993,10 @@ function applyStep(o, anim) {
     let ji = 0, nPop = document.querySelectorAll('#arena .pop').length;
     for (const g of G.values()) {
       const r = g.tu && g.tu.maxHp ? g.v / g.tu.maxHp : 0, big = !g.onHero && r >= 0.08;
-      const quiet = !g.onHero && !g.crit && !big && (ALL ? (SP >= 3 && r < 0.15) || (SP >= 2 && r < 0.1) || nPop >= (SP >= 2 ? 4 : 6) : nPop >= (SP >= 2 ? 6 : 8));
+      // 倍速下少跳：2 倍速不跳回血小数字、掉血不到 3% 不跳；3 倍速再省掉打不到目标 2% 血的小数字（暴击、重击照跳），掉血不到 5% 不跳、回血不跳
+      const hr = g.onHero && B.P ? g.v * uK(g.tu) / (B.P.maxHp * uK(B.P) || 1) : 0;
+      const quiet = g.onHero ? (SP >= 2 && (g.heal ? SP >= 3 || hr < 0.1 : hr < (SP >= 3 ? 0.05 : 0.03)))
+        : !g.crit && !big && (ALL ? (SP >= 3 && r < 0.15) || (SP >= 2 && r < 0.1) || nPop >= (SP >= 2 ? 4 : 6) : (SP >= 3 && r < 0.02) || nPop >= (SP >= 3 ? 4 : SP >= 2 ? 5 : 8));
       if (quiet) continue; nPop++;
       const heroSide = g.onHero && !ALL ? (g.heal ? ' mr' : ' ml') : '';
       const col = g.heal ? 'heal' : g.onHero && !ALL ? 'hurt' : g.dot ? g.c : g.crit ? 'crit' : REFL.has(g.tag) ? 'refl' : ALL ? (g.ally ? 'ally' : g.c) : '';
@@ -2007,7 +2011,7 @@ function applyStep(o, anim) {
         if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
       if (delay) setTimeout(put, delay); else put();
     }
-    for (const t of TX) popPut(t.el, `pop txt ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))), 'h');
+    if (SP < 2) for (const t of TX) popPut(t.el, `pop txt ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))), 'h');
     if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
     if (anim && actorU && actorU.kind === 'ally' && o.cast) {   // 伙伴出手：头顶冒招式名，身上亮一圈
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
