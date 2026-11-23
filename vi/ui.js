@@ -609,10 +609,32 @@ function kitRow(cls) {
     return k ? `<div class="kp ${on ? 'on' : ''}"><button class="kpb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}">${esc(k.n)}</button><button class="kpe" data-act="kitedit" data-arg="${i}" aria-label="Lưu">Lưu</button></div>`
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ Lưu bộ này</button></div>`; }).join('')}</div>`;
 }
+// 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
+const KS_EXTRA = [['healPct', "Trị liệu"], ['regen', "Hồi máu"], ['regenPct', "Hồi máu"], ['thorns', "Phản chấn"], ['xDr', "Giảm ST"], ['xBoss', "ST thủ lĩnh"], ['xExec', "Trảm sát"], ['xDouble', "Liên trảm"], ['xFirst', "Tiên thủ"],
+  ['xBreak', "Phá thế"], ['xRage', "Nộ khí"], ['xTen', "Thanh thần"], ['xLast', "Bất khuất"], ['xHaste', "Tật hành"], ['xKill', "Tham lang"], ['cdSkip', "Miễn hồi chiêu"], ['xCritNext', "Hội tâm"], ['xShield', "Bàn thạch"],
+  ['allyPct', "Đồng hành"], ['freeze', "Bất động"], ['poison', "Kèm độc"], ['skd', "Chiêu riêng"], ['minion', "Số cương thi"], ['minionPct', "Cương thi"], ['gf', "Bạc"], ['xLuck', "Tỉ lệ thần binh"]];
 function keyStats(cls) {
-  const ch = SAVE.chars[cls], s = charStats(cls);
-  const L = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Bạo kích", s.crit + '%'], ["ST bạo", s.critDmg + '%']];
-  return `<button class="kstats" data-act="statall">${L.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}<em>Tất cả chỉ số ›</em></button>`;
+  const ch = SAVE.chars[cls], s = charStats(cls), r1 = v => Math.round(v * 10) / 10;
+  const L = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", s.atk], ["Hộ giáp", s.armorT], ["Kháng toàn bộ", s.res + '%'], ["Bạo kích", s.crit + '%'], ["ST bạo", s.critDmg + '%'],
+    ["Tốc độ", s.speed], ["Sát thương", '+' + s.dmgPct + '%'], ["Thuật", '+' + s.elem + '%'], ["Hút máu", s.leech + '%'], ["Né tránh", r1(s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) + '%'], ["Phúc duyên", '+' + s.mf + '%'],
+    ...KS_EXTRA.filter(([k]) => s[k] > 0).map(([k, n]) => [n, PCT_STATS.has(k) ? '+' + r1(s[k]) + '%' : '+' + r1(s[k])])];
+  // 再往下：身上的套装几件、生效中的神兵/套装/心法特效（只写名字，详情在「全部属性」）
+  const sets = SETS.filter(S => S.cls === cls && (s.setCount[S.id] || 0) >= 2).map(S => `<i class="r-set">${esc(S.n)} ${s.setCount[S.id]}/${S.pieces.length}</i>`);
+  const fx = [...s.fx].map(f => { const Lg = LEGENDS.find(l => l.fx === f); if (Lg) return `<i class="r-legend">${esc(Lg.n)}</i>`;
+    for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<i class="ktal">Tâm pháp·${esc(T.n)}</i>`; } return ''; }).filter(Boolean);
+  const chips = [...sets, ...fx];
+  return `<button class="kstats" data-act="statall">${L.map(([n, v]) => `<div class="ksi"><span>${n}</span><b>${v}</b></div>`).join('')}${chips.length ? `<p class="ksfx">${chips.join('')}</p>` : ''}<em>Tất cả chỉ số ›</em></button>`;
+}
+addEventListener('resize', () => fitKstats()); try { document.fonts && document.fonts.ready.then(() => fitKstats()); } catch (e) {}
+// 属性框只放整行：放不下的那几行藏起来（不出现半行）
+function fitKstats() {
+  const k = document.querySelector('.gfit .kstats'); if (!k) return; const it = [...k.querySelectorAll(':scope > .ksi')], fx = k.querySelector(':scope > .ksfx');
+  it.forEach(d => { d.style.display = ''; }); if (fx) { fx.style.display = ''; fx.style.maxHeight = ''; }
+  const cs = getComputedStyle(k), bot = k.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth);
+  let cut = it.findIndex(d => d.getBoundingClientRect().bottom > bot + 0.5);
+  if (cut >= 0) { cut -= cut % 3; it.slice(Math.max(3, cut)).forEach(d => { d.style.display = 'none'; }); if (fx) fx.style.display = 'none'; return; }
+  if (fx) { const top = fx.getBoundingClientRect().top, ch = 22, n = Math.floor((bot - top) / ch);   // 特效小标签：放得下几行就留几行
+    if (n < 1) fx.style.display = 'none'; else if (fx.scrollHeight > n * ch + 1) fx.style.maxHeight = n * ch + 'px'; }
 }
 const statAllModal = cls => () => `<h2 class="mh">${CLASSES[cls].n} · Chỉ số</h2>${statFull(cls)}<button class="btn ghost" data-act="close">Xong</button>`;
 function statFull(cls) {
@@ -637,7 +659,7 @@ function gearTab() {
     const D = deltaMap(cls), up = {}; for (const it of SAVE.stash) { const d = D.get(it.id); if (!(d > 0)) continue; const ps = posFor(cls, it, gpos(it)); if (d > (up[ps] || 0)) up[ps] = d; }
     const nUp = Object.keys(up).length, eq = SAVE.chars[cls].eq;
     let doll = SLOTS.filter(sl => slotOpen(sl.id)).map(sl => { const it = eq[sl.id];
-      return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${it ? `<span class="gnm r-${it.rarity}">${esc(it.name)}</span>` : ''}${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
+      return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
     if (boxOpen()) { const nb = boxOf(cls).filter(Boolean).length;
       doll += `<button class="gsb box ${nb ? 'b-legend' : 'empty'}" data-act="gsl" data-arg="box"><span class="gi">${SPR.img('gem', 30, { G: '#ffb02a' }, nb ? 'glow' : '')}</span><span class="gn">Hộp Linh Ngọc ${nb}/${BOX_SLOTS}</span></button>`
         + SLOTS.filter(sl => sl.rift && !slotOpen(sl.id)).map(sl => `<div class="gsb locked"><span class="gi"><i>Khóa</i></span><span class="gn">${sl.n}</span><small>Ảo Cảnh tầng ${sl.rift}</small></div>`).join(''); }
@@ -3608,7 +3630,7 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   const keepS = {}; app.querySelectorAll('[data-scroll]').forEach(e => { keepS[e.dataset.scroll] = e.scrollTop; });   // 框里滚到哪儿，重画以后还在哪儿
   app.innerHTML = html;
-  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep();
+  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep(); fitKstats();
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast("Bạn đã thu phục tinh phách thủ lĩnh, có thể mang hai <b>Dịch Sứ</b> ra trận (ô “Dịch Sứ” trong bảng Ảo Cảnh). Mang rồi chúng sẽ theo bên cạnh bạn, khi bản lĩnh kích hoạt sẽ lóe sáng."), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`Đồng hành mới: <b>${COMPANIONS[c].n}</b> (${COMPANIONS[c].role}) đồng ý theo bạn vào Ảo Cảnh. Vào mục “Đồng hành” trong bảng Ảo Cảnh để mang theo.`), 600 + i * 2800)); } }

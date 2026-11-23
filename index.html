@@ -1672,11 +1672,14 @@ body[data-view=credits] #app{height:100vh;height:100svh;overflow:hidden;box-sizi
 .arena.hstop,.arena.hstop *{animation-play-state:paused!important}
 @keyframes iGlint{50%{opacity:.7}}   /* 冰：亮度闪改成透明度闪，不用每帧重画 */
 @keyframes shPulse{50%{transform:scale(1.04)}}   /* 护盾：只缩放，光晕固定 */
-/* 人物页「身上」：装备格把下面的空位撑满（格子变高，顺便写上装备名），屏幕小就在框里滚 */
+/* 人物页「身上」：多出来的高度给属性框——框撑满剩下的空，能放几行放几行；装备格保持原大小 */
 .gfit{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-.gfit .gdoll{flex:1 0 auto;grid-auto-rows:minmax(58px,1fr)}
-.gsb .gnm{display:block;max-width:100%;padding:0 3px;box-sizing:border-box;font-size:calc(10.5px * var(--fs,1));line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-@media(max-height:700px){.gsb .gnm{display:none}}   /* 矮屏：只留格子，按钮不被挤下去 */
+.gfit .kstats{flex:1 1 auto;min-height:62px;overflow:hidden;align-content:start;grid-auto-rows:min-content;padding-bottom:22px}
+.gfit .kstats em{position:absolute;right:9px;bottom:5px}
+.gfit .gdoll{flex:none}
+.kstats .ksfx{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 5px;margin:4px 0 0;overflow:hidden;line-height:18px}
+.kstats .ksfx i{font-style:normal;font-size:calc(11px * var(--fs,1));padding:0 6px;height:18px;border:1px solid var(--line);border-radius:9px;background:#0a0706;white-space:nowrap}
+.kstats .ksfx i.ktal{color:var(--gold2)}
 .gfit .gbar{position:sticky;bottom:0;z-index:2;background:linear-gradient(180deg,rgba(14,10,9,0),#0e0a09 30%);padding-top:6px}
 </style>
 </head>

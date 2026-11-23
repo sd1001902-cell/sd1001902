@@ -608,10 +608,32 @@ function kitRow(cls) {
     return k ? `<div class="kp ${on ? 'on' : ''}"><button class="kpb" ${busy || on ? 'disabled' : ''} data-act="kituse" data-arg="${i}">${esc(k.n)}</button><button class="kpe" data-act="kitedit" data-arg="${i}" aria-label="存">存</button></div>`
       : `<div class="kp empty"><button class="kpb" data-act="kitedit" data-arg="${i}">＋ 存当前</button></div>`; }).join('')}</div>`;
 }
+// 人物页的属性框：先放常用的十二项，再放身上有的特殊属性；框有多高放多少行，放不下的点「全部属性」看
+const KS_EXTRA = [['healPct', '治疗'], ['regen', '回血'], ['regenPct', '回血'], ['thorns', '反震'], ['xDr', '减伤'], ['xBoss', '首领伤'], ['xExec', '斩杀'], ['xDouble', '连斩'], ['xFirst', '先手'],
+  ['xBreak', '破势'], ['xRage', '怒气'], ['xTen', '清神'], ['xLast', '不屈'], ['xHaste', '疾行'], ['xKill', '贪狼'], ['cdSkip', '免冷却'], ['xCritNext', '会心'], ['xShield', '磐石'],
+  ['allyPct', '伙伴'], ['freeze', '定身'], ['poison', '附毒'], ['skd', '专招'], ['minion', '僵尸数'], ['minionPct', '僵尸'], ['gf', '银两'], ['xLuck', '神兵率']];
 function keyStats(cls) {
-  const ch = SAVE.chars[cls], s = charStats(cls);
-  const L = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击', s.crit + '%'], ['暴伤', s.critDmg + '%']];
-  return `<button class="kstats" data-act="statall">${L.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}<em>全部属性 ›</em></button>`;
+  const ch = SAVE.chars[cls], s = charStats(cls), r1 = v => Math.round(v * 10) / 10;
+  const L = [['气血', hpTxt(s.maxHp, ch.level)], ['攻击', s.atk], ['护甲', s.armorT], ['全抗', s.res + '%'], ['暴击', s.crit + '%'], ['暴伤', s.critDmg + '%'],
+    ['速度', s.speed], ['伤害', '+' + s.dmgPct + '%'], ['术法', '+' + s.elem + '%'], ['吸血', s.leech + '%'], ['闪避', r1(s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) + '%'], ['福缘', '+' + s.mf + '%'],
+    ...KS_EXTRA.filter(([k]) => s[k] > 0).map(([k, n]) => [n, PCT_STATS.has(k) ? '+' + r1(s[k]) + '%' : '+' + r1(s[k])])];
+  // 再往下：身上的套装几件、生效中的神兵/套装/心法特效（只写名字，详情在「全部属性」）
+  const sets = SETS.filter(S => S.cls === cls && (s.setCount[S.id] || 0) >= 2).map(S => `<i class="r-set">${esc(S.n)} ${s.setCount[S.id]}/${S.pieces.length}</i>`);
+  const fx = [...s.fx].map(f => { const Lg = LEGENDS.find(l => l.fx === f); if (Lg) return `<i class="r-legend">${esc(Lg.n)}</i>`;
+    for (const Bq of talentBranches(cls)) { const T = Bq.t.find(t => t.fx === f); if (T) return `<i class="ktal">心法·${esc(T.n)}</i>`; } return ''; }).filter(Boolean);
+  const chips = [...sets, ...fx];
+  return `<button class="kstats" data-act="statall">${L.map(([n, v]) => `<div class="ksi"><span>${n}</span><b>${v}</b></div>`).join('')}${chips.length ? `<p class="ksfx">${chips.join('')}</p>` : ''}<em>全部属性 ›</em></button>`;
+}
+addEventListener('resize', () => fitKstats()); try { document.fonts && document.fonts.ready.then(() => fitKstats()); } catch (e) {}
+// 属性框只放整行：放不下的那几行藏起来（不出现半行）
+function fitKstats() {
+  const k = document.querySelector('.gfit .kstats'); if (!k) return; const it = [...k.querySelectorAll(':scope > .ksi')], fx = k.querySelector(':scope > .ksfx');
+  it.forEach(d => { d.style.display = ''; }); if (fx) { fx.style.display = ''; fx.style.maxHeight = ''; }
+  const cs = getComputedStyle(k), bot = k.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth);
+  let cut = it.findIndex(d => d.getBoundingClientRect().bottom > bot + 0.5);
+  if (cut >= 0) { cut -= cut % 3; it.slice(Math.max(3, cut)).forEach(d => { d.style.display = 'none'; }); if (fx) fx.style.display = 'none'; return; }
+  if (fx) { const top = fx.getBoundingClientRect().top, ch = 22, n = Math.floor((bot - top) / ch);   // 特效小标签：放得下几行就留几行
+    if (n < 1) fx.style.display = 'none'; else if (fx.scrollHeight > n * ch + 1) fx.style.maxHeight = n * ch + 'px'; }
 }
 const statAllModal = cls => () => `<h2 class="mh">${CLASSES[cls].n} · 属性</h2>${statFull(cls)}<button class="btn ghost" data-act="close">好了</button>`;
 function statFull(cls) {
@@ -636,7 +658,7 @@ function gearTab() {
     const D = deltaMap(cls), up = {}; for (const it of SAVE.stash) { const d = D.get(it.id); if (!(d > 0)) continue; const ps = posFor(cls, it, gpos(it)); if (d > (up[ps] || 0)) up[ps] = d; }
     const nUp = Object.keys(up).length, eq = SAVE.chars[cls].eq;
     let doll = SLOTS.filter(sl => slotOpen(sl.id)).map(sl => { const it = eq[sl.id];
-      return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${it ? `<span class="gnm r-${it.rarity}">${esc(it.name)}</span>` : ''}${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
+      return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
     if (boxOpen()) { const nb = boxOf(cls).filter(Boolean).length;
       doll += `<button class="gsb box ${nb ? 'b-legend' : 'empty'}" data-act="gsl" data-arg="box"><span class="gi">${SPR.img('gem', 30, { G: '#ffb02a' }, nb ? 'glow' : '')}</span><span class="gn">灵玉匣 ${nb}/${BOX_SLOTS}</span></button>`
         + SLOTS.filter(sl => sl.rift && !slotOpen(sl.id)).map(sl => `<div class="gsb locked"><span class="gi"><i>锁</i></span><span class="gn">${sl.n}</span><small>幻境 ${sl.rift} 层</small></div>`).join(''); }
@@ -3607,7 +3629,7 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   const keepS = {}; app.querySelectorAll('[data-scroll]').forEach(e => { keepS[e.dataset.scroll] = e.scrollTop; });   // 框里滚到哪儿，重画以后还在哪儿
   app.innerHTML = html;
-  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep();
+  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep(); fitKstats();
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast('你收服过首领的精魄，可以带两只<b>役使</b>上阵（幻境面板里的「役使」空位）。带上以后它们会跟在你身边，本事触发时会闪一下。'), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`新伙伴：<b>${COMPANIONS[c].n}</b>（${COMPANIONS[c].role}）愿意跟你进幻境了。去幻境面板的「伙伴」里带上。`), 600 + i * 2800)); } }
