@@ -153,3 +153,5 @@ html[lang=vi] html body .pop{font-family:"Noto Sans",sans-serif !important;lette
 html[lang=vi] html body .pop.crit,html[lang=vi] html body .pop.crit.big{font-family:"Noto Sans",sans-serif !important;}
 html[lang=vi] .statb{font-family:"Noto Serif",serif !important;}
 html[lang=vi] details.bcard>summary small{font-family:"Noto Sans",sans-serif !important;}
+html[lang=vi] html body .pop{font-family:"Noto Sans",sans-serif !important;letter-spacing:normal;}
+html[lang=vi] #arena .pop{font-family:"Lilita One","Noto Sans",system-ui,sans-serif !important;font-weight:900;letter-spacing:.3px}

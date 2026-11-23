@@ -42,13 +42,35 @@ const unitIcon = (spr, size, pal, extra, mode) => { const lk = typeof HERO !== '
 // 顶栏的大数字缩写：十万以上写成「12.3万」，省地方
 const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); if (n >= 1e8) return `${Math.round(n / 1e7) / 10} tỉ`; const v = n >= 1000000 ? Math.round(n / 10000) : Math.round(n / 1000) / 10; return `${v} vạn`; };
 const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
-// 跳字：新数字放在头顶正中（主角的掉血在左、回血在右），同一列里还没散的往上挪一行，最多留三个；站在最上面一排的（首领常在后排），数字放低一点，不被出手条挡住
-function popPut(el, cls, html) {
+// 跳字（2026-11-24 第三版）：游戏体粗数字 + 粗描边（后面垫一层描边字，前面是本色／暴击金色渐变）；头上「爆」出来，弹一下就往上飘、半程淡出，0.7 秒左右；
+// 暴击从三倍大旋着砸下来，炸一圈金环、画面抖一下；同一个目标的数字按中、左、右三条道轮流冒；站在最上排的（首领常在后排）数字放到身体中部
+const POP_KF = {
+  n: [[0, 6, .4, 0, 0], [.1, -4, 1.35, 1, 0], [.2, -8, 1, 1, 0], [.5, -20, 1, 1, 0], [1, -52, .9, 0, 0]],
+  b: [[0, 6, .4, 0, 0], [.1, -4, 1.6, 1, 0], [.22, -8, 1, 1, 0], [.5, -22, 1, 1, 0], [1, -58, .9, 0, 0]],
+  c: [[0, 0, 3, 0, -14], [.07, -2, .85, 1, 5], [.14, -6, 1.18, 1, -2], [.22, -8, 1, 1, 0], [.58, -16, 1, 1, 0], [1, -62, .92, 0, 0]],
+  h: [[0, 0, .5, 0, 0], [.12, -4, 1.3, 1, 0], [.24, -6, 1, 1, 0], [.55, -16, 1, 1, 0], [1, -40, 1, 0, 0]],
+};
+const POP_MS = { n: 700, b: 800, c: 1000, h: 650 };
+const popSpd = () => ({ 1: 1, 2: 0.8, 3: 0.65 }[SAVE.speed] || 1);
+const popHTML = h => `<i class="o">${h}</i><b>${h}</b>`;
+function popPut(el, cls, html, kind) {
   if (!el) return null;
-  const side = / m[lr]\b/.exec(cls), sel = ':scope > .pop' + (side ? '.' + side[0].trim() : ':not(.ml):not(.mr):not(.move)');
-  const old = [...el.querySelectorAll(sel)]; old.forEach(q => { q.style.marginTop = ((parseFloat(q.style.marginTop) || 0) - 19) + 'px'; }); if (old.length >= 3) old[0].remove();
+  kind = kind || 'n';
+  const side = / m[lr]\b/.test(cls);
+  const old = [...el.querySelectorAll(':scope > .pop' + (side ? (/ ml\b/.test(cls) ? '.ml' : '.mr') : ':not(.ml):not(.mr):not(.move)'))]; if (old.length >= 4) old[0].remove();
   const now = performance.now(); if (!el._lowT || now - el._lowT > 1500) { el._lowT = now; const ar = document.getElementById('arena'); el._low = !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; }
-  const p = document.createElement('span'); p.className = cls + (el._low ? ' low' : ''); p.innerHTML = html; el.appendChild(p); setTimeout(() => p.remove(), 1150); return p;
+  const p = document.createElement('span'); p.className = cls + (el._low ? ' low' : ''); p.innerHTML = popHTML(html);
+  if (!side) { const x = [0, -18, 18][(el._lane = (el._lane || 0) + 1) % 3]; if (x) p.style.left = `calc(50% + ${x}px)`; }
+  el.appendChild(p);
+  const kf = POP_KF[kind] || POP_KF.n, dur = (POP_MS[kind] || 700) * popSpd();
+  if (p.animate) { const a = p.animate(kf.map(([o, y, sc, op, rt]) => ({ offset: o, transform: `translate(-50%,${y}px) scale(${sc})${rt ? ` rotate(${rt}deg)` : ''}`, opacity: op })), { duration: dur, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }); a.onfinish = () => p.remove(); }
+  else setTimeout(() => p.remove(), dur);
+  if (kind === 'c') {   // 暴击：身后炸一圈金环，画面抖一下
+    const r = document.createElement('i'); r.className = 'cburst' + (el._low ? ' low' : ''); if (p.style.left) r.style.left = p.style.left; el.appendChild(r);
+    if (r.animate) r.animate([{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.9)', opacity: 0 }], { duration: 360 * popSpd(), easing: 'ease-out' }).onfinish = () => r.remove(); else setTimeout(() => r.remove(), 400);
+    if (VFX.shakeNow) VFX.shakeNow(5);
+  }
+  return p;
 }
 const uK = u => u && u.side === 'p' && B && B.P ? hpK(B.P.lv) : 1;                       // 战斗里某个单位的显示倍数
 const chTitle = ch => CHAPTERS[ch - 1] ? `Chương ${CN[ch]} · ${CHAPTERS[ch - 1].n}` : "Ảo Cảnh Cửu U";   // 幻境用的是假章节号
@@ -1958,8 +1980,8 @@ function applyStep(o, anim) {
       if (!show) { if (anim && dmgN && SP < 3) { if (tu && tu.side === 'e') { if (tu.hp > 0) VFX.onHit(id, false); } else bump(el, 'hurt', 300); } }
       else if (dmgN || dot || c === 'heal') {
         const kk = id + '|' + (onHero && !ALL ? (c === 'heal' ? 'heal' : 'hurt') : dot ? 'dot' + c : c === 'heal' ? 'heal' : 'dmg');
-        const g = G.get(kk) || { id, el, tu, onHero, n: 0, v: 0, crit: false, tag: '', c, dot, heal: c === 'heal', ally: ALL && byAlly && tu && tu.side === 'e' };
-        g.v += +txt.replace(/\D/g, '') || 0; g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
+        const g = G.get(kk) || { id, el, tu, onHero, n: 0, v: 0, vals: [], crit: false, tag: '', c, dot, heal: c === 'heal', ally: ALL && byAlly && tu && tu.side === 'e' };
+        const vv = +txt.replace(/\D/g, '') || 0; g.v += vv; g.vals.push(vv); g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
         G.set(kk, g);
       } else TX.push({ el, txt, c, onHero });
       if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(1);
@@ -1978,13 +2000,18 @@ function applyStep(o, anim) {
       if (quiet) continue; nPop++;
       const heroSide = g.onHero && !ALL ? (g.heal ? ' mr' : ' ml') : '';
       const col = g.heal ? 'heal' : g.onHero && !ALL ? 'hurt' : g.dot ? g.c : g.crit ? 'crit' : REFL.has(g.tag) ? 'refl' : ALL ? (g.ally ? 'ally' : g.c) : '';
-      const num = fmtBig(g.v * uK(g.tu)), sign = g.heal ? '+' : g.onHero && !ALL || g.dot ? '-' : '';
-      const html = `${sign}${num}${g.crit ? '!' : ''}${g.n > 1 ? `<small>×${g.n}</small>` : ''}`;
+      const sign = g.heal ? '+' : g.onHero && !ALL || g.dot ? '-' : '', K = uK(g.tu);
+      const txtOf = (v, n) => `${sign}${fmtBig(v * K)}${g.crit ? '!' : ''}${n > 1 ? `<small>×${n}</small>` : ''}`;
+      const kind = g.onHero || g.dot ? 'h' : g.crit ? 'c' : big ? 'b' : 'n';
       const delay = o.jzz && !g.onHero ? ji++ * 60 * spdF() : 0;   // 金刚震：数字跟着金光一个个亮
-      const put = () => { popPut(g.el, `pop ${col}${big ? ' big' : ''}${g.dot ? ' dot' : ''}${heroSide}`, html); if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
+      const put = () => {
+        const multi = g.vals.length > 1 && !g.onHero && SP < 3, p = popPut(g.el, `pop ${col}${big ? ' big' : ''}${g.dot ? ' dot' : ''}${heroSide}`, multi ? txtOf(g.vals[0], 1) : txtOf(g.v, g.n), kind);
+        if (multi && p) { let acc = g.vals[0]; g.vals.slice(1).forEach((v, i) => setTimeout(() => { if (!p.isConnected) return; acc += v; p.innerHTML = popHTML(txtOf(acc, i + 2)); const bb = p.querySelector('b'); if (bb && bb.animate) bb.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 120 }); }, (i + 1) * 70 * popSpd()));   // 多段：数字原地往上滚
+        }
+        if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
       if (delay) setTimeout(put, delay); else put();
     }
-    for (const t of TX) popPut(t.el, `pop ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))));
+    for (const t of TX) popPut(t.el, `pop txt ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))), 'h');
     if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
     if (anim && actorU && actorU.kind === 'ally' && o.cast) {   // 伙伴出手：头顶冒招式名，身上亮一圈
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
