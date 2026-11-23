@@ -38,6 +38,8 @@ html[lang=vi] .combo span{font-size:15px}
 html[lang=vi] .arena .unit .tags,html[lang=vi] .arena.sv .unit .tags{flex-wrap:wrap;white-space:normal;row-gap:2px;overflow:visible}
 html[lang=vi] .hs-grid .skb2{white-space:normal;line-height:1.05;font-size:calc(10.5px * var(--fs,1));text-align:left;padding-right:4px;overflow:visible}
 html[lang=vi] .hs-grid .skb2 i{top:-6px;right:-4px;transform:none;font-size:10px;padding:0 4px;line-height:14px}
+html[lang=vi] .hsr b{width:7.4em;font-size:calc(11px * var(--fs,1))}
+html[lang=vi] .bc-sec .bc-h{width:4.6em}
 html[lang=vi] body{font-family:"Noto Sans",sans-serif !important;}
 html[lang=vi] h1,html[lang=vi] h2,html[lang=vi] h3,html[lang=vi] h4{font-family:"Noto Serif",serif !important;}
 html[lang=vi] .panel>h3 small,html[lang=vi] .tbr h3 small,html[lang=vi] .smith h4 small{font-family:"Noto Sans",sans-serif !important;}
@@ -145,3 +147,5 @@ html[lang=vi] .cpk-t b{font-family:"Noto Serif",serif !important;}
 html[lang=vi] .cpk-t b em{font-family:"Noto Sans",sans-serif !important;}
 html[lang=vi] .clstip b{font-family:"Noto Serif",serif !important;}
 html[lang=vi] .lgre-o b{font-family:"Noto Serif",serif !important;}
+html[lang=vi] html body .pop{font-family:"Noto Sans",sans-serif !important;letter-spacing:normal;}
+html[lang=vi] html body .pop.crit,html[lang=vi] html body .pop.crit.big{font-family:"Noto Sans",sans-serif !important;}

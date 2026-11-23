@@ -776,12 +776,29 @@ function sanState(cls) {
   if (!s.sanN) return `${C.n} đang mặc ${n} món thần binh, trên người và trong Túi Càn Khôn đều chưa có Vô Tướng Hoàn hay Vô Danh Giới.`;
   return `${C.n} đang mặc ${n} món thần binh: sát thương <b>+${Math.round(s.sanN * SAN_DMG * 100)}%</b>, sát thương phải nhận <b>-${Math.round(Math.min(SAN_DR_CAP, s.sanN * SAN_DR) * 1000) / 10}%</b>.`;
 }
-function sanCard(cls) {
+function sanModal(cls) {
   const owned = new Set(allItems().map(it => it.legend).filter(Boolean)), R = ['wuxiang', 'wuming'].map(id => LEGENDS.find(l => l.id === id));
-  return `<details class="wxinfo"><summary>Con đường thứ ba: đồ lẻ (không mặc Bộ)</summary>
-    <p class="help-p">Không mặc món Bộ nào, toàn thân đổi sang thần binh. Sống nhờ một cặp nhẫn: mỗi món thần binh đang mặc, mỗi chiếc nhẫn cho sát thương +${Math.round(SAN_DMG * 100)}%, sát thương phải nhận -${SAN_DR * 100}%. Mười món thần binh, hai chiếc nhẫn = sát thương +${Math.round(SAN_DMG * 2000)}%, chịu đòn -${SAN_DR * 2000}%. Yếu hơn Bộ 6 món một chút, đổi lại mười ô tùy bạn phối.</p>
-    ${R.map(X => `<div class="bc-line"><i class="${owned.has(X.id) || SAVE.cube[X.id] ? 'bc-ok' : 'bc-no'}">${owned.has(X.id) || SAVE.cube[X.id] ? '✓' : '✗'}</i><b class="r-legend">${X.n}</b><small>Nhẫn · ${owned.has(X.id) || SAVE.cube[X.id] ? "đã có" : "qua ải rồi thì đâu cũng rơi"}</small></div>`).join('')}
-    <p class="san-st">${sanState(cls)}</p></details>`;
+  return `<h2 class="mh">Đồ lẻ (không mặc Bộ)</h2>
+    <p class="help-p">Không mặc món Bộ nào, toàn thân đổi sang thần binh. Sống nhờ một cặp nhẫn: mỗi món thần binh đang mặc, mỗi chiếc nhẫn cho sát thương +${Math.round(SAN_DMG * 100)}%, sát thương phải nhận -${SAN_DR * 100}%. Mười món thần binh, hai chiếc nhẫn = sát thương +${Math.round(SAN_DMG * 2000)}%, sát thương phải nhận -${SAN_DR * 2000}%. Yếu hơn Bộ 6 món một chút, được cái không kén đồ.</p>
+    ${R.map(X => `<div class="bc-line"><i class="${owned.has(X.id) || SAVE.cube[X.id] ? 'bc-ok' : 'bc-no'}">${owned.has(X.id) || SAVE.cube[X.id] ? '✓' : '✗'}</i><b class="r-legend">${X.n}</b><small>Nhẫn · ${owned.has(X.id) || SAVE.cube[X.id] ? "đã có" : "qua ải rồi thì đâu cũng rơi"}</small><p>${X.d}</p></div>`).join('')}
+    <p class="san-st">${sanState(cls)}</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">Hiểu rồi</button></div>`;
+}
+// 流派推荐里点某一件：弹出效果和哪里掉（卡片上只留 ✓✗ 清单）
+function bcInfoModal(cls, arg) {
+  const [t, id, rn] = String(arg).split(':'), C = CLASSES[cls], ch = SAVE.chars[cls], owned = new Set(allItems().map(it => it.legend).filter(Boolean));
+  let h = '', d = '', src = '';
+  if (t === 'K') { const k = C.skills.find(x => x.id === id), R = RUNES[id] && rn ? RUNES[id][rn === 'a' ? 0 : 1] : null;
+    h = k.n + (R ? ' · ' + R.n : ''); d = k.d + (R ? `<br><b>Biến chiêu «${R.n}»</b>: ${R.d}` : ''); src = k.lv > ch.level ? `Học ở cấp ${k.lv}` : "Đã học"; }
+  else if (t === 'S') { const S = SETS.find(x => x.id === id), n = charStats(cls).setCount[id] || 0;
+    h = S.n; d = [['2', S.b2d], ['4', S.b4d], ['6', S.b6d]].filter(x => x[1]).map(x => `<b>${x[0]} món</b>: ${x[1]}`).join('<br>'); src = `Đã mặc ${n}/6 · rơi từ Ảo Cảnh tầng ${S.rlv || RSET_LV}`; }
+  else if (t === 'G') { const G = LGEMS[id], g = SAVE.lgems.find(x => x.t === id), inb = !!g && (ch.lgs || []).includes(g.id);
+    h = G.n; d = G.d(g ? g.lv : 1); src = g ? (inb ? `Đã gắn · cấp ${g.lv}` : "đã có, chưa đặt") : "yêu vương Ảo Cảnh rơi"; }
+  else { const X = LEGENDS.find(l => l.id === id); if (!X) return '';
+    h = X.n; d = X.d;
+    if (t === 'W') src = owned.has(id) ? "đã có" : `Binh phách ${SAVE.bp || 0}/${WPN_COST}, gom đủ thì tìm Trương Đại Chùy đúc`;
+    else if (t === 'C') { const has = !!SAVE.cube[id], inb = (ch.cube || []).includes(id); src = has ? (inb ? "Đã cho vào Túi Càn Khôn" : "Đã thu, chưa cho vào Túi Càn Khôn") : `rơi từ chương ${CN[X.ch || 1]}`; }
+    else { const open = slotOpen(X.slot); src = `${SLOT_NAME[X.slot]} · ${owned.has(id) ? "đã có" : open ? "rơi trong Ảo Cảnh" : `Ảo Cảnh tầng ${SLOTS.find(z => z.id === X.slot).rift} mở ${SLOT_NAME[X.slot]} rồi mới rơi`}`; } }
+  return `<h2 class="mh">${h}</h2><p class="help-p">${d}</p><p class="bc-src">${src}</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">Hiểu rồi</button></div>`;
 }
 function buildCard(cls) {
   const L = BUILDS[cls]; if (!L || !featureOn('rift')) return '';
@@ -789,27 +806,21 @@ function buildCard(cls) {
   let bi = ch.bld; if (bi == null) bi = (s.setCount[L[1].set] || 0) > (s.setCount[L[0].set] || 0) ? 1 : 0;
   const B = L[bi], S = SETS.find(x => x.id === B.set), owned = new Set(allItems().map(it => it.legend).filter(Boolean));
   const ok = v => v ? '<i class="bc-ok">✓</i>' : '<i class="bc-no">✗</i>';
+  const chip = (on, arg, txt) => `<span class="bc-bit ${on ? 'on' : ''}" data-act="bcinfo" data-arg="${arg}">${ok(on)}${txt}</span>`;
   const skRow = B.sk.map(([id, rn]) => { const k = C.skills.find(x => x.id === id), R = RUNES[id] && rn ? RUNES[id][rn === 'a' ? 0 : 1] : null, on = load.includes(id) && (!R || !featureOn('runes') || ch.runes[id] === rn);
-    return `<span class="bc-bit ${on ? 'on' : ''}">${ok(on)}${k.n}${R ? '·' + R.n : ''}${k.lv > ch.level ? `<small>cấp ${k.lv}</small>` : ''}</span>`; }).join('');
+    return chip(on, `K:${id}:${rn || ''}`, `${k.n}${R ? '·' + R.n : ''}${k.lv > ch.level ? `<small>cấp ${k.lv}</small>` : ''}`); }).join('');
   const nSet = s.setCount[S.id] || 0;
-  const legRow = B.leg.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = owned.has(lid), open = slotOpen(X.slot);
-    return `<div class="bc-line">${ok(has)}<b class="r-legend">${X.n}</b><small>${SLOT_NAME[X.slot]} · ${has ? "đã có" : open ? "rơi trong Ảo Cảnh" : `Ảo Cảnh tầng ${SLOTS.find(z => z.id === X.slot).rift} mở ${SLOT_NAME[X.slot]} rồi mới rơi`}</small><p>${X.d}</p></div>`; }).join('');
-  const WX0 = LEGENDS.find(l => l.w && l.set === B.set), hasW = WX0 && owned.has(WX0.id);
-  const wpnRow = WX0 ? `<div class="bc-line">${ok(hasW)}<b class="r-legend">${WX0.n}</b><small>${hasW ? "đã có" : `Binh phách ${SAVE.bp || 0}/${WPN_COST}, gom đủ thì tìm Trương Đại Chùy đúc`}</small><p>${WX0.d}</p></div>` : '';
-  const cubeRow = B.cube.map(lid => { const X = LEGENDS.find(l => l.id === lid), has = !!SAVE.cube[lid], inb = (ch.cube || []).includes(lid);
-    return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}${X.n}<small>${has ? (inb ? '' : "đã cất, chưa đặt") : `rơi từ chương ${CN[X.ch || 1]}`}</small></span>`; }).join('');
-  const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t), inb = !!g && (ch.lgs || []).includes(g.id);
-    return `<span class="bc-bit ${inb ? 'on' : ''}">${ok(inb)}<b style="color:${LGEMS[t].c}">${LGEMS[t].n}</b><small>${g ? (inb ? '' : "đã có, chưa đặt") : "yêu vương Ảo Cảnh rơi"}</small></span>`; }).join('');
-  return `<div class="bcard"><h4 class="sub-h">Gợi ý lối chơi <small>hai hướng sau khi phá đảo · không biết phối thế nào thì cứ theo đây</small></h4>
+  const legRow = B.leg.map(lid => chip(owned.has(lid), 'L:' + lid, LEGENDS.find(l => l.id === lid).n)).join('');
+  const WX0 = LEGENDS.find(l => l.w && l.set === B.set);
+  const cubeRow = B.cube.map(lid => chip((ch.cube || []).includes(lid), 'C:' + lid, LEGENDS.find(l => l.id === lid).n)).join('');
+  const gemRow = B.gems.map(t => { const g = SAVE.lgems.find(x => x.t === t); return chip(!!g && (ch.lgs || []).includes(g.id), 'G:' + t, LGEMS[t].n); }).join('');
+  const sec = (h, row) => `<div class="bc-sec"><span class="bc-h">${h}</span><div class="bc-bits">${row}</div></div>`;
+  return `<div class="bcard"><h4 class="sub-h">Gợi ý lối chơi</h4>
     <div class="seg sm">${L.map((X, i) => `<button class="${i === bi ? 'on' : ''}" data-act="bldpick" data-arg="${i}">${SETS.find(z => z.id === X.set).n}</button>`).join('')}</div>
-    <p class="help-p">${B.d}.</p>
-    <div class="bc-sec"><span class="bc-h">Chiêu</span><div class="bc-bits">${skRow}</div></div>
-    <div class="bc-sec"><span class="bc-h">Bộ</span><div class="bc-bits"><span class="bc-bit ${nSet >= 6 ? 'on' : ''}">${ok(nSet >= 6)}<b class="r-set">${S.n}</b><small>đã mặc ${nSet}/6 · rơi từ Ảo Cảnh tầng ${S.rlv || RSET_LV}</small></span></div></div>
-    <div class="bc-sec"><span class="bc-h">Binh khí</span><div>${wpnRow}</div></div>
-    <div class="bc-sec"><span class="bc-h">Thần binh</span><div>${legRow}</div></div>
-    ${featureOn('cube') ? `<div class="bc-sec"><span class="bc-h">Túi Càn Khôn</span><div class="bc-bits">${cubeRow}</div></div>` : ''}
-    <div class="bc-sec"><span class="bc-h">Linh ngọc</span><div class="bc-bits">${gemRow}</div></div>
-    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">Phối nhanh theo gợi ý (chiêu, biến chiêu, Túi Càn Khôn, linh ngọc)</button>${sanCard(cls)}</div>`;
+    <p class="help-p">${B.d}</p>
+    ${sec("Chiêu", skRow)}${sec("Bộ", chip(nSet >= 6, 'S:' + S.id, `${S.n}<small>${nSet}/6</small>`))}${WX0 ? sec("Binh khí", chip(owned.has(WX0.id), 'W:' + WX0.id, WX0.n)) : ''}${sec("Thần binh", legRow)}${featureOn('cube') ? sec("Túi Càn Khôn", cubeRow) : ''}${sec("Linh ngọc", gemRow)}
+    <button class="btn" style="width:100%;margin-top:8px" data-act="bldapply" data-arg="${bi}">Phối theo một chạm</button>
+    <div class="bc-san">Đồ lẻ (không mặc Bộ)<button class="qhelp sm" data-act="sanhelp" aria-label="Giải thích">?</button></div></div>`;
 }
 function mechCard(cls) {
   const M = CLS_MECH[cls], s = charStats(cls);
@@ -1217,6 +1228,7 @@ const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}<
       <p class="help-p">Chỉ dẫn “Manh mối”: chỉ cho biết đại khái ở vùng nào, đồ phải tự tìm; “Chi tiết”: đánh dấu thẳng vị trí.</p>
       </section><section class="panel"><h3>Hình ảnh</h3><div class="row"><button class="btn ghost" data-act="gfxq">Hiệu ứng: ${["Thấp (tiết kiệm pin)", "Vừa", "Cao"][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
       <button class="btn ghost" data-act="cine">Hoạt cảnh tất sát: ${SAVE.cineOff ? "tắt" : "gọn"}</button>
+      <button class="btn ghost" data-act="allnums">Số sát thương: ${SAVE.allNums ? "Hiện tất cả" : "Chỉ nhân vật chính"}</button>
       <button class="btn ghost" data-act="hdpx">Điểm ảnh: ${SAVE.hdOff ? "Cổ điển" : "Sắc nét"}</button></div>
       <p class="help-p">Điện thoại nóng, tốn pin thì chỉnh xuống “Thấp”: chế độ tiết kiệm pin — ít hạt hơn, bỏ khựng hình và quay chậm, các động tác chờ của nhân vật và cảnh dừng lại, bản đồ đứng yên thì vẽ ít khung hình hơn.</p></section>`;
 // ---------- 存档备份 ----------
@@ -1511,7 +1523,7 @@ function showRes() {
   el.innerHTML = BRES.win
     ? `<div class="res win"><h3>Thắng</h3><p>Kinh nghiệm +${BRES.xp}${BRES.cu ? `<small class="cu"> (đuổi cấp ×${cuTxt(BRES.cu)})</small>` : ''}${lvText} · Bạc +${BRES.gold}${extra ? " · " + extra : ''}</p>
        ${lootChips(BRES.items)}${gemChips(BRES.gems)}${zyChips(BRES.zy)}${BRES.items.length || BRES.gems.length || (BRES.zy && BRES.zy.length) ? '' : "<p class=\"sub\">Lần này không rơi trang bị</p>"}
-       ${BRES.stat ? `<details class="bstat-d"><summary>Thống kê trận này</summary>${statTable(BRES.stat)}</details>` : ''}
+       ${BRES.stat ? `<details class="bstat-d"><summary>Thống kê trận này</summary>${statHero(BRES.stat, BRES.hs)}</details>` : ''}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
     : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>Không trụ nổi</h3><p>Nó mạnh quá. Bàn tay cầm đao của bạn run lên —</p><button class="btn big" data-act="bcont">……</button></div>`
       : run.mode === 'rift' ? `<div class="res lose"><h3>Ngã xuống rồi</h3><p>Ảo Cảnh không lấy mạng bạn, chỉ lấy hương: bạn bị ném về lối vào, hương cháy mất một đoạn (ngã càng nhiều cháy càng nhiều). Bầy yêu vật vừa hạ bạn vẫn ở chỗ cũ.</p><button class="btn big" data-act="bcont">Đứng dậy</button></div>`
@@ -1590,7 +1602,7 @@ document.addEventListener('click', e => { if (STPOP && e.target.closest && e.tar
 function drawStPop() {
   const el = document.getElementById('stpop'); if (!el) return;
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
-  if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">Thống kê trận này</b><span class="stx">✕</span>${statTable(B.stat)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
+  if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">Thống kê trận này</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
   el.classList.remove('full'); el._h = '';
   const u = STPOP && B && B.units.find(x => x.id === STPOP.id), D = u && stDesc(u, STPOP.k);
   if (!D) { STPOP = null; el.hidden = true; return; }
@@ -1692,6 +1704,27 @@ const allyMoveName = (u, id) => id === 'blade2' ? ({ zhen: "Đao bộ khoái", k
 const skShort = n => /[\u4e00-\u9fff]/.test(n) ? n.slice(0, 2) : n.split(' ').slice(0, 2).join(' ');   // 招式条上的短名：中文取两个字，越南语取前两个词
 // 小队统计表（战斗里、结算、幻境一局）
 let STATOPEN = false;   // 统计改成画中画：战斗画面左下角「统计」，点开才有（每场默认收起）
+// 本场统计（2026-11-24）：主角详细——输出按来源、最高一击、暴击率；承伤分护体挡下／减伤挡掉／真正掉血；伙伴每人一行输出占比
+function statHero(st, hs) {
+  if (!hs) return statTable(st);
+  const rows = Object.values(st || {}), me = rows.find(r => r.cid === 'P'), tot = rows.reduce((a, r) => a + r.dmg, 0) || 1, f = v => fmtBig(Math.round(v || 0));
+  const bar = (n, pc, c) => `<div class="hsr"><b>${esc(n)}</b><span class="hsb"><i style="width:${Math.max(0, Math.min(100, pc))}%${c ? ';background:' + c : ''}"></i></span><em>${Math.round(pc)}%</em></div>`;
+  const src = Object.entries(hs.src || {}).sort((a, b) => b[1] - a[1]), sTot = src.reduce((a, x) => a + x[1], 0) || 1;
+  const top = src.slice(0, 5), rest = src.slice(5).reduce((a, x) => a + x[1], 0);
+  if (rest > 0) top.push(["Khác", rest]);
+  const myDmg = me ? me.dmg : sTot, raw = Math.max(hs.raw || 0, (hs.sh || 0) + (hs.hp || 0)), rT = raw || 1;
+  const mit = Math.max(0, raw - (hs.sh || 0) - (hs.hp || 0));
+  const others = rows.filter(r => r.cid !== 'P').sort((a, b) => b.dmg - a.dmg);
+  return `<div class="hsd">
+    <div class="hsh">Bạn · sát thương <b>${f(myDmg)}</b>${others.length ? `<small>chiếm ${Math.round(myDmg / tot * 100)}% cả đội</small>` : ''}</div>
+    ${top.length ? top.map(([k, v]) => bar(k, v / sTot * 100)).join('') : "<p class=\"sub\">Chưa ra tay.</p>"}
+    <div class="hsk"><span>Đòn cao nhất ${f(hs.max)}</span><span>Tỉ lệ bạo kích ${hs.n ? Math.round(hs.cr / hs.n * 100) : 0}%</span></div>
+    <div class="hsh">Chịu đòn · bị đánh ${hs.hitN || 0} lần, nhận vào ${f(raw)}</div>
+    ${raw ? bar("Hộ thể chặn", (hs.sh || 0) / rT * 100, '#e0c060') + bar("Giảm sát thương", mit / rT * 100, '#8fa8c8') + bar("Mất máu", (hs.hp || 0) / rT * 100, '#d8665a') : ''}
+    <div class="hsk"><span>Hồi máu ${f(hs.heal)}</span><span>Khống chế ${me ? me.ctrl || 0 : 0} lần</span></div>
+    ${others.length ? `<div class="hsh">Đồng hành · tỉ lệ sát thương</div>${others.map(r => bar(r.cid === 'Z' ? "Cương thi" : r.n.replace(/（.*）/, ''), r.dmg / tot * 100, '#7a9ab8')).join('')}` : ''}
+  </div>`;
+}
 function statTable(st, mini) {
   const rows = Object.values(st || {}); if (!rows.length) return "<p class=\"sub\">Chưa có dữ liệu.</p>";
   const ord = r => r.cid === 'P' ? 0 : r.cid === 'Z' ? 2 : 1; rows.sort((a, b) => ord(a) - ord(b) || b.dmg - a.dmg);
@@ -1878,27 +1911,37 @@ function applyStep(o, anim) {
     const basicId = actorU && actorU.kind === 'hero' ? (CLASSES[actorU.cls].skills.find(k => !k.cd) || {}).id : null;
     const isBasic = o.cast && basicId && o.cast.id === basicId;
     const SP = SAVE.speed || 1, reactN = new Set((o.react || []).map(R => R.n)), popIdx = {}, byAlly = actorU && (actorU.kind === 'ally' || actorU.kind === 'minion');
-    for (const [id, txt0, c, isSt] of o.pops) {
+    const ALL = !!SAVE.allNums;   // 设置里「伤害数字：全部显示」；默认只看主角
+    for (const [id, txt0, c, isSt, by] of o.pops) {
       const el = document.getElementById('u-' + id); if (!el) continue;
       const tu = B.units.find(u => u.id === id);
       // 少字：状态名已经挂在血条下面、连招名在顶上横幅里，不再在人头上飘一遍；反伤只留数字
       if (isSt || reactN.has(txt0)) continue;
       const txt = c === 'thorn' ? txt0.replace(/^\D+/, '') : txt0, dmgN = /^\d+$/.test(txt);
       if (SP >= 2 && /^-\d+$/.test(txt) && (c === 'burn' || c === 'poison')) { if (anim && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); } continue; }   // 快速时持续伤害不跳字，看血条
-      // 少跳字：2 倍速小伤害（不到一成血）不跳、4 倍速不到一成半不跳；同一时间场上最多五六个数字，挤不下的小数字就不跳了（暴击、大伤害照跳）
+      // 只看主角（默认）：妖物身上只跳主角打出来的数字；主角身上跳小号的掉血（红）、回血（绿）和格挡闪避；伙伴、僵尸身上不跳，只闪一下
+      const onHero = id === 'P', mine = by === 'P';
+      let cls2 = '';
+      if (!ALL) {
+        if (tu && tu.side === 'e') { if (!(mine && (dmgN || /^-\d+$/.test(txt)))) { if (anim && dmgN && tu.hp > 0 && SP < 3) VFX.onHit(id, false); continue; } }
+        else if (onHero) { if (dmgN || /^-\d+$/.test(txt)) cls2 = ' me-hurt'; else if (c === 'heal') cls2 = ' me-heal'; else if (txt === "Đỡ đòn" || txt === "Né tránh") cls2 = ' me-hurt'; else continue; }
+        else { if (anim && dmgN && SP < 3) bump(el, 'hurt', 300); continue; }
+      }
+      // 少跳字：全部显示时，快速下的小伤害不跳；只看主角时只在同一时间太挤时才省掉小数字（暴击、大伤害照跳）
       const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08, nPop = document.querySelectorAll('#arena .pop').length;
-      const quiet = dmgN && c !== 'crit' && c !== 'thorn' && tu && tu.maxHp && ((SP >= 3 && +txt / tu.maxHp < 0.15) || (SP >= 2 && +txt / tu.maxHp < 0.1) || (nPop >= (SP >= 2 ? 4 : 6) && !big));
-      const parts = anim && SP < 2 && isBasic && dmgN && +txt >= 6 ? (() => { const a = Math.round(+txt * 0.3), b2 = Math.round(+txt * 0.3); return [a, b2, +txt - a - b2]; })() : [txt];
-      const tier = v => { if (!dmgN || !tu || !tu.maxHp) return ''; const r = v / tu.maxHp; return r >= 0.22 ? ' big' : r >= 0.08 ? ' mid' : ''; };
+      const quiet = dmgN && c !== 'crit' && !onHero && tu && tu.maxHp && (ALL ? ((SP >= 3 && +txt / tu.maxHp < 0.15) || (SP >= 2 && +txt / tu.maxHp < 0.1) || (nPop >= (SP >= 2 ? 4 : 6) && !big)) : (nPop >= (SP >= 2 ? 5 : 7) && !big));
+      const parts = [txt];   // 一下就是一个数（原来普攻拆三段跳，看着乱）
+      const tier = v => { if (!dmgN || !tu || !tu.maxHp || onHero) return ''; const r = v / tu.maxHp; return r >= 0.08 ? ' big' : ''; };
       let pop = null, sum = 0;
       parts.forEach((v, k) => setTimeout(() => {
-        const last = k === parts.length - 1, cr = c === 'crit' && last;
+        const last = k === parts.length - 1, cr = c === 'crit' && last && !onHero;
         if (quiet) { if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e') && (SP < 3 || cr)) VFX.onHit(id, cr); return; }   // 3 倍速：不跳字的小伤害也不冒命中火花（暴击照冒）
-        if (!pop || !pop.isConnected) { const ix = popIdx[id] = (popIdx[id] || 0) + 1; pop = document.createElement('span'); pop.style.left = (36 + ((ix * 37) % 28)) + '%'; pop.style.marginTop = -((ix - 1) * 17) + 'px'; el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100 + parts.length * 90); }   // 同一次出手里一个比一个往上错开
+        if (!pop || !pop.isConnected) {   // 新数字在头顶正中，之前还没散的往上挪一行，排成一列；最多留三个
+          const old = [...el.querySelectorAll(':scope > .pop:not(.move)')]; old.forEach(q => { q.style.marginTop = ((parseFloat(q.style.marginTop) || 0) - 19) + 'px'; }); if (old.length >= 3) old[0].remove();
+          pop = document.createElement('span'); el.appendChild(pop); const pp = pop; setTimeout(() => pp.remove(), 1100); }
         sum += dmgN ? +v : 0;
-        pop.className = 'pop ' + c + tier(dmgN ? sum : 0) + (parts.length > 1 && !last ? ' tick' : '') + (parts.length > 1 && k > 0 ? ' re' : '') + (byAlly && dmgN && tu && tu.side === 'e' ? ' ally' : '');
-        pop.textContent = dmgN ? fmtBig(sum * uK(tu)) + (cr ? '!' : '') : String(v).replace(/\d+/, n => fmtBig(+n * uK(tu)));
-        if (parts.length > 1 && k > 0) { pop.style.animation = 'none'; void pop.offsetWidth; pop.style.animation = ''; }
+        pop.className = 'pop ' + (onHero && !ALL ? '' : c) + tier(dmgN ? sum : 0) + cls2 + (ALL && byAlly && dmgN && tu && tu.side === 'e' ? ' ally' : '');
+        pop.textContent = dmgN ? (onHero && !ALL ? '-' : '') + fmtBig(sum * uK(tu)) + (cr ? '!' : '') : String(v).replace(/\d+/, n => fmtBig(+n * uK(tu)));
         if (anim && dmgN && !(tu && tu.hp <= 0 && tu.side === 'e')) VFX.onHit(id, cr);
       }, k * 90 * spdF()));
       if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(parts.length);
@@ -1912,7 +1955,7 @@ function applyStep(o, anim) {
     if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
     if (anim && actorU && actorU.kind === 'ally' && o.cast) {   // 伙伴出手：头顶冒招式名，身上亮一圈
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
-      if (el && mv) { const t = document.createElement('span'); t.className = 'pop move'; t.textContent = mv; el.appendChild(t); setTimeout(() => t.remove(), 1000); bump(el, 'acting', 600); }
+      if (el && mv && SAVE.allNums) { const t = document.createElement('span'); t.className = 'pop move'; t.textContent = mv; el.appendChild(t); setTimeout(() => t.remove(), 1000); bump(el, 'acting', 600); }
     }
     if (anim && o.jzz) { VFX.onJinzhen(); SFX.play('react'); }
     if (anim && o.react) { o.react.forEach(R => VFX.onReact(R.id, R.n, (STATES[R.s] || {}).c || '#e8b0ff')); SFX.play('react'); if (!SAVE.flags.combo1) { SAVE.flags.combo1 = 1; setTimeout(() => toast(`Ra được liên chiêu “${o.react[0].n}”! Dùng chiêu mở đòn gây trạng thái cho địch trước, rồi đánh bằng chiêu kết đòn là có thêm hiệu ứng. Vào “Tu luyện · Võ học” xem cách phối hợp`), 600); } }
@@ -3296,7 +3339,7 @@ function endHTML() {
       <p>${tl > 0 ? `${boxOpen() ? r.upgPara ? "Linh ngọc đều tối đa · " : `Linh ngọc nâng cấp được <b>${r.upg}</b> lần · ` : ''}Hiện tối đa khiêu chiến được <b>${SAVE.riftCap}</b> tầng${SAVE.riftCap > (r.capBefore || 0) ? " (đã mở lên trên)" : ''}` : `Hương cháy hết rồi: tầng này không tính qua${boxOpen() ? ", linh ngọc chỉ nâng được 1 lần" : ''}`}</p>
       ${r.bp ? `<p class="newslot">Binh phách <b>+${r.bp}</b> (hiện ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? ", đủ đúc một binh khí chuyên thuộc rồi: tìm Trương Đại Chùy" : ''})</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">Mở ô trang bị mới: <b>${r.newSlots.map(p => SLOT_NAME[p]).join(", ")}</b>. Vào trang “Nhân vật” xem; loại trang bị này từ giờ sẽ rơi trong Ảo Cảnh.</p>` : ''}
-      ${r.stat ? `<details class="bstat-d"><summary>Thống kê ván này</summary>${statTable(r.stat)}</details>` : ''}
+      ${r.stat ? `<details class="bstat-d"><summary>Thống kê ván này</summary>${statHero(r.stat, r.hs)}</details>` : ''}
       ${r.record ? `<p class="evres">Kỷ lục mới của ${CLASSES[r.cls].n}: tầng ${r.riftLv} · ${r.world ? "mất " + fmtClock(r.clock || 0) : used + " lượt"}</p>` : ''}</div></div>`;
     if (boxOpen()) extra += `<div class="lgup"><h3>Linh ngọc</h3>${r.newGem ? `<p class="evres">Nhận linh ngọc mới: <b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${r.upgPara ? `<p class="evres">Linh ngọc đều đã đạt cấp ${LGEM_CAP}: ${r.upgPara.n} lượt nâng đổi thành kinh nghiệm Tu vi <b>+${fmtBig(r.upgPara.x)}</b>${r.upgPara.lv ? ` (Tu vi lên ${r.upgPara.lv} cấp)` : ''}</p>` : ''}
@@ -3743,6 +3786,8 @@ const ACT = {
   parareset: () => { resetPara(); toast("Đã hoàn lại điểm tu vi"); refresh(); },
   rune: a => { const [id, r] = split(a); setRune(ctxCls(), id, r); SFX.play('magic'); refresh(); },
   bldpick: i => { SAVE.chars[ctxCls()].bld = +i; refresh(); },
+  bcinfo: a => { const prev = MODALFN, h = bcInfoModal(ctxCls(), a); if (!h) return; openModal(() => h); BACK = prev; },
+  sanhelp: () => { const prev = MODALFN, c = ctxCls(); openModal(() => sanModal(c)); BACK = prev; },
   bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');
     toast(`Đã phối xong: mang ${r.sk} chiêu${r.miss ? ` (${r.miss} chiêu chưa học)` : ''}${r.cube ? `, Túi Càn Khôn đặt ${r.cube} món` : ''}${r.gems ? `, linh ngọc đặt ${r.gems} viên` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
@@ -3834,6 +3879,7 @@ const ACT = {
   joy: () => { SAVE.joy = !SAVE.joy; save(); render(); },
   gfxq: () => { SAVE.gfx = ((SAVE.gfx != null ? SAVE.gfx : 2) + 1) % 3; save(); if (SAVE.gfx !== 0 && document.getAnimations) document.getAnimations().forEach(a => { if (a.playState === 'paused') a.play(); }); refresh(); },
   cine: () => { SAVE.cineOff = !SAVE.cineOff; save(); refresh(); },
+  allnums: () => { SAVE.allNums = !SAVE.allNums; save(); refresh(); },
   hdpx: () => { SAVE.hdOff = !SAVE.hdOff; save(); render(); },
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`Lần này dẫn ${COMPANIONS[c].n} đi cùng: ${COMPANIONS[c].d}`); },
   speed: s => { SAVE.speed = Math.min(3, +s); VFX.setSpeed(+s); save(); document.querySelectorAll('#spdc [data-act=speed]').forEach(b => b.classList.toggle('on', b.dataset.arg === String(s))); schedule(); },

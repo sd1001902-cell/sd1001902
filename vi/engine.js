@@ -1896,7 +1896,7 @@ function heal(u, amt, out, quiet) {
   if (u.fmHeal) amt *= 1 + u.fmHeal / 100;   // 地载阵后排：受到的治疗加成
   if (u.side === 'e' && BNOW && wearyN(BNOW) > 0) return 0;   // 久战破绽：妖物回不了血了
   const a = Math.min(u.maxHp - u.hp, Math.round(amt));
-  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); if (u.side === 'p') stAdd(BNOW, stActor(BNOW), 'heal', a); }
+  if (a >= 1) { u.hp += a; if (!quiet) out.pops.push([u.id, '+' + popN(u, a), 'heal']); if (u.side === 'p') stAdd(BNOW, stActor(BNOW), 'heal', a); if (BNOW && u === BNOW.P) hsOf(BNOW).heal += a; }
   if (a >= 1 && u.kind === 'hero' && u.fx && u.fx.has('cBodhi') && BNOW) BNOW.units.filter(x => x.kind === 'ally' && x.hp > 0).forEach(x => { x.hp = Math.min(x.maxHp, x.hp + Math.round(x.maxHp * a / u.maxHp)); });   // 菩提子
   if (u.kind === 'hero' && u.fx && u.fx.has('daRi4')) {   // 大日如来：溢出的治疗攒成护体
     const over = Math.round(amt) - Math.max(0, a), cap = Math.round(u.maxHp * dariCap(u));
@@ -2005,6 +2005,10 @@ function stAddK(b, k, f, v) {
 const stAdd = (b, u, f, v) => stAddK(b, stKey(u), f, v);
 const stActor = b => b && b.curActor && b.curActor.side === 'p' ? b.curActor : b && b.P;   // 控制、治疗记在正在出手的那个人头上
 function mergeStat(into, st) { if (!st) return into; into = into || {}; for (const k in st) { const r = st[k], key = r.cid; const t = into[key] = into[key] || { n: r.n, cid: key, dmg: 0, ctrl: 0, heal: 0, shield: 0, taken: 0, guard: 0 }; for (const f of ['dmg', 'ctrl', 'heal', 'shield', 'taken', 'guard']) t[f] += r[f] || 0; } return into; }
+// 主角详细统计（2026-11-24）：输出按来源分、最高一击、暴击率；承伤分护体挡下／减伤挡掉／真正掉血；回了多少血
+const hsOf = b => b.hs || (b.hs = { src: {}, max: 0, n: 0, cr: 0, hitN: 0, raw: 0, sh: 0, hp: 0, heal: 0 });
+function hsDmg(b, k, v) { if (!b || !(v > 0)) return; const h = hsOf(b); h.src[k] = (h.src[k] || 0) + v; if (v > h.max) h.max = v; }
+function mergeHs(into, h) { if (!h) return into; into = into || { src: {}, max: 0, n: 0, cr: 0, hitN: 0, raw: 0, sh: 0, hp: 0, heal: 0 }; for (const k in h.src) into.src[k] = (into.src[k] || 0) + h.src[k]; into.max = Math.max(into.max, h.max || 0); for (const f of ['n', 'cr', 'hitN', 'raw', 'sh', 'hp', 'heal']) into[f] += h[f] || 0; return into; }
 function battleStep(b) {
   const out = { lines: [], pops: [], actor: null, cast: null };
   if (b.over) return out;
@@ -2034,7 +2038,8 @@ function act(b, u, out) {
   for (const k of ['burn', 'poison']) {
     const d = u.st[k]; if (!d) continue;
     const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
-    out.pops.push([u.id, '-' + popN(u, dmg), k]);
+    if (u.side === 'e' && (d.by || 'P') === 'P') hsDmg(b, "Sát thương duy trì", Math.min(dmg, dmg + Math.min(0, u.hp))); else if (u === b.P) { const h = hsOf(b); h.raw += dmg; h.hp += dmg; }
+    out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : '']);
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
     if (u.hp <= 0) { out.lines.push(`${u.name} ${k === 'burn' ? "bị thiêu" : "trúng độc"} chết`); return; }
   }
@@ -2769,6 +2774,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src === b.P && b.guiCast && b.castSk && !opt.proc) d *= 1.2;
   if (crit && src === b.P && fx.has('gReset') && !opt.proc && RNG.ch(0.1)) { const k2 = src.skills.find(k => k.left > 0 && !(b.castSk && b.castSk.id === k.id)); if (k2) { k2.left = 0; out.pops.push(['P', "Hồi phong", 'buff']); } }
   if (crit) { d *= ((src.critDmg || 150) + (src === b.P && fx && fx.has('cKiCrit') ? 10 * (b.kiSnap != null ? b.kiSnap : src.ki || 0) : 0)) / 100;   /* 夜行带：每点杀意暴伤 +10% */ if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; if (src === b.P) src.cbNext = true; }
+  const dRaw = tgt === b.P && src.side === 'e' ? d / ((tgt.st.chan ? 1 - CHAN_DR / 100 : 1) * (tgt.fmR ? 1 - tgt.fmR / 100 : 1) * (tgt.st.butui ? 0.5 : 1)) : 0;   // 主角统计：减伤之前打来多少
   if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1) * (tgt.st.tieArm ? 1.4 : 1)); }
   else d *= 1 - Math.max(0, Math.min(RES_SOFT[1], tgt.res || 0) - (tgt.st.melt ? 20 : 0)) / 100;
   if (tgt.st.liuDr && tgt.side === 'p' && src.side === 'e') d *= 1 - (b.liuDrV || 0.2);   // 刘师傅念经
@@ -2838,16 +2844,17 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     const K = b.units.find(x => x.cid === 'kang' && x.hp > 0 && x !== tgt && x.hp / x.maxHp > 0.25);   // 自己血不到四分之一就不挡了
     if (K) { const part = Math.round(d * (K.afl >= 10 ? 0.4 : 0.3)), own = Math.min(K.hp - 1, Math.round(part * 0.6));   // 挡下的那部分，康总管自己只吃六成（皮糙肉厚）
       if (part > 0 && own > 0) { K.hp -= own; d -= part; out.pops.push([K.id, popN(K, own), 'phys']); stAdd(b, K, 'guard', part); } } }
+  const hsT = tgt === b.P && src.side === 'e' ? hsOf(b) : null; if (hsT) { hsT.hitN++; hsT.raw += Math.max(d, dRaw); }
   const dPre = d, shieldThorns = tgt.shield > 0 && tgt.runes && tgt.runes.aegis === 'a';
   if (tgt.shield > 0) {
-    const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a; if (tgt.side === 'p') stAdd(b, tgt, 'shield', a);
+    const a = Math.min(tgt.shield, d); tgt.shield -= a; d -= a; if (tgt.side === 'p') stAdd(b, tgt, 'shield', a); if (hsT) hsT.sh += a;
     if (tgt === b.P && a > 0 && tgt.shield <= 0 && tgt.lgv && tgt.lgv.xuanjia != null && src.side === 'e' && (b.xjAt == null || (b.pr || 0) - b.xjAt >= 2)) {   // 玄甲玉：护体打碎炸开
-      b.xjAt = b.pr || 0; out.pops.push(['P', "Huyền Giáp", 'crit']); aliveOf(b, 'e').forEach(f => hit(b, tgt, f, LGV.xjBoom(tgt.lgv.xuanjia) / 100, 'holy', out, { proc: 1, aoe: 1, refl: 1 })); }
+      b.xjAt = b.pr || 0; out.pops.push(['P', "Huyền Giáp", 'crit']); aliveOf(b, 'e').forEach(f => hit(b, tgt, f, LGV.xjBoom(tgt.lgv.xuanjia) / 100, 'holy', out, { proc: 1, aoe: 1, refl: 1, tag: "Huyền Giáp Ngọc" })); }
     if (tgt === b.P && a > 0 && tgt.shield <= 0 && tfx && tfx.has('cTagang') && (b.tagang || 0) < 2) {   // 踏罡步：护体打光，冰冻全场
       b.tagang = (b.tagang || 0) + 1; out.lines.push("Đạp Cương Bộ: hộ thể vỡ, hàn khí cuốn qua cả sân"); aliveOf(b, 'e').forEach(f => freezeU(f, out, "Đóng băng")); }
     if (d <= 0) {
       out.pops.push([tgt.id, "Khiên", 'miss']);
-      if (shieldThorns && src.hp > 0) { const r = Math.round(dPre * 0.3); src.hp -= r; out.pops.push([src.id, "Phản thương" + r, 'thorn']); }
+      if (shieldThorns && src.hp > 0) { const r = Math.round(dPre * 0.3); src.hp -= r; out.pops.push([src.id, "Phản thương" + r, 'thorn', 0, tgt === b.P ? 'P' : '']); if (tgt === b.P) hsDmg(b, "Phản thương", r); }
       thornHit(b, tgt, src, out, opt);
       return 0;
     }
@@ -2855,7 +2862,9 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (tgt.kind === 'hero' && src.side === 'e' && !opt.noBlock && RNG.ch(0.12)) { d = Math.max(1, Math.round(d * 0.5)); out.pops.push([tgt.id, "Đỡ đòn", 'block']); }
   tgt.hp -= d;
   if (tgt.side === 'e') stAdd(b, src, 'dmg', d + Math.min(0, tgt.hp)); else stAdd(b, tgt, 'taken', d);
-  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem]);
+  if (hsT) hsT.hp += d;
+  else if (src === b.P && tgt.side === 'e') { hsDmg(b, opt.tag || (opt.ult ? "Tất sát" : !opt.proc && b.castSk ? b.castSk.n : "Hiệu ứng"), d + Math.min(0, tgt.hp)); if (!opt.proc && !opt.tag && !opt.ult) { const h = hsOf(b); h.n++; if (crit) h.cr++; } }
+  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem, 0, src === b.P ? 'P' : '']);
   if (tgt.side === 'e' && b.P && b.P.fx) {   // 职业神兵：打中之后
     const PF = b.P.fx;
     if (src === b.P && tgt.st.melt && PF.has('cMeltFury') && b.mfAt !== b.pr) { b.mfAt = b.pr; src.fury = Math.min(100, (src.fury || 0) + 4); }          // 嗜战刀鞘
@@ -2947,7 +2956,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       refl += r;
     }
     if (tgt.st.butui && tgt.runes && tgt.runes.butui === 'b') refl *= 2;
-    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, "Phản thương" + refl, 'thorn']); }
+    if (refl >= 1) { refl = Math.round(refl); src.hp -= refl; out.pops.push([src.id, "Phản thương" + refl, 'thorn', 0, tgt === b.P ? 'P' : '']); if (src === b.P) { const h = hsOf(b); h.raw += refl; h.hp += refl; } else if (tgt === b.P) hsDmg(b, "Phản thương", refl); }
     if (tfx && tfx.has('revenge') && src.hp > 0 && RNG.ch(0.3)) hit(b, tgt, src, 1, 'phys', out, { proc: 1 });
   }
   return d;
@@ -2968,7 +2977,7 @@ function thornHit(b, tgt, src, out, opt) {
   let K = (tgt.thornK || 0) + (chan && monk ? THORN_TAUNT : 0); if (K <= 0) return;
   if (lh4) K *= 2;
   K *= 1 + (tgt.thornDmg || 0) / 100;
-  const d = hit(b, tgt, src, K * f / 100, 'holy', out, { proc: 1, refl: 1 });
+  const d = hit(b, tgt, src, K * f / 100, 'holy', out, { proc: 1, refl: 1, tag: "Phản chấn" });
   if (!monk) return;
   if (real) {
     heal(tgt, tgt.maxHp * sustV(tgt, 'a') / 100, out, true);   // 金刚不坏：挨打反震回血
@@ -2986,7 +2995,7 @@ function thornHit(b, tgt, src, out, opt) {
 function jinZhen(b, P, K, out) {
   const tfx = P.fx, m = K / 100 * JZ_K * (tfx.has('wFumo') ? 1 + P.wpK : 1) * (tfx.has('cCounter') ? 1.3 : 1);
   out.jzz = 1; out.lines.push("Kim Cương Chấn! Phật quang quét qua cả sân");
-  aliveOf(b, 'e').forEach(f => { hit(b, P, f, m, 'holy', out, { proc: 1, aoe: 1, refl: 1 }); if (tfx.has('fumoBelt') && f.hp > 0 && RNG.ch(0.3)) freezeU(f, out, "Choáng"); });
+  aliveOf(b, 'e').forEach(f => { hit(b, P, f, m, 'holy', out, { proc: 1, aoe: 1, refl: 1, tag: "Kim Cương Chấn" }); if (tfx.has('fumoBelt') && f.hp > 0 && RNG.ch(0.3)) freezeU(f, out, "Choáng"); });
 }
 function resolveDeaths(b, out) {
   const run = b.run, P = b.P;
@@ -3049,8 +3058,8 @@ function dropItem(run, q, ilvl, mf) { return makeItem({ ilvl, rarity: rollRarity
 function finishBattle(b) {
   const run = b.run, s = runStats(run);
   run.hp = Math.max(0, Math.min(b.P.hp, s.maxHp));
-  const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null, stat: b.stat || null };
-  run.stat = mergeStat(run.stat, b.stat);
+  const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null, stat: b.stat || null, hs: b.hs || null };
+  run.stat = mergeStat(run.stat, b.stat); run.hs = mergeHs(run.hs, b.hs);
   if (!b.win) return res;
   const lv = SAVE.chars[run.cls].level, di = diffIdx(run), rw = run.mode === 'rift' && !!run.world, sw = !!run.world && !rw;   // rw：新幻境（一局要打上百只，单只的掉落和经验减半）
   DROP_LUCK = s.xLuck || 0; DROP_MF = s.mf || 0;

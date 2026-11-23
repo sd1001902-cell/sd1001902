@@ -725,7 +725,7 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;opa
 .ws-tbl>*>span:first-child{text-align:left;display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.ws-tbl .hd{color:var(--dim);background:#150f0c}.ws-tbl button{cursor:pointer}.ws-tbl .lo{color:#e8a23a}
 .ws-stash{max-height:190px;overflow-y:auto;margin-bottom:8px;border:1px dashed var(--line2);border-radius:6px;padding:4px}.svc-row.on{border-color:var(--gold2)}
 .wpn{border:1px solid #6a5a2a;border-radius:6px;padding:8px 10px;margin-top:8px;background:rgba(212,175,55,.05)}.wpn-h{display:flex;align-items:center;gap:8px}.wpn-h .nm{flex:1;min-width:0}.wpn-h small{display:block;color:var(--dim);font-size:calc(11px * var(--fs,1))}.wpn p{margin:5px 0 0;font-size:calc(12.5px * var(--fs,1));line-height:1.45}
-.san-st{margin:6px 0 0;font-size:calc(12.5px * var(--fs,1));color:#cdbb8a}.san-st b{color:#6fe27c}.san-st b.lo{color:#e8a23a}
+.bc-san{margin-top:8px;display:flex;align-items:center;gap:6px;font-size:calc(12.5px * var(--fs,1));color:var(--dim)}.bc-src{margin:4px 0 8px;color:#cdbb8a;font-size:calc(12.5px * var(--fs,1))}.bc-bit[data-act]{cursor:pointer}.bc-bit small{margin-left:2px}.san-st{margin:6px 0 0;font-size:calc(12.5px * var(--fs,1));color:#cdbb8a}.san-st b{color:#6fe27c}.san-st b.lo{color:#e8a23a}
 .skboost{margin-top:5px;padding:5px 7px;border-left:2px solid #6a5a2a;background:rgba(212,175,55,.05);font-size:calc(12px * var(--fs,1));line-height:1.45;color:var(--dim)}.skboost b{margin-right:5px}.skboost .tl{color:var(--gold2)}
 .gcur{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;margin-bottom:8px;border:1px dashed var(--line2);border-radius:4px;background:#110c0a}
 .gcur .linkish{display:inline-flex;align-items:center;gap:4px;flex:1;min-width:0}
@@ -1914,6 +1914,20 @@ html body .arena.sv .unit .sp{filter:none}
 html body .arena.sv .unit.st-burn .sp{animation:none!important;filter:sepia(.45) saturate(1.8) hue-rotate(-20deg) brightness(1.04)}
 #banner:not(.on),.flash:not(.on){display:none}
 body[data-view="battle"]::before{display:none}
+
+/* 2026-11-24 伤害数字统一：一种粗体数字、三档（普通／重击／暴击），固定在头顶正中往上叠；主角身上的掉血回血小一号 */
+html body .pop{left:50%;font:700 calc(17px * var(--fs,1))/1 "Noto Sans SC",system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:0;text-shadow:0 1px 0 #000,0 0 3px #000,0 0 6px rgba(0,0,0,.7)}
+html body .pop.big{font-size:calc(21px * var(--fs,1))}
+html body .pop.thorn{font-size:calc(17px * var(--fs,1));color:#fff2b0}
+html body .pop.crit,html body .pop.crit.big{font:700 calc(24px * var(--fs,1))/1 "Noto Sans SC",system-ui,sans-serif;color:#ffd23a;text-shadow:0 1px 0 #000,0 0 4px #000,0 0 8px rgba(255,120,30,.55)}
+html body .pop.crit::before{display:none}
+html body .pop.me-hurt{font-size:calc(13px * var(--fs,1));color:#ff7a6a;top:6%}
+html body .pop.me-heal{font-size:calc(13px * var(--fs,1));color:#6ee07a;top:6%}
+.hsd{font-size:calc(12px * var(--fs,1));margin-top:4px;text-align:left}
+.hsh{color:#e8c88a;margin:7px 0 3px;border-top:1px solid #3a2e24;padding-top:5px}.hsd .hsh:first-child{border-top:0;padding-top:0;margin-top:2px}.hsh b{color:#fff2d0;font-weight:700}.hsh small{color:var(--dim);margin-left:6px;font-size:calc(11px * var(--fs,1))}
+.hsr{display:flex;align-items:center;gap:6px;margin:3px 0}.hsr b{flex:none;width:4.6em;font-weight:400;color:#cdbb9a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hsr em{flex:none;width:2.6em;text-align:right;font-style:normal;font-variant-numeric:tabular-nums;color:#e8dcc8}
+.hsb{flex:1;height:7px;background:#3a2e24;border-radius:3px;overflow:hidden}.hsb i{display:block;height:100%;background:#c9a35a}
+.hsk{display:flex;justify-content:space-between;color:#b9a888;margin:4px 0 0;font-size:calc(11.5px * var(--fs,1))}
 </style>
 </head>
 <body>
