@@ -4,8 +4,10 @@ const SFX = (() => {
   let ctx = null, master = null, musicGain = null, musicNodes = null, last = {};
   let soundOn = true, musicOn = true;
   let mvol = 0.6;   // 音乐音量（0–1），设置里的滑条调这个
+  // 切到后台 / 锁屏：整个声音引擎停下（底音、混响都不再算），回来再接着放
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!ctx) return; try { if (document.hidden) ctx.suspend(); else if (soundOn || musicOn) ctx.resume(); } catch (e) {} });
   function ensure() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return ctx; }
+    if (ctx) { if (ctx.state === 'suspended' && !document.hidden) ctx.resume().catch(() => {}); return ctx; }
     try {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain(); master.gain.value = 0.5; master.connect(ctx.destination);
@@ -246,7 +248,7 @@ const SFX = (() => {
   let rev = null, wetIn = null, tm2 = [];
   function bus2() {
     if (rev) return; rev = ctx.createConvolver();
-    const sr = ctx.sampleRate, n = Math.floor(sr * 3.2), b = ctx.createBuffer(2, n, sr);
+    const sr = ctx.sampleRate, n = Math.floor(sr * 2.2), b = ctx.createBuffer(2, n, sr);   // 混响尾巴 3.2→2.2 秒：卷积一直在算，短一点省电
     for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.8) * Math.min(1, i / (sr * 0.015)); }
     rev.buffer = b; wetIn = ctx.createGain(); const lp = ctx.createBiquadFilter(), wo = ctx.createGain(); lp.type = 'lowpass'; lp.frequency.value = 3200; wo.gain.value = 0.5;
     wetIn.connect(rev); rev.connect(lp); lp.connect(wo); wo.connect(musicGain);

@@ -17,6 +17,7 @@ const VFX = (() => {
   let idleH = 0;
   function idleTick() {
     if (!arena || !document.body.contains(arena)) { clearInterval(idleH); return; }
+    if (typeof SAVE !== 'undefined' && SAVE && SAVE.gfx === 0) return;   // 特效「低」（省电）：待机呼吸不换图
     const t = performance.now();
     arena.querySelectorAll('.unit:not(.dead) .act').forEach(act => {
       if (isRig(act)) { const el = act.closest('.unit'); if (!el || el._busy > t) return; const p = act.dataset.pose; if (p !== 'idle' && p !== 'idle2') return;

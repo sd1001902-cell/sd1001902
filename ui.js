@@ -636,7 +636,7 @@ function gearTab() {
     const D = deltaMap(cls), up = {}; for (const it of SAVE.stash) { const d = D.get(it.id); if (!(d > 0)) continue; const ps = posFor(cls, it, gpos(it)); if (d > (up[ps] || 0)) up[ps] = d; }
     const nUp = Object.keys(up).length, eq = SAVE.chars[cls].eq;
     let doll = SLOTS.filter(sl => slotOpen(sl.id)).map(sl => { const it = eq[sl.id];
-      return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
+      return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${it ? `<span class="gnm r-${it.rarity}">${esc(it.name)}</span>` : ''}${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
     if (boxOpen()) { const nb = boxOf(cls).filter(Boolean).length;
       doll += `<button class="gsb box ${nb ? 'b-legend' : 'empty'}" data-act="gsl" data-arg="box"><span class="gi">${SPR.img('gem', 30, { G: '#ffb02a' }, nb ? 'glow' : '')}</span><span class="gn">灵玉匣 ${nb}/${BOX_SLOTS}</span></button>`
         + SLOTS.filter(sl => sl.rift && !slotOpen(sl.id)).map(sl => `<div class="gsb locked"><span class="gi"><i>锁</i></span><span class="gn">${sl.n}</span><small>幻境 ${sl.rift} 层</small></div>`).join(''); }
@@ -944,6 +944,13 @@ function playPrologue() {
     ['narr', '（在最上面选一个职业，再点「出发」开始第一章）'],
   ], null), 400);
 }
+// 特效「低」（省电）：把一直循环的装饰动画（呼吸、飘动、火苗……）停在第一帧，打击、飘字这些一次性的照放
+let FXSW = 0;
+function fxSweep() {
+  clearTimeout(FXSW); if (SAVE.gfx !== 0 || !document.getAnimations) return;
+  try { for (const a of document.getAnimations()) { const T = a.effect && a.effect.getTiming && a.effect.getTiming(); const el = a.effect.target; if (T && T.iterations === Infinity && a.playState === 'running' && !(el && el.closest && el.closest('.snowsc'))) a.pause(); } } catch (e) {}
+  FXSW = setTimeout(fxSweep, 1500);
+}
 // ---------- 序 · 雪夜：三百年前，送饭的少年阿土在山道上救了一只白狐（第一章开场前播一次，江湖录·纪录里能重看）----------
 const SNOW_BEATS = [
   { c: 'b1', t: '三百年前 · 冬', lines: [['', '那年的雪，下了整整七天。']] },
@@ -1017,10 +1024,10 @@ const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${l
       <button class="btn ghost" data-act="fs">字号：${({ 0.9: '小', 1: '标准', 1.15: '大', 1.3: '特大' })[SAVE.fs || 1] || '标准'}</button>
       <button class="btn ghost" data-act="guide">任务指引：${SAVE.guide === 'full' ? '详细' : '线索'}</button></div>
       <p class="help-p">任务指引「线索」：只告诉你大概在哪一带，东西要自己找；「详细」：直接标出位置。</p>
-      </section><section class="panel"><h3>画面</h3><div class="row"><button class="btn ghost" data-act="gfxq">特效：${['低', '中', '高'][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
+      </section><section class="panel"><h3>画面</h3><div class="row"><button class="btn ghost" data-act="gfxq">特效：${['低（省电）', '中', '高'][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
       <button class="btn ghost" data-act="cine">必杀动画：${SAVE.cineOff ? '关闭' : '简洁'}</button>
       <button class="btn ghost" data-act="hdpx">像素：${SAVE.hdOff ? '经典' : '高清'}</button></div>
-      <p class="help-p">手机发烫或卡顿时把特效调到「低」：粒子减少，不再顿帧、慢镜。</p></section>`;
+      <p class="help-p">手机发烫、耗电快就调到「低」：省电模式——粒子少、不顿帧不慢镜，人物和场景的待机小动画停下，地图静止时少画几帧。</p></section>`;
 // ---------- 存档备份 ----------
 const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
 const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} ${b.lv} 级 · ${b.ended ? '已通关全部十章' : `已通关 ${b.cleared} 章`} · 银两 ${b.gold}`;
@@ -1495,7 +1502,11 @@ function statMini(st) {
   return `<div class="smr smh"><span></span><span>输出占比</span><span></span><span>控</span><span>疗</span><span>伤</span></div>${rows.map(r => { const pc = Math.round(r.dmg / tot * 100);
     return `<div class="smr"><span>${esc(r.cid === 'P' ? '你' : r.n.replace(/（.*）/, ''))}</span><span class="smb"><i style="width:${pc}%"></i></span><span>${pc}%</span><span>${r.ctrl || '—'}</span><span>${f(r.heal)}</span><span>${f(r.taken)}</span></div>`; }).join('')}`;
 }
-function updStat() { const el = document.getElementById('bstatp'); if (!el || !B) return; el.innerHTML = statMini(B.stat); }
+let STATT = 0, STATQ = 0;
+function updStat() {   // 统计框半秒刷一次就够（原来每一步都整块重写，一直在逼页面重排）
+  const go = () => { STATQ = 0; STATT = performance.now(); const el = document.getElementById('bstatp'); if (!el || !B) return; const h = statMini(B.stat); if (el._h !== h) { el._h = h; el.innerHTML = h; } };
+  const w = 450 - (performance.now() - STATT); if (w <= 0) return go(); if (!STATQ) STATQ = setTimeout(go, w);
+}
 function updBattle(o, anim) {
   if (STATOPEN) updStat();
   if (!B) return;
@@ -1694,6 +1705,7 @@ function battleContinue() {
 
 
 // ---------- 大地图 ----------
+let WGEN = 0, WDRAWT = 0, WF = 1, WMOVING = false;   // 地图重画：代数、上一帧时间、这一帧相当于几个 60 帧、这一帧有没有东西在动
 let WALK = null, WAUTO = false, WAUTOZ = null, WKEY = null, WLOOP = 0, WCAM = null, WHERO = null, WMONP = {}, WTAP = null, WTRK = false, JOY = null, WGOAL = null, WPART = [], WTRAIL = [];
 const WTS = () => (window.innerWidth < 700 ? 42 : 52), W_STEP = 150;
 const wch = () => SAVE.run.chapter;
@@ -1754,8 +1766,11 @@ function wSetup() {
   if (!WHERO || WHERO.ch !== wch() || WHERO.sc !== S.sc) { WHERO = { ch: wch(), sc: S.sc, x: S.pos.x, y: S.pos.y, flip: false, t: 0 }; WMONP = {}; WCAM = null; WPART = []; WTRAIL = []; }
   WHERO.x = S.pos.x; WHERO.y = S.pos.y;
   if (!WCAM) WCAM = { x: S.pos.x, y: S.pos.y };
-  cancelAnimationFrame(WLOOP);
-  const loop = t => { if (VIEW !== 'world' || !$('#wcv') || !SAVE.run || !SAVE.run.world) return; wDraw(cv, dpr, ts, t); WLOOP = requestAnimationFrame(loop); };
+  cancelAnimationFrame(WLOOP); clearTimeout(WLOOP); const gen = ++WGEN; WDRAWT = 0;
+  // 省电：有东西在动（走路、镜头、妖物挪步、点地涟漪）才 60 帧；静止时约 20 帧，只剩火光、呼吸这些小动静
+  const loop = t => { if (gen !== WGEN || VIEW !== 'world' || !$('#wcv') || !SAVE.run || !SAVE.run.world) return; wDraw(cv, dpr, ts, t);
+    const mv = WMOVING || WALK || JOY, low = SAVE.gfx === 0;   // 特效「低」= 省电：走路 30 帧，静止 8 帧
+    if (mv && !low) WLOOP = requestAnimationFrame(loop); else WLOOP = setTimeout(() => { if (gen === WGEN) WLOOP = requestAnimationFrame(loop); }, mv ? 22 : low ? 120 : 38); };
   WLOOP = requestAnimationFrame(loop);
   cv.onpointerdown = e => { const r = cv.getBoundingClientRect(); wTap(e.clientX - r.left, e.clientY - r.top, cv, ts); };
   if (SAVE.joy) wJoySetup();
@@ -1859,7 +1874,9 @@ function wDraw(cv, dpr, ts, t) {
   // 匀速滑到下一格（不再一格一跳）
   if (WHERO.mv) { const k = Math.min(1, (t - WHERO.mv.t0) / WHERO.mv.d); WHERO.x = WHERO.mv.fx + (S.pos.x - WHERO.mv.fx) * k; WHERO.y = WHERO.mv.fy + (S.pos.y - WHERO.mv.fy) * k; WHERO.dist = (WHERO.mv.dist0 || 0) + k; if (k >= 1 && !WALK) WHERO.mv = null; }
   else { WHERO.x = S.pos.x; WHERO.y = S.pos.y; }
-  WCAM.x += (WHERO.x - WCAM.x) * 0.2; WCAM.y += (WHERO.y - WCAM.y) * 0.2;
+  WF = WDRAWT ? Math.min(4, Math.max(0.25, (t - WDRAWT) / 16.67)) : 1; WDRAWT = t;   // 跟帧率无关：慢帧时一步走得多一点
+  { const k = 1 - Math.pow(0.8, WF); WCAM.x += (WHERO.x - WCAM.x) * k; WCAM.y += (WHERO.y - WCAM.y) * k; }
+  WMOVING = !!WHERO.mv || Math.abs(WHERO.x - WCAM.x) + Math.abs(WHERO.y - WCAM.y) > 0.02 || !!(WTAP && t - WTAP.t < 450);
   // 小场景居中，不跟镜头
   const cxm = m.W * ts <= Wp ? (m.W - 1) / 2 : Math.max((Wp / ts - 1) / 2, Math.min(m.W - (Wp / ts + 1) / 2, WCAM.x));
   const cym = m.H * ts <= Hp ? (m.H - 1) / 2 : Math.max((Hp / ts - 1) / 2, Math.min(m.H - (Hp / ts + 1) / 2, WCAM.y));
@@ -1986,7 +2003,7 @@ function wDraw(cv, dpr, ts, t) {
     const d2 = (mn.x - S.pos.x) ** 2 + (mn.y - S.pos.y) ** 2;
     if (!(wInSight(ch, mn.x, mn.y) || (bell && d2 <= W_BELL * W_BELL) || (mn.tag === 'walker' && bell))) continue;
     const P0 = WMONP[mn.id] || (WMONP[mn.id] = { x: mn.x, y: mn.y });
-    P0.x += (mn.x - P0.x) * 0.18; P0.y += (mn.y - P0.y) * 0.18;
+    { const k = 1 - Math.pow(0.82, WF); P0.x += (mn.x - P0.x) * k; P0.y += (mn.y - P0.y) * k; if (Math.abs(mn.x - P0.x) + Math.abs(mn.y - P0.y) > 0.02) WMOVING = true; }
     const C0 = CHAPTERS[(mn.c || ch) - 1] || CHAPTERS[0], def = mn.boss ? C0.boss : (C0.mons[mn.m] || {}), px = ox + P0.x * ts, py = oy + P0.y * ts;
     const size = mn.boss ? ts * 1.7 : mn.big ? ts * 1.35 : mn.rare ? ts * 1.3 : mn.elite ? ts * 1.15 : ts * 0.95, bob = mn.beh === 'sleep' ? 0 : Math.sin(t / 220 + mn.x) * 2;
     if (mn.elite || mn.boss) { g.fillStyle = mn.boss ? `rgba(255,50,40,${0.3 + 0.15 * pulse})` : mn.rare ? 'rgba(190,120,255,.35)' : 'rgba(255,120,40,.25)'; g.beginPath(); g.ellipse(px + ts / 2, py + ts * 0.85, ts * (mn.boss ? 0.8 : 0.5), ts * (mn.boss ? 0.28 : 0.18), 0, 0, 7); g.fill(); }
@@ -2009,7 +2026,7 @@ function wDraw(cv, dpr, ts, t) {
   const fol = [S.flags.ngocFollow ? ['ngoc'] : null, S.flags.zhenFollow ? ['constable'] : null, S.flags.escort ? [(SPEAKERS[S.flags.escort] || {}).spr || 'villager', (SPEAKERS[S.flags.escort] || {}).pal] : null].filter(Boolean);
   fol.forEach((f, i) => { const tp = WTRAIL[i + 1] || WTRAIL[WTRAIL.length - 1] || { x: S.pos.x - 0.6 * (i + 1), y: S.pos.y + 0.1 };
     f.p = f.p || { x: tp.x, y: tp.y }; const k2 = 'f' + i; const Pq = WMONP[k2] || (WMONP[k2] = { x: tp.x, y: tp.y, d: 0 });
-    const dx = (tp.x - Pq.x) * 0.16, dy = (tp.y - Pq.y) * 0.16, mv = Math.hypot(dx, dy); Pq.x += dx; Pq.y += dy; Pq.d = (Pq.d || 0) + mv;
+    const kf = 1 - Math.pow(0.84, WF), dx = (tp.x - Pq.x) * kf, dy = (tp.y - Pq.y) * kf, mv = Math.hypot(dx, dy); Pq.x += dx; Pq.y += dy; Pq.d = (Pq.d || 0) + mv; if (mv > 0.004) WMOVING = true;
     if (Math.abs(dx) > 0.01) Pq.flip = dx < 0;
     const flk = typeof HERO !== 'undefined' && HERO.lookOf(f[0]);
     if (flk) { const c2 = HERO.cv(flk, mv > 0.004 ? 'w' + (Math.floor(Pq.d * 2.5) % 4) : Math.floor((t + i * 300) / 600) % 2 ? 'idle2' : 'idle', HERO.mapPal(flk, f[1])), u = ts * 1.0 / 30, fx = ox + (Pq.x + 0.5) * ts, fy = oy + (Pq.y + 0.85) * ts;
@@ -2033,7 +2050,7 @@ function wDraw(cv, dpr, ts, t) {
     g.restore(); }
   // 天气
   wCrowd(g, ch, m, S, ox, oy, ts, t, spr);
-  wWeather(g, T.wx, Wp, Hp, t);
+  if (SAVE.gfx !== 0) wWeather(g, T.wx, Wp, Hp, t);
   // 迷雾
   if (!m.def.lit) { const fog = wFogCanvas(ch); g.imageSmoothingEnabled = true; g.drawImage(fog, ox - ts / 2, oy - ts / 2, (m.W + 1) * ts, (m.H + 1) * ts); g.imageSmoothingEnabled = false; }
   else { g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 0, Wp, oy); g.fillRect(0, oy + m.H * ts, Wp, Hp); }
@@ -2058,16 +2075,16 @@ function wWeather(g, wx, W, H, t) {
   const N = { fog: 7, wisp: 14, ember: 26, dust: 22, drip: 14, leaf: 12, snow: 40, ash: 24, spore: 18, petal: 14 }[wx] || 0;
   while (WPART.length < N) WPART.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random(), p: Math.random() * 6.28 });
   for (const P of WPART) {
-    if (wx === 'fog') { P.x += 0.15 + P.s * 0.2; if (P.x > W + 150) P.x = -150; const r = 90 + P.s * 90; const gr = g.createRadialGradient(P.x, P.y, 0, P.x, P.y, r); gr.addColorStop(0, 'rgba(180,170,160,.08)'); gr.addColorStop(1, 'rgba(180,170,160,0)'); g.fillStyle = gr; g.fillRect(P.x - r, P.y - r, r * 2, r * 2); }
-    else if (wx === 'wisp') { P.y -= 0.15 + P.s * 0.2; P.x += Math.sin(t / 900 + P.p) * 0.3; if (P.y < -10) { P.y = H + 10; P.x = Math.random() * W; } const a = 0.35 + 0.3 * Math.sin(t / 400 + P.p); g.fillStyle = `rgba(110,240,180,${a * 0.25})`; g.beginPath(); g.arc(P.x, P.y, 6 + P.s * 4, 0, 7); g.fill(); g.fillStyle = `rgba(190,255,220,${a})`; g.beginPath(); g.arc(P.x, P.y, 1.6 + P.s, 0, 7); g.fill(); }
-    else if (wx === 'ember') { P.y -= 0.4 + P.s * 0.6; P.x += Math.sin(t / 500 + P.p) * 0.4; if (P.y < -5) { P.y = H + 5; P.x = Math.random() * W; } g.fillStyle = `rgba(255,${120 + P.s * 80 | 0},40,${0.4 + 0.4 * P.s})`; g.fillRect(P.x, P.y, 2, 2); }
-    else if (wx === 'dust') { P.y += Math.sin(t / 1300 + P.p) * 0.08; P.x += 0.06 + P.s * 0.05; if (P.x > W + 5) P.x = -5; g.fillStyle = `rgba(255,230,180,${0.12 + 0.15 * P.s})`; g.fillRect(P.x, P.y, 1.5, 1.5); }
-    else if (wx === 'snow') { P.y += 0.5 + P.s * 0.8; P.x += Math.sin(t / 800 + P.p) * 0.5 - 0.2; if (P.y > H + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = `rgba(240,248,255,${0.5 + 0.4 * P.s})`; g.fillRect(P.x, P.y, 2 + P.s, 2 + P.s); }
-    else if (wx === 'ash') { P.y += 0.25 + P.s * 0.3; P.x += Math.sin(t / 900 + P.p) * 0.4; if (P.y > H + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = `rgba(90,80,80,${0.4 + 0.3 * P.s})`; g.fillRect(P.x, P.y, 2, 2); }
-    else if (wx === 'spore') { P.y -= 0.12 + P.s * 0.15; P.x += Math.sin(t / 700 + P.p) * 0.35; if (P.y < -5) { P.y = H + 5; P.x = Math.random() * W; } g.fillStyle = `rgba(170,230,90,${0.25 + 0.3 * Math.sin(t / 300 + P.p) ** 2})`; g.beginPath(); g.arc(P.x, P.y, 1.5 + P.s * 1.5, 0, 7); g.fill(); }
-    else if (wx === 'petal') { P.y += 0.35 + P.s * 0.3; P.x += 0.3 + Math.sin(t / 600 + P.p) * 0.6; if (P.y > H + 5 || P.x > W + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = P.s > 0.5 ? 'rgba(255,190,210,.7)' : 'rgba(255,240,245,.6)'; g.fillRect(P.x, P.y, 3, 2); }
-    else if (wx === 'drip') { P.y += 2 + P.s * 2; if (P.y > H) { P.y = -20; P.x = Math.random() * W; } g.fillStyle = 'rgba(140,200,220,.35)'; g.fillRect(P.x, P.y, 1, 6); }
-    else if (wx === 'leaf') { P.y += 0.3 + P.s * 0.3; P.x += 0.4 + Math.sin(t / 700 + P.p) * 0.5; if (P.y > H + 5 || P.x > W + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = P.s > 0.5 ? 'rgba(200,120,50,.6)' : 'rgba(140,170,70,.5)'; g.fillRect(P.x, P.y, 3, 2); }
+    if (wx === 'fog') { P.x += WF * (0.15 + P.s * 0.2); if (P.x > W + 150) P.x = -150; const r = 90 + P.s * 90; const gr = g.createRadialGradient(P.x, P.y, 0, P.x, P.y, r); gr.addColorStop(0, 'rgba(180,170,160,.08)'); gr.addColorStop(1, 'rgba(180,170,160,0)'); g.fillStyle = gr; g.fillRect(P.x - r, P.y - r, r * 2, r * 2); }
+    else if (wx === 'wisp') { P.y -= WF * (0.15 + P.s * 0.2); P.x += WF * (Math.sin(t / 900 + P.p) * 0.3); if (P.y < -10) { P.y = H + 10; P.x = Math.random() * W; } const a = 0.35 + 0.3 * Math.sin(t / 400 + P.p); g.fillStyle = `rgba(110,240,180,${a * 0.25})`; g.beginPath(); g.arc(P.x, P.y, 6 + P.s * 4, 0, 7); g.fill(); g.fillStyle = `rgba(190,255,220,${a})`; g.beginPath(); g.arc(P.x, P.y, 1.6 + P.s, 0, 7); g.fill(); }
+    else if (wx === 'ember') { P.y -= WF * (0.4 + P.s * 0.6); P.x += WF * (Math.sin(t / 500 + P.p) * 0.4); if (P.y < -5) { P.y = H + 5; P.x = Math.random() * W; } g.fillStyle = `rgba(255,${120 + P.s * 80 | 0},40,${0.4 + 0.4 * P.s})`; g.fillRect(P.x, P.y, 2, 2); }
+    else if (wx === 'dust') { P.y += WF * (Math.sin(t / 1300 + P.p) * 0.08); P.x += WF * (0.06 + P.s * 0.05); if (P.x > W + 5) P.x = -5; g.fillStyle = `rgba(255,230,180,${0.12 + 0.15 * P.s})`; g.fillRect(P.x, P.y, 1.5, 1.5); }
+    else if (wx === 'snow') { P.y += WF * (0.5 + P.s * 0.8); P.x += WF * (Math.sin(t / 800 + P.p) * 0.5 - 0.2); if (P.y > H + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = `rgba(240,248,255,${0.5 + 0.4 * P.s})`; g.fillRect(P.x, P.y, 2 + P.s, 2 + P.s); }
+    else if (wx === 'ash') { P.y += WF * (0.25 + P.s * 0.3); P.x += WF * (Math.sin(t / 900 + P.p) * 0.4); if (P.y > H + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = `rgba(90,80,80,${0.4 + 0.3 * P.s})`; g.fillRect(P.x, P.y, 2, 2); }
+    else if (wx === 'spore') { P.y -= WF * (0.12 + P.s * 0.15); P.x += WF * (Math.sin(t / 700 + P.p) * 0.35); if (P.y < -5) { P.y = H + 5; P.x = Math.random() * W; } g.fillStyle = `rgba(170,230,90,${0.25 + 0.3 * Math.sin(t / 300 + P.p) ** 2})`; g.beginPath(); g.arc(P.x, P.y, 1.5 + P.s * 1.5, 0, 7); g.fill(); }
+    else if (wx === 'petal') { P.y += WF * (0.35 + P.s * 0.3); P.x += WF * (0.3 + Math.sin(t / 600 + P.p) * 0.6); if (P.y > H + 5 || P.x > W + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = P.s > 0.5 ? 'rgba(255,190,210,.7)' : 'rgba(255,240,245,.6)'; g.fillRect(P.x, P.y, 3, 2); }
+    else if (wx === 'drip') { P.y += WF * (2 + P.s * 2); if (P.y > H) { P.y = -20; P.x = Math.random() * W; } g.fillStyle = 'rgba(140,200,220,.35)'; g.fillRect(P.x, P.y, 1, 6); }
+    else if (wx === 'leaf') { P.y += WF * (0.3 + P.s * 0.3); P.x += WF * (0.4 + Math.sin(t / 700 + P.p) * 0.5); if (P.y > H + 5 || P.x > W + 5) { P.y = -5; P.x = Math.random() * W; } g.fillStyle = P.s > 0.5 ? 'rgba(200,120,50,.6)' : 'rgba(140,170,70,.5)'; g.fillRect(P.x, P.y, 3, 2); }
   }
 }
 function shade(hex, d) { const n = parseInt(hex.slice(1), 16); const c = k => Math.max(0, Math.min(255, ((n >> k) & 255) + d)); return `rgb(${c(16)},${c(8)},${c(0)})`; }
@@ -3462,7 +3479,7 @@ const ACT = {
   fs: () => { const o = [0.9, 1, 1.15, 1.3]; SAVE.fs = o[(o.indexOf(SAVE.fs || 1) + 1) % o.length]; applyFs(); save(); refresh(); },
   guide: () => { SAVE.guide = SAVE.guide === 'full' ? 'clue' : 'full'; save(); refresh(); toast(SAVE.guide === 'full' ? '任务指引：详细（直接标出目标位置）' : '任务指引：线索（只告诉大概在哪一带）'); },
   joy: () => { SAVE.joy = !SAVE.joy; save(); render(); },
-  gfxq: () => { SAVE.gfx = ((SAVE.gfx != null ? SAVE.gfx : 2) + 1) % 3; save(); refresh(); },
+  gfxq: () => { SAVE.gfx = ((SAVE.gfx != null ? SAVE.gfx : 2) + 1) % 3; save(); if (SAVE.gfx !== 0 && document.getAnimations) document.getAnimations().forEach(a => { if (a.playState === 'paused') a.play(); }); refresh(); },
   cine: () => { SAVE.cineOff = !SAVE.cineOff; save(); refresh(); },
   hdpx: () => { SAVE.hdOff = !SAVE.hdOff; save(); render(); },
   comp: c => { SAVE.comp = c; save(); refresh(); toast(`这次带 ${COMPANIONS[c].n} 一起去：${COMPANIONS[c].d}`); },
@@ -3590,7 +3607,7 @@ function render() {
   const html = { title: titleHTML, town: townHTML, world: worldHTML, map: mapHTML, battle: battleHTML, event: eventHTML, shop: shopHTML, rest: restHTML, chest: chestHTML, end: endHTML, credits: creditsHTML }[VIEW]();
   const keepS = {}; app.querySelectorAll('[data-scroll]').forEach(e => { keepS[e.dataset.scroll] = e.scrollTop; });   // 框里滚到哪儿，重画以后还在哪儿
   app.innerHTML = html;
-  document.body.dataset.view = VIEW;
+  document.body.dataset.view = VIEW; document.body.classList.toggle('fx0', SAVE.gfx === 0); fxSweep();
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast('你收服过首领的精魄，可以带两只<b>役使</b>上阵（幻境面板里的「役使」空位）。带上以后它们会跟在你身边，本事触发时会闪一下。'), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`新伙伴：<b>${COMPANIONS[c].n}</b>（${COMPANIONS[c].role}）愿意跟你进幻境了。去幻境面板的「伙伴」里带上。`), 600 + i * 2800)); } }

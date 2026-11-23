@@ -1659,6 +1659,25 @@ body[data-view=credits] #app{height:100vh;height:100svh;overflow:hidden;box-sizi
 .cr-unlock summary{cursor:pointer;color:var(--gold);text-align:center}.cr-unlock p{margin:6px 0 0;max-height:30vh;overflow-y:auto}
 .credits .btn{flex:none;width:100%;animation:crin .8s ease-out 1.2s both}
 @media(prefers-reduced-motion:reduce){.cr-win .cr-roll{animation:none;top:0;position:static}.cr-win{overflow-y:auto}}
+/* 省电：一直循环的发光改成只动透明度（交给显卡合成，不用每帧重画）；神兵光、灼烧色调改成静止 */
+.autob:not(.ghost),.wauto:not(.ghost){animation:none;position:relative}
+.autob:not(.ghost)::after,.wauto:not(.ghost)::after{content:'';position:absolute;inset:-1px;border-radius:inherit;box-shadow:0 0 14px rgba(196,41,31,.7);opacity:0;animation:glowo 1.4s ease-in-out infinite;pointer-events:none}
+.ultb.manual{animation:none}
+.ultb.manual::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 16px rgba(255,140,60,.9);opacity:0;animation:glowo .6s ease-in-out infinite alternate;pointer-events:none}
+.skb2.wait{animation:none}
+.skb2.wait::after{content:'';position:absolute;inset:0;border-radius:inherit;background:rgba(255,236,200,.16);opacity:0;animation:glowo .8s infinite alternate;pointer-events:none}
+@keyframes glowo{50%{opacity:1}}
+.unit.wr-legend .wp img{animation:none}
+.unit.st-burn .sp{animation:none;filter:drop-shadow(0 0 8px #ff7a1a) sepia(.6) saturate(2.2) hue-rotate(-22deg) brightness(1.06)}
+.arena.hstop,.arena.hstop *{animation-play-state:paused!important}
+@keyframes iGlint{50%{opacity:.7}}   /* 冰：亮度闪改成透明度闪，不用每帧重画 */
+@keyframes shPulse{50%{transform:scale(1.04)}}   /* 护盾：只缩放，光晕固定 */
+/* 人物页「身上」：装备格把下面的空位撑满（格子变高，顺便写上装备名），屏幕小就在框里滚 */
+.gfit{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.gfit .gdoll{flex:1 0 auto;grid-auto-rows:minmax(58px,1fr)}
+.gsb .gnm{display:block;max-width:100%;padding:0 3px;box-sizing:border-box;font-size:calc(10.5px * var(--fs,1));line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-height:700px){.gsb .gnm{display:none}}   /* 矮屏：只留格子，按钮不被挤下去 */
+.gfit .gbar{position:sticky;bottom:0;z-index:2;background:linear-gradient(180deg,rgba(14,10,9,0),#0e0a09 30%);padding-top:6px}
 </style>
 </head>
 <body>
