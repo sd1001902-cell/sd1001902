@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>九幽回廊</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0908">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="九幽回廊">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@600;900&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
@@ -1740,6 +1748,8 @@ html body .arena.sv .side .unit .sts{height:13px;max-height:13px;min-height:0;ov
   var F = ['data.js', 'story.js', 'quests.js', 'data2.js', 'maps.js', 'sprites.js', 'hero.js', 'vfx.js', 'gfx.js', 'engine.js', 'world.js', 'chapters.js', 'audio.js', 'ui.js'];
   if (L === 'vi') {
     document.documentElement.lang = 'vi'; document.title = 'Cửu U Hồi Lang';
+    var mf = document.querySelector('link[rel=manifest]'), at = document.querySelector('meta[name=apple-mobile-web-app-title]');
+    if (mf) mf.href = 'manifest-vi.webmanifest'; if (at) at.content = 'Cửu U Hồi Lang';
     var tap = document.querySelector('.dlg-tap'), skip = document.querySelector('.dlg-skip');
     if (tap) tap.textContent = 'Chạm để tiếp tục ▸'; if (skip) skip.textContent = 'Bỏ qua';
     document.write('<link href="https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;600;700;900&family=Noto+Sans:wght@400;500;700&family=Playfair+Display:wght@700;900&display=swap&subset=vietnamese" rel="stylesheet" media="print" onload="this.media=\'all\'">');
@@ -1748,6 +1758,14 @@ html body .arena.sv .side .unit .sts{height:13px;max-height:13px;min-height:0;ov
   }
   var P = L === 'vi' ? 'vi/' : '';
   for (var i = 0; i < F.length; i++) document.write('<script src="' + P + F[i] + '"><\/script>');
+})();
+</script>
+<script>
+// 自己网址上（不在 claude.ai 的框里）才装离线缓存，装到主屏幕后没网也能打开
+(function () {
+  var inFrame = true; try { inFrame = window.self !== window.top; } catch (e) {}
+  if (!inFrame && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost'))
+    addEventListener('load', function () { try { navigator.serviceWorker.register('sw.js').catch(function () {}); } catch (e) {} });
 })();
 </script>
 </body>
