@@ -2046,6 +2046,7 @@ function act(b, u, out) {
     if (u.side === 'e' && (d.by || 'P') === 'P') hsDmg(b, "Sát thương duy trì", Math.min(dmg, dmg + Math.min(0, u.hp))); else if (u === b.P) { const h = hsOf(b); h.raw += dmg; h.hp += dmg; }
     out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : '']);
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
+    if (u.hp <= 0 && u.kind === 'hero') heroSave(b, u, out);
     if (u.hp <= 0) { out.lines.push(`${u.name} ${k === 'burn' ? "bị thiêu" : "trúng độc"} chết`); return; }
   }
   if (u.st.frozen) { delete u.st.frozen; if (u.frzA) { u.frzA = false; if (u.side === 'e' && b.P && b.P.cls === 'paladin') thornHit(b, b.P, u, out, { thf: 1 }); if (u.hp <= 0) { out.actor = null; return; } } if (u.charging) { delete u.charging; out.pops.push([u.id, "Ngắt", 'buff']); out.lines.push(`${u.name} bị đánh choáng, tụ lực bị ngắt!`); } else out.lines.push(`${u.name} bị choáng`); out.actor = null; return; }
@@ -2556,7 +2557,7 @@ function stClear(f, s) { for (const k of s === 'any' ? ['burn', 'slow', 'melt', 
 function stSet(src, f, s, out) {
   if (f.hp <= 0) return;
   if (s === 'burn' && f.cocoon && f.shield > 0) { f.shield = 0; f.cocoon = false; out.pops.push([f.id, "Kén tơ cháy thủng", 'react']); out.lines.push(`Kén tơ của ${f.name} bắt lửa rồi!`); }
-  if (s === 'burn') { f.st.burn = { d: src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1), t: 3 + stExt(src), by: stKey(src) || 'P' }; out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); }
+  if (s === 'burn') { f.st.burn = { d: dotIn(BNOW, src, f, src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1)), t: 3 + stExt(src), by: stKey(src) || 'P' }; out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); }
   else if (s === 'chill') { if (!f.st.slow) stAdd(BNOW, stKey(src) ? src : stActor(BNOW), 'ctrl', 1); f.st.slow = 3 + stExt(src); out.pops.push([f.id, "Đóng băng", 'cold', 1]); if (f.lavaShell && f.shield > 0) { f.shield = 0; f.lavaShell = false; out.pops.push([f.id, "Vỏ nứt", 'react']); out.lines.push(`Lớp vỏ dung nham của ${f.name} bị đông nứt!`); } }
   else if (s === 'armor') { f.st.melt = 3 + stExt(src); out.pops.push([f.id, "Phá giáp", 'crit', 1]); if (f.shield > 0 && (f.trait === 'shield' || f.silver)) { f.shield = 0; out.pops.push([f.id, f.silver ? "Giáp bạc vỡ rồi" : "Vỡ giáp", 'react']); if (f.silver) out.lines.push(`Giáp bạc của ${f.name} bị đánh vỡ!`); } }
   else if (s === 'stun') freezeU(f, out, "Choáng");
@@ -2659,7 +2660,7 @@ function doAbility(b, u, A, out, now) {
       return true;
     case 'poison':
       bossSay(u, out, A.say); out.cast = { id: 'bossAoe', elem: 'poison', aoe: true, enemy: true };
-      allies.forEach(t => { hit(b, u, t, A.mult || 0.65, 'poison', out, { proc: 1 }); if (t.hp > 0) { t.st.poison = { d: u.atk * (A.dot || 0.35), t: 3 }; out.pops.push([t.id, "Trúng độc", 'poison', 1]); } });
+      allies.forEach(t => { hit(b, u, t, A.mult || 0.65, 'poison', out, { proc: 1 }); if (t.hp > 0) { t.st.poison = { d: dotIn(b, u, t, u.atk * (A.dot || 0.35)), t: 3 }; out.pops.push([t.id, "Trúng độc", 'poison', 1]); } });
       return true;
     case 'heal':
       if (u.hp / u.maxHp > 0.85) return false;
@@ -2906,16 +2907,8 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src === b.P && src.xDouble && !opt.proc && !opt.aoe && tgt.hp > 0 && RNG.ch(src.xDouble / 100)) { out.pops.push([tgt.id, "Liên trảm", 'crit']); hit(b, src, tgt, mult * 0.5, elem, out, { proc: 1 }); }
   if (tgt.kind === 'hero' || tgt.kind === 'ally') addRage(tgt, 6);
   if (tgt.kind === 'hero') {
-    if (tgt.hp <= 0 && tfx.has('caorenOff') && !b.caoren) { b.caoren = true; tgt.hp = Math.round(tgt.maxHp * 0.25); out.lines.push("Hình nhân thế mạng chịu thay bạn đòn này!"); out.pops.push([tgt.id, "Hình nhân", 'buff']);
-      aliveOf(b, 'e').forEach(f => { applyPoison(tgt, f, 35, tgt.poisonPct || 0); out.pops.push([f.id, "Trúng độc", 'poison', 1]); }); }
-    if (tgt.hp <= 0 && tfx.has('buSi6') && !b.buSi) { b.buSi = true; tgt.hp = 1; tgt.st.butui = 3; out.lines.push("Tu La Bất Tử: bạn nhất quyết không ngã!"); out.pops.push([tgt.id, "Bất Tử", 'buff']); }
-    if (tgt.hp <= 0 && tfx.has('gBond') && !b.bond) { const al = b.units.find(x => x.kind === 'ally' && x.hp > 0);   // 同心锁
-      if (al) { b.bond = true; tgt.hp = Math.round(tgt.maxHp * 0.2); al.hp = Math.max(1, Math.round(al.hp - al.maxHp * 0.5)); out.lines.push(`${al.name} đỡ thay bạn đòn này!`); out.pops.push([al.id, "Đồng tâm", 'buff']); } }
+    heroSave(b, tgt, out);   // 免死：替身草人、修罗不死、同心锁、不灭金身甲（各自每场一次）
     if (tgt.hp > 0 && tgt.hp / tgt.maxHp < 0.3 && tfx.has('gPanic') && !b.panic) { b.panic = true; out.lines.push("Kinh Thiền Y rung lên, yêu vật đứng sững cả lũ"); aliveOf(b, 'e').forEach(f => freezeU(f, out)); }
-    if (tgt.hp <= 0 && tfx.has('cheatDeath') && !b.cheated) {
-      b.cheated = true; tgt.hp = Math.round(tgt.maxHp * 0.3);
-      out.lines.push("Giáp Bất Hủ tỏa sáng, bạn trở về từ bờ vực cái chết!"); out.pops.push([tgt.id, "Bất hủ", 'buff']);
-    }
     if (tgt.hp > 0 && tgt.hp / tgt.maxHp < 0.35 && tfx.has('cXuming') && (b.xuming || 0) < 2) { b.xuming = (b.xuming || 0) + 1; heal(tgt, tgt.maxHp * 0.2, out); out.pops.push([tgt.id, "Tục mệnh", 'buff']); }   // 续命灯
     if (tgt.hp > 0 && tgt.hp / tgt.maxHp < 0.3 && tfx.has('phoenix') && !b.phoenix) {
       b.phoenix = true; out.lines.push("Lông phượng hoàng bùng cháy!"); out.cast = { id: 'phoenix', elem: 'fire', aoe: true };
@@ -2942,7 +2935,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (crit && fx && fx.has('shadowDance') && RNG.ch(0.35)) { const t2 = tgt.hp > 0 ? tgt : aliveOf(b, 'e')[0]; if (t2) hit(b, src, t2, 1, 'phys', out, { proc: 1 }); }
   } else {
     if (src.aff.includes('cold') && RNG.ch(0.2)) freezeU(tgt, out);
-    if (src.aff.includes('venom') && tgt.hp > 0) tgt.st.poison = { d: src.atk * 0.25, t: 3 };
+    if (src.aff.includes('venom') && tgt.hp > 0) tgt.st.poison = { d: dotIn(b, src, tgt, src.atk * 0.25), t: 3 };
     if (src.aff.includes('fiery')) hit(b, src, tgt, 0.4, 'fire', out, { proc: 1 });
   }
   if (tgt.hp > 0 && src.hp > 0) {
@@ -2965,6 +2958,33 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (tfx && tfx.has('revenge') && src.hp > 0 && RNG.ch(0.3)) hit(b, tgt, src, 1, 'phys', out, { proc: 1 });
   }
   return d;
+}
+// 主角挨到致命伤时的免死（挨打和持续伤害都走这里；2026-11-24 原来只有挨打才查，被毒、被烧死的时候免死不触发）
+// 妖物挂在我方身上的持续伤害：原来直接按妖物攻击算，护甲、抗性、减伤全不吃，高层一跳就能打掉大半血。
+// 现在按抗性和各种减伤打折，幻境里一跳最多打掉最大气血的 R_DOT_CAP（2026-11-24）
+const R_DOT_CAP = 0.06;
+function dotIn(b, src, t, d) {
+  if (!t || t.side !== 'p' || !src || src.side !== 'e') return d;
+  let k = 1 - Math.min(RES_SOFT[1], t.res || 0) / 100;
+  if (t.kind === 'hero') k *= MON_UP * (1 - ((SUST[t.cls] || {}).dr || 0) / 100);
+  if (t.xDr) k *= 1 - Math.min(50, t.xDr) / 100;
+  if (t.sanN) k *= 1 - Math.min(SAN_DR_CAP, SAN_DR * t.sanN);
+  if (t.st && t.st.chan) k *= 1 - CHAN_DR / 100;
+  if (t.fx && t.fx.has('luoHan6') && t.fonu) k *= 1 - 0.04 * t.fonu;
+  d *= k; if (b && riftB(b) && t.maxHp) d = Math.min(d, t.maxHp * R_DOT_CAP);
+  return d;
+}
+function heroSave(b, tgt, out) {
+  const tfx = tgt.fx; if (!tfx || tgt.hp > 0) return;
+    if (tgt.hp <= 0 && tfx.has('caorenOff') && !b.caoren) { b.caoren = true; tgt.hp = Math.round(tgt.maxHp * 0.25); out.lines.push("Hình nhân thế mạng chịu thay bạn đòn này!"); out.pops.push([tgt.id, "Hình nhân", 'buff']);
+      aliveOf(b, 'e').forEach(f => { applyPoison(tgt, f, 35, tgt.poisonPct || 0); out.pops.push([f.id, "Trúng độc", 'poison', 1]); }); }
+    if (tgt.hp <= 0 && tfx.has('buSi6') && !b.buSi) { b.buSi = true; tgt.hp = 1; tgt.st.butui = 3; out.lines.push("Tu La Bất Tử: bạn nhất quyết không ngã!"); out.pops.push([tgt.id, "Bất Tử", 'buff']); }
+    if (tgt.hp <= 0 && tfx.has('gBond') && !b.bond) { const al = b.units.find(x => x.kind === 'ally' && x.hp > 0);   // 同心锁
+      if (al) { b.bond = true; tgt.hp = Math.round(tgt.maxHp * 0.2); al.hp = Math.max(1, Math.round(al.hp - al.maxHp * 0.5)); out.lines.push(`${al.name} đỡ thay bạn đòn này!`); out.pops.push([al.id, "Đồng tâm", 'buff']); } }
+    if (tgt.hp <= 0 && tfx.has('cheatDeath') && !b.cheated) {
+      b.cheated = true; tgt.hp = Math.round(tgt.maxHp * 0.3);
+      out.lines.push("Giáp Bất Hủ tỏa sáng, bạn trở về từ bờ vực cái chết!"); out.pops.push([tgt.id, "Bất hủ", 'buff']);
+    }
 }
 // 反震（2026-11-24 和反击合并）：和尚没有「反击」了，挨打只有反震——每挨一下打（被护体挡下的也算）必定弹一下：
 //   伤害 = 攻击 × 反震倍率 × (1 + 反震伤害%)，佛光，吃伤害加成和佛怒。和尚自带反震倍率 +MONK_THK%（calcStats），狮子吼嘲讽期间再 +50%。

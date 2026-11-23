@@ -44,24 +44,23 @@ const fmtBig = n => { n = Math.round(n); if (n < 10000) return String(n); if (n 
 const hpTxt = (v, lv) => fmtBig(hpShow(Math.max(0, v), lv == null ? heroLv() : lv));   // 主角这边的气血数字：乘上气血倍数再显示
 // 跳字（2026-11-24 第三版）：游戏体粗数字 + 粗描边（后面垫一层描边字，前面是本色／暴击金色渐变）；头上「爆」出来，弹一下就往上飘、半程淡出，0.7 秒左右；
 // 暴击从三倍大旋着砸下来，炸一圈金环、画面抖一下；同一个目标的数字按中、左、右三条道轮流冒；站在最上排的（首领常在后排）数字放到身体中部
-const POP_KF = {   // 2026-11-24 第五版：冒出来、弹一下就往上淡出，整段更短（开倍速再缩）
-  n: [[0, 4, .6, 0, 0], [.14, -3, 1.12, 1, 0], [.28, -6, 1, 1, 0], [.45, -12, 1, 1, 0], [1, -34, .95, 0, 0]],
-  b: [[0, 4, .6, 0, 0], [.14, -3, 1.2, 1, 0], [.3, -6, 1, 1, 0], [.45, -12, 1, 1, 0], [1, -36, .95, 0, 0]],
-  c: [[0, 0, 1.5, 0, 0], [.12, -3, .95, 1, 0], [.24, -6, 1.05, 1, 0], [.34, -8, 1, 1, 0], [.5, -12, 1, 1, 0], [1, -38, .95, 0, 0]],
-  h: [[0, 0, .6, 0, 0], [.14, -3, 1.1, 1, 0], [.3, -5, 1, 1, 0], [.45, -10, 1, 1, 0], [1, -28, 1, 0, 0]],
+const POP_KF = {   // 2026-11-24 第六版：头上冒出、轻弹一下就一路往上飘，飘到七成才开始淡；整段留久一点，看得清
+  n: [[0, 6, .7, 0, 0], [.08, 0, 1.12, 1, 0], [.16, -3, 1, 1, 0], [.7, -40, 1, 1, 0], [1, -56, .95, 0, 0]],
+  b: [[0, 6, .7, 0, 0], [.08, 0, 1.2, 1, 0], [.18, -3, 1, 1, 0], [.7, -42, 1, 1, 0], [1, -58, .95, 0, 0]],
+  c: [[0, 0, 1.5, 0, 0], [.1, -2, .95, 1, 0], [.2, -5, 1.05, 1, 0], [.3, -9, 1, 1, 0], [.72, -42, 1, 1, 0], [1, -58, .95, 0, 0]],
+  h: [[0, 0, .7, 0, 0], [.1, -2, 1.1, 1, 0], [.2, -5, 1, 1, 0], [.7, -30, 1, 1, 0], [1, -42, 1, 0, 0]],
 };
-const POP_MS = { n: 520, b: 560, c: 640, h: 480 };
-const popSpd = () => ({ 1: 1, 2: 0.72, 3: 0.55 }[SAVE.speed] || 1);
-const popMax = () => ({ 1: 3, 2: 2, 3: 1 }[SAVE.speed] || 3);   // 同一个目标同时留几个数字：倍速越高留得越少（3 倍速新数字直接顶掉旧的）
+const POP_MS = { n: 760, b: 800, c: 900, h: 720 };
+const popSpd = () => ({ 1: 1, 2: 0.85, 3: 0.72 }[SAVE.speed] || 1);
+const popMax = () => ({ 1: 3, 2: 3, 3: 2 }[SAVE.speed] || 3);   // 同一个目标同时留几个数字：倍速越高留得越少（3 倍速新数字直接顶掉旧的）
 const popHTML = h => `<i class="o">${h}</i><b>${h}</b>`;
 function popPut(el, cls, html, kind) {
   if (!el) return null;
   kind = kind || 'n';
   const side = / m[lr]\b/.test(cls);
-  const old = [...el.querySelectorAll(':scope > .pop' + (side ? (/ ml\b/.test(cls) ? '.ml' : '.mr') : ':not(.ml):not(.mr):not(.move)'))]; for (let k = 0; k <= old.length - popMax(); k++) old[k].remove();
+  const old = [...el.querySelectorAll(':scope > .pop' + (side ? (/ ml\b/.test(cls) ? '.ml' : '.mr') : ':not(.ml):not(.mr):not(.move)'))]; for (let k = 0; k <= old.length - popMax(); k++) old[k].remove(); old.forEach(q => { if (q.isConnected) q.style.marginTop = ((parseFloat(q.style.marginTop) || 0) - 24) + 'px'; });   // 新数字一出来，还没飘走的整列往上让一行，字和字之间拉开
   const now = performance.now(); if (!el._lowT || now - el._lowT > 1500) { el._lowT = now; const ar = document.getElementById('arena'); el._low = !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; }
   const p = document.createElement('span'); p.className = cls + (el._low ? ' low' : ''); p.innerHTML = popHTML(html);
-  if (!side) { const x = [0, -18, 18][(el._lane = (el._lane || 0) + 1) % 3]; if (x) p.style.left = `calc(50% + ${x}px)`; }
   el.appendChild(p);
   const kf = POP_KF[kind] || POP_KF.n, dur = (POP_MS[kind] || 700) * popSpd();
   if (p.animate) { const a = p.animate(kf.map(([o, y, sc, op, rt]) => ({ offset: o, transform: `translate(-50%,${y}px) scale(${sc})${rt ? ` rotate(${rt}deg)` : ''}`, opacity: op })), { duration: dur, easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' }); a.onfinish = () => p.remove(); }
@@ -1971,7 +1970,7 @@ function applyStep(o, anim) {
     const SP = SAVE.speed || 1, reactN = new Set((o.react || []).map(R => R.n)), popIdx = {}, byAlly = actorU && (actorU.kind === 'ally' || actorU.kind === 'minion');
     const ALL = !!SAVE.allNums;   // 设置里「伤害数字：全部显示」；默认只看主角
     // 2026-11-24 跳字再细：同一个目标这一下的数字合成一个（多段带「×n」）；普攻不跳；颜色只留白、金（暴击）、淡金（反震金刚震）、橙（灼烧）、绿（中毒）
-    const G = new Map(), TX = [], REFL = new Set(['反震', '金刚震', '反伤', '玄甲玉']);
+    const G = new Map(), TX = [], REFL = new Set(['反震', '金刚震', '反伤', '玄甲玉']), SAVEP = new Set(['不朽', '同心', '草人', '不死', '蜕皮']);   // 免死、保命的字：任何时候都跳
     for (const [id, txt0, c, isSt, by, tag] of o.pops) {
       const el = document.getElementById('u-' + id); if (!el) continue;
       const tu = B.units.find(u => u.id === id);
@@ -1982,8 +1981,8 @@ function applyStep(o, anim) {
       let show = true;
       if (!ALL) {   // 只看主角：妖物身上只跳主角打的（普攻除外）；主角身上跳小号掉血、回血、格挡闪避；伙伴、僵尸身上不跳
         if (tu && tu.side === 'e') show = mine && (dmgN || dot) && !(isBasic && !tag && dmgN && !o.jzz);
-        else if (onHero) show = dmgN || dot || c === 'heal' || txt === '格挡' || txt === '闪避';
-        else show = false;
+        else if (onHero) show = dmgN || dot || c === 'heal' || txt === '格挡' || txt === '闪避' || SAVEP.has(txt);
+        else show = SAVEP.has(txt);
       }
       if (!show) { if (anim && dmgN && SP < 3) { if (tu && tu.side === 'e') { if (tu.hp > 0) VFX.onHit(id, false); } else bump(el, 'hurt', 300); } }
       else if (dmgN || dot || c === 'heal') {
@@ -1991,7 +1990,7 @@ function applyStep(o, anim) {
         const g = G.get(kk) || { id, el, tu, onHero, n: 0, v: 0, vals: [], crit: false, tag: '', c, dot, heal: c === 'heal', ally: ALL && byAlly && tu && tu.side === 'e' };
         const vv = +txt.replace(/\D/g, '') || 0; g.v += vv; g.vals.push(vv); g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
         G.set(kk, g);
-      } else TX.push({ el, txt, c, onHero });
+      } else TX.push({ el, txt, c, onHero, save: SAVEP.has(txt) });
       if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(1);
       if (anim && (txt === '闪避' || txt === '格挡') && el.animate) { el.animate([{ transform: 'none' }, { transform: txt === '闪避' ? 'translate(-22px,-6px)' : 'translateX(-6px)' }, { transform: 'none' }], { duration: 260 }); if (txt === '格挡') VFX.onBlock(id); }
       if (anim && dot && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); }
@@ -2022,7 +2021,7 @@ function applyStep(o, anim) {
         if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
       if (delay) setTimeout(put, delay); else put();
     }
-    if (SP < 2) for (const t of TX) popPut(t.el, `pop txt ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))), 'h');
+    for (const t of TX) if (SP < 2 || t.save) popPut(t.el, t.save ? 'pop txt save' : `pop txt ${t.onHero && !ALL ? 'hurt ml' : t.c}`, esc(String(t.txt).replace(/\d+/, n => fmtBig(+n))), t.save ? 'c' : 'h');
     if (anim && o.yi) yiFlash(o.yi, YISHI[o.yi] && YISHI[o.yi].n);
     if (anim && actorU && actorU.kind === 'ally' && o.cast) {   // 伙伴出手：头顶冒招式名，身上亮一圈
       const el = document.getElementById('u-' + actorU.id), mv = allyMoveName(actorU, o.cast.id);
