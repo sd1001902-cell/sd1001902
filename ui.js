@@ -669,7 +669,7 @@ const goHelpModal = () => () => {
     <p class="help-p">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
     <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
     <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>
-    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快，${R_HI2[0]} 层往上每层涨的是原来的 ${+(R_HI2[1] / R_HI[1]).toFixed(1)} 倍；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个。</p>
+    <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；${R_SEG.slice(1).map(g => g[0]).join('、')} 层起各再快一档，每层涨的分别是原来的 ${R_SEG.slice(1).map(g => +(g[1] / R_SEG[0][1]).toFixed(1)).join('、')} 倍；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个。</p>
     <p class="help-p">守关妖王：层数越高出手越快；${R_BOSS_AFF.join('、')} 层起各多带一条词缀；${R_BOSS_DUO[0]} 层起每出手 ${R_BOSS_DUO[1]} 次连动一次。打到七成血腾起护体真气（打破之前伤它只有一半），三成半血暴怒、喊帮手。它一下最多打掉你${CN[Math.round(R_BOSS_CAP * 10)]}成气血。</p>`
     : `<p class="help-p">一章一张大地图：走路遇怪、找钥匙、做任务，最后打首领。首领有专门克制它的线索和钥匙，先找钥匙再打会轻松很多。倒下了得到的东西都会保留，会在最近的篝火边醒来。</p>`}
     ${featureOn('mods') ? `<h4 class="sub-h">加难度</h4><div class="mods">${DUNGEON_MODS.map(M => `<button class="mod ${SAVE.mods.includes(M.id) ? 'on' : ''}" data-act="modt" data-arg="${M.id}"><b>${M.n}</b><span>${M.d}</span><small>${M.r}</small></button>`).join('')}</div>` : ''}

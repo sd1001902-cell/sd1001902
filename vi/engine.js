@@ -1255,9 +1255,13 @@ const MW = 5, MH = 6;
 // 改后 80 层 ≈ 原来 67 层，100 层 ≈ 原来 73 层，原来 80 层的难度落在 125–130 层
 const R_LIN = [50, 0.08, 0.05, 0.7];
 const R_HI = [150, 0.10, 0.06];   // 2026-11-23 150 层以后每层涨得更快（用户：线性从 6 提到 10）：气血每层 +10%、攻击每层 +6%（都按 50 层的数值算），小怪、精英、妖王一样
-const R_HI2 = [300, 0.30, 0.18];   // 2026-11-24 用户定：300 层以后每层气血 +30%、攻击 +18%（按 50 层的数值算，原来 10% / 6%，三倍），手感不对再改
-const rLinHp = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[1] * Math.max(0, Math.min(N, R_HI2[0]) - R_HI[0]) + R_HI2[1] * Math.max(0, N - R_HI2[0]); };
-const rLinAtk = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[2] * Math.max(0, Math.min(N, R_HI2[0]) - R_HI[0]) + R_HI2[2] * Math.max(0, N - R_HI2[0]); };
+// 150 层以后分段涨：每段 [从第几层起, 每层气血 +, 每层攻击 +]（都按 50 层的数值算），后一段接着前一段累加
+// 2026-11-23 150 层起 10% / 6%；2026-11-24 用户定 300 层起 30% / 18%、400 层起 45% / 25%、500 层起 60% / 35%
+const R_SEG = [[150, 0.10, 0.06], [300, 0.30, 0.18], [400, 0.45, 0.25], [500, 0.60, 0.35]];
+const R_HI2 = R_SEG[1];   // 说明文字用
+const rSegSum = (N, k) => { let v = 0; for (let i = 0; i < R_SEG.length; i++) { const a = R_SEG[i][0], b = i + 1 < R_SEG.length ? R_SEG[i + 1][0] : Infinity; if (N > a) v += R_SEG[i][k] * (Math.min(N, b) - a); } return v; };
+const rLinHp = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + rSegSum(N, 1); };
+const rLinAtk = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + rSegSum(N, 2); };
 const rOldLv = N => 6 + Math.round(N * 1.4);   // 没改之前的妖物等级：幻境里的经验还按它算，免得层数高了经验反而少
 function riftD(N) {
   const M = Math.min(N, R_LIN[0]), k = Math.max(0, N - R_LIN[0]), base = 6 + Math.round(M * 1.4) + Math.round(k * R_LIN[3]), ar = 4 + base * 3.5;
