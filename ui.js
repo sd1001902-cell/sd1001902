@@ -2088,10 +2088,10 @@ function applyStep(o, anim) {
   const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}${heroKeyChips(P)}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? '普' : payOn ? '收' : k.ap ? STATES[k.ap].n[0] : k.pay ? '收' : '';
       return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`; }).join('') + '</div>';
-  const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
-    $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq);
-    $('#ultpct').textContent = B.ultReq ? '马上' : full ? '点我！' : `${r}%`; ub.disabled = B.over;
-    if (full && !B.over && !SAVE.flags.ult2) { SAVE.flags.ult2 = 1; const U = ULTS[P.cls]; setTimeout(() => toast(`必杀要自己点了：怒气满了点「必杀·${U.n}」——${U.d}。不占出手，还能打断妖王蓄力；怒气留到下一场。开着自动出招时，程序只在妖物蓄力时替你放（只打断）`, 6500), 300); } }
+  const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100, n = Math.floor(r / 100), U = ULTS[P.cls];   // 2026-11-24 第二版：能存两格
+    $('#ultfill').style.width = (full ? 100 : r) + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq); ub.classList.toggle('two', n >= 2);
+    $('#ultpct').textContent = B.ultReq ? '马上' : n >= 2 ? '满两格' : full ? `一格 · ${r - 100}%` : `${r}%`; ub.disabled = B.over;
+    if (full && !B.over && !SAVE.flags.ult3) { SAVE.flags.ult3 = 1; setTimeout(() => toast(`必杀改了：攒得慢，能存两格，留着打妖王。点「${U.n}」——${U.d}。不占出手，还能打断妖王蓄力；怒气留到下一场。开着自动出招时，只用第二格替你打断蓄力，永远给你留一格`, 7000), 300); } }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
   drawSbar(); drawStPop();
@@ -3916,7 +3916,7 @@ const ACT = {
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast('怒气还没满'); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? '自动<br>出招' : '手动<br>出招'; }
-    toast(SAVE.ultAuto ? '自动出招：技能自动放；必杀只在妖物蓄力时替你放（只打断），想要增益就自己点「必杀」' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」（不占出手）'); if (B) applyStep(null); },
+    toast(SAVE.ultAuto ? '自动出招：技能自动放；必杀攒满两格时，只用第二格替你打断妖物蓄力，想要增益就自己点「必杀」' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」（不占出手）'); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; if (B.castAuto) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;
     if (k.left > 0) return toast(`「${k.n}」还要冷却 ${k.left} 招`); B.castReq = B.castReq === id ? null : id; SFX.play('click'); applyStep(null); if (B.waiting && B.castReq) { B.waiting = false; clearTimeout(timer); tick(); } },
   btarget: id => { if (!B || B.over) return; B.target = B.target === id ? null : id; SFX.play('click'); applyStep(null); },
