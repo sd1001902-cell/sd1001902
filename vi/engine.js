@@ -2010,7 +2010,13 @@ function makeZombie(b, P, zt, slot, rune) {
   const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
               maxHp: Math.round(P.maxHp * Z.hp * m * hpM), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? YINBING_MUL : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd * hq, crit: 5, critDmg: 150, g: 40, st: {},
               ae: Z.ae, wx: 'tu', taunt: Z.taunt, thornsP: Z.thornsP ? Z.thornsP + (P.ironPct || 0) / 150 : 0, poisonPct: P.poisonPct || 0, life: Z.life };
-  if (b.run && (b.run.mode === 'rift' || b.run.mode === 'tower')) { u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg; u.xBoss = P.xBoss || 0; }   // 2026-11-25 对首领、精英的伤害也跟着（屠魁、九幽裂魄、镇妖录那条）   // 2026-11-25 通天塔也一样（原来塔里不吃，选伤害词条只加主角自己）   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
+  if (b.run && (b.run.mode === 'rift' || b.run.mode === 'tower')) {   // 幻境、通天塔：你身上通用的增伤僵尸都吃（2026-11-25 用户：按道理僵尸都能吃）。只在你自己出手时才有的（连斩、会心、残血、反震、淬毒、某一招伤害、嗜杀这类灵玉）不算
+    u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg;
+    u.elem = P.elem || 0;                                              // 术法伤害：毒尸、阴火尸打的是毒、火，吃；跳尸、铁甲尸是物理，照样不吃
+    u.xBoss = P.xBoss || 0; u.xExec = P.xExec || 0; u.xBreak = P.xBreak || 0; u.frozenDmg = P.frozenDmg || 0;   // 首领精英、斩杀、破势、对定身敌人
+    const J = P.jy || {}; if (J.tuntian || J.shentong || J.pojia) u.jy = { tuntian: J.tuntian || 0, shentong: J.shentong || 0, pojia: J.pojia || 0 };   // 九幽吞天、神通（集火那一口算招式）、洞穿
+    if (P.lgv && P.lgv.shigu != null) u.sgK = LGV.sgK(P.lgv.shigu);    // 蚀骨玉：敌人身上每有一种状态加伤
+  }   // 2026-11-25 通天塔也一样（原来塔里不吃，选伤害词条只加主角自己）   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
   u.hp = u.maxHp; b.units.push(u); return u;
 }
 const zombiesOf = b => b.units.filter(u => u.kind === 'minion' && u.hp > 0);
@@ -2854,7 +2860,8 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src === b.P && b.guiYuan && !opt.proc) d *= GUIYUAN_MUL;
   if (src.side === 'p' && b.P && b.P.yi && b.P.yi.xuanbing && (tgt.st.frozen || tgt.st.slow)) { d *= 1 + (12 + b.P.yi.xuanbing * 6) / 100; if (src === b.P && (!b.xbTold || RNG.ch(0.12))) { b.xbTold = 1; out.yi = 'xuanbing'; out.pops.push([tgt.id, "Phong Trấn", 'cold']); } }
   if (src.xBoss && (tgt.kind === 'boss' || tgt.kind === 'elite')) d *= 1 + src.xBoss / 100;
-  if (src === b.P && src.jy && tgt.side === 'e') {   // 九幽·吞天、神通
+  if (src.sgK && tgt.side === 'e') d *= 1 + src.sgK / 100 * stHas(tgt, 'any');   // 蚀骨玉（僵尸那份）
+  if ((src === b.P || src.kind === 'minion') && src.jy && tgt.side === 'e') {   // 九幽·吞天、神通（僵尸也吃，2026-11-25）
     if (src.jy.tuntian) { const nd = b.units.reduce((a, u) => a + (u.side === 'e' && u.hp <= 0 ? 1 : 0), 0); if (nd) d *= 1 + Math.min(10, nd) * src.jy.tuntian / 100; }
     if (src.jy.shentong && b.castSk && !opt.proc) d *= 1 + src.jy.shentong / 100;
   }
@@ -2876,7 +2883,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (crit && src === b.P && fx.has('gReset') && !opt.proc && RNG.ch(0.1)) { const k2 = src.skills.find(k => k.left > 0 && !(b.castSk && b.castSk.id === k.id)); if (k2) { k2.left = 0; out.pops.push(['P', "Hồi phong", 'buff']); } }
   if (crit) { d *= ((src.critDmg || 150) + (src === b.P && fx && fx.has('cKiCrit') ? 10 * (b.kiSnap != null ? b.kiSnap : src.ki || 0) : 0)) / 100;   /* 夜行带：每点杀意暴伤 +10% */ if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; if (src === b.P) src.cbNext = true; }
   const dRaw = tgt === b.P && src.side === 'e' ? d / ((tgt.st.chan ? 1 - CHAN_DR / 100 : 1) * (tgt.fmR ? 1 - tgt.fmR / 100 : 1) * (tgt.st.butui ? 0.5 : 1)) : 0;   // 主角统计：减伤之前打来多少
-  const pj = src === b.P && src.jy && src.jy.pojia && tgt.side === 'e' ? 1 - src.jy.pojia / 100 : 1;   // 九幽·洞穿
+  const pj = (src === b.P || src.kind === 'minion') && src.jy && src.jy.pojia && tgt.side === 'e' ? 1 - src.jy.pojia / 100 : 1;   // 九幽·洞穿（僵尸也吃）
   if (elem === 'phys') { const K = 40 + (src.lv || 1) * 9; d *= K / (K + tgt.armor * pj * (tgt.st.warcry ? 1.5 : 1) * (tgt.st.melt ? 0.5 : 1) * (tgt.st.tieArm ? 1.4 : 1)); }
   else d *= 1 - Math.max(0, Math.min(RES_SOFT[1], tgt.res || 0) * pj - (tgt.st.melt ? 20 : 0)) / 100;
   if (tgt.st.liuDr && tgt.side === 'p' && src.side === 'e') d *= 1 - (b.liuDrV || 0.2);   // 刘师傅念经
