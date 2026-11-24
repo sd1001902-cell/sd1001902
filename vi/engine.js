@@ -1223,6 +1223,18 @@ function combineGem(key) {
   SAVE.gold -= c; SAVE.mats -= m; SAVE.gems[key] -= 3; if (!SAVE.gems[key]) delete SAVE.gems[key];
   const nk = gemKey(t, +tier + 1); addGem(nk); return { ok: true, key: nk };
 }
+// 一键合成（2026-11-24 用户要的）：每种玉从低档往高档，能合的全合上去；银两、魂晶不够就停在那一步
+function combineAllPlan(apply) {
+  const G0 = SAVE.gems, G = { ...G0 }; let gold = SAVE.gold, mats = SAVE.mats, n = 0, cost = 0, mcost = 0;
+  const types = [...new Set(Object.keys(G).map(k => k.split('_')[0]))];
+  for (let tier = 0; tier < GEM_TIERS.length - 1 && tier < gemCap(); tier++) for (const t of types) {
+    const k = gemKey(t, tier), c = combineCost(k), m = combineMats(k);
+    while ((G[k] || 0) >= 3 && gold >= c && mats >= m) { G[k] -= 3; const nk = gemKey(t, tier + 1); G[nk] = (G[nk] || 0) + 1; gold -= c; mats -= m; cost += c; mcost += m; n++; }
+  }
+  const got = {}; for (const k in G) if (G[k] > (G0[k] || 0)) got[k] = G[k] - (G0[k] || 0);   // 净多出来的（中间档合出来又合上去的不算）
+  if (apply && n) { SAVE.gems = {}; for (const k in G) if (G[k] > 0) SAVE.gems[k] = G[k]; SAVE.gold = gold; SAVE.mats = mats; }
+  return { n, cost, mcost, got };
+}
 // 镶着的玉石直接升一档：再拿两颗同色同档的（加上镶着的那颗就是三颗），花费和合成一样，不用先拆下来
 function upgradeSocketed(it, idx) {
   const key = it && it.gems && it.gems[idx]; if (!key || key.startsWith('L:')) return { err: "Ở đây không có ngọc" };

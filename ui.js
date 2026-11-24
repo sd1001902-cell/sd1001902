@@ -350,6 +350,7 @@ function boxBody(cls) {
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
   return `<p class="help-p">三块相同的玉石可以合成高一阶，现在最高合成到「${GEM_TIERS[gemCap()]}」。玉器坊管到「极品」；后四档「无瑕、通灵、天成、九幽」要幻境最高层打到 ${GEM_RIFT.join('、')} 层。镶在装备上的玉石也能直接升级（玉掌柜那里点它）。</p>
+    ${(() => { const P = combineAllPlan(false); return P.n ? `<button class="btn gemall" data-act="combineall">一键合成：合 ${P.n} 次（${fmtBig(P.cost)} 两${P.mcost ? ` + ${P.mcost} 魂晶` : ''}）</button>` : ''; })()}
     <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
       <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">合成（${combineCost(k)} 两${combineMats(k) ? ` + ${combineMats(k)} 魂晶` : ''}）</button></div>`).join('')
       : '<div class="empty-note">还没有玉石。精英、首领和宝箱会掉落玉石。</div>'}</div>
@@ -3892,6 +3893,7 @@ const ACT = {
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
+  combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast('没有能合的玉石'); SFX.play('rare'); toast(`合了 ${r.n} 次，得到 ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join('、')); save(); refresh(); },
   combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast('合成了 ' + gemName(r.key)); refresh(); },
   learn: a => { const [br, i] = split(a); if (learnTalent(ctxCls(), br, +i)) { SFX.play('buff'); refresh(); } },
   respec: () => { if (resetTalents(ctxCls())) { toast('散功完毕，心法点已退回'); refresh(); } },

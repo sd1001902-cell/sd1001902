@@ -350,6 +350,7 @@ function boxBody(cls) {
 function gemsBody() {
   const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
   return `<p class="help-p">Ba viên ngọc giống nhau ghép được một viên cao hơn một bậc, giờ tối đa ghép tới “${GEM_TIERS[gemCap()]}”. Xưởng Ngọc quản tới “cực phẩm”; bốn bậc sau “vô hà, thông linh, thiên thành, Cửu U” cần Ảo Cảnh cao nhất đánh tới tầng ${GEM_RIFT.join(", ")}. Ngọc đã khảm trên trang bị cũng nâng cấp thẳng được (chạm vào nó ở chỗ Chưởng quầy Ngọc).</p>
+    ${(() => { const P = combineAllPlan(false); return P.n ? `<button class="btn gemall" data-act="combineall">Ghép tất cả: ghép ${P.n} lần (${fmtBig(P.cost)} lượng${P.mcost ? ` + ${P.mcost} hồn tinh` : ''})</button>` : ''; })()}
     <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
       <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">Ghép (${combineCost(k)} lượng${combineMats(k) ? ` + ${combineMats(k)} hồn tinh` : ''})</button></div>`).join('')
       : "<div class=\"empty-note\">Chưa có ngọc. Tinh anh, thủ lĩnh và rương báu sẽ rơi ngọc.</div>"}</div>
@@ -3893,6 +3894,7 @@ const ACT = {
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast("Hồn thần binh đã vào Túi Càn Khôn, sang trang “Trang bị” đặt nó vào ô"); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
+  combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast("Không có ngọc nào ghép được"); SFX.play('rare'); toast(`Đã ghép ${r.n} lần, được ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join(", ")); save(); refresh(); },
   combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Đã ghép " + gemName(r.key)); refresh(); },
   learn: a => { const [br, i] = split(a); if (learnTalent(ctxCls(), br, +i)) { SFX.play('buff'); refresh(); } },
   respec: () => { if (resetTalents(ctxCls())) { toast("Tán công xong, đã hoàn lại điểm tâm pháp"); refresh(); } },
