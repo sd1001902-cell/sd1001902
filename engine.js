@@ -1998,7 +1998,7 @@ const ZOMBIE_ORDER = ['tiaoshi', 'tiejia', 'dushi', 'yinhuo'];
 // 尸阵：赶尸人在武学页排的位置；没排过就按解锁情况给一个顺手的
 function necroForm(lv, form) {
   const ok = z => ZOMBIES[z] && !ZOMBIES[z].ult && ZOMBIES[z].lv <= lv;
-  const def = [ok('tiejia') ? 'tiejia' : 'tiaoshi', 'tiaoshi', ok('dushi') ? 'dushi' : 'tiaoshi', ok('yinhuo') ? 'yinhuo' : 'tiaoshi', 'tiaoshi'];
+  const def = [ok('tiejia') ? 'tiejia' : 'tiaoshi', 'tiaoshi', ok('dushi') ? 'dushi' : 'tiaoshi', ok('yinhuo') ? 'yinhuo' : 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi'];   // 2026-11-25 原来只有 5 格：尸位到 6、7 时后面的位置排了存不住
   return def.map((d, i) => form && ok(form[i]) ? form[i] : d);
 }
 function makeZombie(b, P, zt, slot, rune) {
@@ -2008,7 +2008,7 @@ function makeZombie(b, P, zt, slot, rune) {
   const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
               maxHp: Math.round(P.maxHp * Z.hp * m * hpM), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? YINBING_MUL : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd * hq, crit: 5, critDmg: 150, g: 40, st: {},
               ae: Z.ae, wx: 'tu', taunt: Z.taunt, thornsP: Z.thornsP ? Z.thornsP + (P.ironPct || 0) / 150 : 0, poisonPct: P.poisonPct || 0, life: Z.life };
-  if (b.run && b.run.mode === 'rift') { u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg; }   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
+  if (b.run && (b.run.mode === 'rift' || b.run.mode === 'tower')) { u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg; }   // 2026-11-25 通天塔也一样（原来塔里不吃，选伤害词条只加主角自己）   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
   u.hp = u.maxHp; b.units.push(u); return u;
 }
 const zombiesOf = b => b.units.filter(u => u.kind === 'minion' && u.hp > 0);
@@ -3137,7 +3137,7 @@ function resolveDeaths(b, out) {
     if (u.kind === 'ally') { out.say = [u.id, u.cid === 'kang' ? '哎哟我的老腰……撤了撤了！' : '我、我先撤一下！你给我撑住！']; out.lines.push(`${u.name}退到了后面`); continue; }
     if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name}倒下了……`); continue; }
     if (u.kind === 'minion' && P.cls === 'necro' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'b') / 100, out);
-    if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * 0.5); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1 })); out.pops.push([u.id, '阴兵爆', 'fire']); }
+    if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * 0.5); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1, tag: '阴兵爆' })); out.pops.push([u.id, '阴兵爆', 'fire']); }   // tag：本场统计里单列「阴兵爆」（原来算在「特效」里）
     if (u.kind === 'minion' && P.fx.has('ganshiBelt') && P.hp > 0 && !ZOMBIES[u.zt].ult && !(b.revUsed = b.revUsed || {})[u.slot]) { b.revUsed[u.slot] = 1; (b.revQ = b.revQ || []).push({ zt: u.zt, slot: u.slot, t: 3 }); }
     if (u.side === 'e' && u.st && u.st.poison && P.fx.has('baiduOff')) { const nx = aliveOf(b, 'e').find(f => f !== u && !f.st.poison); if (nx) { nx.st.poison = { d: u.st.poison.d, t: 3 }; out.pops.push([nx.id, '毒传', 'poison', 1]); } }
     if (u.kind === 'minion' && P.fx.has('corpseBurst')) { aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out)); out.lines.push('僵尸炸开，尸火四溅'); }

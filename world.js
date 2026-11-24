@@ -1522,8 +1522,8 @@ function rStep(ch, x, y, run) {
 // 每个职业的历史最高层、首通奖励永久保留。
 var TW = { bossK: [0.45, 0.6], ilvl: 70, plus: 10, gemT: 6, lgLv0: 20, lgLvK: 1.2, lgMax: 150, nStart: 2, n0: 24, nK: 5, box: 200,
   para: { pAtk: 25, pArmor: 25, pHp: 25, crit: 60, spd: 40, res: 80, dmgPct: 90, hpPct: 60, armorPct: 25 },
-  cls: { berserker: { hpPct: 20, dmgPct: 30 }, mage: { hpPct: 80, dmgPct: 40 }, necro: { hpPct: 80, dmgPct: 150, minionPct: 60 }, assassin: { hpPct: 40, dmgPct: 40 }, paladin: {} },
-  start: { necro: ['summon', 'shidu'], assassin: ['venom', 'bingpo'] } };   // 起手两招（没写的按等级取前两招）   // 塔里不带伙伴：各职业的底子按模拟补一点（和尚自己扛得住，不补）
+  cls: { berserker: { hpPct: 20, dmgPct: 30 }, mage: { hpPct: 80, dmgPct: 40 }, necro: { hpPct: 80, dmgPct: 80, minionPct: 60 }, assassin: { hpPct: 40, dmgPct: 40 }, paladin: {} },
+  start: { necro: ['summon', 'shidu'], assassin: ['venom', 'bingpo'] } };   // 2026-11-25 塔里僵尸改成吃你的伤害、暴击（同幻境），赶尸人伤害补偿 150 → 80：打塔主步数 227 → 121，最高层中位约 30 → 33（60 局）   // 起手两招（没写的按等级取前两招）   // 塔里不带伙伴：各职业的底子按模拟补一点（和尚自己扛得住，不补）
 const twN = f => Math.round(TW.n0 + TW.nK * (f - 1));   // 第 f 层相当于幻境多少层（妖物强度）
 function twWeek() { return Math.floor(((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000 + 3) / 7); }   // 周一换周（本地时间）
 function twRng(seed) { let s = seed | 0; return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
