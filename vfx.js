@@ -647,13 +647,15 @@ const VFX = (() => {
     // ---- 必杀 ----
     if (c.id === 'ult') {
       const W = arena.clientWidth, H = arena.clientHeight, mid = { x: W * 0.62, y: H * 0.45 }, foes = fps.length ? fps : [mid];
+      if (c.cut) { inkWash(INK); glyphF(mid, ULTS.cutG || '断', '#ffd86a', 150, G * 1.2); shake(7); return Math.round(T * 0.5); }   // 自动出招：只打断蓄力
       inkWash(c.combo ? '#2a0a1a' : INK);
+      const UG = (ULTS[c.cls] || {}).g;   // 2026-11-24 必杀改成职业增益：大字跟着新招名
       switch (c.cls) {
-        case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, '斩', '#ff3a2a', 170, G * 1.4); shake(12); break;
-        case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, '雷', '#e6e0ff', 170, G * 1.4); shake(10); break;
-        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyphF(mid, '鬼', GHOST, 170, G * 1.4); shake(8); break;
-        case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, '杀', G * 1.6); glyphF(mid, '杀', '#ff3a3a', 150, G * 1.2); shake(8); break; }
-        case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyphF(mid, '佛', GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10); break;
+        case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, UG, '#ff3a2a', 170, G * 1.4); shake(12); break;
+        case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, UG, '#e6e0ff', 170, G * 1.4); shake(10); break;
+        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyphF(mid, UG, GHOST, 170, G * 1.4); shake(8); break;
+        case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, '杀', G * 1.6); glyphF(mid, UG, '#ff3a3a', 150, G * 1.2); shake(8); break; }
+        case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyphF(mid, UG, GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10); break;
       }
       if (c.combo) { const ap2 = pos('NG'); if (ap2) foes.forEach((p, i) => later(() => proj('foxfire', ap2, p, T, '#9ad8ff'), 200 + i * 40)); glyphF({ x: W * 0.3, y: H * 0.35 }, '狐', '#ffb3d8', 110, G * 1.3); }
       return Math.round(T * 0.7);

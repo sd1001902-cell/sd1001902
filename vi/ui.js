@@ -1083,7 +1083,7 @@ function formHTML(cls) {
   return `<div class="form"><h4 class="sub-h">Thi trận <small>Vào trận xếp sẵn theo thứ tự này; con nào ngã thì dùng Rung Chuông Gọi Xác gọi lại (thi vị ${cap})</small></h4>
     ${Array.from({ length: cap }, (_, i) => `<div class="frow"><span class="fpos">${i + 1}</span>${ZOMBIE_ORDER.map(z => { const Z = ZOMBIES[z], lock = Z.lv > ch.level;
       return `<button class="fz ${form[i] === z ? 'on' : ''}" ${lock ? 'disabled' : ''} data-act="form" data-arg="${i}|${z}">${SPR.img(Z.spr, 26, Z.pal)}<b>${Z.n}</b><small>${lock ? Z.lv + " cấp" : esc(Z.d.split(", ")[0])}</small></button>`; }).join('')}</div>`).join('')}
-    <p class="help-p">${ZOMBIE_ORDER.concat('shiwang').map(z => `<b>${ZOMBIES[z].n}</b> (cấp ${ZOMBIES[z].lv}): ${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
+    <p class="help-p">${ZOMBIE_ORDER.map(z => `<b>${ZOMBIES[z].n}</b> (cấp ${ZOMBIES[z].lv}): ${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
 }
 function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
@@ -1517,7 +1517,7 @@ const CAST_NAMES = { ngocHeal: "ném tới một bình thuốc", foxHeal: "dùng
   blade2: "vung đao chém xuống", chain2: "quăng xích sắt", zhengjue: "niệm một câu chính khí quyết", zhengqi: "cao giọng ngâm «Chính Khí Ca»", gen: '', bossHeal: "hút độc khí hồi máu", roar: "ngửa mặt hú dài", enrage: "nổi cuồng bạo", web: "nhả tơ quấn lấy bạn", summon: "gọi đồng bọn tới", phase: "hiện nguyên hình", phoenix: "Lông phượng hoàng bùng cháy" };
 function narrate(o) {
   if (!o.actor || !o.cast || !B) return '';
-  if (o.ult) return `Bạn thi triển tuyệt kỹ “${o.ult.n}”!`;
+  if (o.ult) return o.ult.auto ? "Bạn quát lớn một tiếng, cắt đứt yêu vật đang tụ lực!" : `Bạn thi triển tuyệt kỹ “${o.ult.n}”!`;
   if (o.cast.id === 'charge') return '';
   const u = B.units.find(x => x.id === o.actor); if (!u) return '';
   const dmg = o.pops.filter(p => /^\d+$/.test(p[1])).reduce((a, p) => a + +p[1], 0);
@@ -1613,7 +1613,7 @@ function battleHTML() {
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><button class="statb" id="statc" data-act="statfull" aria-label="Thống kê trận này">TK</button><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
     <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div></div><div class="hud-sk" id="hudsk"></div>
-      <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
+      <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}: ${U.d}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
 </div>`;
 }
 // ---- 状态栏和状态说明 ----
@@ -1636,7 +1636,7 @@ const ST_INFO = {
   chan: ["Thiền", '#fff2b0', 1, "Sát thương phải chịu -45%, bội số phản chấn +50%."],
   renew: ["Hồi xuân", '#5df07a', 1, "Mỗi lượt hồi 6% khí huyết."],
   shield: ["Hộ Thể", '#ffe58a', 1, "Chân khí hộ thể: chặn sát thương trước, chặn hết mới mất máu."],
-  charging: ["Tụ lực", '#ff5a3a', 0, "Thủ lĩnh đang tụ lực, chiêu sau rất nặng. Làm nó choáng là cắt được, tuyệt kỹ cũng cắt được."],
+  charging: ["Tụ lực", '#ff5a3a', 0, "Thủ lĩnh đang tụ lực, chiêu sau rất nặng. Làm nó choáng là cắt được, tuyệt kỹ cũng cắt được (bật tự động ra chiêu thì sẽ tung giúp bạn)."],
   enraged: ["Cuồng Bạo", '#ff5a3a', 0, "Sát thương và tốc độ tăng mạnh."],
   ghost: ["Quỷ thân", '#c39cff', 0, "Hóa thành quỷ ảnh, rất khó đánh trúng. Dùng choáng để nó hiện hình."],
   cocoon: ["Kén tơ", '#e8e0d0', 0, "Nhả tơ bọc lấy mình, chặn sát thương. Dùng thiêu đốt có thể đốt thủng kén tơ."],
@@ -2089,8 +2089,9 @@ function applyStep(o, anim) {
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? "Cơ" : payOn ? "Kết" : k.ap ? STATES[k.ap].n[0] : k.pay ? "Kết" : '';
       return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `Hồi chiêu ${k.left}` : payOn ? "Thu chiêu!" : !k.cd ? "Đánh thường" : "Sẵn sàng"}</small></button>`; }).join('') + '</div>';
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
-    $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full && !B.ultAuto); ub.classList.toggle('queued', !!B.ultReq);
-    $('#ultpct').textContent = B.ultReq ? "Chiêu sau" : full ? (B.ultAuto ? "Đầy" : "Chạm!") : `${r}%`; ub.disabled = B.over; }
+    $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq);
+    $('#ultpct').textContent = B.ultReq ? "Ngay" : full ? "Chạm!" : `${r}%`; ub.disabled = B.over;
+    if (full && !B.over && !SAVE.flags.ult2) { SAVE.flags.ult2 = 1; const U = ULTS[P.cls]; setTimeout(() => toast(`Tuyệt kỹ giờ phải tự chạm: nộ khí đầy thì chạm «Tuyệt kỹ · ${U.n}» — ${U.d}. Không tốn lượt, còn cắt được yêu vương đang tụ lực; nộ khí giữ sang trận sau. Khi bật tự động ra chiêu, chương trình chỉ tung giúp lúc yêu vật tụ lực (chỉ để cắt)`, 6500), 300); } }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = "Đan dược " + SAVE.run.potions;
   drawSbar(); drawStPop();
@@ -3914,7 +3915,7 @@ const ACT = {
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast("Nộ khí chưa đầy"); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? "Tự động<br>ra chiêu" : "Thủ công<br>ra chiêu"; }
-    toast(SAVE.ultAuto ? "Tự động ra chiêu: kỹ năng và tuyệt kỹ đều tự tung" : "Thủ công ra chiêu: chạm kỹ năng phía trên, chiêu sau nhân vật sẽ tung nó; không chạm thì dùng chiêu cơ bản. Nộ khí đầy thì chạm “Tuyệt kỹ”"); if (B) applyStep(null); },
+    toast(SAVE.ultAuto ? "Tự động ra chiêu: kỹ năng tự tung; tuyệt kỹ chỉ tự tung khi yêu vật tụ lực (chỉ để cắt), muốn hiệu ứng tăng cường thì tự chạm «Tuyệt kỹ»" : "Thủ công ra chiêu: chạm kỹ năng phía trên, chiêu sau nhân vật sẽ tung nó; không chạm thì dùng chiêu cơ bản. Nộ khí đầy thì chạm «Tuyệt kỹ» (không tốn lượt)"); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; if (B.castAuto) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;
     if (k.left > 0) return toast(`“${k.n}” còn ${k.left} chiêu nữa mới hồi xong`); B.castReq = B.castReq === id ? null : id; SFX.play('click'); applyStep(null); if (B.waiting && B.castReq) { B.waiting = false; clearTimeout(timer); tick(); } },
   btarget: id => { if (!B || B.over) return; B.target = B.target === id ? null : id; SFX.play('click'); applyStep(null); },

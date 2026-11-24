@@ -1774,7 +1774,7 @@ function startBattle(run, kind) {
               xDouble: s.xDouble || 0, xRage: s.xRage || 0, xTen: s.xTen || 0, xDr: s.xDr || 0, xLast: s.xLast || 0, xHaste: s.xHaste || 0, hasteN: s.xHaste ? 2 : 0, xKill: s.xKill || 0, xCritNext: s.xCritNext || 0,
               lgv: s.lgv || {}, lowHpK: s.lowHpK || 0, thornK: (s.thornK || 0) + (s.fx.has('thornsPct') ? 60 : 0), ssN: 0,
               zhen: 0, thornDmg: s.thornDmg || 0, yi: yiOf(ch), fonu: 0, jy: s.jy || {}, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
-              fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: 25 };
+              fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: run.rage != null ? Math.min(100, run.rage) : 25 };   // 2026-11-24 怒气跨场保留（同一趟里）
   const encU = run.encUnits; delete run.encUnits;
   const b = { kind, P, units: [P, ...(encU || makeEncounter(run, kind, cell))], corpses: 0, turn: 0, over: false, win: false,
               dead: [], extraLoot: 0, cheated: false, phoenix: false, run, goblinEscaped: false, ultAuto: true, castAuto: true, castReq: null, ultReq: false, ults: 0, reacts: 0 };
@@ -2057,6 +2057,12 @@ function battleStep(b) {
   const out = { lines: [], pops: [], actor: null, cast: null };
   if (b.over) return out;
   BNOW = b;
+  // 必杀（2026-11-24）：不占出手，按下去下一步立刻放；自动出招时只在妖物蓄力时替你放（只打断）
+  if (b.P && b.P.hp > 0 && b.P.rage >= 100) { const foes = aliveOf(b, 'e');
+    if (foes.length && (b.ultReq || (b.ultAuto && foes.some(f => f.charging)))) { out.actor = 'P'; out.dt = 0; ultimate(b, b.P, foes, out, !b.ultReq);
+      if (b.P.lgv && b.P.lgv.tiangang != null) { b.P.st.tg = 3; out.pops.push(['P', "Thiên Cương", 'buff']); }   // 天罡玉：必杀后两招加伤
+      resolveDeaths(b, out); return out; } }
+  b.ultReq = false;
   const live = b.units.filter(u => u.hp > 0);
   let actor = null, bt = Infinity;
   for (const u of live) { const t = (100 - u.g) / spdOf(u); if (t < bt) { bt = t; actor = u; } }
@@ -2091,7 +2097,7 @@ function act(b, u, out) {
   }
   if (u.st.frozen) { delete u.st.frozen; if (u.frzA) { u.frzA = false; if (u.side === 'e' && b.P && b.P.cls === 'paladin') thornHit(b, b.P, u, out, { thf: 1 }); if (u.hp <= 0) { out.actor = null; return; } } if (u.charging) { delete u.charging; out.pops.push([u.id, "Ngắt", 'buff']); out.lines.push(`${u.name} bị đánh choáng, tụ lực bị ngắt!`); } else out.lines.push(`${u.name} bị choáng`); out.actor = null; return; }
   if (u.trait === 'regen' && u.hp > 0 && !u.st.burn && !(riftB(b) && u.st.poison)) heal(u, u.maxHp * (riftB(b) ? R_REGEN : 0.05), out);   // 幻境里精英血厚三倍多，回 5% 打不动：改成 2%，中毒也压得住
-  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'tg', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG', 'liuDr', 'tieArm']) if (u.st[k] && --u.st[k] <= 0) {
+  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'tg', 'rumo', 'jsh', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG', 'liuDr', 'tieArm']) if (u.st[k] && --u.st[k] <= 0) {
     delete u.st[k];
     if (k === 'smoke' && u.kind === 'hero' && u.fx && u.fx.has('cJinchan') && u.hp > 0) {   // 金蝉手：烟遁散了，回血、清负面
       heal(u, u.maxHp * 0.15, out); for (const z of ['frozen', 'poison', 'burn', 'slow', 'curse', 'weak', 'vuln', 'melt']) delete u.st[z]; delete u.st.weakV; out.pops.push([u.id, "Kim Thiền", 'buff']); }
@@ -2204,20 +2210,32 @@ function ngocAct(b, u, out) {
 }
 
 // ---------------- 必杀技 ----------------
+// 2026-11-24 改成主动按钮（用户定）：怒气满了点「必杀」才有职业增益（加上打断妖王蓄力、伙伴合击）；
+//   自动出招时程序只在妖物蓄力时替你放，只有打断效果。怒气同一趟里跨场保留。增益收着做：必杀带来的伤害占比压在一成以内
 const ULTS = {
-  berserker: { n: "Bá Đao Trảm", g: "Trảm", elem: 'phys', wx: 'jin' },
-  mage:      { n: "Thiên Lôi Dẫn", g: "LÔI", elem: 'light', wx: 'mu' },
-  necro:     { n: "Vạn Quỷ Phệ Hồn", g: "QUỶ", elem: 'magic', wx: 'shui' },
-  assassin:  { n: "Thiên Nhận Sát", g: "SÁT", elem: 'phys', wx: 'jin' },
-  paladin:   { n: "Như Lai Thần Chưởng", g: "PHẬT", elem: 'holy', wx: 'tu' },
+  berserker: { n: "Nhập Ma", g: "MA", elem: 'phys', wx: 'jin', d: "Nộ ý +25; trong hai lượt sát thương +10%, 10% sát thương gây ra hồi thành khí huyết" },
+  mage:      { n: "Ngũ Hành Quy Nhất", g: "QUY", elem: 'light', wx: 'mu', d: "«Liên» +2 tầng; mục tiêu hiện tại bị treo ngẫu nhiên một trong Thiêu đốt, Đóng băng, Phá giáp, Trúng độc" },
+  necro:     { n: "Bách Quỷ Hoàn Hồn", g: "QUỶ", elem: 'magic', wx: 'shui', d: "Gọi lại một con cương thi đã ngã; độc trên mọi yêu vật lập tức kết toán một lần, không xóa tầng độc" },
+  assassin:  { n: "Vô Ảnh Thiên Nhận", g: "ẢNH", elem: 'phys', wx: 'jin', d: "Sát ý +2; ngẫu nhiên hai chiêu đang hồi lập tức dùng lại được" },
+  cutG: "ĐOẠN",
+  paladin:   { n: "Kim Thân", g: "PHẬT", elem: 'holy', wx: 'tu', d: "«Chấn» +3 tầng; nhận hộ thể bằng 10% khí huyết, trong hai lượt Phản chấn +30%" },
 };
-function ultimate(b, P, foes, out) {
+// 数值是模拟定的（毕业号 360 层，怒气满就按）：各流派必杀带来的提速大多在一成以内；血海带天罡玉打妖王接近两成（天罡玉本来就是吃必杀的）
+const ULT = { furyAdd: 25, rmDmg: 0.1, rmLee: 0.1, rmT: 3, lian: 2, sts: 1, zomb: 1, duK: 1, ki: 2, cdN: 2, zhen: 3, jsSh: 0.1, jsThk: 0.3, jsT: 3, sw: 0 };   // 两回合：状态在自己回合开头扣，记 3；sw 尸王不再召出
+function lianCap(P) { return (P.fx.has('tianshi') ? 7 : 5) + (P.fx.has('wTaiyi') ? 2 : 0); }
+function ultimate(b, P, foes, out, autoCut) {
   P.rage = 0; b.ultReq = false; b.ults++;
+  const U = ULTS[P.cls];
+  let cut = 0;
+  for (const f of foes) if (f.charging) { delete f.charging; cut++; out.pops.push([f.id, "Ngắt", 'buff']); out.lines.push(`Tụ lực của ${f.name} bị ngắt!`); }
+  if (autoCut) {   // 自动出招：只替你打断
+    out.ult = { cls: P.cls, n: "Ngắt", g: ULTS.cutG, combo: false, auto: 1 }; out.cast = { id: 'ult', elem: U.elem, aoe: true, cls: P.cls, cut: 1 };
+    out.lines.push("Nhân lúc nó tụ lực, bạn quát lớn một tiếng cắt đứt nó!"); return;
+  }
   const NG = b.units.find(u => u.kind === 'ally' && u.hp > 0);
   const J = b.units.filter(u => u.kind === 'ally' && u.hp > 0 && u.rage >= 100);   // 怒气满的伙伴一起出手
   const combo = J.length > 0;
   J.forEach(u => { u.rage = 0; });
-  const U = ULTS[P.cls], m = 1 + 0.3 * J.length;
   out.ult = { cls: P.cls, n: combo ? (J.length > 1 ? `${J.length + 1} người hợp kích · ` : "Song nhân hợp kích · ") + U.n : U.n, g: U.g, combo, comp: NG && NG.comp, sprs: J.map(u => u.spr) };
   out.cast = { id: 'ult', elem: U.elem, aoe: true, cls: P.cls, combo };
   out.lines.push(combo ? `Bạn và ${J.map(u => u.name).join(", ")} cùng ra tay — “${U.n}”!` : `Tuyệt kỹ “${U.n}”!`);
@@ -2230,18 +2248,22 @@ function ultimate(b, P, foes, out) {
     else if (u.cid === 'liu') { b.liuDrV = Math.max(b.liuDrV || 0, u.afl >= 10 ? 0.3 : 0.2); b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.liuDr = 4; }); out.pops.push([u.id, "Kinh thanh", 'buff']); }
     else if (u.cid === 'tie') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.tieArm = 4; }); foes.forEach(f => stSet(u, f, 'burn', out)); out.pops.push([u.id, "Hỏa súng tề minh", 'buff']); }
   });
-  // 打断首领蓄力
-  for (const f of foes) if (f.charging) { delete f.charging; out.pops.push([f.id, "Ngắt", 'buff']); out.lines.push(`Tụ lực của ${f.name} bị ngắt!`); }
-  const o = { ult: 1, aoe: 1, wx: U.wx };
   switch (P.cls) {
-    case 'berserker': { let tot = 0; foes.forEach(f => { tot += hit(b, P, f, 3.2 * m, 'phys', out, o); }); heal(P, tot * 0.3, out); break; }
-    case 'mage': for (let i = 0; i < 6; i++) { const al = aliveOf(b, 'e'); if (!al.length) break; hit(b, P, RNG.pick(al), 1.3 * m, 'light', out, o); } break;
-    case 'necro': foes.forEach(f => { hit(b, P, f, (P.lv >= 25 ? 1.6 : 2.6) * m, 'magic', out, o); if (f.hp > 0) { f.st.curse = 3; f.st.curseB = true; } });
-      if (P.lv >= 25 && !zombiesOf(b).some(z => z.zt === 'shiwang')) { makeZombie(b, P, 'shiwang', 9); out.lines.push("Mặt đất nứt ra — Thi Vương bò lên!"); } break;
-    case 'assassin': for (let i = 0; i < 7; i++) { const al = aliveOf(b, 'e'); if (!al.length) break; const t = al.reduce((a, c) => c.hp / c.maxHp < a.hp / a.maxHp ? c : a); hit(b, P, t, 0.75 * m, 'phys', out, o); } break;
-    case 'paladin': foes.forEach(f => hit(b, P, f, 2.6 * m, 'holy', out, o)); heal(P, P.maxHp * 0.2, out); P.shield = Math.max(P.shield, Math.round(P.maxHp * 0.15)); break;
+    case 'berserker': P.fury = Math.min(100, (P.fury || 0) + ULT.furyAdd); P.st.rumo = ULT.rmT; out.pops.push(['P', "Nhập Ma", 'crit']); break;
+    case 'mage': { P.lian = Math.min(lianCap(P), (P.lian || 0) + ULT.lian); out.pops.push(['P', `Liên ${P.lian}`, 'buff']);
+      const pool = ['burn', 'chill', 'armor', 'poison'];
+      const t = (b.target && foes.find(f => f.id === b.target)) || foes[0], L = pool.slice(); for (let k = 0; k < ULT.sts && L.length; k++) stSet(P, t, L.splice(RNG.i(0, L.length - 1), 1)[0], out); break; }   // 挂在当前目标身上
+    case 'necro': {
+      const n = summonSkel(b, P, P.runes.summon || null, ULT.zomb); if (n) out.pops.push(['P', "Dậy xác", 'buff']);
+      if (ULT.sw && P.lv >= 25 && !zombiesOf(b).some(z => z.zt === 'shiwang')) { makeZombie(b, P, 'shiwang', 9); out.lines.push("Mặt đất nứt ra — Thi Vương bò lên!"); }
+      const K = ULT.duK * (P.fx.has('duXing6') ? DUXING_BURST : 1) * (P.fx.has('wWandu') ? 1 + P.wpK : 1);
+      foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(ps.d * ps.t * K), proc: 1, aoe: 1, raw: 1, ult: 1 }); } }); break; }
+    case 'assassin': { P.ki = Math.min(P.kiMax, (P.ki || 0) + ULT.ki); out.pops.push(['P', `Sát ý ${P.ki}`, 'buff']);
+      const cd = P.skills.filter(k => k.left > 0); for (let k = 0; k < ULT.cdN && cd.length; k++) cd.splice(RNG.i(0, cd.length - 1), 1)[0].left = 0; break; }
+    case 'paladin': { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * ULT.jsSh)); P.st.jsh = ULT.jsT; out.pops.push(['P', "Kim Thân", 'crit']);
+      P.zhen = (P.zhen || 0) + ULT.zhen; if (P.zhen >= jzNeed(P)) { P.zhen = 0; jinZhen(b, P, (P.thornK || 0) * (1 + (P.thornDmg || 0) / 100), out); } break; }
   }
-  if (combo) { const cw = NG.wx || 'huo'; aliveOf(b, 'e').forEach(f => hit(b, NG, f, 1.2, WX_ELEM[cw], out, { ...o, wx: cw })); heal(P, P.maxHp * 0.1, out); }
+  if (combo) { const cw = NG.wx || 'huo'; aliveOf(b, 'e').forEach(f => hit(b, NG, f, 1.2, WX_ELEM[cw], out, { ult: 1, aoe: 1, wx: cw })); heal(P, P.maxHp * 0.1, out); }
 }
 function skillReady(b, P, sk, foes) {
   switch (sk.id) {
@@ -2334,7 +2356,6 @@ function heroAct(b, P, out) {
   if (P.hp / P.maxHp < 0.35 && run.potions > 0) drinkPotion(b, out);   // 兜底：气血低于 35% 自动吃一颗
   for (const sk of P.skills) if (sk.left > 0) sk.left--;
   let foes = aliveOf(b, 'e'); if (!foes.length) return;
-  if (P.rage >= 100 && (b.ultAuto || b.ultReq)) { ultimate(b, P, foes, out); if (P.lgv && P.lgv.tiangang != null) { P.st.tg = 3; out.pops.push(['P', "Thiên Cương", 'buff']); } return; }   // 天罡玉：必杀后两招加伤
   let sk;
   if (b.castAuto) sk = autoPick(b, P, foes);
   else { sk = b.castReq && P.skills.find(k => k.id === b.castReq && k.left <= 0); b.castReq = null; if (!sk) sk = P.skills.find(k => !k.cd); }
@@ -2726,6 +2747,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src === b.P && fx.has('gGamble') && !opt.proc && opt.flat == null && tgt.side === 'e') { const r = Math.random(); if (r < 0.1) { gam = 3; out.pops.push(['P', "Cô chú", 'crit']); } else if (r < 0.2) { out.pops.push([tgt.id, "Đánh hụt", 'miss']); return 0; } }
   let d = opt.flat != null ? opt.flat : src.atk * mult * (1 + (src.dmgPct || 0) / 100 + (elem !== 'phys' ? (src.elem || 0) / 100 : 0));
   if (src.st.warcry) d *= 1.4;
+  if (src.st.rumo) d *= 1 + ULT.rmDmg;   // 狂刀客必杀「入魔」
   if (src.kind === 'hero') {   // 职业的看家本事
     if (src.cls === 'berserker') { d *= (src.fury >= 50 ? 1.15 * (src.lgv && src.lgv.zhanhun != null ? 1 + LGV.zhHalf(src.lgv.zhanhun) / 100 : 1) : 1) * (1 + (0.03 + (src.lowHpK || 0) / 100) * Math.floor((1 - src.hp / src.maxHp) * 10)); }   // 战魂玉：怒意过半加伤、残血加伤
     if (src.cls === 'mage' && src.lian) d *= 1 + src.lian * (0.08 + (src.lianPct || 0) / 100);
@@ -2970,6 +2992,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   let lee = (src.leech || 0) / 100 * (fx && fx.has('vampire') ? 2 : 1) * (fx && fx.has('wXiuluo') && src.hp / src.maxHp < 0.5 ? 2 : 1);
   if (src.aff && src.aff.includes('vamp')) lee += 0.3;
   if (src.st.warcry && src.runes && src.runes.warcry === 'b') lee += 0.1;
+  if (src.st.rumo) lee += ULT.rmLee;
   if (lee && src.kind === 'hero' && src.cls !== 'berserker') { const k = BK || 1; lee *= (0.3 + 0.7 / (k * k)) / k; }   // 三成；刚出门那几级气血还没放大多少，吸血也就还没怎么缩，平滑过渡
   if (lee) heal(src, d * lee, out, true);
   if (opt.proc) return d;
@@ -3056,6 +3079,7 @@ function thornHit(b, tgt, src, out, opt) {
   const tfx = tgt.fx || new Set(), chan = !!tgt.st.chan, monk = tgt.cls === 'paladin', lh4 = chan && tfx.has('luoHan4');
   let K = (tgt.thornK || 0) + (chan && monk ? THORN_TAUNT : 0); if (K <= 0) return;
   if (lh4) K *= 2;
+  if (tgt.st.jsh) K *= 1 + ULT.jsThk;   // 和尚必杀「金身」
   K *= 1 + (tgt.thornDmg || 0) / 100;
   const d = hit(b, tgt, src, K * f / 100, 'holy', out, { proc: 1, refl: 1, tag: "Phản chấn" });
   if (!monk) return;
@@ -3137,7 +3161,7 @@ function resolveDeaths(b, out) {
 function dropItem(run, q, ilvl, mf) { return makeItem({ ilvl, rarity: rollRarity(q, mf, dOf(run).loot), cls: run.cls }); }
 function finishBattle(b) {
   const run = b.run, s = runStats(run);
-  run.hp = Math.max(0, Math.min(b.P.hp, s.maxHp));
+  run.hp = Math.max(0, Math.min(b.P.hp, s.maxHp)); run.rage = Math.round(b.P.rage || 0);
   const res = { win: b.win, xp: 0, gold: 0, items: [], levels: 0, gems: [], mats: 0, zy: [], key: false, goblin: b.goblinEscaped ? 'fled' : null, stat: b.stat || null, hs: b.hs || null };
   run.stat = mergeStat(run.stat, b.stat); run.hs = mergeHs(run.hs, b.hs);
   if (!b.win) return res;

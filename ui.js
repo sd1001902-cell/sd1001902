@@ -1082,7 +1082,7 @@ function formHTML(cls) {
   return `<div class="form"><h4 class="sub-h">尸阵 <small>开战时按这个顺序列好阵；倒下的用摇铃唤尸补回来（尸位 ${cap}）</small></h4>
     ${Array.from({ length: cap }, (_, i) => `<div class="frow"><span class="fpos">${i + 1}</span>${ZOMBIE_ORDER.map(z => { const Z = ZOMBIES[z], lock = Z.lv > ch.level;
       return `<button class="fz ${form[i] === z ? 'on' : ''}" ${lock ? 'disabled' : ''} data-act="form" data-arg="${i}|${z}">${SPR.img(Z.spr, 26, Z.pal)}<b>${Z.n}</b><small>${lock ? Z.lv + ' 级' : esc(Z.d.split('，')[0])}</small></button>`; }).join('')}</div>`).join('')}
-    <p class="help-p">${ZOMBIE_ORDER.concat('shiwang').map(z => `<b>${ZOMBIES[z].n}</b>（${ZOMBIES[z].lv} 级）：${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
+    <p class="help-p">${ZOMBIE_ORDER.map(z => `<b>${ZOMBIES[z].n}</b>（${ZOMBIES[z].lv} 级）：${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
 }
 function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
@@ -1516,7 +1516,7 @@ const CAST_NAMES = { ngocHeal: '扔来一瓶药', foxHeal: '用狐火为你疗�
   blade2: '挥刀劈下', chain2: '甩出锁链', zhengjue: '念了一句正气诀', zhengqi: '高声诵读《正气歌》', gen: '', bossHeal: '吸取毒气回血', roar: '仰天长啸', enrage: '狂暴了', web: '吐丝缠住了你', summon: '召来帮手', phase: '现出真身', phoenix: '凤凰之羽爆燃' };
 function narrate(o) {
   if (!o.actor || !o.cast || !B) return '';
-  if (o.ult) return `你施展必杀「${o.ult.n}」！`;
+  if (o.ult) return o.ult.auto ? '你一声断喝，打断了妖物蓄力！' : `你施展必杀「${o.ult.n}」！`;
   if (o.cast.id === 'charge') return '';
   const u = B.units.find(x => x.id === o.actor); if (!u) return '';
   const dmg = o.pops.filter(p => /^\d+$/.test(p[1])).reduce((a, p) => a + +p[1], 0);
@@ -1612,7 +1612,7 @@ function battleHTML() {
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><button class="statb" id="statc" data-act="statfull" aria-label="本场统计">统</button><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
     <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div></div><div class="hud-sk" id="hudsk"></div>
-      <button class="ultb" id="ultb" data-act="ult" title="必杀·${U.n}"><i id="ultfill"></i><span><b>必杀</b><small id="ultpct"></small></span></button>
+      <button class="ultb" id="ultb" data-act="ult" title="必杀·${U.n}：${U.d}"><i id="ultfill"></i><span><b>必杀</b><small id="ultpct"></small></span></button>
 </div>`;
 }
 // ---- 状态栏和状态说明 ----
@@ -1635,7 +1635,7 @@ const ST_INFO = {
   chan: ['禅', '#fff2b0', 1, '受到的伤害 -45%，反震倍率 +50%。'],
   renew: ['回春', '#5df07a', 1, '每回合回 6% 气血。'],
   shield: ['护体', '#ffe58a', 1, '护体真气：先挡伤害，挡完才掉血。'],
-  charging: ['蓄力', '#ff5a3a', 0, '首领在憋大招，下一招很重。打晕它能打断，必杀也能打断。'],
+  charging: ['蓄力', '#ff5a3a', 0, '首领在憋大招，下一招很重。打晕它能打断，必杀也能打断（开着自动出招时会替你放）。'],
   enraged: ['狂暴', '#ff5a3a', 0, '伤害和速度大增。'],
   ghost: ['鬼身', '#c39cff', 0, '化成鬼影，很难打中。用眩晕让它现形。'],
   cocoon: ['丝茧', '#e8e0d0', 0, '吐丝裹住自己，挡伤害。用灼烧能把丝茧烧穿。'],
@@ -2088,8 +2088,9 @@ function applyStep(o, anim) {
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? '普' : payOn ? '收' : k.ap ? STATES[k.ap].n[0] : k.pay ? '收' : '';
       return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`; }).join('') + '</div>';
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100;
-    $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full && !B.ultAuto); ub.classList.toggle('queued', !!B.ultReq);
-    $('#ultpct').textContent = B.ultReq ? '下一招' : full ? (B.ultAuto ? '满' : '点我！') : `${r}%`; ub.disabled = B.over; }
+    $('#ultfill').style.width = r + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq);
+    $('#ultpct').textContent = B.ultReq ? '马上' : full ? '点我！' : `${r}%`; ub.disabled = B.over;
+    if (full && !B.over && !SAVE.flags.ult2) { SAVE.flags.ult2 = 1; const U = ULTS[P.cls]; setTimeout(() => toast(`必杀要自己点了：怒气满了点「必杀·${U.n}」——${U.d}。不占出手，还能打断妖王蓄力；怒气留到下一场。开着自动出招时，程序只在妖物蓄力时替你放（只打断）`, 6500), 300); } }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
   drawSbar(); drawStPop();
@@ -3913,7 +3914,7 @@ const ACT = {
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast('怒气还没满'); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? '自动<br>出招' : '手动<br>出招'; }
-    toast(SAVE.ultAuto ? '自动出招：技能和必杀都自动放' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」'); if (B) applyStep(null); },
+    toast(SAVE.ultAuto ? '自动出招：技能自动放；必杀只在妖物蓄力时替你放（只打断），想要增益就自己点「必杀」' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」（不占出手）'); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; if (B.castAuto) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;
     if (k.left > 0) return toast(`「${k.n}」还要冷却 ${k.left} 招`); B.castReq = B.castReq === id ? null : id; SFX.play('click'); applyStep(null); if (B.waiting && B.castReq) { B.waiting = false; clearTimeout(timer); tick(); } },
   btarget: id => { if (!B || B.over) return; B.target = B.target === id ? null : id; SFX.play('click'); applyStep(null); },
