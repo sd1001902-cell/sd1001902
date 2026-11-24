@@ -1823,7 +1823,7 @@ function startBattle(run, kind) {
   if (s.fx.has('gDrum')) for (const u of b.units) if (u.kind === 'ally' || u.kind === 'minion') u.g = 100;                                                                          // 聚将鼓
   if (s.fx.has('cShiyu')) for (const u of b.units) if (u.kind === 'ally') { u.maxHp = u.hp = Math.round(u.maxHp * 1.3); u.atk *= 1.3; }   // 尸语冠
   if (P.allyPct || P.jy.tongpao) for (const u of b.units) if (u.kind === 'ally') { const k = (1 + (P.allyPct || 0) / 100) * (1 + (P.jy.tongpao || 0) / 100); u.maxHp = u.hp = Math.round(u.maxHp * k); u.atk *= k; }   // 同心玉；九幽·同袍（只管伙伴）
-  for (const u of b.units) { const k = stKey(u); if (k && !(b.stat && b.stat[k])) { stAddK(b, k, 'dmg', 1e-9); b.stat[k].dmg = 0; } }   // 开战就有统计框：你、每个伙伴、僵尸先各占一行
+  for (const u of b.units) { const k0 = stKey(u), k = k0 === 'Z' ? 'P' : k0; if (k && !(b.stat && b.stat[k])) { stAddK(b, k, 'dmg', 1e-9); b.stat[k].dmg = 0; } }   // 开战就有统计框：你、每个伙伴、僵尸先各占一行
   applyForm(b, run);   // 阵法：号位加成、前后排、克制
   { const bz = b.units.filter(u => u.kind === 'boss'); if (bz.length) b.bossHp0 = bz.reduce((a, u) => a + u.hp / u.maxHp, 0) / bz.length; }   // 开打时首领剩几成血（幻境妖王可能是上次打剩的）
   if (P.yi.xianling || P.yi.zhizhu) for (const f of b.units) if (f.side === 'e') {
@@ -2057,6 +2057,7 @@ const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'bos
 const stKey = u => !u ? null : u.kind === 'minion' ? 'Z' : u.side === 'p' && u.kind !== 'ward' ? u.id : null;
 function stAddK(b, k, f, v) {
   if (!b || !k || !(v > 0)) return; b.stat = b.stat || {};
+  if (k === 'Z') { if (f === 'taken') return; if (f === 'dmg') hsDmg(b, '僵尸', v); k = 'P'; }   // 2026-11-25 用户：僵尸的输出算在你头上（你的输出来源里单列一项「僵尸」）；僵尸挨的打不算进你的承伤
   let r = b.stat[k]; if (!r) { const u = k === 'Z' ? null : b.units.find(x => x.id === k); r = b.stat[k] = { n: k === 'Z' ? '僵尸' : u ? u.name : k, cid: k === 'P' || k === 'Z' ? k : (u && (u.cid || (u.fox ? 'ngoc' : u.comp))) || k, dmg: 0, ctrl: 0, heal: 0, shield: 0, taken: 0, guard: 0 }; }
   r[f] += v;
 }
@@ -2104,7 +2105,7 @@ function act(b, u, out) {
     const d = u.st[k]; if (!d) continue;
     const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
     if (u.side === 'e' && (d.by || 'P') === 'P') hsDmg(b, '持续伤害', Math.min(dmg, dmg + Math.min(0, u.hp))); else if (u === b.P) { const h = hsOf(b); h.raw += dmg; h.hp += dmg; }
-    out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : '']);
+    out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : d.by === 'Z' ? 'Z' : '']);
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
     if (u.hp <= 0 && u.kind === 'hero') heroSave(b, u, out);
     if (u.hp <= 0) { out.lines.push(`${u.name}${k === 'burn' ? '被烧' : '被毒'}死了`); return; }
@@ -2967,7 +2968,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (tgt.side === 'e') stAdd(b, src, 'dmg', d + Math.min(0, tgt.hp)); else stAdd(b, tgt, 'taken', d);
   if (hsT) hsT.hp += d;
   else if (src === b.P && tgt.side === 'e') { hsDmg(b, opt.tag || (opt.ult ? '必杀' : !opt.proc && b.castSk ? b.castSk.n : '特效'), d + Math.min(0, tgt.hp)); if (!opt.proc && !opt.tag && !opt.ult) { const h = hsOf(b); h.n++; if (crit) h.cr++; } }
-  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem, 0, src === b.P ? 'P' : '', opt.tag || '']);
+  out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem, 0, src === b.P ? 'P' : src.kind === 'minion' ? 'Z' : '', opt.tag || '']);   // 僵尸打的也标出来：只看主角时一起跳
   if (tgt.side === 'e' && b.P && b.P.fx) {   // 职业神兵：打中之后
     const PF = b.P.fx;
     if (src === b.P && tgt.st.melt && PF.has('cMeltFury') && b.mfAt !== b.pr) { b.mfAt = b.pr; src.fury = Math.min(100, (src.fury || 0) + 4); }          // 嗜战刀鞘

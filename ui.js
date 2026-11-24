@@ -2099,7 +2099,7 @@ function applyStep(o, anim) {
       const tu = B.units.find(u => u.id === id);
       if (isSt || reactN.has(txt0)) continue;   // 状态名挂在身上、连招名在顶上横幅里，不在人头上飘
       const txt = c === 'thorn' ? txt0.replace(/^\D+/, '') : txt0, dmgN = /^\d+$/.test(txt), dot = /^-\d+$/.test(txt);
-      const onHero = id === 'P', mine = by === 'P' || c === 'thorn' && by === 'P';
+      const onHero = id === 'P', mine = by === 'P' || by === 'Z';   // 僵尸打的算你的（2026-11-25）
       let show = true;
       if (!ALL) {   // 只看主角：妖物身上只跳主角打的（含普攻，累计成一个数）；主角身上跳小号掉血、回血、格挡闪避；伙伴、僵尸身上不跳
         if (tu && tu.side === 'e') show = mine && (dmgN || dot);   // 2026-11-24 累计以后普攻也算进总数
