@@ -657,7 +657,8 @@ const hpShow = (v, lv) => Math.round(v * hpK(lv));
 const heroLv = () => { try { return SAVE.chars[SAVE.cls].level || 1; } catch (e) { return 1; } };
 // 各职业的续航：狂刀客靠吸血；别的职业吸血只有三成（按放大后的气血算），各有各的路子。sust = 续航强度加成（%）
 // 妖物打主角一方的伤害整体上调（MON_UP），换来各职业本职续航更有分量；两边一起调，胜率对齐改之前
-let MON_UP = 1.3;   // 1 / 1.3 ≈ 0.77：狂刀客的 23% 减伤就是照这个数定的
+let MON_UP = 1.3;
+let DR_CAP = 0.7;   // 2026-11-24 主角各种「受到的伤害 -x%」连乘后最多减七成（护甲、全抗另算）。罗汉叠了狮子吼、佛怒、不动明王、金钟玉、职业减伤，850 层挨的伤害能减掉 97.5%   // 1 / 1.3 ≈ 0.77：狂刀客的 23% 减伤就是照这个数定的
 const SUST = {
   berserker:{ n: "Huyết chiến", d: "Da dày thịt chắc: sát thương phải chịu -{dr}%; hút máu có hiệu lực trọn vẹn (gây ra bao nhiêu sát thương thì hồi máu theo tỉ lệ hút máu bấy nhiêu)", dr: 23 },
   mage:     { n: "Thủy hành hộ thể", d: "Mỗi lần nối thêm một tầng “Liên”, trên người thêm một lớp hộ thể ({a}% khí huyết tối đa, cộng dồn tối đa {cap}%)", a: 6.5, cap: 45 },
@@ -1254,8 +1255,9 @@ const MW = 5, MH = 6;
 // 改后 80 层 ≈ 原来 67 层，100 层 ≈ 原来 73 层，原来 80 层的难度落在 125–130 层
 const R_LIN = [50, 0.08, 0.05, 0.7];
 const R_HI = [150, 0.10, 0.06];   // 2026-11-23 150 层以后每层涨得更快（用户：线性从 6 提到 10）：气血每层 +10%、攻击每层 +6%（都按 50 层的数值算），小怪、精英、妖王一样
-const rLinHp = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[1] * Math.max(0, N - R_HI[0]); };
-const rLinAtk = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[2] * Math.max(0, N - R_HI[0]); };
+const R_HI2 = [300, 0.10, 0.06];   // 300 层以后每层涨多少（气血、攻击，按 50 层的数值算）；和 R_HI 一样就是不变
+const rLinHp = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[1] * Math.max(0, Math.min(N, R_HI2[0]) - R_HI[0]) + R_HI2[1] * Math.max(0, N - R_HI2[0]); };
+const rLinAtk = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[2] * Math.max(0, Math.min(N, R_HI2[0]) - R_HI[0]) + R_HI2[2] * Math.max(0, N - R_HI2[0]); };
 const rOldLv = N => 6 + Math.round(N * 1.4);   // 没改之前的妖物等级：幻境里的经验还按它算，免得层数高了经验反而少
 function riftD(N) {
   const M = Math.min(N, R_LIN[0]), k = Math.max(0, N - R_LIN[0]), base = 6 + Math.round(M * 1.4) + Math.round(k * R_LIN[3]), ar = 4 + base * 3.5;
@@ -1930,7 +1932,9 @@ let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
 let YINBING_MUL = 2;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
-let BUSI_HP = 0.03, BUSI_AOE = 5, WANFU_ST = 0.2, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.6, DUXING_DR = 0.13, DUXING_STACK = 5, DUXING_BURST = 2, QIANJI_MUL = 3, DARI_CAP = 0.5, DARI_DMG = 1, DARI_HIT = 2, DARI_REGEN = 0.12;
+// 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
+let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
+let BUSI_HP = 0.04, BUSI_AOE = 5, WANFU_ST = 0.5, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.6, DUXING_DR = 0.13, DUXING_STACK = 8, DUXING_BURST = 3, QIANJI_MUL = 6, DARI_CAP = 0.5, DARI_DMG = 1.5, DARI_HIT = 2, DARI_REGEN = 0.12;
 const emptySlots = (b, P) => Math.max(0, Math.min(4, (P.minionCap || 3)) - zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length);
 const DART_SK = new Set(['venom', 'bingpo', 'fan']), BUSI_SK = new Set(['whirl', 'liedi']);
 // ---------------- 赶尸人的僵尸 ----------------
@@ -1998,7 +2002,7 @@ let BNOW = null;
 const riftB = b => !!(b && b.run && b.run.mode === 'rift' && b.run.world);
 // 幻境守关的蓄力大招（惊堂木、喷火、吞噬这些）：剧情里有道具能克，幻境里没得克，再乘上守关的攻击 ×2.2，满血一下就没（僵尸县令的惊堂木平均打掉 87%，最高 137%）。
 // 幻境里这类大招每下最多打掉目标一半气血：还是要命（后面接着眩晕和普攻），但不会满血秒人
-var R_CAP_HIT = 0.5, R_BOSS_CAP = 0.6;
+var R_CAP_HIT = 0.5, R_BOSS_CAP = 0.4;   // 2026-11-24 守关妖王一次出手最多打掉四成气血（原来六成：高层两下就倒，除了罗汉谁都打不过首领）
 const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'boss' ? 2 : 0] + 1) : 0;
 // ---------------- 小队统计：输出、控制、治疗、护体挡下、承伤、挡刀（按人分；僵尸合一行） ----------------
 const stKey = u => !u ? null : u.kind === 'minion' ? 'Z' : u.side === 'p' && u.kind !== 'ward' ? u.id : null;
@@ -2748,8 +2752,8 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (fx.has('archmage')) d *= 1.15;
     if (fx.has('elemSurge') && elem !== 'phys' && RNG.ch(0.2)) d *= 2;
     if (fx.has('armorHunter') && tgt.st.melt) d *= 1.4;
-    if (fx.has('xueHai6') && src.fury) d *= 1 + src.fury * 0.015;
-    if (fx.has('qiSha6') && src === b.P && b.castSk && b.castSk.fin) d *= 4;
+    if (fx.has('xueHai6') && src.fury) d *= 1 + src.fury * XUEHAI_FURY;
+    if (fx.has('qiSha6') && src === b.P && b.castSk && b.castSk.fin) d *= QISHA_FIN;
     if (fx.has('luoHan6') && src.fonu) d *= 1 + src.fonu * FONU_DMG;
     if (src === b.P && !opt.raw) {
       if (fx.has('buSi6')) d *= (1 + BUSI_HP * 100 * (1 - Math.max(0, src.hp) / src.maxHp)) * (b.castSk && BUSI_SK.has(b.castSk.id) && !opt.proc ? BUSI_AOE : 1);
@@ -2760,7 +2764,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       if (fx.has('youying') && src.st.smoke) d *= 1.5;
     }
   }
-  if (src === b.P && b.guiYuan && !opt.proc) d *= 3;
+  if (src === b.P && b.guiYuan && !opt.proc) d *= GUIYUAN_MUL;
   if (src.side === 'p' && b.P && b.P.yi && b.P.yi.xuanbing && (tgt.st.frozen || tgt.st.slow)) { d *= 1 + (12 + b.P.yi.xuanbing * 6) / 100; if (src === b.P && (!b.xbTold || RNG.ch(0.12))) { b.xbTold = 1; out.yi = 'xuanbing'; out.pops.push([tgt.id, "Phong Trấn", 'cold']); } }
   if (src.xBoss && (tgt.kind === 'boss' || tgt.kind === 'elite')) d *= 1 + src.xBoss / 100;
   if (src.xExec && tgt.hp / tgt.maxHp < 0.3) d *= 1 + src.xExec / 100;
@@ -2777,7 +2781,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   else if (src === b.P && fx && fx.has('qianJi6') && b.castSk && DART_SK.has(b.castSk.id) && tgt.st.poison && !opt.proc) { crit = true; d *= QIANJI_MUL; }
   else if (src === b.P && src.kcOn && !opt.proc) crit = true;
   else if (RNG.ch(((src.crit || 0) + (src === b.P && fx && fx.has('cFuryCrit') ? (src.fury || 0) / 5 : 0)) / 100)) crit = true;   // 战意带：每 10 点怒意暴击 +2%
-  if (src === b.P && b.guiCast && b.castSk && !opt.proc) d *= 1.2;
+  if (src === b.P && b.guiCast && b.castSk && !opt.proc) d *= 1 + GUIYUAN_SW;
   if (crit && src === b.P && fx.has('gReset') && !opt.proc && RNG.ch(0.1)) { const k2 = src.skills.find(k => k.left > 0 && !(b.castSk && b.castSk.id === k.id)); if (k2) { k2.left = 0; out.pops.push(['P', "Hồi phong", 'buff']); } }
   if (crit) { d *= ((src.critDmg || 150) + (src === b.P && fx && fx.has('cKiCrit') ? 10 * (b.kiSnap != null ? b.kiSnap : src.ki || 0) : 0)) / 100;   /* 夜行带：每点杀意暴伤 +10% */ if (fx && fx.has('critStack') && src.stacks < 10) src.stacks++; if (src === b.P) src.cbNext = true; }
   const dRaw = tgt === b.P && src.side === 'e' ? d / ((tgt.st.chan ? 1 - CHAN_DR / 100 : 1) * (tgt.fmR ? 1 - tgt.fmR / 100 : 1) * (tgt.st.butui ? 0.5 : 1)) : 0;   // 主角统计：减伤之前打来多少
@@ -2797,8 +2801,9 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
       else if (P2.x === 'detonate') { d *= 1 + ((fx && fx.has('detPlus') ? 2.3 : 0.8) + (fx && fx.has('wanFu6') ? WANFU_DET : 0)) * has; if (!(fx && fx.has('wanFu6'))) stClear(tgt, 'any'); }
     }
   }
+  const dA = d;   // 减伤封顶用：这一段之前的数
   if (tfx) {
-    if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 0.75;
+    if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 1 - XUEHAI_DR;
     if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
     if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
     if (tfx.has('duXing4') && tgt === b.P) d *= 1 - DUXING_DR * emptySlots(b, tgt);
@@ -2834,6 +2839,9 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     else if (src.side === 'e' && tgt.side === 'p') d *= lvMul(heroLv - (src.lv || heroLv), -0.06, -W_LVUP[1]);
   }
   if (src.side === 'e' && tgt.kind === 'hero') d *= MON_UP * (1 - ((SUST[tgt.cls] || {}).dr || 0) / 100);   // 只加在主角身上；狂刀客皮厚，正好抵掉
+  if (DR_CAP < 1 && src.side === 'e' && tgt === b.P && dA > 0) {   // 各种「受到的伤害 -x%」连乘封顶（护甲、全抗不算在内）
+    const pre = (tgt.st.chan ? 1 - CHAN_DR / 100 : 1) * (tgt.fmR ? 1 - tgt.fmR / 100 : 1) * (tgt.st.butui ? 0.5 : 1), T = pre * d / (dA * MON_UP);
+    if (T < 1 - DR_CAP) d *= (1 - DR_CAP) / T; }
   // 全抗词条不再随等级涨（普通装备第七章从约 48 掉到约 33），妖物打主角的术法伤害按章节相应调低（W_TUNE[章][4]）
   if (src.side === 'e' && tgt.kind === 'hero' && elem !== 'phys' && b.run && b.run.mode === 'story' && b.run.world) d *= (W_TUNE[b.run.chapter] || [])[4] || 1;
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
