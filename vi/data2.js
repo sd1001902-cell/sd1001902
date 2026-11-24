@@ -76,6 +76,7 @@ const LGV = {
   zhLow: lv => 1 + lv * 0.05, zhHalf: lv => 10 + lv * 0.5,     // 战魂：气血每少 10%，伤害再 +x%；怒意过半时伤害 +x%
   wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
   swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
+  kgH: lv => 100 + lv * 1, kgA: lv => 60 + lv * 0.75, kgU: lv => 16 + lv * 0.2,   // 尸王玉召出的尸王：气血、攻击（你的 %）、光环（其他僵尸伤害 +%）。2026-11-25 用户定：120 级 220% / 150% / 40%
   dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
   jsSh: lv => 3 + lv * 0.04,                                    // 金身：挨打反震时得护体（最大气血 %）。2026-11-24 反击并进反震，次数多了，数值降到原来的八成左右
   lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
@@ -95,7 +96,7 @@ const LGEMS = {
   // ---- 本命玉：每门一颗 ----
   zhanhun: { n: "Chiến Hồn Ngọc", c: '#ff6a3a', cls: 'berserker', d: lv => `Nộ ý nhận được +${Math.round(20 + lv)}%; nộ ý quá nửa thì sát thương +${LGV.zhHalf(lv).toFixed(0)}%; khí huyết mỗi lần thiếu 10%, sát thương thêm +${LGV.zhLow(lv).toFixed(1)}% (Huyết Hải, Tu La Bất Tử)`, st: lv => ({ furyGain: 20 + lv, lowHpK: LGV.zhLow(lv) }) },
   wuxing:  { n: "Ngũ Hành Ngọc", c: '#c8a2ff', cls: 'mage', d: lv => `Khi đổi sang hành khác để ra chiêu, ${LGV.wxCh(lv).toFixed(0)}% tỉ lệ gắn lên mục tiêu trạng thái của hành đó (Hỏa thiêu đốt, Thủy băng đông, Thổ phá giáp, Mộc trúng độc, Kim choáng); mỗi tầng “Liên” sát thương thêm +${(1.5 + lv * 0.06).toFixed(1)}% (Quy Nguyên, Vạn Phù)`, st: lv => ({ lianPct: 1.5 + lv * 0.06 }) },
-  shiwang: { n: "Thi Vương Ngọc", c: '#7fd08a', cls: 'necro', d: lv => `Sát thương và khí huyết của cương thi +${Math.round(20 + lv * 0.8)}%; mỗi thi vị còn trống, sát thương trúng độc của bạn +${LGV.swPoi(lv).toFixed(0)}% (Âm Binh, Ngũ Độc)`, st: lv => ({ minionPct: 20 + lv * 0.8 }) },
+  shiwang: { n: "Thi Vương Ngọc", c: '#7fd08a', cls: 'necro', d: lv => `Vào trận gọi một Thi Vương trấn giữ (không chiếm thi vị, mỗi lần ra tay quét mọi yêu vật): khí huyết bằng ${Math.round(LGV.kgH(lv))}% của bạn, công bằng ${Math.round(LGV.kgA(lv))}% của bạn, rồi nhân cường độ cương thi và Đồng Tâm Ngọc; khi có mặt, sát thương các cương thi khác +${Math.round(LGV.kgU(lv))}%; ngã xuống 5 hiệp sau tự bò dậy. Mỗi thi vị trống, sát thương trúng độc của bạn +${LGV.swPoi(lv).toFixed(0)}% (mặc Ngũ Độc Độc Hành thì không gọi Thi Vương)`, st: () => ({}) },   // 2026-11-25 重做：原来是僵尸强度 +(20 + 0.8 × 等级)%
   duopo:   { n: "Đoạt Phách Ngọc", c: '#a0a8ff', cls: 'assassin', d: lv => `Giới hạn Sát ý +1; ám khí (Tiêu Tẩm Độc, Băng Phách Châm, Mạn Thiên Hoa Vũ) trúng thì ${LGV.dpKi(lv).toFixed(0)}% tỉ lệ +1 Sát ý; sát thương đòn kết liễu +${LGV.dpFin(lv).toFixed(0)}% (Thất Sát, Thiên Cơ)`, st: () => ({}) },
   jinshen: { n: "Kim Thân Ngọc", c: '#ffd76a', cls: 'paladin', d: lv => `Bội số phản chấn +${Math.round(30 + lv)}%; mỗi lần bị đánh phản chấn, nhận hộ thể chân khí bằng ${LGV.jsSh(lv).toFixed(1)}% khí huyết tối đa (La Hán, Đại Nhật)`, st: lv => ({ thornK: 30 + lv }) },
   // ---- 打法玉：不绑门派，配对了套装才好用 ----

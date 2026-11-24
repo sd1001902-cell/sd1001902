@@ -76,6 +76,7 @@ const LGV = {
   zhLow: lv => 1 + lv * 0.05, zhHalf: lv => 10 + lv * 0.5,     // 战魂：气血每少 10%，伤害再 +x%；怒意过半时伤害 +x%
   wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
   swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
+  kgH: lv => 100 + lv * 1, kgA: lv => 60 + lv * 0.75, kgU: lv => 16 + lv * 0.2,   // 尸王玉召出的尸王：气血、攻击（你的 %）、光环（其他僵尸伤害 +%）。2026-11-25 用户定：120 级 220% / 150% / 40%
   dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
   jsSh: lv => 3 + lv * 0.04,                                    // 金身：挨打反震时得护体（最大气血 %）。2026-11-24 反击并进反震，次数多了，数值降到原来的八成左右
   lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
@@ -95,7 +96,7 @@ const LGEMS = {
   // ---- 本命玉：每门一颗 ----
   zhanhun: { n: '战魂玉', c: '#ff6a3a', cls: 'berserker', d: lv => `怒意获得 +${Math.round(20 + lv)}%；怒意过半时伤害 +${LGV.zhHalf(lv).toFixed(0)}%；气血每少 10%，伤害再 +${LGV.zhLow(lv).toFixed(1)}%（血海、修罗不死）`, st: lv => ({ furyGain: 20 + lv, lowHpK: LGV.zhLow(lv) }) },
   wuxing:  { n: '五行玉', c: '#c8a2ff', cls: 'mage', d: lv => `换一种五行出招时，${LGV.wxCh(lv).toFixed(0)}% 几率给目标挂上这种五行的状态（火灼烧、水冰冻、土破甲、木中毒、金眩晕）；「连」每层伤害再 +${(1.5 + lv * 0.06).toFixed(1)}%（归元、万符）`, st: lv => ({ lianPct: 1.5 + lv * 0.06 }) },
-  shiwang: { n: '尸王玉', c: '#7fd08a', cls: 'necro', d: lv => `僵尸的伤害和气血 +${Math.round(20 + lv * 0.8)}%；尸位每空一个，你的中毒伤害 +${LGV.swPoi(lv).toFixed(0)}%（阴兵、五毒）`, st: lv => ({ minionPct: 20 + lv * 0.8 }) },
+  shiwang: { n: '尸王玉', c: '#7fd08a', cls: 'necro', d: lv => `开战召出一具尸王坐镇（不占尸位，每次出手横扫所有妖物）：气血是你的 ${Math.round(LGV.kgH(lv))}%、攻击是你的 ${Math.round(LGV.kgA(lv))}%，再乘僵尸强度、同心玉；在场时其他僵尸伤害 +${Math.round(LGV.kgU(lv))}%；倒下 5 回合后自己爬回来。尸位每空一个，你的中毒伤害 +${LGV.swPoi(lv).toFixed(0)}%（穿五毒独行时不召尸王）`, st: () => ({}) },   // 2026-11-25 重做：原来是僵尸强度 +(20 + 0.8 × 等级)%
   duopo:   { n: '夺魄玉', c: '#a0a8ff', cls: 'assassin', d: lv => `杀意上限 +1；暗器（淬毒镖、冰魄针、漫天花雨）打中时 ${LGV.dpKi(lv).toFixed(0)}% 几率 +1 杀意；终结技伤害 +${LGV.dpFin(lv).toFixed(0)}%（七杀、千机）`, st: () => ({}) },
   jinshen: { n: '金身玉', c: '#ffd76a', cls: 'paladin', d: lv => `反震倍率 +${Math.round(30 + lv)}%；每次挨打反震，得到 ${LGV.jsSh(lv).toFixed(1)}% 最大气血的护体真气（罗汉、大日）`, st: lv => ({ thornK: 30 + lv }) },
   // ---- 打法玉：不绑门派，配对了套装才好用 ----

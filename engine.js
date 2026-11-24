@@ -1797,7 +1797,8 @@ function startBattle(run, kind) {
   if (run.cls === 'mage') P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * 0.35));   // 五行道士：护身符箓
   if (run.cls === 'assassin') P.g = Math.max(P.g, 30);   // 夜行刺客：先手
   if (s.fx.has('undeadAlly')) summonSkel(b, P);
-  if (run.cls === 'necro' && !s.fx.has('duXing4')) summonSkel(b, P, P.runes.summon || null, P.minionCap || 3);   // 赶尸人：开战时僵尸已经按尸阵列好，不用先花几回合摇铃（五毒独行不带尸）
+  if (run.cls === 'necro' && !s.fx.has('duXing4')) summonSkel(b, P, P.runes.summon || null, P.minionCap || 3);
+  if (run.cls === 'necro' && !s.fx.has('duXing4') && P.lgv && P.lgv.shiwang != null) kingUp(b, P);   // 尸王玉   // 赶尸人：开战时僵尸已经按尸阵列好，不用先花几回合摇铃（五毒独行不带尸）
   if (P.yi.qingxu) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * (8 + P.yi.qingxu * 4) / 100)); (b.yiPops = b.yiPops || []).push(['P', '丹火护体', 'buff', 'qingxu']); }
   if (P.jy.xuanming) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * P.jy.xuanming / 100)); (b.yiPops = b.yiPops || []).push(['P', '玄冥', 'buff']); }   // 九幽·玄冥
   if (run.encWard) {   // 守护战：一个不能打的人在念，念完就赢；他倒了就输
@@ -1994,7 +1995,7 @@ const ZOMBIES = {
   tiejia:  { n: '铁甲尸', lv: 6,  spr: 'yong', pal: { B: '#4a4a5a' }, hp: 0.7, atk: 0.4, spd: 85, arm: 2.2, ae: 'phys', taunt: 0.6, thornsP: 0.15, d: '前排 · 嘲讽：敌人六成攻击打它，挨打反震' },
   dushi:   { n: '毒尸',   lv: 12, spr: 'swampcorpse', pal: null, hp: 0.32, atk: 0.5, spd: 98, arm: 0.8, ae: 'poison', ap: 'poison', apc: 0.7, d: '后排 · 喷毒，挂中毒' },
   yinhuo:  { n: '阴火尸', lv: 20, spr: 'jiangshi', pal: { B: '#2a3a6a', S: '#9ad0ff' }, hp: 0.3, atk: 0.42, spd: 82, arm: 0.8, ae: 'fire', aoe: 0.8, ap: 'burn', apc: 0.4, d: '后排 · 吐尸火，打所有敌人，挂灼烧' },
-  shiwang: { n: '尸王',   lv: 25, spr: 'jiangshi', pal: { B: '#6a4a10', S: '#e8c13a' }, hp: 1.2, atk: 0.9, spd: 100, arm: 2, ae: 'phys', aoe: 1, life: 4, ult: true, d: '必杀召出，横扫全场 4 回合；在场时所有僵尸攻击 +30%' },
+  shiwang: { n: '尸王',   lv: 1, spr: 'jiangshi', pal: { B: '#6a4a10', S: '#e8c13a' }, hp: 1, atk: 1, spd: 100, arm: 2, ae: 'phys', aoe: 1, ult: true, d: '尸王玉召出，不占尸位，横扫全场；在场时其他僵尸伤害加成' },   // 气血、攻击、光环按尸王玉等级（kingUp）
 };
 const ZOMBIE_ORDER = ['tiaoshi', 'tiejia', 'dushi', 'yinhuo'];
 // 尸阵：赶尸人在武学页排的位置；没排过就按解锁情况给一个顺手的
@@ -2003,6 +2004,13 @@ function necroForm(lv, form) {
   const def = [ok('tiejia') ? 'tiejia' : 'tiaoshi', 'tiaoshi', ok('dushi') ? 'dushi' : 'tiaoshi', ok('yinhuo') ? 'yinhuo' : 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi'];   // 2026-11-25 原来只有 5 格：尸位到 6、7 时后面的位置排了存不住
   return def.map((d, i) => form && ok(form[i]) ? form[i] : d);
 }
+// 尸王玉：开战召一具尸王坐镇（不占尸位）。气血、攻击照主角算（kgH、kgA，%），再乘僵尸强度、同心玉；光环让其他僵尸伤害 +kgU%；倒下 KING_REV 回合后爬回来
+const KING_REV = 5;
+function kingUp(b, P) {
+  const lv = P.lgv.shiwang, u = makeZombie(b, P, 'shiwang', 9, null);
+  u.gemKing = true; u.maxHp = u.hp = Math.round(u.maxHp * LGV.kgH(lv) / 100); u.atk *= LGV.kgA(lv) / 100; u.aura = LGV.kgU(lv) / 100; return u;
+}
+const kingAura = (b, u) => { const k = b.units.find(x => x.gemKing && x.hp > 0 && x !== u); return k ? 1 + k.aura : 1; };
 function makeZombie(b, P, zt, slot, rune) {
   const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + (P.minionPct || 0) / 100) * (1 + (P.allyPct || 0) / 100);
   const hq = P.fx && P.fx.has('huangquan') ? 1.25 : 1;
@@ -2034,8 +2042,8 @@ function summonSkel(b, P, rune, n) {
 function minionAct(b, u, out) {
   if (u.life != null && --u.life < 0) { u.hp = 0; out.lines.push(`${u.name}化成一捧土，回地底去了`); out.pops.push([u.id, '归土', 'miss']); return; }
   const foes = aliveOf(b, 'e'); if (!foes.length) return;
-  const Z = ZOMBIES[u.zt] || ZOMBIES.tiaoshi, king = b.units.some(x => x.zt === 'shiwang' && x.hp > 0 && x !== u);
-  const am = (u.st.yang ? 1.3 : 1) * (king ? 1.3 : 1), sk = Z.ap ? { ap: Z.ap, apc: Z.apc || 1 } : null;
+  const Z = ZOMBIES[u.zt] || ZOMBIES.tiaoshi;
+  const am = (u.st.yang ? 1.3 : 1) * kingAura(b, u), sk = Z.ap ? { ap: Z.ap, apc: Z.apc || 1 } : null;
   if (Z.aoe) { out.cast = { id: 'minion', elem: u.ae, target: foes[0].id, aoe: true }; foes.forEach(f => hit(b, u, f, Z.aoe * am, u.ae, out, { aoe: 1, sk })); return; }
   const t = (b.focus && foes.find(f => f.id === b.focus)) || (Z.taunt ? foes[0] : foes.reduce((a, c) => c.hp < a.hp ? c : a));
   out.cast = { id: 'minion', elem: u.ae, target: t.id }; hit(b, u, t, am, u.ae, out, { sk });
@@ -2238,7 +2246,7 @@ function ngocAct(b, u, out) {
 const ULTS = {
   berserker: { n: '入魔', g: '魔', s: '伤害 +60%', elem: 'phys', wx: 'jin', d: '三回合内伤害 +60%；怒意 +30，打出伤害的 20% 回成气血（穿不死套时不加怒意、不吸血，免得把血线吸回去）' },
   mage:      { n: '五行归一', g: '归', s: '伤害翻倍', elem: 'light', wx: 'mu', d: '三回合内伤害翻倍；接下来两招必定暴击' },
-  necro:     { n: '百鬼还魂', g: '鬼', s: '尸满·毒发', elem: 'magic', wx: 'shui', d: '尸位补满，尸王爬出来横扫四回合（25 级起）；三回合内你和僵尸伤害 +40%；所有妖物身上的毒立刻结算两次。穿五毒独行时不起尸，毒改成结算四次' },
+  necro:     { n: '百鬼还魂', g: '鬼', s: '尸满·毒发', elem: 'magic', wx: 'shui', d: '尸位补满；三回合内你和僵尸伤害 +40%；所有妖物身上的毒立刻结算两次。穿五毒独行时不起尸，毒改成结算四次（尸王改由尸王玉召出）' },
   assassin:  { n: '无影千刃', g: '影', s: '夺命·冷却', elem: 'phys', wx: 'jin', d: '全场打上夺命印；所有招式冷却 -2；杀意 +3（穿千机时改成：全场上毒、暗器冷却清零、三回合内伤害 +60%）' },
   cutG: '断',
   paladin:   { n: '金身', g: '佛', s: '金刚震·护体', elem: 'holy', wx: 'tu', d: '立刻打出一次金刚震（不耗「震」）；获得 30% 气血的护体；三回合内反震 ×5，佛光伤害 +50%' },
@@ -2279,7 +2287,6 @@ function ultimate(b, P, foes, out, autoCut) {
     case 'necro': {
       const solo = P.fx.has('duXing4');   // 五毒独行吃空尸位：不起尸，毒多结算一次
       const n = solo ? 0 : summonSkel(b, P, P.runes.summon || null, ULT.zomb); if (n) out.pops.push(['P', '起尸', 'buff']);   // 尸位补满
-      if (!solo && ULT.sw && P.lv >= 25 && !zombiesOf(b).some(z => z.zt === 'shiwang')) { makeZombie(b, P, 'shiwang', 9); out.lines.push('地面裂开——尸王爬了出来！'); }
       const K = (ULT.duK + (solo ? 2 : 0)) * (P.fx.has('duXing6') ? DUXING_BURST : 1) * (P.fx.has('wWandu') ? 1 + P.wpK : 1);
       foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, '毒发', 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(ps.d * ps.t * K), proc: 1, aoe: 1, raw: 1, ult: 1 }); } }); P.st.baigui = ULT.rmT; break; }   // duK＝结算几次
     case 'assassin': { P.ki = Math.min(P.kiMax, (P.ki || 0) + (P.fx.has('qianJi4') ? 0 : ULT.ki)); if (!P.fx.has('qianJi4')) out.pops.push(['P', `杀意 ${P.ki}`, 'buff']); out.pops.push(['P', `杀意 ${P.ki}`, 'buff']);
@@ -2376,7 +2383,8 @@ function heroAct(b, P, out) {
   if (P.fx.has('gYinYang')) { P.yy = b.pr % 2 === 1 ? 'yang' : 'yin'; out.pops.push(['P', P.yy === 'yang' ? '阳' : '阴', 'buff']); }   // 两仪佩
   if (b.revQ && b.revQ.length) {   // 赶尸索：倒下的僵尸过 3 回合自己爬起来
     for (const q of b.revQ) q.t--;
-    for (const q of b.revQ.filter(x => x.t <= 0)) { if (!zombiesOf(b).some(z => z.slot === q.slot && !ZOMBIES[z.zt].ult)) { const z = makeZombie(b, P, q.zt, q.slot, P.runes.summon || null); out.pops.push([z.id, '起尸', 'buff']); out.lines.push(`${z.name}自己爬了起来`); } }
+    for (const q of b.revQ.filter(x => x.t <= 0 && x.king)) if (!zombiesOf(b).some(z => z.gemKing) && P.lgv && P.lgv.shiwang != null) { const z = kingUp(b, P); out.pops.push([z.id, '尸王归位', 'buff']); out.lines.push('地面裂开——尸王又爬了回来！'); }
+    for (const q of b.revQ.filter(x => x.t <= 0 && !x.king)) { if (!zombiesOf(b).some(z => z.slot === q.slot && !ZOMBIES[z.zt].ult)) { const z = makeZombie(b, P, q.zt, q.slot, P.runes.summon || null); out.pops.push([z.id, '起尸', 'buff']); out.lines.push(`${z.name}自己爬了起来`); } }
     b.revQ = b.revQ.filter(x => x.t > 0);
   }
   if (riftB(b)) { const w = wearyN(b); if (w === 1) { out.lines.push('久战破绽：妖物的气息乱了——不再回血，往后每轮多受 ' + Math.round(R_WEARY[1] * 100) + '% 伤害'); aliveOf(b, 'e').forEach(f => out.pops.push([f.id, '破绽', 'react'])); } b.weary = w; }
@@ -2523,7 +2531,7 @@ function castInner(b, P, sk, foes, out) {
     case 'meteor': all(2.0 * m * (R === 'b' ? 1.5 : 1), R === 'a' ? 'cold' : 'fire', f => { if (R === 'a') freezeU(f, out); }); break;
     case 'summon': if (!summonSkel(b, P, R, R === 'a' ? 2 : 1)) out.lines.push('尸位已经满了'); break;
     case 'jihuo': { out.cast.aoe = false;
-      const volley = () => zombiesOf(b).forEach(z => { const tt = t.hp > 0 ? t : aliveOf(b, 'e')[0]; if (tt) hit(b, z, tt, (z.st.yang ? 1.3 : 1) * (R === 'a' ? 1.3 : 1), z.ae || 'phys', out, { sk }); });
+      const volley = () => zombiesOf(b).forEach(z => { const tt = t.hp > 0 ? t : aliveOf(b, 'e')[0]; if (tt) hit(b, z, tt, (z.st.yang ? 1.3 : 1) * (R === 'a' ? 1.3 : 1) * kingAura(b, z), z.ae || 'phys', out, { sk }); });
       volley();
       if (P.fx.has('shehunOff') && RNG.ch(0.3) && aliveOf(b, 'e').length) { out.pops.push(['P', '摄魂铃', 'crit']); volley(); }
       if (R === 'b' && zombiesOf(b).length) { P.st.guardZ = 1; out.pops.push(['P', '护主', 'buff']); }
@@ -3159,6 +3167,7 @@ function resolveDeaths(b, out) {
     if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name}倒下了……`); continue; }
     if (u.kind === 'minion' && P.cls === 'necro' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'b') / 100, out);
     if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * YINBING_BOOM); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1, tag: '阴兵爆' })); out.pops.push([u.id, u.selfBoom ? '自爆' : '阴兵爆', 'fire']); if (u.selfBoom) out.lines.push(`${u.name}撑不住了，自己炸开`); }   // tag：本场统计里单列「阴兵爆」（原来算在「特效」里）
+    if (u.gemKing && P.hp > 0) { (b.revQ = b.revQ || []).push({ king: 1, t: KING_REV }); out.lines.push('尸王倒下了……地底还在响'); }
     if (u.kind === 'minion' && P.fx.has('ganshiBelt') && P.hp > 0 && !ZOMBIES[u.zt].ult && !(b.revUsed = b.revUsed || {})[u.slot]) { b.revUsed[u.slot] = 1; (b.revQ = b.revQ || []).push({ zt: u.zt, slot: u.slot, t: 3 }); }
     if (u.side === 'e' && u.st && u.st.poison && P.fx.has('baiduOff')) { const nx = aliveOf(b, 'e').find(f => f !== u && !f.st.poison); if (nx) { nx.st.poison = { d: u.st.poison.d, t: 3 }; out.pops.push([nx.id, '毒传', 'poison', 1]); } }
     if (u.kind === 'minion' && P.fx.has('corpseBurst')) { aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out)); out.lines.push('僵尸炸开，尸火四溅'); }

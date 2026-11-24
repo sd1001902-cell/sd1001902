@@ -1802,7 +1802,7 @@ function unitEl(u) {
   const el = document.createElement('div');
   el.className = 'unit k-' + u.kind + (u.rare ? ' rare' : '') + ' spawn'; el.id = 'u-' + u.id;
   if (u.side === 'e') { el.dataset.act = 'btarget'; el.dataset.arg = u.id; }
-  const size = { hero: 64, boss: u.guard ? 76 : 112, elite: u.rare ? 68 : 60, normal: 48, mini: 38, minion: 40, goblin: 54, ally: 56, ward: 60 }[u.kind] || 48;
+  const size = { hero: 64, boss: u.guard ? 76 : 112, elite: u.rare ? 68 : 60, normal: 48, mini: 38, minion: u.zt === 'shiwang' ? 52 : 40, goblin: 54, ally: 56, ward: 60 }[u.kind] || 48;   // 尸王比普通僵尸大一圈
   el.dataset.pal = JSON.stringify(u.pal || null); el.dataset.size = size;
   const img = u.kind === 'hero' ? heroSpr(u.cls, size) : SPR.img(u.spr || 'skeleton', size, u.pal), spr = u.kind === 'hero' ? CLASSES[u.cls].spr : u.spr;
   el.style.setProperty('--sz', size + 'px'); const ic = VFX.idleCls(spr); if (ic) el.classList.add(ic);

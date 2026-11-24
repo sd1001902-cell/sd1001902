@@ -1797,7 +1797,8 @@ function startBattle(run, kind) {
   if (run.cls === 'mage') P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * 0.35));   // 五行道士：护身符箓
   if (run.cls === 'assassin') P.g = Math.max(P.g, 30);   // 夜行刺客：先手
   if (s.fx.has('undeadAlly')) summonSkel(b, P);
-  if (run.cls === 'necro' && !s.fx.has('duXing4')) summonSkel(b, P, P.runes.summon || null, P.minionCap || 3);   // 赶尸人：开战时僵尸已经按尸阵列好，不用先花几回合摇铃（五毒独行不带尸）
+  if (run.cls === 'necro' && !s.fx.has('duXing4')) summonSkel(b, P, P.runes.summon || null, P.minionCap || 3);
+  if (run.cls === 'necro' && !s.fx.has('duXing4') && P.lgv && P.lgv.shiwang != null) kingUp(b, P);   // 尸王玉   // 赶尸人：开战时僵尸已经按尸阵列好，不用先花几回合摇铃（五毒独行不带尸）
   if (P.yi.qingxu) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * (8 + P.yi.qingxu * 4) / 100)); (b.yiPops = b.yiPops || []).push(['P', "Đan Hỏa Hộ Thể", 'buff', 'qingxu']); }
   if (P.jy.xuanming) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * P.jy.xuanming / 100)); (b.yiPops = b.yiPops || []).push(['P', "Huyền Minh", 'buff']); }   // 九幽·玄冥
   if (run.encWard) {   // 守护战：一个不能打的人在念，念完就赢；他倒了就输
@@ -1994,7 +1995,7 @@ const ZOMBIES = {
   tiejia:  { n: "Thiết Giáp Thi", lv: 6,  spr: 'yong', pal: { B: '#4a4a5a' }, hp: 0.7, atk: 0.4, spd: 85, arm: 2.2, ae: 'phys', taunt: 0.6, thornsP: 0.15, d: "Hàng trước · khiêu khích: sáu phần đòn của địch đánh vào nó, bị đánh thì phản chấn" },
   dushi:   { n: "Độc Thi",   lv: 12, spr: 'swampcorpse', pal: null, hp: 0.32, atk: 0.5, spd: 98, arm: 0.8, ae: 'poison', ap: 'poison', apc: 0.7, d: "Hàng sau · phun độc, gây trúng độc" },
   yinhuo:  { n: "Âm Hỏa Thi", lv: 20, spr: 'jiangshi', pal: { B: '#2a3a6a', S: '#9ad0ff' }, hp: 0.3, atk: 0.42, spd: 82, arm: 0.8, ae: 'fire', aoe: 0.8, ap: 'burn', apc: 0.4, d: "Hàng sau · phun thi hỏa, đánh mọi kẻ địch, gây thiêu đốt" },
-  shiwang: { n: "Thi Vương",   lv: 25, spr: 'jiangshi', pal: { B: '#6a4a10', S: '#e8c13a' }, hp: 1.2, atk: 0.9, spd: 100, arm: 2, ae: 'phys', aoe: 1, life: 4, ult: true, d: "Gọi ra bằng tuyệt kỹ, càn quét cả trận 4 lượt; khi có mặt thì mọi cương thi công +30%" },
+  shiwang: { n: "Thi Vương",   lv: 1, spr: 'jiangshi', pal: { B: '#6a4a10', S: '#e8c13a' }, hp: 1, atk: 1, spd: 100, arm: 2, ae: 'phys', aoe: 1, ult: true, d: "Do Thi Vương Ngọc gọi ra, không chiếm thi vị, quét cả trận; khi có mặt các cương thi khác được tăng sát thương" },   // 气血、攻击、光环按尸王玉等级（kingUp）
 };
 const ZOMBIE_ORDER = ['tiaoshi', 'tiejia', 'dushi', 'yinhuo'];
 // 尸阵：赶尸人在武学页排的位置；没排过就按解锁情况给一个顺手的
@@ -2003,6 +2004,13 @@ function necroForm(lv, form) {
   const def = [ok('tiejia') ? 'tiejia' : 'tiaoshi', 'tiaoshi', ok('dushi') ? 'dushi' : 'tiaoshi', ok('yinhuo') ? 'yinhuo' : 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi', 'tiaoshi'];   // 2026-11-25 原来只有 5 格：尸位到 6、7 时后面的位置排了存不住
   return def.map((d, i) => form && ok(form[i]) ? form[i] : d);
 }
+// 尸王玉：开战召一具尸王坐镇（不占尸位）。气血、攻击照主角算（kgH、kgA，%），再乘僵尸强度、同心玉；光环让其他僵尸伤害 +kgU%；倒下 KING_REV 回合后爬回来
+const KING_REV = 5;
+function kingUp(b, P) {
+  const lv = P.lgv.shiwang, u = makeZombie(b, P, 'shiwang', 9, null);
+  u.gemKing = true; u.maxHp = u.hp = Math.round(u.maxHp * LGV.kgH(lv) / 100); u.atk *= LGV.kgA(lv) / 100; u.aura = LGV.kgU(lv) / 100; return u;
+}
+const kingAura = (b, u) => { const k = b.units.find(x => x.gemKing && x.hp > 0 && x !== u); return k ? 1 + k.aura : 1; };
 function makeZombie(b, P, zt, slot, rune) {
   const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + (P.minionPct || 0) / 100) * (1 + (P.allyPct || 0) / 100);
   const hq = P.fx && P.fx.has('huangquan') ? 1.25 : 1;
@@ -2034,8 +2042,8 @@ function summonSkel(b, P, rune, n) {
 function minionAct(b, u, out) {
   if (u.life != null && --u.life < 0) { u.hp = 0; out.lines.push(`${u.name} hóa thành một nắm đất, trở về lòng đất`); out.pops.push([u.id, "Về đất", 'miss']); return; }
   const foes = aliveOf(b, 'e'); if (!foes.length) return;
-  const Z = ZOMBIES[u.zt] || ZOMBIES.tiaoshi, king = b.units.some(x => x.zt === 'shiwang' && x.hp > 0 && x !== u);
-  const am = (u.st.yang ? 1.3 : 1) * (king ? 1.3 : 1), sk = Z.ap ? { ap: Z.ap, apc: Z.apc || 1 } : null;
+  const Z = ZOMBIES[u.zt] || ZOMBIES.tiaoshi;
+  const am = (u.st.yang ? 1.3 : 1) * kingAura(b, u), sk = Z.ap ? { ap: Z.ap, apc: Z.apc || 1 } : null;
   if (Z.aoe) { out.cast = { id: 'minion', elem: u.ae, target: foes[0].id, aoe: true }; foes.forEach(f => hit(b, u, f, Z.aoe * am, u.ae, out, { aoe: 1, sk })); return; }
   const t = (b.focus && foes.find(f => f.id === b.focus)) || (Z.taunt ? foes[0] : foes.reduce((a, c) => c.hp < a.hp ? c : a));
   out.cast = { id: 'minion', elem: u.ae, target: t.id }; hit(b, u, t, am, u.ae, out, { sk });
@@ -2238,7 +2246,7 @@ function ngocAct(b, u, out) {
 const ULTS = {
   berserker: { n: "Nhập Ma", g: "MA", s: "Sát thương +60%", elem: 'phys', wx: 'jin', d: "Trong ba lượt sát thương +60%; Nộ ý +30, 20% sát thương gây ra hồi thành khí huyết (mặc bộ Bất Tử thì không cộng Nộ ý, không hút máu, để khỏi hút máu lên lại)" },
   mage:      { n: "Ngũ Hành Quy Nhất", g: "QUY", s: "Sát thương ×2", elem: 'light', wx: 'mu', d: "Trong ba lượt sát thương gấp đôi; hai chiêu tiếp theo chắc chắn chí mạng" },
-  necro:     { n: "Bách Quỷ Hoàn Hồn", g: "QUỶ", s: "Đầy thi · độc phát", elem: 'magic', wx: 'shui', d: "Lấp đầy thi vị, Thi Vương bò lên quét cả trận bốn lượt (từ cấp 25); trong ba lượt bạn và cương thi sát thương +40%; độc trên mọi yêu vật lập tức kết toán hai lần. Mặc Ngũ Độc Độc Hành thì không gọi thi, độc đổi thành kết toán bốn lần" },
+  necro:     { n: "Bách Quỷ Hoàn Hồn", g: "QUỶ", s: "Đầy thi · độc phát", elem: 'magic', wx: 'shui', d: "Bổ sung đầy thi vị; trong ba hiệp bạn và cương thi sát thương +40%; độc trên người mọi yêu vật lập tức kết toán hai lần. Mặc Ngũ Độc Độc Hành thì không gọi xác, độc đổi thành kết toán bốn lần (Thi Vương nay do Thi Vương Ngọc gọi ra)" },
   assassin:  { n: "Vô Ảnh Thiên Nhận", g: "ẢNH", s: "Đoạt mệnh · hồi chiêu", elem: 'phys', wx: 'jin', d: "Đánh Đoạt Mệnh Ấn lên cả trận; mọi chiêu hồi chiêu -2; Sát ý +3 (mặc Thiên Cơ thì đổi thành: cả trận trúng độc, ám khí hồi chiêu về 0, trong ba lượt sát thương +60%)" },
   cutG: "ĐOẠN",
   paladin:   { n: "Kim Thân", g: "PHẬT", s: "Kim Cương Chấn · hộ thể", elem: 'holy', wx: 'tu', d: "Lập tức đánh ra một lần Kim Cương Chấn (không tốn «Chấn»); nhận hộ thể bằng 30% khí huyết; trong ba lượt Phản chấn ×5, sát thương Phật quang +50%" },
@@ -2279,7 +2287,6 @@ function ultimate(b, P, foes, out, autoCut) {
     case 'necro': {
       const solo = P.fx.has('duXing4');   // 五毒独行吃空尸位：不起尸，毒多结算一次
       const n = solo ? 0 : summonSkel(b, P, P.runes.summon || null, ULT.zomb); if (n) out.pops.push(['P', "Dậy xác", 'buff']);   // 尸位补满
-      if (!solo && ULT.sw && P.lv >= 25 && !zombiesOf(b).some(z => z.zt === 'shiwang')) { makeZombie(b, P, 'shiwang', 9); out.lines.push("Mặt đất nứt ra — Thi Vương bò lên!"); }
       const K = (ULT.duK + (solo ? 2 : 0)) * (P.fx.has('duXing6') ? DUXING_BURST : 1) * (P.fx.has('wWandu') ? 1 + P.wpK : 1);
       foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(ps.d * ps.t * K), proc: 1, aoe: 1, raw: 1, ult: 1 }); } }); P.st.baigui = ULT.rmT; break; }   // duK＝结算几次
     case 'assassin': { P.ki = Math.min(P.kiMax, (P.ki || 0) + (P.fx.has('qianJi4') ? 0 : ULT.ki)); if (!P.fx.has('qianJi4')) out.pops.push(['P', `Sát ý ${P.ki}`, 'buff']); out.pops.push(['P', `Sát ý ${P.ki}`, 'buff']);
@@ -2376,7 +2383,8 @@ function heroAct(b, P, out) {
   if (P.fx.has('gYinYang')) { P.yy = b.pr % 2 === 1 ? 'yang' : 'yin'; out.pops.push(['P', P.yy === 'yang' ? "Dương" : "âm u", 'buff']); }   // 两仪佩
   if (b.revQ && b.revQ.length) {   // 赶尸索：倒下的僵尸过 3 回合自己爬起来
     for (const q of b.revQ) q.t--;
-    for (const q of b.revQ.filter(x => x.t <= 0)) { if (!zombiesOf(b).some(z => z.slot === q.slot && !ZOMBIES[z.zt].ult)) { const z = makeZombie(b, P, q.zt, q.slot, P.runes.summon || null); out.pops.push([z.id, "Dậy xác", 'buff']); out.lines.push(`${z.name} tự bò dậy`); } }
+    for (const q of b.revQ.filter(x => x.t <= 0 && x.king)) if (!zombiesOf(b).some(z => z.gemKing) && P.lgv && P.lgv.shiwang != null) { const z = kingUp(b, P); out.pops.push([z.id, "Thi Vương trở lại", 'buff']); out.lines.push("Mặt đất nứt toác — Thi Vương lại bò lên!"); }
+    for (const q of b.revQ.filter(x => x.t <= 0 && !x.king)) { if (!zombiesOf(b).some(z => z.slot === q.slot && !ZOMBIES[z.zt].ult)) { const z = makeZombie(b, P, q.zt, q.slot, P.runes.summon || null); out.pops.push([z.id, "Dậy xác", 'buff']); out.lines.push(`${z.name} tự bò dậy`); } }
     b.revQ = b.revQ.filter(x => x.t > 0);
   }
   if (riftB(b)) { const w = wearyN(b); if (w === 1) { out.lines.push("Đánh lâu lộ sơ hở: khí tức yêu vật rối loạn — không hồi máu nữa, từ đây mỗi vòng nhận thêm " + Math.round(R_WEARY[1] * 100) + "% sát thương"); aliveOf(b, 'e').forEach(f => out.pops.push([f.id, "Phá Trán", 'react'])); } b.weary = w; }
@@ -2523,7 +2531,7 @@ function castInner(b, P, sk, foes, out) {
     case 'meteor': all(2.0 * m * (R === 'b' ? 1.5 : 1), R === 'a' ? 'cold' : 'fire', f => { if (R === 'a') freezeU(f, out); }); break;
     case 'summon': if (!summonSkel(b, P, R, R === 'a' ? 2 : 1)) out.lines.push("Thi vị đã đầy"); break;
     case 'jihuo': { out.cast.aoe = false;
-      const volley = () => zombiesOf(b).forEach(z => { const tt = t.hp > 0 ? t : aliveOf(b, 'e')[0]; if (tt) hit(b, z, tt, (z.st.yang ? 1.3 : 1) * (R === 'a' ? 1.3 : 1), z.ae || 'phys', out, { sk }); });
+      const volley = () => zombiesOf(b).forEach(z => { const tt = t.hp > 0 ? t : aliveOf(b, 'e')[0]; if (tt) hit(b, z, tt, (z.st.yang ? 1.3 : 1) * (R === 'a' ? 1.3 : 1) * kingAura(b, z), z.ae || 'phys', out, { sk }); });
       volley();
       if (P.fx.has('shehunOff') && RNG.ch(0.3) && aliveOf(b, 'e').length) { out.pops.push(['P', "Chuông Nhiếp Hồn", 'crit']); volley(); }
       if (R === 'b' && zombiesOf(b).length) { P.st.guardZ = 1; out.pops.push(['P', "Hộ Chủ", 'buff']); }
@@ -3159,6 +3167,7 @@ function resolveDeaths(b, out) {
     if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name} ngã xuống rồi…`); continue; }
     if (u.kind === 'minion' && P.cls === 'necro' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'b') / 100, out);
     if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * YINBING_BOOM); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1, tag: "Âm binh nổ" })); out.pops.push([u.id, u.selfBoom ? "Tự nổ" : "Âm binh nổ", 'fire']); if (u.selfBoom) out.lines.push(`${u.name} không trụ nổi, tự nổ tung`); }   // tag：本场统计里单列「阴兵爆」（原来算在「特效」里）
+    if (u.gemKing && P.hp > 0) { (b.revQ = b.revQ || []).push({ king: 1, t: KING_REV }); out.lines.push("Thi Vương ngã xuống… lòng đất vẫn còn rung"); }
     if (u.kind === 'minion' && P.fx.has('ganshiBelt') && P.hp > 0 && !ZOMBIES[u.zt].ult && !(b.revUsed = b.revUsed || {})[u.slot]) { b.revUsed[u.slot] = 1; (b.revQ = b.revQ || []).push({ zt: u.zt, slot: u.slot, t: 3 }); }
     if (u.side === 'e' && u.st && u.st.poison && P.fx.has('baiduOff')) { const nx = aliveOf(b, 'e').find(f => f !== u && !f.st.poison); if (nx) { nx.st.poison = { d: u.st.poison.d, t: 3 }; out.pops.push([nx.id, "Truyền độc", 'poison', 1]); } }
     if (u.kind === 'minion' && P.fx.has('corpseBurst')) { aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out)); out.lines.push("Cương thi nổ tung, thi hỏa văng tứ tung"); }
