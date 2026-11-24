@@ -54,6 +54,38 @@ const POP_MS = { n: 760, b: 800, c: 900, h: 720 };
 const popSpd = () => ({ 1: 1, 2: 0.85, 3: 0.72 }[SAVE.speed] || 1);
 const popMax = () => ({ 1: 3, 2: 3, 3: 2 }[SAVE.speed] || 3);   // 同一个目标同时留几个数字：倍速越高留得越少（3 倍速新数字直接顶掉旧的）
 const popHTML = h => `<i class="o">${h}</i><b>${h}</b>`;
+// 累计数字：每个目标一种（伤害 / 掉血 / 回血）只挂一个，往上加
+const ACC_IDLE = 900, ACC_KILL = 650, ACC_OUT = 650;
+function accPut(el, key, v, o) {
+  if (!el || !(v > 0)) return;
+  el._acc = el._acc || {}; let a = el._acc[key];
+  if (!a || !a.p.isConnected || a.out) {
+    const p = document.createElement('span'); p.className = 'pop acc ' + (o.cls || '') + (accLow(el) ? ' low' : ''); el.appendChild(p);
+    a = el._acc[key] = { p, v: 0, t: null, out: false };
+    if (p.animate) p.animate([{ transform: 'translate(-50%,6px) scale(.7)', opacity: 0 }, { transform: 'translate(-50%,0) scale(1)', opacity: 1 }], { duration: 140 * spdF(), easing: 'ease-out' });
+  }
+  a.v += v; const p = a.p; p.innerHTML = popHTML(`${o.sign || ''}${fmtBig(a.v)}`);
+  if (o.kill) accFree(el, a);
+  const b = p.querySelector('b'), sc = o.kill ? 1.45 : o.crit ? 1.35 : 1.12;
+  if (o.crit || o.kill) { p.classList.add('hot'); clearTimeout(a.hot); a.hot = setTimeout(() => p.classList.remove('hot'), 300 * spdF()); }
+  if (p.animate) p.animate([{ transform: `translate(-50%,0) scale(${sc})` }, { transform: 'translate(-50%,0) scale(1)' }], { duration: (o.crit || o.kill ? 260 : 160) * spdF(), easing: 'ease-out' });
+  clearTimeout(a.t);
+  a.t = setTimeout(() => { a.out = true; if (!p.animate) return p.remove(); p.animate([{ transform: 'translate(-50%,0)', opacity: 1 }, { transform: 'translate(-50%,-44px)', opacity: 0 }], { duration: ACC_OUT * popSpd(), easing: 'ease-in', fill: 'forwards' }).onfinish = () => p.remove(); }, (o.kill ? ACC_KILL : ACC_IDLE) * popSpd());
+}
+// 打死：数字搬到场地上（不跟着尸体变灰变淡），换成橙色大号，过一会儿飘走
+function accFree(el, a) {
+  const p = a.p; if (p.classList.contains('kill')) return; p.classList.add('kill');
+  const ar = document.getElementById('arena');
+  if (ar && p.parentNode === el) { const r = p.getBoundingClientRect(), R = ar.getBoundingClientRect(); p.style.left = (r.left + r.width / 2 - R.left) + 'px'; p.style.top = (r.top - R.top) + 'px'; p.style.margin = '0'; ar.appendChild(p); }
+}
+function accDead(el) {   // 妖物倒下时头上还挂着的累计数（比如被灼烧烧死）也一起定格
+  if (!el || !el._acc) return;
+  for (const a of Object.values(el._acc)) { if (a.out || !a.p.isConnected || a.p.classList.contains('kill')) continue;
+    accFree(el, a); const p = a.p;
+    if (p.animate) p.animate([{ transform: 'translate(-50%,0) scale(1.45)' }, { transform: 'translate(-50%,0) scale(1)' }], { duration: 260 * spdF(), easing: 'ease-out' });
+    clearTimeout(a.t); a.t = setTimeout(() => { a.out = true; if (!p.animate) return p.remove(); p.animate([{ transform: 'translate(-50%,0)', opacity: 1 }, { transform: 'translate(-50%,-44px)', opacity: 0 }], { duration: ACC_OUT * popSpd(), easing: 'ease-in', fill: 'forwards' }).onfinish = () => p.remove(); }, ACC_KILL * popSpd()); }
+}
+const accLow = el => { const ar = document.getElementById('arena'); return !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; };
 function popPut(el, cls, html, kind) {
   if (!el) return null;
   kind = kind || 'n';
@@ -1690,7 +1722,7 @@ function unitEl(u) {
   el.innerHTML = `<div class="aura"><i class="a-rage"></i><i class="a-fire"></i><i class="a-tox"></i><i class="a-ice"></i><i class="a-shd"></i><i class="a-cur"></i><i class="a-stun"><b>✦</b><b>✦</b><b>✦</b></i></div><div class="sp">${VFX.rigHTML(u, img, size, spr)}</div>
     <div class="un${u.kind === 'boss' ? ' bs' : u.kind === 'elite' || u.rare ? ' el' : ''}">${esc(u.name)}</div>
     ${u.side === 'e' && (u.kind === 'elite' || u.kind === 'boss' || u.rare) && u.aff && u.aff.length ? `<div class="tags">${u.aff.slice(0, 2).map(a => { const A = ELITE_AFFIXES.find(x => x.id === a); return A ? `<span data-act="stinfo" data-arg="${u.id}|aff:${a}">${A.n}</span>` : ''; }).join('')}${u.aff.length > 2 ? `<span data-act="stinfo" data-arg="${u.id}|all">+${u.aff.length - 2}</span>` : ''}</div>` : ''}
-    <div class="hpbar"><i></i><b class="sh"></b><span></span></div><div class="sts"></div>${u.kind === 'hero' && u.yi && Object.keys(u.yi).length ? yiFolHTML(u.yi) : ''}`;
+    <div class="hpbar"><em class="tr"></em><i></i><b class="sh"></b><span></span></div><div class="sts"></div>${u.kind === 'hero' && u.yi && Object.keys(u.yi).length ? yiFolHTML(u.yi) : ''}`;
   setTimeout(() => el.classList.remove('spawn'), u.kind === 'boss' ? 650 : 400);
   if (u.kind === 'boss' && !u.guard) setTimeout(() => VFX.onLand(u.id), 560);
   return el;
@@ -1934,7 +1966,7 @@ function applyStep(o, anim) {
     if (!el) { if (u.dead && u.kind === 'minion') continue; el = unitEl(u); (u.side === 'e' ? foes : allies).appendChild(el); refit = true; }
     if (u.dead && u.kind === 'minion') { el.classList.add('die'); setTimeout(() => { el.remove(); fitSides(); }, 500); continue; }
     if (u.phased && el.dataset.phased !== '1') { el.dataset.phased = '1'; el.querySelector('.sp').innerHTML = VFX.rigHTML(u, SPR.img(u.spr, +el.dataset.size, u.pal), +el.dataset.size, u.spr); el.querySelector('.un').firstChild.textContent = u.name; bump(el, 'phase', 800); }
-    if (u.dead && !u._shownDead) { u._shownDead = true; if (!u.escaped && anim) VFX.onDeath(u.id, u.kind);
+    if (u.dead && !u._shownDead) { u._shownDead = true; if (u.side === 'e') accDead(el); if (!u.escaped && anim) VFX.onDeath(u.id, u.kind);
       if (u.side === 'e' && !u.escaped && anim && el.animate) { const big = u.kind === 'boss'; el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }], { duration: big ? 2000 : 800, fill: 'forwards' }); }
       else el.classList.add(u.escaped ? 'fled' : u.kind === 'ally' ? 'retreat' : 'die');
       if (u.side === 'e' && B && !B.over) setTimeout(() => { if (B && !B.over) { el.classList.add('gone'); fitSides(); } }, u.kind === 'boss' ? 2100 : 850); }   // 倒下的敌人动画放完就收起来，不占位子
@@ -1942,7 +1974,8 @@ function applyStep(o, anim) {
     el.classList.toggle('charging', !!u.charging && u.hp > 0);
     el.classList.toggle('dead', !!u.dead);
     el.classList.toggle('tgt', u.side === 'e' && B.target === u.id && u.hp > 0);
-    el.querySelector('.hpbar i').style.width = Math.max(0, u.hp / u.maxHp * 100) + '%';
+    { const w = Math.max(0, u.hp / u.maxHp * 100), tr = el.querySelector('.hpbar .tr'); el.querySelector('.hpbar i').style.width = w + '%';   // 白色残影：掉血先留一截白，慢一拍再缩
+      if (tr) { const cur = parseFloat(tr.style.width); if (!(cur > w)) { tr.style.transition = 'none'; tr.style.width = w + '%'; void tr.offsetWidth; tr.style.transition = ''; } else tr.style.width = w + '%'; } }
     el.querySelector('.hpbar .sh').style.width = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100) + '%' : '0';
     el.querySelector('.hpbar span').textContent = u.escaped ? "chuồn rồi" : u.kind === 'ally' && u.dead ? "tạm lui" : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`;
     const st = [];
@@ -1980,17 +2013,16 @@ function applyStep(o, anim) {
       const tu = B.units.find(u => u.id === id);
       if (isSt || reactN.has(txt0)) continue;   // 状态名挂在身上、连招名在顶上横幅里，不在人头上飘
       const txt = c === 'thorn' ? txt0.replace(/^\D+/, '') : txt0, dmgN = /^\d+$/.test(txt), dot = /^-\d+$/.test(txt);
-      if (SP >= 2 && dot && (c === 'burn' || c === 'poison')) { if (anim && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); } continue; }   // 快速时持续伤害不跳字，看血条
       const onHero = id === 'P', mine = by === 'P' || c === 'thorn' && by === 'P';
       let show = true;
-      if (!ALL) {   // 只看主角：妖物身上只跳主角打的（普攻除外）；主角身上跳小号掉血、回血、格挡闪避；伙伴、僵尸身上不跳
-        if (tu && tu.side === 'e') show = mine && (dmgN || dot) && !(isBasic && !tag && dmgN && !o.jzz);
+      if (!ALL) {   // 只看主角：妖物身上只跳主角打的（含普攻，累计成一个数）；主角身上跳小号掉血、回血、格挡闪避；伙伴、僵尸身上不跳
+        if (tu && tu.side === 'e') show = mine && (dmgN || dot);   // 2026-11-24 累计以后普攻也算进总数
         else if (onHero) show = dmgN || dot || c === 'heal' || txt === "Đỡ đòn" || txt === "Né tránh" || SAVEP.has(txt);
         else show = SAVEP.has(txt);
       }
       if (!show) { if (anim && dmgN && SP < 3) { if (tu && tu.side === 'e') { if (tu.hp > 0) VFX.onHit(id, false); } else bump(el, 'hurt', 300); } }
       else if (dmgN || dot || c === 'heal') {
-        const kk = id + '|' + (onHero && !ALL ? (c === 'heal' ? 'heal' : 'hurt') : dot ? 'dot' + c : c === 'heal' ? 'heal' : 'dmg');
+        const kk = id + '|' + (c === 'heal' ? 'heal' : onHero && !ALL ? 'hurt' : tu && tu.side === 'e' ? 'dmg' : dot ? 'dot' + c : 'dmg');   // 2026-11-24 累计：妖物身上主角的伤害（含持续伤害）合成一个数
         const g = G.get(kk) || { id, el, tu, onHero, n: 0, v: 0, vals: [], crit: false, tag: '', c, dot, heal: c === 'heal', ally: ALL && byAlly && tu && tu.side === 'e' };
         const vv = +txt.replace(/\D/g, '') || 0; g.v += vv; g.vals.push(vv); g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
         G.set(kk, g);
@@ -2004,24 +2036,17 @@ function applyStep(o, anim) {
       if (dmgN && anim && show) { if (SP < 3 || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
     }
-    let ji = 0, nPop = document.querySelectorAll('#arena .pop').length;
+    // 2026-11-24 跳字第七版「累计」：每个目标头上只留一个数，后面每打一下原地往上加、弹一下；暴击闪金；打死放大定格；停手一会儿整体上飘淡出。主角掉血、回血各一个
+    let ji = 0;
     for (const g of G.values()) {
-      const r = g.tu && g.tu.maxHp ? g.v / g.tu.maxHp : 0, big = !g.onHero && r >= 0.08;
-      // 倍速下少跳：2 倍速不跳回血小数字、掉血不到 3% 不跳；3 倍速再省掉打不到目标 2% 血的小数字（暴击、重击照跳），掉血不到 5% 不跳、回血不跳
-      const hr = g.onHero && B.P ? g.v * uK(g.tu) / (B.P.maxHp * uK(B.P) || 1) : 0;
-      const quiet = g.onHero ? (SP >= 2 && (g.heal ? SP >= 3 || hr < 0.1 : hr < (SP >= 3 ? 0.05 : 0.03)))
-        : !g.crit && !big && (ALL ? (SP >= 3 && r < 0.15) || (SP >= 2 && r < 0.1) || nPop >= (SP >= 2 ? 4 : 6) : (SP >= 3 && r < 0.02) || nPop >= (SP >= 3 ? 4 : SP >= 2 ? 5 : 8));
-      if (quiet) continue; nPop++;
-      const heroSide = g.onHero && !ALL ? (g.heal ? ' mr' : ' ml') : '';
-      const col = g.heal ? 'heal' : g.onHero && !ALL ? 'hurt' : g.dot ? g.c : g.crit ? 'crit' : REFL.has(g.tag) ? 'refl' : ALL ? (g.ally ? 'ally' : g.c) : '';
-      const sign = g.heal ? '+' : g.onHero && !ALL || g.dot ? '-' : '', K = uK(g.tu);
-      const txtOf = (v, n) => `${sign}${fmtBig(v * K)}${g.crit ? '!' : ''}${n > 1 ? `<small>×${n}</small>` : ''}`;
-      const kind = g.onHero || g.dot ? 'h' : g.crit ? 'c' : big ? 'b' : 'n';
-      const delay = o.jzz && !g.onHero ? ji++ * 60 * spdF() : 0;   // 金刚震：数字跟着金光一个个亮
-      const put = () => {
-        const multi = g.vals.length > 1 && !g.onHero && SP < 3, p = popPut(g.el, `pop ${col}${big ? ' big' : ''}${g.dot ? ' dot' : ''}${heroSide}`, multi ? txtOf(g.vals[0], 1) : txtOf(g.v, g.n), kind);
-        if (multi && p) { let acc = g.vals[0]; g.vals.slice(1).forEach((v, i) => setTimeout(() => { if (!p.isConnected) return; acc += v; p.innerHTML = popHTML(txtOf(acc, i + 2)); const bb = p.querySelector('b'); if (bb && bb.animate) bb.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 120 }); }, (i + 1) * 70 * popSpd()));   // 多段：数字原地往上滚
-        }
+      const K = uK(g.tu), kill = !g.onHero && g.tu && g.tu.hp <= 0 && !g.heal;
+      const key = g.heal ? 'heal' : g.onHero && !ALL ? 'hurt' : 'dmg';
+      const friend = g.onHero || !!(g.tu && g.tu.side === 'p');   // 自己人身上：红字带减号
+      const cls = g.heal ? 'heal' : friend ? 'hurt' : '';
+      const side = g.onHero && !ALL ? (g.heal ? ' mr' : ' ml') : '';
+      const sign = g.heal ? '+' : friend ? '-' : '';
+      const delay = o.jzz && !g.onHero ? ji++ * 60 * spdF() : 0;   // 金刚震：一只只亮
+      const put = () => { accPut(g.el, key, g.v * K, { cls: cls + side, sign, crit: g.crit && !g.onHero, kill });
         if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
       if (delay) setTimeout(put, delay); else put();
     }
