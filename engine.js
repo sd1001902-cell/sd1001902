@@ -393,7 +393,7 @@ const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
 const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%：神兵掉得多了，这两档收一收才显得珍贵）
 // 上古、太古跟着幻境层数走：30 层以内 5% / 0.3%，往上每层 +0.25% / +0.03%（69 层约 14.8% / 1.5%），封顶 20% / 2%。幻境以外（主线、赌装备、铸兵）按底数
 const ANC_STEP = [0.0025, 0.0005], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 500, PRIMAL_COST = 1000, PRIMAL_FROM = 90, PRIMAL_P0 = 0.005;   // 太古：幻境 90 层起才出，90 层 0.5%，每层 +0.05%，120 层到 2% 封顶
-const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };
+const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= JY_FROM ? 2 * jyRate(N) : (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };   // 400 层起太古 = 九幽的两倍（400 层 2%，500 层 6%）
 const ancNow = () => ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0);
 // 九幽（2026-11-24 用户定）：太古之上第四档。全属性再 +30%（合计普通的 1.69 倍），5–6 条满值词条，外加 1 条九幽词条。
 // 只在幻境 400 层起掉：400 层 1%，每层 +0.02%，500 层 3% 封顶；保底：太古点化成九幽（2000 魂晶 + 10 颗九幽玄晶，要到过 400 层）；九幽词条可以花 2 颗玄晶重洗

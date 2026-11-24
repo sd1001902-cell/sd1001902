@@ -643,7 +643,7 @@ function goTab() {
         <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}</small></div>
         <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
       <div class="rquick"><button data-act="rlvto" data-arg="1" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>Tầng 1</button><button data-act="rlv" data-arg="-50" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-50</button><button data-act="rlv" data-arg="-10" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-10</button><button data-act="rlv" data-arg="10" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+10</button><button data-act="rlv" data-arg="50" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+50</button>${rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? `<button data-act="rlvto" data-arg="${rec.lv}" class="rq-rec">Kỷ lục ${rec.lv}</button>` : ''}<button data-act="rlvto" data-arg="${maxR}" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>Cao nhất ${maxR}</button></div>
-      <div class="rinfo">${info.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+      <div class="rinfo">${[0, 2, 1, 5, 3, 4].map(i => info[i]).map(([k, v], i) => `<div class="${i < 2 ? 'full' : ''}"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
       ${riftPath() && !SAVE.story.ended ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">Đang đuổi theo: kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (thấp hơn nhân vật cao nhất ${topLevel() - SAVE.chars[cls].level} cấp)</p>` : ''}
       ${teamRow()}${formRow()}
