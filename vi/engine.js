@@ -646,12 +646,12 @@ function calcStats(clsId, eq, level, buffs, ch) {
       if (T.st) for (const k in T.st) add(k, T.st[k] * r);
       if (T.fx) fx.add(T.fx);
     });
-    for (const lid of ch.cube || []) { const L = lid && LEGENDS.find(l => l.id === lid); if (L && SAVE.cube[lid]) fx.add(L.fx); }
-    if (SAVE && boxOpen()) {   // 灵玉匣：自带的气血、伤害，加上匣里三颗灵玉
-      const bs = boxStat(SAVE.riftMax); add('hpPct', bs); add('dmgPct', bs);
-      for (const gid of ch.lgs || []) { const g = gid && SAVE.lgems.find(x => x.id === gid), G = g && LGEMS[g.t]; if (G && (!G.cls || G.cls === clsId)) { const st = G.st(g.lv); for (const k in st) add(k, st[k]); lgv[g.t] = g.lv; } }
+    for (const lid of ch.cube || []) { const L = lid && LEGENDS.find(l => l.id === lid); if (L && (ch.tower || SAVE.cube[lid])) fx.add(L.fx); }   // 通天塔：塔里收的神兵之魂直接算
+    if (ch.tower ? ch.twLg.length : SAVE && boxOpen()) {   // 灵玉匣：自带的气血、伤害，加上匣里三颗灵玉（通天塔：塔里拿的灵玉）
+      const bs = boxStat(ch.tower ? TW.box : SAVE.riftMax); add('hpPct', bs); add('dmgPct', bs);
+      for (const gid of ch.lgs || []) { const g = gid && (ch.tower ? ch.twLg : SAVE.lgems).find(x => x.id === gid), G = g && LGEMS[g.t]; if (G && (!G.cls || G.cls === clsId)) { const st = G.st(g.lv); for (const k in st) add(k, st[k]); lgv[g.t] = g.lv; } }
     }
-    const yi = yiOf(ch);
+    const yi = ch.tower ? {} : yiOf(ch);
     if (yi.guiwang) { add('mf', 12 + yi.guiwang * 8); add('gf', 20 + yi.guiwang * 10); }
     if (yi.mozun) add('dmgPct', 8 + yi.mozun * 4);
   }
@@ -661,7 +661,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   // 散件流：身上没有任何套装效果（没有哪套凑到两件）时，无相环、无名戒按穿着的神兵件数算
   const sanK = (fx.has('sanA') ? 1 : 0) + (fx.has('sanB') ? 1 : 0);
   s.sanN = sanK && !Object.keys(setCount).some(id => setCount[id] >= 2) ? sanK * nLeg : 0;
-  if (SAVE) { const g = globalStats(); for (const k in g) add(k, g[k]); }
+  if (SAVE) { const g = ch && ch.tower ? twGlobal() : globalStats(); for (const k in g) add(k, g[k]); }   // 通天塔：修为按统一的底子
   if (buffs) for (const k in buffs) add(k, buffs[k]);
   s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100) * (fx.has('gGlass') ? 0.8 : 1) * (1 + (s.pHp || 0) / 100)));   // pHp／pArmor／pAtk：修为的「根基」，乘在最终数值上
   s.cls = clsId; s.sust = clsId === 'berserker' ? 0 : Math.round(s.leech * 4);   // 别的职业：每 1% 吸血折成 4% 续航强度（本职的护体／替死／身法／金刚）
@@ -1309,12 +1309,13 @@ function riftD(N) {
   return { n: "Bí cảnh · tầng " + N + " ", base, res: Math.round(Math.min(N * 1.2, 100 * ar / (490 + ar))),   // 全抗跟着这一层妖物护甲的减伤走（对 50 级的主角），术法和物理吃一样的亏
     hpMul: Math.pow(1.075, M) * rLinHp(N, R_LIN[1]), atkMul: Math.pow(1.055, M) * rLinAtk(N, R_LIN[2]), loot: Math.min(4, 0.5 + N / 15) };
 }
-const dOf = run => run.mode === 'rift' ? riftD(run.riftLv) : DIFFS[run.diff];
-const themeOf = run => run.mode === 'rift' ? RIFT_THEMES[run.theme] : CHAPTERS[run.chapter - 1];
-const diffIdx = run => run.mode === 'rift' ? Math.min(2, Math.floor(run.riftLv / 15)) : DIFF_IDS.indexOf(run.diff);
+const dOf = run => run.mode === 'rift' || run.mode === 'tower' ? riftD(run.riftLv) : DIFFS[run.diff];
+const themeOf = run => run.mode === 'rift' || run.mode === 'tower' ? RIFT_THEMES[run.theme] : CHAPTERS[run.chapter - 1];
+const diffIdx = run => run.mode === 'rift' || run.mode === 'tower' ? Math.min(2, Math.floor(run.riftLv / 15)) : DIFF_IDS.indexOf(run.diff);
 const hasMod = (run, id) => (run.mods || []).includes(id);
 const riftUnlocked = () => featureOn('rift');
 function runStats(run) {
+  if (run.mode === 'tower') return calcStats(run.cls, run.twCh.eq, run.twCh.level, run.buffs, run.twCh);
   const F = run.food && typeof FOODS !== 'undefined' && FOODS.find(f => f.id === run.food);
   if (F && F.st) { const b = { ...run.buffs }; for (const k in F.st) b[k] = (b[k] || 0) + F.st[k]; return charStats(run.cls, b); }
   return charStats(run.cls, run.buffs);
@@ -1771,14 +1772,14 @@ let BOSS_HP = 2.9, BOSS_ATK = 1.3;
 var W_EAFF = 1;   // 大地图精英额外词缀条数（2026-11：精英 2 条词缀，稀有 3 条）
 var W_LVUP = [0.02, 0.02, 4];   // 比妖物高时：每级打出 +2%、挨打 -2%，最多 4 级（原来 +7% / -6%，最多 6 级）
 function startBattle(run, kind) {
-  const s = runStats(run), C = CLASSES[run.cls], ch = SAVE.chars[run.cls], lv = ch.level, cell = curCell(run);
-  const { act, basic } = skillList(run.cls);
-  const skills = [...act.filter(k => k.lv <= lv), basic].map(k => ({ ...k, left: 0, wx: featureOn('runes') ? runeWx(k, (ch.runes || {})[k.id]) : k.wx }));   // 道士的变招可以改五行
+  const s = runStats(run), C = CLASSES[run.cls], ch = run.twCh || SAVE.chars[run.cls], lv = ch.level, cell = curCell(run), rnOn = !!run.twCh || featureOn('runes');
+  const { act, basic } = run.twCh ? { act: ch.loadout.map(id => C.skills.find(k => k.id === id)).filter(Boolean), basic: C.skills.find(k => !k.cd) } : skillList(run.cls);   // 通天塔：用塔里的招式
+  const skills = [...act.filter(k => k.lv <= lv), basic].map(k => ({ ...k, left: 0, wx: rnOn ? runeWx(k, (ch.runes || {})[k.id]) : k.wx }));   // 道士的变招可以改五行
   BK = hpK(lv);
   const P = { id: 'P', side: 'p', kind: 'hero', name: C.n, lv, cls: run.cls, spr: C.spr, hp: Math.min(run.hp, s.maxHp), maxHp: s.maxHp, atk: s.atk,
               armor: s.armorT, res: s.res, spd: 100 + s.spd, crit: s.crit, critDmg: s.critDmg, leech: s.leech, regen: s.regen,
               thorns: s.thorns, sust: s.sust || 0, dodge: s.dodge, dmgPct: s.dmgPct, elem: s.elem, freeze: s.freeze, poison: s.poison, frozenDmg: s.frozenDmg,
-              minionCap: 3 + s.minion + (s.fx && s.fx.has('minionArmor') ? 1 : 0), minionPct: s.minionPct, healPct: s.healPct, sk: s.sk, runes: featureOn('runes') ? { ...ch.runes } : {},
+              minionCap: 3 + s.minion + (s.fx && s.fx.has('minionArmor') ? 1 : 0), minionPct: s.minionPct, healPct: s.healPct, sk: s.sk, runes: rnOn ? { ...ch.runes } : {},
               xBoss: s.xBoss, xExec: s.xExec, xBreak: s.xBreak,
               fury: 0, furyGain: s.furyGain || 0, lian: s.fx.has('cLianFloor') ? 2 : 0, lastWx: null, lianPct: s.lianPct || 0, ki: s.fx.has('cangfengBelt') ? 3 : 0, kiMax: 5 + (s.lgv && s.lgv.duopo != null ? 1 : 0) + (s.fx.has('deathMarkPlus') ? 1 : 0) + (s.fx.has('qiSha4') ? 2 : 0) + (s.fx.has('wQisha') ? 1 : 0), kiPct: s.kiPct || 0,
               wpK: wpnK(ch), sanN: s.sanN || 0, goldK: s.fx.has('gGold') ? Math.min(0.3, Math.floor((SAVE.gold || 0) / 1e5) * 0.03) : 0,
@@ -1898,6 +1899,7 @@ function formMembers(run) {
   return [...new Set(ks)];
 }
 function applyForm(b, run) {
+  if (run && run.mode === 'tower') return;   // 通天塔不带阵法
   const F = formCur(), en = enemyForm(run, b.kind);
   b.fm = F; b.efm = en; b.fk = formK(F || 'san', en);
   if (!F) return;
@@ -2046,7 +2048,7 @@ function turnOrder(b, n) {
 // 幻境里的「久战破绽」：一场打到第 R_WEARY[0] 轮（按主角出手算），妖物不再回血，之后每轮多受 R_WEARY[1] 的伤害——再能回血的妖物也拖不成死局
 let R_WEARY = [10, 0.10, 20], R_REGEN = 0.02;   // [普通战从第几轮起, 每轮多受多少, 妖王战从第几轮起]：妖王是这一局的关口，晚一倍才露破绽
 let BNOW = null;
-const riftB = b => !!(b && b.run && b.run.mode === 'rift' && b.run.world);
+const riftB = b => !!(b && b.run && ((b.run.mode === 'rift' && b.run.world) || b.run.mode === 'tower'));   // 通天塔照幻境的规矩打（久战破绽、妖王封顶、两段）
 // 幻境守关的蓄力大招（惊堂木、喷火、吞噬这些）：剧情里有道具能克，幻境里没得克，再乘上守关的攻击 ×2.2，满血一下就没（僵尸县令的惊堂木平均打掉 87%，最高 137%）。
 // 幻境里这类大招每下最多打掉目标一半气血：还是要命（后面接着眩晕和普攻），但不会满血秒人
 var R_CAP_HIT = 0.5, R_BOSS_CAP = 0.4;   // 2026-11-24 守关妖王一次出手最多打掉四成气血（原来六成：高层两下就倒，除了罗汉谁都打不过首领）
@@ -2918,7 +2920,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   }
   // 大地图第二章起：等级差直接影响伤害。比妖物低 1 级：打出 -7%、挨打 +6%（最多按 6 级算）；
   // 比妖物高：收益压低（W_LVUP），高 1 级只 +2% / -2%，最多按 4 级算——要变强得靠刷装备，不是靠练级碾压
-  if (b.run && b.run.world && b.run.mode !== 'rift' && b.run.chapter >= 2 && b.P) {
+  if (b.run && b.run.world && b.run.mode === 'story' && b.run.chapter >= 2 && b.P) {
     const heroLv = b.P.lv || 1;
     const lvMul = (gp, dn, up) => gp > 0 ? 1 + Math.min(W_LVUP[2], gp) * up : 1 + Math.max(-6, gp) * dn;
     if (src.side === 'p' && tgt.side === 'e') d *= lvMul(heroLv - (tgt.lv || heroLv), 0.07, W_LVUP[0]);

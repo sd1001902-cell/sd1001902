@@ -1513,3 +1513,159 @@ function rStep(ch, x, y, run) {
   }
   return { acts };
 }
+
+// ============ 通天塔（2026-11-24 用户定）============
+// 一层一场：普通层一群小怪带精英，逢 5 层精英首领带护法，逢 10 层塔主（妖王）。进塔时人人一样（50 级、一身宝品塔装、两招），
+// 自己号上的装备、修为、玉、伙伴、阵法、役使一样都不带；每过一层三选一往上长：普通层拿塔装（太古 +10 满词条、自带玉）或招式、变招，
+// 逢 5 层拿神兵之魂（乾坤袋，最多三格），逢 10 层拿灵玉（最多三颗）。每层回满血，不带丹药；怒气在塔里一层层留着。
+// 每十层存一次档，倒下回到存档那层（带着存档时那身塔装）。每周换一座塔（楼层、妖物、三选一按周和职业定好，大家一样），从第一层重爬；
+// 每个职业的历史最高层、首通奖励永久保留。
+var TW = { bossK: [0.45, 0.6], ilvl: 70, plus: 10, gemT: 6, lgLv0: 20, lgLvK: 1.2, lgMax: 150, nStart: 2, n0: 24, nK: 5, box: 200,
+  para: { pAtk: 25, pArmor: 25, pHp: 25, crit: 60, spd: 40, res: 80, dmgPct: 90, hpPct: 60, armorPct: 25 },
+  cls: { berserker: { hpPct: 20, dmgPct: 30 }, mage: { hpPct: 80, dmgPct: 40 }, necro: { hpPct: 80, dmgPct: 150, minionPct: 60 }, assassin: { hpPct: 40, dmgPct: 40 }, paladin: {} },
+  start: { necro: ['summon', 'shidu'], assassin: ['venom', 'bingpo'] } };   // 起手两招（没写的按等级取前两招）   // 塔里不带伙伴：各职业的底子按模拟补一点（和尚自己扛得住，不补）
+const twN = f => Math.round(TW.n0 + TW.nK * (f - 1));   // 第 f 层相当于幻境多少层（妖物强度）
+function twWeek() { return Math.floor(((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000 + 3) / 7); }   // 周一换周（本地时间）
+function twRng(seed) { let s = seed | 0; return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const twHash = (...a) => { let h = 2166136261; for (const c of a.join('|')) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h | 0; };
+function twWith(seed, fn) {   // 塔里的东西按种子生成：同一周同一个职业，大家看到的一样
+  const R = Math.random, W = AFFIXES.filter(a => a.k === 'mf' || a.k === 'gf').map(a => [a, a.w]);
+  Math.random = twRng(seed); W.forEach(([a]) => { a.w = 0; });   // 塔装不出福缘、招财这种没用的词条
+  try { return fn(); } finally { Math.random = R; W.forEach(([a, w]) => { a.w = w; }); }
+}
+const twClone = o => JSON.parse(JSON.stringify(o));
+function twSave() {
+  const T = SAVE.tower || (SAVE.tower = { wk: 0, c: {}, rec: {}, ms: {}, wr: {} }), w = twWeek();
+  if (T.wk !== w) { T.wk = w; T.c = {}; T.wr = {}; }
+  return T;
+}
+function twState(cls) { const T = twSave(); return T.c[cls] || (T.c[cls] = twNew(cls)); }
+function twNew(cls) { const kit = twStartKit(cls); return { fl: 1, ck: 0, best: 0, kit, ckKit: twClone(kit), pend: null }; }
+const twSets = cls => BUILDS[cls].map(B => B.set);
+function twItem(cls, slot, rarity, extra) {   // 一件塔装：宝品照常；套装、神兵一律太古 +10、词条满值；孔开满、镶通灵玉
+  const it = makeItem({ slot: slotType(slot), ilvl: TW.ilvl, rarity, cls, noSocket: true, ...(extra || {}) });
+  it.plus = TW.plus; it.tw = 1;
+  if (it.rarity === 'set' || it.rarity === 'legend') { it.anc = 2; if (it.aff.length < 5) addAffixes(it, 5 - it.aff.length); it.aff = it.aff.map(([k]) => [k, affixValue(affDef(k), it.ilvl, affMult(it), true)]); }
+  const st = slotType(it.slot), n = MAX_SOCKETS[st] || 0, g = ['weapon', 'ring', 'amulet', 'offhand'].includes(st) ? 'ruby' : 'emerald';
+  it.sockets = n; it.gems = Array.from({ length: n }, () => gemKey(g, TW.gemT));
+  return it;
+}
+function twStartKit(cls) {
+  const T = twSave();
+  return twWith(twHash(T.wk, cls, 'start'), () => {
+    const eq = {}; for (const sl of POS_IDS) { const it = twItem(cls, sl, 'rare'); it.slot = sl === 'ring2' ? 'ring' : it.slot; eq[sl] = it; }
+    const sk = TW.start[cls] || CLASSES[cls].skills.filter(k => k.cd).sort((a, b) => a.lv - b.lv).slice(0, TW.nStart).map(k => k.id);
+    return { eq, sk, rn: {}, cube: [], lg: [], rage: 25 };
+  });
+}
+function twTal(cls) { const t = {}; for (const Bq of talentBranches(cls)) Bq.t.forEach(T => { t[Bq.id + '.' + T.id] = T.max; }); return t; }
+function twCh(cls, kit) {   // 塔里的「角色」：交给 calcStats / startBattle 用，不碰存档里的角色
+  return { tower: true, level: 50, eq: kit.eq, tal: twTal(cls), cube: kit.cube.slice(), lgs: kit.lg.map((g, i) => 'tw' + i), twLg: kit.lg.map((g, i) => ({ id: 'tw' + i, t: g.t, lv: g.lv })),
+    runes: { ...kit.rn }, loadout: kit.sk.slice(), loadoutManual: 1, yi: [], form: SAVE.chars[cls] && SAVE.chars[cls].form };
+}
+function twGlobal() { const s = {}; for (const P of PARAGON_STATS) { const n = TW.para[P.k] || 0; if (n) s[P.k] = (s[P.k] || 0) + n * P.v; } return s; }
+const twLgLv = f => Math.min(TW.lgMax, Math.round(TW.lgLv0 + TW.lgLvK * f));
+// 第 f 层的妖物：按周、职业、层数定好
+function twFloor(cls, f) {
+  const T = twSave();
+  return twWith(twHash(T.wk, cls, 'floor', f), () => {
+    const c = 1 + ((f - 1 + T.wk) % 10), F = CHAPTERS[c - 1], N = twN(f), run = { mode: 'rift', riftLv: N, theme: c - 1, mods: [], cls, world: true }, lv = riftD(N).base, ez = rEliteEase(N);
+    const nAff = 1 + (N >= 20 ? 1 : 0) + (N >= R_AFF_HI[0] ? 1 : 0) + (N >= R_AFF_HI[1] ? 1 : 0);
+    const affs = (k, ban) => RNG.shuffle(ELITE_AFFIXES.map(a => a.id).filter(a => !(ban || []).includes(a))).slice(0, k);
+    const norm = def => { const u = makeMonster(def, lv, run, 'normal'); u.maxHp = u.hp = Math.round(u.hp * R_NORM[0]); u.atk *= R_NORM[1]; return u; };
+    const elite = (def, k, mul, ban) => { const e = makeMonster(def, lv + 1, run, 'elite', affs(k, ban)); e.name = joinName(RNG.pick(ELITE_TITLES), def.n); e.maxHp = e.hp = Math.round(e.hp * R_ELITE[0] * ez[0] * (mul || 1)); e.atk *= R_ELITE[1] * ez[1]; if (e.shield) e.shield = Math.round(e.maxHp * 0.3); return e; };
+    let units = [], kind = 'battle', name = '';
+    if (f % 10 === 0) {   // 塔主：本章首领，按幻境守关妖王的规矩加强（加速、连动、词缀、两段）
+      kind = 'boss';
+      const u = makeMonster(F.boss, lv + 2, run, 'boss'); name = '塔主·' + F.boss.n; u.name = name; u.maxHp = u.hp = Math.round(u.hp * 1.15 * R_BOSS[0] * R_BOSS_UP * TW.bossK[0]); u.atk *= R_BOSS[1] * TW.bossK[1];   // 一个人打，比幻境守关妖王软一点
+      const n = R_BOSS_AFF.filter(x => N >= x).length, pool = ELITE_AFFIXES.map(a => a.id).filter(a => !['split', 'tough', 'fast', 'thorny'].includes(a) && !(u.aff || []).includes(a));
+      rBossUp(run, u, RNG.shuffle(pool).slice(0, n)); units.push(u);   // 一个人打：塔主不给反震（多段的职业会被自己弹死）
+      if (f >= 30) { const def = RNG.pick(F.mons), e = elite(def, 1, R_TEAM[1]); e.name = '护法·' + def.n; e.hufa = true; units.unshift(e); }
+    } else if (f % 5 === 0) {   // 精英首领：稀有精英多一条词缀、血更厚，带两个护法
+      kind = 'elite';
+      const def = RNG.pick(F.mons), e = elite(def, nAff + 1, 1.8, ['split', 'thorny']); e.rare = true; e.name = RNG.pick(RARE_ELITE_NAMES); name = e.name; units.push(e);
+      for (let i = 0; i < 2; i++) { const d2 = RNG.pick(F.mons), h = elite(d2, 1, R_TEAM[1]); h.name = '护法·' + d2.n; h.hufa = true; units.push(h); }
+    } else {   // 普通层：一群小怪，层数高了带一两只精英
+      const main = RNG.pick(F.mons), n = 3 + RNG.i(0, 2) + (main.pack ? 1 : 0);
+      for (let i = 0; i < n; i++) units.push(norm(i === 0 || RNG.ch(0.6) ? main : RNG.pick(F.mons)));
+      const ne = (f >= 3 ? 1 : 0) + (f >= 25 ? 1 : 0); for (let i = 0; i < ne; i++) units.unshift(elite(RNG.pick(F.mons), nAff));
+      if (ne) kind = 'elite';
+    }
+    return { kind, units, c: c, N, lv, name };
+  });
+}
+// 三选一：普通层塔装或招式；逢 5 层神兵之魂；逢 10 层灵玉。都按周、职业、层数定好
+function twPicks(cls, f, kit) {
+  const T = twSave(), C = CLASSES[cls];
+  return twWith(twHash(T.wk, cls, 'pick', f), () => {
+    const out = [], B = BUILDS[cls];
+    const lgPool = () => { const own = new Set(kit.lg.map(g => g.t)); const want = [...new Set(B.flatMap(b => b.gems))].filter(t => LGEMS[t] && !own.has(t) && t !== 'greed');
+      const gen = Object.keys(LGEMS).filter(t => !own.has(t) && t !== 'greed' && !want.includes(t) && (!LGEMS[t].cls || LGEMS[t].cls === cls)); return RNG.shuffle(want).concat(RNG.shuffle(gen)); };
+    const cubePool = () => { const own = new Set(kit.cube); const want = [...new Set(B.flatMap(b => b.cube))].filter(id => !own.has(id) && LEGENDS.some(l => l.id === id));
+      const gen = LEGENDS.filter(l => !l.w && (!l.cls || l.cls === cls) && !own.has(l.id) && !want.includes(l.id) && l.fx).map(l => l.id); return RNG.shuffle(want).slice(0, 2).concat(RNG.shuffle(gen)); };
+    if (f % 10 === 0) {
+      const lv = twLgLv(f);
+      if (kit.lg.length < 3) lgPool().slice(0, 3).forEach(t => out.push({ t: 'lg', g: { t, lv } }));
+      else kit.lg.forEach((g, i) => out.push({ t: 'lgup', i, add: 30 }));   // 三颗满了：选一颗升 30 级
+    } else if (f % 5 === 0 && kit.cube.length < 3) cubePool().slice(0, 3).forEach(lid => out.push({ t: 'cube', lid }));
+    else {
+      const sets = twSets(cls), gear = () => {
+        if (RNG.ch(0.62)) { const sid = RNG.pick(sets), S = SETS.find(x => x.id === sid), [sl] = RNG.pick(S.pieces); return { t: 'eq', it: twItem(cls, sl, 'set', { setId: sid }) }; }
+        const legs = [...new Set(B.flatMap(b => b.leg))].map(id => LEGENDS.find(l => l.id === id)).filter(Boolean);
+        const wpn = LEGENDS.filter(l => l.w && sets.includes(l.set));
+        const gen = LEGENDS.filter(l => !l.cls && !l.w && !l.x && l.slot !== 'offhand');
+        const L = RNG.ch(0.45) ? RNG.pick(legs.concat(wpn)) : RNG.pick(gen); return { t: 'eq', it: twItem(cls, L.slot, 'legend', { legendId: L.id }) };
+      };
+      const skill = () => {
+        const notIn = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
+        if (kit.sk.length < LOADOUT_MAX && notIn.length) return { t: 'sk', id: RNG.pick(notIn).id };
+        const has = kit.sk.filter(id => RUNES[id]); if (!has.length) return gear();
+        const id = RNG.pick(has), cur = kit.rn[id], r = cur ? (cur === 'a' ? 'b' : 'a') : RNG.pick(['a', 'b']); return { t: 'rn', id, r };
+      };
+      out.push(gear()); out.push(RNG.ch(kit.sk.length < LOADOUT_MAX ? 0.6 : 0.35) ? skill() : gear()); out.push(skill());
+      RNG.shuffle(out);
+    }
+    return out;
+  });
+}
+function twApply(cls, p) {   // 选中一样：放进塔装
+  const S = twState(cls), kit = S.kit;
+  if (p.t === 'eq') {
+    const it = p.it, st = slotType(it.slot);
+    let pos = it.slot;
+    if (st === 'ring') { const r1 = kit.eq.ring, r2 = kit.eq.ring2, rank = x => !x ? -1 : x.rarity === 'rare' ? 0 : 1; pos = rank(r2) < rank(r1) ? 'ring2' : 'ring'; }
+    kit.eq[pos] = it;
+  } else if (p.t === 'sk') { if (!kit.sk.includes(p.id) && kit.sk.length < LOADOUT_MAX) kit.sk.push(p.id); }
+  else if (p.t === 'rn') kit.rn[p.id] = p.r;
+  else if (p.t === 'cube') { if (!kit.cube.includes(p.lid) && kit.cube.length < 3) kit.cube.push(p.lid); }
+  else if (p.t === 'lg') { if (kit.lg.length < 3) kit.lg.push(p.g); }
+  else if (p.t === 'lgup') { const g = kit.lg[p.i]; if (g) g.lv = Math.min(TW.lgMax + 60, g.lv + p.add); }
+  S.pend = null;
+  if (S.ckWait) { S.ckWait = false; S.ckKit = twClone(kit); }   // 塔主层：选完再存档（存档里带着这次拿的灵玉）
+}
+// 开打：做一个只在这一场用的「趟」，不碰存档里的进行中冒险
+function twRun(cls) {
+  const S = twState(cls), f = S.fl, fl = twFloor(cls, f), ch = twCh(cls, S.kit);
+  const sth = (() => { try { return wmap(fl.c).def.theme; } catch (e) { return null; } })();
+  const run = { cls, mode: 'tower', world: true, chapter: 1, riftLv: fl.N, theme: fl.c - 1, sth, mods: [], buffs: { ...(TW.cls[cls] || {}) }, potions: 0, team: [], twCh: ch, twF: f, twC: fl.c, twName: fl.name,
+    rage: S.kit.rage, hp: 1e15, encCell: { lv: fl.lv }, encUnits: fl.units, loot: [], goldGot: 0, xpGot: 0, gemsGot: 0, matsGot: 0, kills: 0, t0: Date.now(), prog: 0, food: null };
+  run.hp = runStats(run).maxHp;
+  return { run, kind: fl.kind };
+}
+// 打完一层：赢了记层数、给三选一、发奖；输了回存档
+const TW_REW = { mats: 60, gold: 20000, jyx: 2, mats1: 150 };
+function twEnd(cls, b) {
+  const T = twSave(), S = twState(cls), f = S.fl, res = { win: !!b.win, f, rew: [] };
+  if (b.win) {
+    S.kit.rage = Math.round(b.P.rage || 0); S.best = Math.max(S.best, f); T.rec[cls] = Math.max(T.rec[cls] || 0, f); S.fl = f + 1;
+    S.pend = twPicks(cls, f, S.kit); if (!S.pend.length) S.pend = null;
+    if (f % 10 === 0) {
+      S.ck = f; if (S.pend) S.ckWait = true; else S.ckKit = twClone(S.kit);
+      const k = f / 10; T.wr[cls] = T.wr[cls] || 0; T.ms[cls] = T.ms[cls] || 0;
+      if (f > T.wr[cls]) { T.wr[cls] = f; const m = TW_REW.mats * k, g = TW_REW.gold * k, gk = gemKey(RNG.pick(['ruby', 'sapphire', 'topaz', 'emerald', 'amethyst', 'diamond']), Math.min(gemCap(), 2 + k));
+        SAVE.mats += m; SAVE.gold += g; addGem(gk); res.rew.push({ t: 'wk', m, g, gem: gk }); }
+      if (f > T.ms[cls]) { T.ms[cls] = f; const x = TW_REW.jyx * k, m = TW_REW.mats1 * k; SAVE.jyx = (SAVE.jyx || 0) + x; SAVE.mats += m; res.rew.push({ t: 'first', x, m }); }
+    }
+  } else { S.kit = twClone(S.ckKit); S.fl = S.ck + 1; S.pend = null; S.ckWait = false; res.back = S.fl; }
+  return res;
+}

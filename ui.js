@@ -12,6 +12,7 @@ let GSLOT = null, GSUB = 'stash', ITAB = 'info', BAGTAB = 'stat', HTAB = 'stat',
 let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null, CHEST = null, LASTRUN = null, FILTER = 'all', MODALFN = null, BACK = null;
 
 loadSave(); ensureBounties();
+if (SAVE.run && SAVE.run.mode === 'tower') SAVE.run = null;   // 通天塔的一场没打完就关了：这层不算，回到塔外重打
 if (SAVE.run) VIEW = SAVE.run.world ? 'world' : 'map';
 SFX.set(SAVE.sound, false); applyFs();
 const mvolOf = () => SAVE.mvol == null ? 0.6 : SAVE.mvol; SFX.vol(mvolOf());
@@ -415,6 +416,7 @@ function runBar(run) {
 }
 // 战斗里的顶栏：压成两条细行（血条在下面的状态栏里），整场战斗一屏放得下
 function battleBar(run) {
+  if (run.mode === 'tower') { const S = twState(run.cls); return `<header class="runbar bbar"><div class="bb1"><b class="fl">通天塔 · 第 ${run.twF} 层${run.twName ? ' · ' + esc(run.twName) : ''}</b></div><div class="bb2"><span class="pill">存档 ${S.ck} 层</span><span class="pill gold">本周最高 ${S.best} 层</span></div></header>`; }
   const title = run.mode === 'rift' ? `幻境 ${run.riftLv} 层 · ${themeOf(run).n}` : run.world ? chTitle(run.chapter) : `${chTitle(run.chapter)} · 第${CN[run.floor]}层`;
   const goal = run.world && run.mode !== 'rift' ? '' : run.mode === 'rift'
     ? `<span class="pill ${run.prog >= 100 ? 'gold' : ''}" id="rbprog"><i></i>进度 ${Math.floor(run.prog)}%</span><span class="pill xiang ${xiangLeft(run) <= 0 ? 'out' : xiangLeft(run) < 0.25 ? 'low' : ''}" id="rbxiang">香 ${xiangTxt(run)}</span>`
@@ -610,9 +612,10 @@ function goTab() {
   const cls = SAVE.cls, run = SAVE.run;
   if (run) return `${npcRow()}<section class="panel gopanel"><h3>进行中的冒险</h3><div class="gobody"><div class="resume">${CLASSES[run.cls].n} · ${run.mode === 'rift' ? '九幽幻境 ' + run.riftLv + ' 层' : run.world ? chTitle(run.chapter) + ' · ' + zoneName() : chTitle(run.chapter) + ' · 第' + CN[run.floor] + '层'}</div></div>
     <div class="gostart"><button class="btn big" data-act="resume">继续冒险</button><button class="btn ghost" data-act="retreat" style="width:100%">${run.world ? '结束这一趟（任务进度都保留，可以换个角色）' : '放弃（已得到的东西都会保留）'}</button></div></section>`;
-  const ru = featureOn('rift'), mode = ru && SAVE.mode === 'rift' ? 'rift' : 'story';
-  const modeSel = ru ? `<div class="seg sm"><button class="${mode === 'story' ? 'on' : ''}" data-act="mode" data-arg="story">主线剧情</button><button class="${mode === 'rift' ? 'on' : ''}" data-act="mode" data-arg="rift">九幽幻境</button></div>` : '<b class="gotitle">主线剧情</b>';
+  const ru = featureOn('rift'), mode = ru && (SAVE.mode === 'rift' || SAVE.mode === 'tower') ? SAVE.mode : 'story';
+  const modeSel = ru ? `<div class="seg sm s3"><button class="${mode === 'story' ? 'on' : ''}" data-act="mode" data-arg="story">主线剧情</button><button class="${mode === 'rift' ? 'on' : ''}" data-act="mode" data-arg="rift">九幽幻境</button><button class="${mode === 'tower' ? 'on' : ''}" data-act="mode" data-arg="tower">通天塔</button></div>` : '<b class="gotitle">主线剧情</b>';
   let body;
+  if (mode === 'tower') return `${npcRow()}<section class="panel gopanel"><div class="gotop">${modeSel}<button class="qhelp" data-act="twhelp" aria-label="说明">?</button></div>${towerBody(cls)}</section>`;
   if (mode === 'story') {
     if (!SAVE.unlocked[SAVE.diff]) SAVE.diff = 'normal';
     const diff = SAVE.diff, cl = storyCleared(diff), maxCh = Math.min(10, cl + 1);
@@ -708,6 +711,78 @@ function riftPathCheck() {
   setTimeout(() => { if (DLG || VIEW === 'battle') return; playDialog(st.flatMap(x => [...(x.lines || []), ['narr', `（幻境之路 · 第 ${x.lv} 层：新开放「${x.n}」。在哪：${x.where}）`]]), null, () => refresh()); }, 600);
 }
 // 出征页的说明（原来整段摊在页面上，现在点「?」才出来）
+// ---------- 通天塔（2026-11-24）----------
+const twKindTxt = (cls, f) => f % 10 === 0 ? `塔主·${CHAPTERS[(f - 1 + twSave().wk) % 10].boss.n}` : f % 5 === 0 ? '精英首领带护法' : f >= 3 ? '一群妖物，带精英' : '一群妖物';
+const twNextRew = f => { const k = Math.ceil(f / 10) * 10; return k; };
+function twKitLine(cls, kit) {   // 身上塔装的一句话概括
+  const sets = {}; let leg = 0, rare = 0; for (const p of POS_IDS) { const it = kit.eq[p]; if (!it) continue; if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; else if (it.legend) leg++; else rare++; }
+  const st = Object.keys(sets).map(id => `${(SETS.find(x => x.id === id) || {}).n || id} ${sets[id]} 件`).join(' · ');
+  return [st, leg ? `神兵 ${leg} 件` : '', rare ? `宝品 ${rare} 件` : ''].filter(Boolean).join(' · ');
+}
+function towerBody(cls) {
+  const T = twSave(), S = twState(cls), f = S.fl, kit = S.kit, C = CLASSES[cls], rec = T.rec[cls] || 0, nx = twNextRew(f);
+  const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id]; return k ? `${k.n}${r ? `<small>·${RUNES[id][r === 'a' ? 0 : 1].n}</small>` : ''}` : ''; }).join('、');
+  const cube = kit.cube.map(id => (LEGENDS.find(l => l.id === id) || {}).n).filter(Boolean).join('、') || '还没有';
+  const lg = kit.lg.map(g => `${LGEMS[g.t].n} ${g.lv}`).join('、') || '还没有';
+  return `<div class="gobody tw" data-scroll="gobody">
+      <div class="twhead"><b>${esc(C.n)}</b><span>本周第 <em>${f}</em> 层</span></div>
+      <div class="twstat"><div><small>存档</small><b>${S.ck} 层</b></div><div><small>本周最高</small><b>${S.best} 层</b></div><div><small>历史最高</small><b>${rec} 层</b></div></div>
+      <div class="twnext"><small>第 ${f} 层</small><b>${twKindTxt(cls, f)}</b></div>
+      <div class="twkit" data-act="twkit"><div><small>塔装</small><span>${twKitLine(cls, kit)}</span></div><div><small>招式</small><span>${sk}</span></div><div><small>神兵之魂</small><span>${cube}</span></div><div><small>灵玉</small><span>${lg}</span></div><em>看塔装 ›</em></div>
+      <p class="twrew"><small>第 ${nx} 层塔主</small>${(T.wr[cls] || 0) >= nx ? '本周奖励已领' : `魂晶 ${TW_REW.mats * nx / 10} · 银两 ${fmtBig(TW_REW.gold * nx / 10)} · 玉一颗`}${(T.ms[cls] || 0) >= nx ? '' : ` · <b class="jyc">首通玄晶 ${TW_REW.jyx * nx / 10}</b>`}</p>
+      <p class="sub twnote">进塔人人一样，不带自己的养成 · 每周一换塔</p>
+    </div>
+    <div class="gostart">${S.pend ? `<button class="btn big" data-act="twpend">先选第 ${f - 1} 层的奖励</button>` : `<button class="btn big" data-act="twgo">挑战第 ${f} 层</button>`}</div>`;
+}
+const twPendModal = () => () => { const cls = SAVE.cls, S = twState(cls); return `<h2 class="mh">第 ${S.fl - 1} 层 · 选一样带上楼</h2><div class="twpicks">${(S.pend || []).map((p, i) => twPickHTML(cls, p, i)).join('')}</div>`; };
+function twGo() {
+  if (SAVE.run) return toast('先把进行中的冒险结束了再来');
+  if (twState(SAVE.cls).pend) return openModal(twPendModal());
+  const cls = SAVE.cls, { run, kind } = twRun(cls); AUTO = false;
+  SAVE.run = run; beginBattle(kind);
+  banner(`通天塔 · 第 ${run.twF} 层`, run.twName || (kind === 'elite' ? '有精英' : '一群妖物'), 1400);
+  applyStep(null);
+}
+function twPickHTML(cls, p, i) {
+  const C = CLASSES[cls]; let h = '', d = '';
+  if (p.t === 'eq') { const it = p.it, S = it.set && SETS.find(x => x.id === it.set), L = it.legend && LEGENDS.find(l => l.id === it.legend), kit = twState(cls).kit;
+    const have = S ? POS_IDS.filter(q => kit.eq[q] && kit.eq[q].set === S.id && kit.eq[q].slot !== it.slot).length : 0;
+    h = `<b class="r-${it.rarity}">${itemTitle(it)}</b><small>${(SLOTS.find(x => x.id === slotType(it.slot)) || {}).n || ''}</small>`;
+    d = S ? `${S.n}：换上后 ${have + 1} 件${have + 1 === 2 || have + 1 === 4 || have + 1 === 6 ? `，开 ${have + 1} 件效果` : ''}` : L ? esc(L.d) : ''; }
+  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>新招式 · ${k.n}</b>`; d = esc(k.d); }
+  else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1]; h = `<b>变招 · ${k.n}「${R.n}」</b>`; d = esc(R.d); }
+  else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">神兵之魂 · ${L.n}</b>`; d = esc(L.d); }
+  else if (p.t === 'lg') { const G = LGEMS[p.g.t]; h = `<b style="color:${G.c}">灵玉 · ${G.n} ${p.g.lv} 级</b>`; d = esc(G.d(p.g.lv)); }
+  else if (p.t === 'lgup') { const g = twState(cls).kit.lg[p.i], G = LGEMS[g.t]; h = `<b style="color:${G.c}">${G.n} ${g.lv} → ${g.lv + p.add} 级</b>`; d = esc(G.d(g.lv + p.add)); }
+  return `<button class="twpick" data-act="twpick" data-arg="${i}">${h}<span>${d}</span></button>`;
+}
+function twResHTML() {
+  const cls = SAVE.run.cls, S = twState(cls), R = BRES.tw;
+  const rew = R.rew.map(x => x.t === 'wk' ? `本周奖励：魂晶 +${x.m} · 银两 +${fmtBig(x.g)} · ${gemName(x.gem)}` : `首通奖励：<b class="jyx">九幽玄晶 +${x.x}</b> · 魂晶 +${x.m}`).map(t => `<p class="twrw">${t}</p>`).join('');
+  if (!R.win) return `<div class="res lose tw"><h3>败</h3><p>倒在第 ${R.f} 层。回到第 ${R.back} 层，塔装回到存档时那身。</p>
+    <div class="twbtns"><button class="btn big" data-act="twnext">再来第 ${R.back} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
+  const ck = R.f % 10 === 0 ? `<p class="twrw">存档：第 ${R.f} 层</p>` : '';
+  if (S.pend) return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<p class="sub">选一样带上楼</p><div class="twpicks">${S.pend.map((p, i) => twPickHTML(cls, p, i)).join('')}</div></div>`;
+  return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<div class="twbtns"><button class="btn big" data-act="twnext">上第 ${S.fl} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
+}
+function twEndUI() {
+  BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();
+  if (B.win) VFX.victory('P'); SFX.play(B.win ? (BRES.tw.rew.length ? 'legend' : 'win') : 'lose');
+  flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
+}
+const twKitModal = () => () => {
+  const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls];
+  const eq = POS_IDS.map(p => { const it = kit.eq[p]; return it ? `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}</div>` : ''; }).join('');
+  const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id], R = r && RUNES[id][r === 'a' ? 0 : 1]; return `<div class="twkrow"><small>招式</small><b>${k.n}</b>${R ? `<em>变招「${R.n}」</em>` : ''}</div>`; }).join('');
+  const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>神兵之魂</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
+  const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>灵玉</small><b style="color:${G.c}">${G.n} ${g.lv} 级</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
+  return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">塔装 · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">${eq}${sk}${cu}${lg}</div>`;
+};
+const twHelpModal = () => () => `<h2 class="mh">通天塔</h2><div class="help-scroll"><p class="help-p">一层一场仗，打完直接上楼。普通层是一群妖物（第 3 层起带精英），逢 5 层是精英首领带两个护法，逢 10 层是塔主。</p>
+  <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，必杀的怒气一层层留着。</p>
+  <p class="help-p">每过一层三选一往上长：普通层拿一件塔装（套装、神兵，都是太古 +10、词条满值、孔里镶好玉）或者一个招式、变招（最多五招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。</p>
+  <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
+  <p class="help-p">奖励：每打过一个塔主，这周第一次领魂晶、银两和一颗玉；每个职业第一次打过某一层塔主，再给九幽玄晶。历史最高层永远记着。</p></div>`;
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
   return `<h2 class="mh">${rift ? '九幽幻境' : '主线剧情'}</h2>${rift ? `<p class="help-p">最多可以挑战 ${Math.max(1, SAVE.riftCap || 3)} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多：剩一半以上 +${RIFT_GRADES[0].jump} 层，剩四分之一以上 +${RIFT_GRADES[1].jump} 层，打过就 +${RIFT_GRADES[2].jump} 层。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
@@ -1557,6 +1632,7 @@ function skipBattle() {
 }
 function endBattle() {
   if (BRES) return;
+  if (SAVE.run && SAVE.run.mode === 'tower') return twEndUI();
   BRES = finishBattle(B);
   if (BRES.win) { clearCell(SAVE.run); VFX.victory('P'); }
   if (BRES.win && isRift(SAVE.run) && B.kind !== 'boss') {   // 幻境里的普通合战：不停下来看结算，掉的东西记在这一局里，回地图接着打
@@ -3731,6 +3807,14 @@ const ACT = {
   logt: () => { const l = $('#blog'); if (l) l.classList.toggle('open'); },
   auto: () => { if (AUTO) { stopAuto(); return; } AUTO = true; const b = document.querySelector('.autob'); if (b) { b.classList.remove('ghost'); b.textContent = '自动探索中…'; } autoStep(); },
   mode: m => { SAVE.mode = m; refresh(); },
+  twgo: () => twGo(),
+  twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
+  twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
+  twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls), p = S.pend && S.pend[+i]; if (!p) return; twApply(cls, p); save(); SFX.play('rare');
+    if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) el.innerHTML = twResHTML(); } else { closeModal(); refresh(); } },
+  twpend: () => openModal(twPendModal()),
+  twkit: () => openModal(twKitModal()),
+  twhelp: () => openModal(twHelpModal()),
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },

@@ -12,6 +12,7 @@ let GSLOT = null, GSUB = 'stash', ITAB = 'info', BAGTAB = 'stat', HTAB = 'stat',
 let VIEW = 'town', TT = 'go', B = null, BRES = null, timer = null, EVRES = null, CHEST = null, LASTRUN = null, FILTER = 'all', MODALFN = null, BACK = null;
 
 loadSave(); ensureBounties();
+if (SAVE.run && SAVE.run.mode === 'tower') SAVE.run = null;   // 通天塔的一场没打完就关了：这层不算，回到塔外重打
 if (SAVE.run) VIEW = SAVE.run.world ? 'world' : 'map';
 SFX.set(SAVE.sound, false); applyFs();
 const mvolOf = () => SAVE.mvol == null ? 0.6 : SAVE.mvol; SFX.vol(mvolOf());
@@ -416,6 +417,7 @@ function runBar(run) {
 }
 // 战斗里的顶栏：压成两条细行（血条在下面的状态栏里），整场战斗一屏放得下
 function battleBar(run) {
+  if (run.mode === 'tower') { const S = twState(run.cls); return `<header class="runbar bbar"><div class="bb1"><b class="fl">Tháp Thông Thiên · tầng ${run.twF}${run.twName ? ' · ' + esc(run.twName) : ''}</b></div><div class="bb2"><span class="pill">Lưu ở tầng ${S.ck}</span><span class="pill gold">Cao nhất tuần này ${S.best}</span></div></header>`; }
   const title = run.mode === 'rift' ? `Ảo Cảnh tầng ${run.riftLv} · ${themeOf(run).n}` : run.world ? chTitle(run.chapter) : `${chTitle(run.chapter)} · tầng ${CN[run.floor]}`;
   const goal = run.world && run.mode !== 'rift' ? '' : run.mode === 'rift'
     ? `<span class="pill ${run.prog >= 100 ? 'gold' : ''}" id="rbprog"><i></i>Tiến độ ${Math.floor(run.prog)}%</span><span class="pill xiang ${xiangLeft(run) <= 0 ? 'out' : xiangLeft(run) < 0.25 ? 'low' : ''}" id="rbxiang">Hương ${xiangTxt(run)}</span>`
@@ -611,9 +613,10 @@ function goTab() {
   const cls = SAVE.cls, run = SAVE.run;
   if (run) return `${npcRow()}<section class="panel gopanel"><h3>Chuyến phiêu lưu đang dở</h3><div class="gobody"><div class="resume">${CLASSES[run.cls].n} · ${run.mode === 'rift' ? "Ảo Cảnh Cửu U · tầng " + run.riftLv + " " : run.world ? chTitle(run.chapter) + ' · ' + zoneName() : chTitle(run.chapter) + " · tầng" + CN[run.floor] + ""}</div></div>
     <div class="gostart"><button class="btn big" data-act="resume">Tiếp tục phiêu lưu</button><button class="btn ghost" data-act="retreat" style="width:100%">${run.world ? "Kết thúc chuyến này (giữ nguyên tiến độ nhiệm vụ, có thể đổi nhân vật)" : "Bỏ cuộc (đồ đã nhận vẫn giữ lại)"}</button></div></section>`;
-  const ru = featureOn('rift'), mode = ru && SAVE.mode === 'rift' ? 'rift' : 'story';
-  const modeSel = ru ? `<div class="seg sm"><button class="${mode === 'story' ? 'on' : ''}" data-act="mode" data-arg="story">Cốt truyện chính</button><button class="${mode === 'rift' ? 'on' : ''}" data-act="mode" data-arg="rift">Ảo Cảnh Cửu U</button></div>` : "<b class=\"gotitle\">Cốt truyện chính</b>";
+  const ru = featureOn('rift'), mode = ru && (SAVE.mode === 'rift' || SAVE.mode === 'tower') ? SAVE.mode : 'story';
+  const modeSel = ru ? `<div class="seg sm s3"><button class="${mode === 'story' ? 'on' : ''}" data-act="mode" data-arg="story">Cốt truyện</button><button class="${mode === 'rift' ? 'on' : ''}" data-act="mode" data-arg="rift">Ảo Cảnh Cửu U</button><button class="${mode === 'tower' ? 'on' : ''}" data-act="mode" data-arg="tower">Tháp Thông Thiên</button></div>` : "<b class=\"gotitle\">Cốt truyện chính</b>";
   let body;
+  if (mode === 'tower') return `${npcRow()}<section class="panel gopanel"><div class="gotop">${modeSel}<button class="qhelp" data-act="twhelp" aria-label="Giải thích">?</button></div>${towerBody(cls)}</section>`;
   if (mode === 'story') {
     if (!SAVE.unlocked[SAVE.diff]) SAVE.diff = 'normal';
     const diff = SAVE.diff, cl = storyCleared(diff), maxCh = Math.min(10, cl + 1);
@@ -709,6 +712,78 @@ function riftPathCheck() {
   setTimeout(() => { if (DLG || VIEW === 'battle') return; playDialog(st.flatMap(x => [...(x.lines || []), ['narr', `(Đường Ảo Cảnh · tầng ${x.lv}: mới mở “${x.n}”. Ở đâu: ${x.where})`]]), null, () => refresh()); }, 600);
 }
 // 出征页的说明（原来整段摊在页面上，现在点「?」才出来）
+// ---------- 通天塔（2026-11-24）----------
+const twKindTxt = (cls, f) => f % 10 === 0 ? `Chủ tháp · ${CHAPTERS[(f - 1 + twSave().wk) % 10].boss.n}` : f % 5 === 0 ? "Thủ lĩnh tinh anh kèm hộ pháp" : f >= 3 ? "Một đàn yêu vật, có tinh anh" : "Một đàn yêu vật";
+const twNextRew = f => { const k = Math.ceil(f / 10) * 10; return k; };
+function twKitLine(cls, kit) {   // 身上塔装的一句话概括
+  const sets = {}; let leg = 0, rare = 0; for (const p of POS_IDS) { const it = kit.eq[p]; if (!it) continue; if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; else if (it.legend) leg++; else rare++; }
+  const st = Object.keys(sets).map(id => `${(SETS.find(x => x.id === id) || {}).n || id} ${sets[id]} món`).join(' · ');
+  return [st, leg ? `Thần binh ${leg} món` : '', rare ? `Bảo phẩm ${rare} món` : ''].filter(Boolean).join(' · ');
+}
+function towerBody(cls) {
+  const T = twSave(), S = twState(cls), f = S.fl, kit = S.kit, C = CLASSES[cls], rec = T.rec[cls] || 0, nx = twNextRew(f);
+  const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id]; return k ? `${k.n}${r ? `<small>·${RUNES[id][r === 'a' ? 0 : 1].n}</small>` : ''}` : ''; }).join(", ");
+  const cube = kit.cube.map(id => (LEGENDS.find(l => l.id === id) || {}).n).filter(Boolean).join(", ") || "Chưa có";
+  const lg = kit.lg.map(g => `${LGEMS[g.t].n} ${g.lv}`).join(", ") || "Chưa có";
+  return `<div class="gobody tw" data-scroll="gobody">
+      <div class="twhead"><b>${esc(C.n)}</b><span>Tuần này tầng <em>${f}</em></span></div>
+      <div class="twstat"><div><small>Điểm lưu</small><b>tầng ${S.ck}</b></div><div><small>Cao nhất tuần</small><b>tầng ${S.best}</b></div><div><small>Kỷ lục</small><b>tầng ${rec}</b></div></div>
+      <div class="twnext"><small>Tầng ${f}</small><b>${twKindTxt(cls, f)}</b></div>
+      <div class="twkit" data-act="twkit"><div><small>Đồ tháp</small><span>${twKitLine(cls, kit)}</span></div><div><small>Chiêu</small><span>${sk}</span></div><div><small>Hồn thần binh</small><span>${cube}</span></div><div><small>Linh ngọc</small><span>${lg}</span></div><em>Xem đồ tháp ›</em></div>
+      <p class="twrew"><small>Chủ tháp tầng ${nx}</small>${(T.wr[cls] || 0) >= nx ? "Thưởng tuần này đã nhận" : `Hồn tinh ${TW_REW.mats * nx / 10} · Bạc ${fmtBig(TW_REW.gold * nx / 10)} · một viên ngọc`}${(T.ms[cls] || 0) >= nx ? '' : ` · <b class="jyc">Lần đầu: Huyền Tinh ${TW_REW.jyx * nx / 10}</b>`}</p>
+      <p class="sub twnote">Vào tháp ai cũng như nhau, không mang đồ luyện của mình · thứ Hai đổi tháp</p>
+    </div>
+    <div class="gostart">${S.pend ? `<button class="btn big" data-act="twpend">Chọn thưởng tầng ${f - 1} trước</button>` : `<button class="btn big" data-act="twgo">Khiêu chiến tầng ${f}</button>`}</div>`;
+}
+const twPendModal = () => () => { const cls = SAVE.cls, S = twState(cls); return `<h2 class="mh">Tầng ${S.fl - 1} · chọn một thứ mang lên tầng</h2><div class="twpicks">${(S.pend || []).map((p, i) => twPickHTML(cls, p, i)).join('')}</div>`; };
+function twGo() {
+  if (SAVE.run) return toast("Hãy kết thúc chuyến phiêu lưu đang dở trước đã");
+  if (twState(SAVE.cls).pend) return openModal(twPendModal());
+  const cls = SAVE.cls, { run, kind } = twRun(cls); AUTO = false;
+  SAVE.run = run; beginBattle(kind);
+  banner(`Tháp Thông Thiên · tầng ${run.twF}`, run.twName || (kind === 'elite' ? "Có tinh anh" : "Một đàn yêu vật"), 1400);
+  applyStep(null);
+}
+function twPickHTML(cls, p, i) {
+  const C = CLASSES[cls]; let h = '', d = '';
+  if (p.t === 'eq') { const it = p.it, S = it.set && SETS.find(x => x.id === it.set), L = it.legend && LEGENDS.find(l => l.id === it.legend), kit = twState(cls).kit;
+    const have = S ? POS_IDS.filter(q => kit.eq[q] && kit.eq[q].set === S.id && kit.eq[q].slot !== it.slot).length : 0;
+    h = `<b class="r-${it.rarity}">${itemTitle(it)}</b><small>${(SLOTS.find(x => x.id === slotType(it.slot)) || {}).n || ''}</small>`;
+    d = S ? `${S.n}: mặc vào thành ${have + 1} món${have + 1 === 2 || have + 1 === 4 || have + 1 === 6 ? `, mở hiệu ứng ${have + 1} món` : ''}` : L ? esc(L.d) : ''; }
+  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>Chiêu mới · ${k.n}</b>`; d = esc(k.d); }
+  else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1]; h = `<b>Biến chiêu · ${k.n} «${R.n}»</b>`; d = esc(R.d); }
+  else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">Hồn thần binh · ${L.n}</b>`; d = esc(L.d); }
+  else if (p.t === 'lg') { const G = LGEMS[p.g.t]; h = `<b style="color:${G.c}">Linh ngọc · ${G.n} cấp ${p.g.lv}</b>`; d = esc(G.d(p.g.lv)); }
+  else if (p.t === 'lgup') { const g = twState(cls).kit.lg[p.i], G = LGEMS[g.t]; h = `<b style="color:${G.c}">${G.n} cấp ${g.lv} → ${g.lv + p.add}</b>`; d = esc(G.d(g.lv + p.add)); }
+  return `<button class="twpick" data-act="twpick" data-arg="${i}">${h}<span>${d}</span></button>`;
+}
+function twResHTML() {
+  const cls = SAVE.run.cls, S = twState(cls), R = BRES.tw;
+  const rew = R.rew.map(x => x.t === 'wk' ? `Thưởng tuần: Hồn tinh +${x.m} · Bạc +${fmtBig(x.g)} · ${gemName(x.gem)}` : `Thưởng lần đầu: <b class="jyx">Cửu U Huyền Tinh +${x.x}</b> · Hồn tinh +${x.m}`).map(t => `<p class="twrw">${t}</p>`).join('');
+  if (!R.win) return `<div class="res lose tw"><h3>Bại</h3><p>Ngã ở tầng ${R.f}. Quay về tầng ${R.back}, đồ tháp trở về bộ lúc lưu.</p>
+    <div class="twbtns"><button class="btn big" data-act="twnext">Đánh lại tầng ${R.back}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
+  const ck = R.f % 10 === 0 ? `<p class="twrw">Đã lưu: tầng ${R.f}</p>` : '';
+  if (S.pend) return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<p class="sub">Chọn một thứ mang lên tầng</p><div class="twpicks">${S.pend.map((p, i) => twPickHTML(cls, p, i)).join('')}</div></div>`;
+  return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<div class="twbtns"><button class="btn big" data-act="twnext">Lên tầng ${S.fl}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
+}
+function twEndUI() {
+  BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();
+  if (B.win) VFX.victory('P'); SFX.play(B.win ? (BRES.tw.rew.length ? 'legend' : 'win') : 'lose');
+  flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
+}
+const twKitModal = () => () => {
+  const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls];
+  const eq = POS_IDS.map(p => { const it = kit.eq[p]; return it ? `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}</div>` : ''; }).join('');
+  const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id], R = r && RUNES[id][r === 'a' ? 0 : 1]; return `<div class="twkrow"><small>Chiêu</small><b>${k.n}</b>${R ? `<em>Biến chiêu «${R.n}»</em>` : ''}</div>`; }).join('');
+  const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>Hồn thần binh</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
+  const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>Linh ngọc</small><b style="color:${G.c}">${G.n} cấp ${g.lv}</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
+  return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Đồ tháp · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">${eq}${sk}${cu}${lg}</div>`;
+};
+const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp.</p>
+  <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí tuyệt kỹ giữ qua từng tầng.</p>
+  <p class="help-p">Qua mỗi tầng chọn một trong ba để mạnh lên: tầng thường lấy một món đồ tháp (bộ, thần binh, đều là Thái Cổ +10, dòng tối đa, khảm sẵn ngọc) hoặc một chiêu, một biến chiêu (tối đa năm chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp).</p>
+  <p class="help-p">Mỗi lần hạ chủ tháp là lưu một lần. Ngã thì về tầng đã lưu, đồ tháp cũng về bộ lúc lưu. Thứ Hai hằng tuần đổi tháp mới, leo lại từ tầng một; cùng tuần, cùng nghề thì yêu vật và lựa chọn ai cũng giống nhau.</p>
+  <p class="help-p">Thưởng: mỗi chủ tháp hạ được, lần đầu trong tuần nhận hồn tinh, bạc và một viên ngọc; mỗi nghề lần đầu hạ một chủ tháp còn được Cửu U Huyền Tinh. Kỷ lục cao nhất được giữ mãi.</p></div>`;
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
   return `<h2 class="mh">${rift ? "Ảo Cảnh Cửu U" : "Cốt truyện chính"}</h2>${rift ? `<p class="help-p">Thử thách tối đa tầng ${Math.max(1, SAVE.riftCap || 3)}. Giới hạn <b>một nén hương</b> (${Math.round(riftLimit(SAVE.riftLv) / 60000)} phút). Một ván bốn tầng bản đồ lớn, yêu vật đi thành bầy: đụng một bầy, các bầy bên cạnh bị cuốn vào cùng. Diệt yêu tích đầy tiến độ thì yêu vương giữ ải hiện thân; hạ nó trước khi hương tàn, hương còn càng nhiều thì linh ngọc càng được nâng nhiều lần, lần sau càng nhảy được nhiều tầng: còn trên một nửa +${RIFT_GRADES[0].jump} tầng, còn trên một phần tư +${RIFT_GRADES[1].jump} tầng, qua được là +${RIFT_GRADES[2].jump} tầng. Ngã xuống không tính thua: bạn bị ném về lối vào của tầng này, hương cháy mất một đoạn.</p>
@@ -1558,6 +1633,7 @@ function skipBattle() {
 }
 function endBattle() {
   if (BRES) return;
+  if (SAVE.run && SAVE.run.mode === 'tower') return twEndUI();
   BRES = finishBattle(B);
   if (BRES.win) { clearCell(SAVE.run); VFX.victory('P'); }
   if (BRES.win && isRift(SAVE.run) && B.kind !== 'boss') {   // 幻境里的普通合战：不停下来看结算，掉的东西记在这一局里，回地图接着打
@@ -3732,6 +3808,14 @@ const ACT = {
   logt: () => { const l = $('#blog'); if (l) l.classList.toggle('open'); },
   auto: () => { if (AUTO) { stopAuto(); return; } AUTO = true; const b = document.querySelector('.autob'); if (b) { b.classList.remove('ghost'); b.textContent = "Đang tự khám phá…"; } autoStep(); },
   mode: m => { SAVE.mode = m; refresh(); },
+  twgo: () => twGo(),
+  twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
+  twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
+  twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls), p = S.pend && S.pend[+i]; if (!p) return; twApply(cls, p); save(); SFX.play('rare');
+    if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) el.innerHTML = twResHTML(); } else { closeModal(); refresh(); } },
+  twpend: () => openModal(twPendModal()),
+  twkit: () => openModal(twKitModal()),
+  twhelp: () => openModal(twHelpModal()),
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },
