@@ -1255,7 +1255,7 @@ const MW = 5, MH = 6;
 // 改后 80 层 ≈ 原来 67 层，100 层 ≈ 原来 73 层，原来 80 层的难度落在 125–130 层
 const R_LIN = [50, 0.08, 0.05, 0.7];
 const R_HI = [150, 0.10, 0.06];   // 2026-11-23 150 层以后每层涨得更快（用户：线性从 6 提到 10）：气血每层 +10%、攻击每层 +6%（都按 50 层的数值算），小怪、精英、妖王一样
-const R_HI2 = [300, 0.10, 0.06];   // 300 层以后每层涨多少（气血、攻击，按 50 层的数值算）；和 R_HI 一样就是不变
+const R_HI2 = [300, 0.30, 0.18];   // 2026-11-24 用户定：300 层以后每层气血 +30%、攻击 +18%（按 50 层的数值算，原来 10% / 6%，三倍），手感不对再改
 const rLinHp = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[1] * Math.max(0, Math.min(N, R_HI2[0]) - R_HI[0]) + R_HI2[1] * Math.max(0, N - R_HI2[0]); };
 const rLinAtk = (N, a) => { const k = Math.max(0, N - R_LIN[0]); return 1 + a * Math.min(k, R_HI[0] - R_LIN[0]) + R_HI[2] * Math.max(0, Math.min(N, R_HI2[0]) - R_HI[0]) + R_HI2[2] * Math.max(0, N - R_HI2[0]); };
 const rOldLv = N => 6 + Math.round(N * 1.4);   // 没改之前的妖物等级：幻境里的经验还按它算，免得层数高了经验反而少
