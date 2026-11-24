@@ -665,7 +665,7 @@ function riftPathCheck() {
 // 出征页的说明（原来整段摊在页面上，现在点「?」才出来）
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
-  return `<h2 class="mh">${rift ? '九幽幻境' : '主线剧情'}</h2>${rift ? `<p class="help-p">最多可以挑战 ${Math.max(1, SAVE.riftCap || 3)} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
+  return `<h2 class="mh">${rift ? '九幽幻境' : '主线剧情'}</h2>${rift ? `<p class="help-p">最多可以挑战 ${Math.max(1, SAVE.riftCap || 3)} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多：剩一半以上 +${RIFT_GRADES[0].jump} 层，剩四分之一以上 +${RIFT_GRADES[1].jump} 层，打过就 +${RIFT_GRADES[2].jump} 层。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
     <p class="help-p">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
     <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
     <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>

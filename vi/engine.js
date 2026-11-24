@@ -641,7 +641,7 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.armorT = Math.round(s.armor * (1 + s.armorPct / 100) * (1 + (s.pArmor || 0) / 100));
   s.atk = Math.round(s.atk * (1 + (s.atkPct || 0) / 100) * (1 + (s.pAtk || 0) / 100));   // atkPct：赤玉
   s.critRaw = Math.round(s.crit * 10) / 10; s.resRaw = Math.round(s.res * 10) / 10; s.crit = critSoft(s.critRaw); s.res = resSoft(s.resRaw);   // 2026-11-23 不再 75% 卡死：超出部分打折算
-  s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10;
+  s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10; s.critDmg = Math.round(s.critDmg * 10) / 10; s.crit = Math.round(s.crit * 10) / 10;
   s.dodge = Math.min(45, s.dodge + (fx.has('dodge') ? 15 : 0));
   if (fx.has('boneArmy')) s.minion += 1;
   s.fx = fx; s.setCount = setCount; s.level = level; s.cls = clsId; s.lgv = lgv;
@@ -658,16 +658,6 @@ const heroLv = () => { try { return SAVE.chars[SAVE.cls].level || 1; } catch (e)
 // 各职业的续航：狂刀客靠吸血；别的职业吸血只有三成（按放大后的气血算），各有各的路子。sust = 续航强度加成（%）
 // 妖物打主角一方的伤害整体上调（MON_UP），换来各职业本职续航更有分量；两边一起调，胜率对齐改之前
 let MON_UP = 1.3;   // 1 / 1.3 ≈ 0.77：狂刀客的 23% 减伤就是照这个数定的
-// 2026-11-24 流派平衡（用户：其他流派都要拉一拉）：穿齐六件幻境套装，在幻境里主角（连同僵尸）的伤害、主角受到的伤害再乘一个系数，
-// 打守关妖王再乘一个（100 层起逐步加，250 层加满）。罗汉金身不加。数字同时写在套装六件说明里（SET_TUNE_TXT）
-// 定标：后期配装（上古、根基 100、灵玉 150、带两个伙伴）每场胜率 50% 落在 315–330 层，罗汉 ~370；80% 落在 250 层上下，罗汉 ~275
-const SET_TUNE = { xuehai: [1.35, 0.55, 2.5], busi: [1.35, 0.55, 4.5], guiyuan: [1.8, 0.3, 2.5], wanfu: [1.8, 0.3, 8], yinbing: [1.4, 0.65, 1],
-                   duxing: [1.5, 0.5, 9], qisha: [1.5, 0.4, 2.5], qianji: [3, 0.25, 2.5], dari: [2.2, 0.35, 1] };
-const TUNE_B = [100, 250];
-const setTuneOf = (fx, N) => { for (const S of SETS) if (SET_TUNE[S.id] && S.b6 && fx.has(S.b6)) { const T = SET_TUNE[S.id], f = Math.max(0, Math.min(1, ((N || 0) - TUNE_B[0]) / (TUNE_B[1] - TUNE_B[0]))); return [T[0], T[1], 1 + (T[2] - 1) * f]; } return null; };
-const pctTxt = x => (x >= 1 ? '+' : '') + Math.round((x - 1) * 100) + '%';
-const SET_TUNE_TXT = id => { const T = SET_TUNE[id]; return T ? `Thưởng Ảo Cảnh: sát thương ${pctTxt(T[0])}, sát thương phải nhận ${pctTxt(T[1])}${T[2] > 1 ? `, đánh yêu vương giữ ải thêm ${pctTxt(T[2])} (từ tầng ${TUNE_B[0]} tăng dần, tầng ${TUNE_B[1]} đạt tối đa)` : ''}` : ''; };
-SETS.forEach(S => { const t = SET_TUNE_TXT(S.id); if (t && S.b6d) S.b6d += "; " + t; });
 const SUST = {
   berserker:{ n: "Huyết chiến", d: "Da dày thịt chắc: sát thương phải chịu -{dr}%; hút máu có hiệu lực trọn vẹn (gây ra bao nhiêu sát thương thì hồi máu theo tỉ lệ hút máu bấy nhiêu)", dr: 23 },
   mage:     { n: "Thủy hành hộ thể", d: "Mỗi lần nối thêm một tầng “Liên”, trên người thêm một lớp hộ thể ({a}% khí huyết tối đa, cộng dồn tối đa {cap}%)", a: 6.5, cap: 45 },
@@ -1748,7 +1738,7 @@ function startBattle(run, kind) {
               gDr: s.gDr || 0, regenPct: s.regenPct || 0, allyPct: s.allyPct || 0, cdSkip: s.cdSkip || 0,
               xDouble: s.xDouble || 0, xRage: s.xRage || 0, xTen: s.xTen || 0, xDr: s.xDr || 0, xLast: s.xLast || 0, xHaste: s.xHaste || 0, hasteN: s.xHaste ? 2 : 0, xKill: s.xKill || 0, xCritNext: s.xCritNext || 0,
               lgv: s.lgv || {}, lowHpK: s.lowHpK || 0, thornK: (s.thornK || 0) + (s.fx.has('thornsPct') ? 60 : 0), ssN: 0,
-              zhen: 0, thornDmg: s.thornDmg || 0, yi: yiOf(ch), fonu: 0, tune: run.mode === 'rift' ? setTuneOf(s.fx, run.riftLv) : null, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
+              zhen: 0, thornDmg: s.thornDmg || 0, yi: yiOf(ch), fonu: 0, ironPct: s.ironPct || 0, poisonPct: s.poisonPct || 0,
               fx: s.fx, g: s.fx.has('firstStrike') ? 100 : Math.min(95, s.xFirst || 0), st: {}, stacks: 0, frenzy: 0, mom: 0, shield: 0, skills, rage: 25 };
   const encU = run.encUnits; delete run.encUnits;
   const b = { kind, P, units: [P, ...(encU || makeEncounter(run, kind, cell))], corpses: 0, turn: 0, over: false, win: false,
@@ -2052,7 +2042,7 @@ function battleStep(b) {
 function act(b, u, out) {
   for (const k of ['burn', 'poison']) {
     const d = u.st[k]; if (!d) continue;
-    const dmg = Math.max(1, Math.round(d.d * (u.side === 'e' && (d.by || 'P') === 'P' && b.P && b.P.tune ? b.P.tune[0] * (u.kind === 'boss' ? b.P.tune[2] || 1 : 1) : 1))); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
+    const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
     if (u.side === 'e' && (d.by || 'P') === 'P') hsDmg(b, "Sát thương duy trì", Math.min(dmg, dmg + Math.min(0, u.hp))); else if (u === b.P) { const h = hsOf(b); h.raw += dmg; h.hp += dmg; }
     out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : '']);
     if (!(k === 'poison' && u.side === 'e' && b.P && b.P.fx.has('wWandu')) && --d.t <= 0) delete u.st[k];
@@ -2745,7 +2735,6 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (src.kind === 'minion' && b.P.fx.has('cSpear') && b.focus === tgt.id) d *= 1.2;                           // 镇魂扳指
   }
   if ((src.kind === 'ally' || src.kind === 'minion') && b.P && b.P.fx.has('gDrum')) d *= 1.15;                  // 聚将鼓
-  if (b.P && b.P.tune && (src === b.P || src.kind === 'minion')) d *= b.P.tune[0] * (tgt.kind === 'boss' ? b.P.tune[2] || 1 : 1);   // 流派平衡系数（套装六件）
   if (tgt.st.curse && tgt.st.curseB) d *= 1.25;
   if (fx) {
     if (fx.has('execute') && tgt.hp / tgt.maxHp < 0.3) d *= 1.6;
@@ -2812,7 +2801,6 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
     if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 0.75;
     if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
     if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
-    if (tgt === b.P && tgt.tune && src.side === 'e') d *= tgt.tune[1];
     if (tfx.has('duXing4') && tgt === b.P) d *= 1 - DUXING_DR * emptySlots(b, tgt);
     if (tgt.gDr && src.side === 'e') d *= 1 - Math.min(60, tgt.gDr * (tgt.hp / tgt.maxHp < 0.3 ? 2 : 1)) / 100;
     if (src.side === 'e' && (tgt.xDr || tgt.xLast)) d *= 1 - Math.min(50, (tgt.xDr || 0) + (tgt.hp / tgt.maxHp < 0.3 ? tgt.xLast || 0 : 0)) / 100;
@@ -2983,7 +2971,6 @@ function dotIn(b, src, t, d) {
   if (t.sanN) k *= 1 - Math.min(SAN_DR_CAP, SAN_DR * t.sanN);
   if (t.st && t.st.chan) k *= 1 - CHAN_DR / 100;
   if (t.fx && t.fx.has('luoHan6') && t.fonu) k *= 1 - 0.04 * t.fonu;
-  if (t.tune) k *= t.tune[1];
   d *= k; if (b && riftB(b) && t.maxHp) d = Math.min(d, t.maxHp * R_DOT_CAP);
   return d;
 }

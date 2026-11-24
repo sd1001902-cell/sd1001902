@@ -2,7 +2,7 @@
 // 一章由多个场景组成（野外、室内、地下城、青石镇），场景之间靠「门」相连。
 'use strict';
 var W_ELITE = [6.24, 1.64], W_BOSS = [3.0, 2.7], W_NORM = [2, 0.85];   // 大地图：小怪约打 4–6 下，精英 20–25 下（2026-11 精英两次加强：血 3.0→4.8→6.24、攻 1.28→1.43→1.64，同级正常装要打得吃力，逼人去刷装备）
-const W_SIGHT = 3.3, W_BELL = 6.5, W_BLOCK = '#oT^HCKX:';
+const W_SIGHT = 3.3, W_SIGHT_DARK = 1.8, W_BELL = 6.5, W_BLOCK = '#oT^HCKX:';
 // 特殊地形：% 蛛网（火把烧）  ~ 网桥（走过就塌）  : 深渊  * 岩浆（冷热交替）  " 毒沼  _ 冰面（会滑）
 const wHasKey = (ch, k) => !!k && !!(wkeys()[k] || wstate(ch).flags[k] || wflags()[k]);
 const wTerr = ch => (WMAPS[ch] && WMAPS[ch].terrain) || {};
@@ -67,19 +67,20 @@ function wScene(ch, sc) {
   return S.sd[sc];
 }
 function wReveal(ch) {
-  const m = wmap(ch), S = SAVE.world[wk(ch)], D = wScene(ch), p = S.pos, R = Math.ceil(W_SIGHT);
+  const m = wmap(ch), S = SAVE.world[wk(ch)], D = wScene(ch), p = S.pos, SG = wSight(), R = Math.ceil(SG);
   const a = D.seen.split('');
   if (m.hasBox == null) m.hasBox = Object.values(m.def.pts).some(P => P.t === 'box');
   const room = m.def.lit || m.def.reveal || m.hasBox;     // 室内、推冰块的地方：一进门就全看得见
   for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++) {
     if (!room && (Math.abs(x - p.x) > R || Math.abs(y - p.y) > R)) continue;
     const dx = x - p.x, dy = y - p.y;
-    if (room || dx * dx + dy * dy <= W_SIGHT * W_SIGHT) a[y * m.W + x] = '1';
+    if (room || dx * dx + dy * dy <= SG * SG) a[y * m.W + x] = '1';
   }
   D.seen = a.join('');
 }
 const wSeen = (ch, x, y) => { const m = wmap(ch); return x >= 0 && y >= 0 && x < m.W && y < m.H && wScene(ch).seen[y * m.W + x] === '1'; };
-const wInSight = (ch, x, y) => { const S = SAVE.world[wk(ch)]; if (wmap(ch).def.lit) return true; const p = S.pos, dx = x - p.x, dy = y - p.y; return dx * dx + dy * dy <= W_SIGHT * W_SIGHT; };
+const wSight = () => SAVE.run && SAVE.run.mode === 'rift' && hasMod(SAVE.run, 'dark') ? W_SIGHT_DARK : W_SIGHT;   // 加难度「伸手不见五指」：幻境里看得更近
+const wInSight = (ch, x, y) => { const S = SAVE.world[wk(ch)]; if (wmap(ch).def.lit) return true; const p = S.pos, dx = x - p.x, dy = y - p.y, SG = wSight(); return dx * dx + dy * dy <= SG * SG; };
 
 // ---------------- 人物 ----------------
 function wNpcs(ch, sc) {
@@ -1339,16 +1340,18 @@ function rScenePool() {
 function newRiftRun(cls, riftLv) {
   const pool = RNG.shuffle(rScenePool()), floors = [], used = new Set();
   for (const p of pool) { if (used.has(p.c)) continue; used.add(p.c); floors.push({ c: p.c, sc: p.sc, py: RNG.pick(Object.keys(R_PYLONS)) }); if (floors.length >= R_FLOORS) break; }
-  const run = { world: true, cls, mode: 'rift', diff: 'normal', riftLv: riftLv || 1, chapter: RCH, mods: [], floor: 1, buffs: {}, loot: [], goldGot: 0, xpGot: 0, gemsGot: 0,
+  const run = { world: true, cls, mode: 'rift', diff: 'normal', riftLv: riftLv || 1, chapter: RCH, mods: featureOn('mods') ? (SAVE.mods || []).slice() : [], floor: 1, buffs: {}, loot: [], goldGot: 0, xpGot: 0, gemsGot: 0,
     matsGot: 0, kills: 0, t0: Date.now(), lvStart: SAVE.chars[cls].level, paraStart: SAVE.para.lv, hp: 0, ended: null, rooms: 0, xpMul: 1.75, prog: 0, clock: 0, pts: 0, fights: 0,
     maze: { v: 2, cells: [], maxDist: 1 }, pos: 0, hasKey: true, theme: floors[0].c - 1,
     rw: { floors, f: 0, bossC: RNG.i(1, 10), boss: 0 } };
   run.ngoc = pgOr(0) && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
   if (pgOr(0)) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
+  for (const id of run.mods) { const M = DUNGEON_MODS.find(x => x.id === id); if (!M) continue;   // 2026-11-24 加难度在幻境里也生效（原来幻境开局清单是空的，选了等于没选）
+    if (M.mf) run.buffs.mf = (run.buffs.mf || 0) + M.mf; if (M.gf) run.buffs.gf = (run.buffs.gf || 0) + M.gf; if (M.xp) run.xpMul += M.xp / 100; }
   rBuild(run);
   if (SAVE.world) delete SAVE.world[RCH];
   const prev = SAVE.run; SAVE.run = run; wstate(RCH).flags.rfree = 1; SAVE.run = prev;
-  run.potions = 3 + bLv('alchemist'); run.hp = runStats(run).maxHp;
+  run.potions = hasMod(run, 'scarce') ? 0 : 3 + bLv('alchemist'); run.hp = runStats(run).maxHp;
   return run;
 }
 // 按这一局抽到的层，把假章节的地图表搭出来（开局、读档、导入存档码时都要搭一次）
@@ -1363,6 +1366,7 @@ function rBuild(run) {
   for (const k in _wm) if (k.startsWith(RCH + ':')) delete _wm[k]; delete _wi[RCH];
 }
 const rBase = run => riftD(run.riftLv).base;
+const R_MOD_ELITE = 2;   // 加难度「妖将横行」：幻境每层多几只精英
 // 一层的妖物：一簇一簇地放（一簇两三群，挨在一起，方便一口气拉进来），每层四五只精英
 function rSpawnFloor(ch, sc, wave) {
   const m = wmap(ch, sc), S = SAVE.world[wk(ch)], D = S.sd[sc], R = m.def.rift, Z = rSanitize(R.c, R.sc), run = SAVE.run;
@@ -1371,7 +1375,7 @@ function rSpawnFloor(ch, sc, wave) {
   let cells = Z.cells.filter(p => !taken.has(key(p)));
   if (wave) cells = cells.filter(p => Math.max(Math.abs(p.x - S.pos.x), Math.abs(p.y - S.pos.y)) >= 6);
   const nGroups = wave || Math.max(22, Math.min(34, Math.round(Z.cells.length / 20)));
-  let nElite = wave ? 2 : 4 + R.fi + (RNG.ch(0.5) ? 1 : 0), rareLeft = wave ? 0 : (RNG.ch(0.5) ? 1 : 0);
+  let nElite = wave ? 2 : 4 + R.fi + (RNG.ch(0.5) ? 1 : 0) + (run && hasMod(run, 'elites') ? R_MOD_ELITE : 0), rareLeft = wave ? 0 : (RNG.ch(0.5) ? 1 : 0);
   const centers = []; let guard = 0, left = nGroups;
   while (left > 0 && cells.length && guard++ < 400) {
     const c0 = RNG.pick(cells); if (centers.some(o => Math.max(Math.abs(o.x - c0.x), Math.abs(o.y - c0.y)) < 5)) continue;
@@ -1504,7 +1508,7 @@ function rStep(ch, x, y, run) {
     if (run.rw.boss) return { acts: [...acts, { toast: '守关妖王已经现身，就在这一层——先收拾了它' }] };
     const nf = R.fi + 1, sc = 'f' + nf; run.rw.f = nf; run.rw.fp = 0; run.floor = nf + 1;
     S.sc = sc; const e = wmap(ch, sc).pts['1'][0]; S.pos = { x: e.x, y: e.y }; S.pz.ent = { ...S.pos };
-    wScene(ch); wReveal(ch); wUnstackMons(ch); run.theme = rFloorOf(ch).c - 1; run.potions = Math.min(3 + bLv('alchemist') + 2, (run.potions || 0) + 1);
+    wScene(ch); wReveal(ch); wUnstackMons(ch); run.theme = rFloorOf(ch).c - 1; if (!hasMod(run, 'scarce')) run.potions = Math.min(3 + bLv('alchemist') + 2, (run.potions || 0) + 1);
     return { stop: true, acts: [...acts, { enter: sc }, { toast: '进了下一层：丹药 +1' }] };
   }
   return { acts };

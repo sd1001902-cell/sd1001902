@@ -151,12 +151,12 @@ const GOBLIN_FLEE = 7;
 const RARE_ELITE_NAMES = ["Lão Yêu Toái Cốt", "Bà Bà Huyết Nhãn", "Quỷ Không Mặt", "Ma Chết Đói Vương Nhị", "Hôi Tẫn Nương Nương", "Hủ Tâm Lão Tổ", "Đồ Tể Câm", "Quái Ngàn Răng", "Hắc Cức Sơn Quân", "Nữ Quỷ Khóc Mộ", "Thiết Ngạc Tinh", "Miêu Yêu Chín Mạng"];
 
 const DUNGEON_MODS = [
-  { id: 'elites', n: "Yêu Tướng Hoành Hành", d: "Mỗi tầng thêm 2 phòng tinh anh", r: "Phúc duyên +25%", mf: 25 },
+  { id: 'elites', n: "Yêu Tướng Hoành Hành", d: "Mỗi tầng thêm 2 tinh anh (trong mê cung là phòng tinh anh)", r: "Phúc duyên +25%", mf: 25 },
   { id: 'armored', n: "Đồng Bì Thiết Cốt", d: "Hộ giáp yêu vật +60%", r: "Phúc duyên +15%, kinh nghiệm +15%", mf: 15, xp: 15 },
   { id: 'brutal', n: "hung sát", d: "Sát thương yêu vật +30%", r: "Kinh nghiệm +30%, phúc duyên +10%", mf: 10, xp: 30 },
   { id: 'hardy', n: "Đạo Hạnh Trăm Năm", d: "Khí huyết yêu vật +50%", r: "Phúc duyên +25%, kinh nghiệm +20%", mf: 25, xp: 20 },
   { id: 'scarce', n: "Túi Rỗng", d: "Không mang đan dược, người bán rong cũng không bán", r: "Bạc +100%, phúc duyên +10%", mf: 10, gf: 100 },
-  { id: 'dark', n: "Tối Đen Như Mực", d: "Không thấy phòng bên cạnh có gì", r: "Phúc duyên +20%", mf: 20 },
+  { id: 'dark', n: "Tối Đen Như Mực", d: "Không thấy phòng bên cạnh có gì; trong Ảo Cảnh tầm nhìn chỉ còn hơn một nửa", r: "Phúc duyên +20%", mf: 20 },
 ];
 
 // 修为（原巅峰等级）：满级后所有角色共享
@@ -251,8 +251,8 @@ var RIFT_LIMIT = 13 * 60 * 1000;   // 原来 12 分钟；守关妖王血量 ×1.
 const riftLimit = N => RIFT_LIMIT;
 // 剩下多少香 → 灵玉升级次数、下次最多能挑战高几层
 const RIFT_GRADES = [
-  { min: 0.5,  n: "Thần Tốc", upg: 5, jump: 3 },
-  { min: 0.25, n: "Nhanh Nhẹn", upg: 4, jump: 2 },
+  { min: 0.5,  n: "Thần Tốc", upg: 5, jump: 10 },   // 2026-11-24 跳层放大（原来 +3 / +2）：打得快的号能尽快打到吃力的层数
+  { min: 0.25, n: "Nhanh Nhẹn", upg: 4, jump: 5 },
   { min: 0, n: "Ung Dung", upg: 3, jump: 1 },
   { min: -1,   n: "Tàn Hương", upg: 1, jump: 0 },
 ];
