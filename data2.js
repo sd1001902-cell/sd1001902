@@ -100,9 +100,9 @@ const LGEMS = {
   jinshen: { n: '金身玉', c: '#ffd76a', cls: 'paladin', d: lv => `反震倍率 +${Math.round(30 + lv)}%；每次挨打反震，得到 ${LGV.jsSh(lv).toFixed(1)}% 最大气血的护体真气（罗汉、大日）`, st: lv => ({ thornK: 30 + lv }) },
   // ---- 打法玉：不绑门派，配对了套装才好用 ----
   lianhuan: { n: '连环玉', c: '#ffb060', d: lv => `群攻招式每多打中一个敌人，这一招伤害 +${LGV.lhK(lv).toFixed(1)}%（最多算 5 个）。配修罗不死、万符、千机、大日`, st: () => ({}) },
-  shigu:    { n: '蚀骨玉', c: '#9ad86a', d: lv => `敌人身上每有一种状态，受到你的伤害 +${LGV.sgK(lv).toFixed(1)}%；你挂的状态多持续 1 回合。配万符、五毒、千机、归元`, st: () => ({}) },
+  shigu:    { n: '蚀骨玉', c: '#9ad86a', d: lv => `敌人身上每有一种状态，受到你的伤害 +${LGV.sgK(lv).toFixed(1)}%；你挂的状态多持续 1 回合。配万符、五毒、千机、归元、阴兵（僵尸也吃）`, st: () => ({}) },
   xuanjia:  { n: '玄甲玉', c: '#8ab0d8', d: lv => `身上有护体时伤害 +${LGV.xjK(lv).toFixed(0)}%；护体被打碎时炸开，对所有敌人造成 ${LGV.xjBoom(lv).toFixed(0)}% 伤害（两回合最多一次）。配大日、罗汉、五行道士`, st: () => ({}) },
-  shisha:   { n: '嗜杀玉', c: '#e05a5a', d: lv => `每有一个敌人倒下：回复 ${LGV.ssHeal(lv).toFixed(1)}% 气血，下一招伤害 +${LGV.ssK(lv).toFixed(0)}%（最多叠 3 层，出招后清空）。配七杀、修罗不死、阴兵`, st: () => ({}) },
+  shisha:   { n: '嗜杀玉', c: '#e05a5a', d: lv => `每有一个敌人倒下：回复 ${LGV.ssHeal(lv).toFixed(1)}% 气血，下一招伤害 +${LGV.ssK(lv).toFixed(0)}%（最多叠 3 层，出招后清空）。配七杀、修罗不死`, st: () => ({}) },
   tiangang: { n: '天罡玉', c: '#ffe08a', d: lv => `必杀蓄得快 ${Math.round(30 + lv * 0.5)}%；放完必杀后两招伤害 +${LGV.tgK(lv).toFixed(0)}%。配血海、大日这些靠必杀的打法`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
   // 老存档里被删的灵玉：先放在这里，等玩家挑一颗新的换（等级保留）
   reforge:  { n: '待重铸的灵玉', c: '#8a8070', d: () => '这颗灵玉的效果删掉了：去「灵玉 · 重铸」挑一颗新的，等级原样保留', st: () => ({}), hide: true },
@@ -126,7 +126,7 @@ const BUILDS = {
       leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
     { set: 'yinbing', d: '尸群碾压：僵尸替你挨打，倒下还会炸', sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['curse', 'b']],   /* 2026-11-25 尸爆换成摄魂咒·腐骨：尸爆把八成多的僵尸自己炸掉，550 层 66%/65% → 90%/80% */
-      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shisha'] },
+      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shigu'] },   /* 2026-11-25 嗜杀 → 蚀骨：僵尸也吃蚀骨，阴兵身上常挂减速、破甲、中毒、灼烧；550 层妖王 117 → 102 秒 */
     { set: 'duxing', d: '不带尸，一个人叠毒，再一次结算', sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
       leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['shiwang', 'pain', 'shigu'] } ],
   assassin: [

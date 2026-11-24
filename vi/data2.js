@@ -100,9 +100,9 @@ const LGEMS = {
   jinshen: { n: "Kim Thân Ngọc", c: '#ffd76a', cls: 'paladin', d: lv => `Bội số phản chấn +${Math.round(30 + lv)}%; mỗi lần bị đánh phản chấn, nhận hộ thể chân khí bằng ${LGV.jsSh(lv).toFixed(1)}% khí huyết tối đa (La Hán, Đại Nhật)`, st: lv => ({ thornK: 30 + lv }) },
   // ---- 打法玉：不绑门派，配对了套装才好用 ----
   lianhuan: { n: "Liên Hoàn Ngọc", c: '#ffb060', d: lv => `Chiêu đánh lan mỗi khi trúng thêm một kẻ địch, chiêu đó sát thương +${LGV.lhK(lv).toFixed(1)}% (tính tối đa 5 kẻ). Hợp với Tu La Bất Tử, Vạn Phù, Thiên Cơ, Đại Nhật`, st: () => ({}) },
-  shigu:    { n: "Thực Cốt Ngọc", c: '#9ad86a', d: lv => `Trên người kẻ địch mỗi có một loại trạng thái, sát thương nó nhận từ bạn +${LGV.sgK(lv).toFixed(1)}%; trạng thái bạn gắn kéo dài thêm 1 hiệp. Hợp với Vạn Phù, Ngũ Độc, Thiên Cơ, Quy Nguyên`, st: () => ({}) },
+  shigu:    { n: "Thực Cốt Ngọc", c: '#9ad86a', d: lv => `Trên người kẻ địch mỗi có một loại trạng thái, sát thương nó nhận từ bạn +${LGV.sgK(lv).toFixed(1)}%; trạng thái bạn gắn kéo dài thêm 1 hiệp. Hợp với Vạn Phù, Ngũ Độc, Thiên Cơ, Quy Nguyên, Âm Binh (cương thi cũng hưởng)`, st: () => ({}) },
   xuanjia:  { n: "Huyền Giáp Ngọc", c: '#8ab0d8', d: lv => `Khi có hộ thể, sát thương +${LGV.xjK(lv).toFixed(0)}%; hộ thể bị đánh vỡ thì nổ tung, gây ${LGV.xjBoom(lv).toFixed(0)}% sát thương lên mọi kẻ địch (hai hiệp tối đa một lần). Hợp với Đại Nhật, La Hán, Đạo Sĩ Ngũ Hành`, st: () => ({}) },
-  shisha:   { n: "Thị Sát Ngọc", c: '#e05a5a', d: lv => `Mỗi khi có một kẻ địch ngã xuống: hồi ${LGV.ssHeal(lv).toFixed(1)}% khí huyết, chiêu kế tiếp sát thương +${LGV.ssK(lv).toFixed(0)}% (cộng dồn tối đa 3 tầng, ra chiêu xong thì xóa). Hợp với Thất Sát, Tu La Bất Tử, Âm Binh`, st: () => ({}) },
+  shisha:   { n: "Thị Sát Ngọc", c: '#e05a5a', d: lv => `Mỗi khi có một kẻ địch ngã xuống: hồi ${LGV.ssHeal(lv).toFixed(1)}% khí huyết, chiêu kế tiếp sát thương +${LGV.ssK(lv).toFixed(0)}% (cộng dồn tối đa 3 tầng, ra chiêu xong thì xóa). Hợp với Thất Sát, Tu La Bất Tử`, st: () => ({}) },
   tiangang: { n: "Thiên Cương Ngọc", c: '#ffe08a', d: lv => `Tuyệt kỹ tích nhanh hơn ${Math.round(30 + lv * 0.5)}%; tung tuyệt kỹ xong, hai chiêu sau sát thương +${LGV.tgK(lv).toFixed(0)}%. Hợp với Huyết Hải, Đại Nhật và các lối đánh dựa vào tuyệt kỹ`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
   // 老存档里被删的灵玉：先放在这里，等玩家挑一颗新的换（等级保留）
   reforge:  { n: "Linh ngọc chờ tái luyện", c: '#8a8070', d: () => "Hiệu quả của viên linh ngọc này đã bị xóa: vào “Linh ngọc · Tái luyện” chọn một viên mới, cấp giữ nguyên", st: () => ({}), hide: true },
@@ -126,7 +126,7 @@ const BUILDS = {
       leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
     { set: 'yinbing', d: "Bầy xác nghiền nát: cương thi chịu đòn thay bạn, ngã xuống còn nổ", sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['curse', 'b']],   /* 2026-11-25 尸爆换成摄魂咒·腐骨：尸爆把八成多的僵尸自己炸掉，550 层 66%/65% → 90%/80% */
-      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shisha'] },
+      leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shigu'] },   /* 2026-11-25 嗜杀 → 蚀骨：僵尸也吃蚀骨，阴兵身上常挂减速、破甲、中毒、灼烧；550 层妖王 117 → 102 秒 */
     { set: 'duxing', d: "Không mang xác, một mình chồng độc rồi kết toán một lần", sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
       leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['shiwang', 'pain', 'shigu'] } ],
   assassin: [
