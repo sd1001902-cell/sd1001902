@@ -1981,7 +1981,7 @@ const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv &&
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, '乏力', 'curse', 1]); } };
 let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
-let YINBING_MUL = 2, YINBING_BIG = 0.5, YINBING_DR = 0.07;   // 2026-11-25 挡大招门槛 25% → 50%：推荐配装不放尸爆以后僵尸墙一直在，阴兵 550 层 89%/88% 太强（用户定的温和削法）   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
+let YINBING_MUL = 2, YINBING_BIG = 0.5, YINBING_DR = 0.07, YINBING_SELF = 0.4, YINBING_BOOM = 1;   // 4 件：气血低于 SELF 自己炸，炸掉最大气血 × BOOM（2026-11-25：原来只在倒下时炸 50%）   // 2026-11-25 挡大招门槛 25% → 50%：推荐配装不放尸爆以后僵尸墙一直在，阴兵 550 层 89%/88% 太强（用户定的温和削法）   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
 // 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
 let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
@@ -2464,7 +2464,7 @@ function autoPick(b, P, foes) {
   }
   if (P.cls === 'berserker' && FX.has('buSi4') && !(P.fury >= 80 && pick('bawang') && foes.length < 2)) { const x = (foes.some(f => f.st.melt) ? pick('whirl') : null) || pick('liedi') || pick('whirl'); if (x) return x; }
   if (P.cls === 'assassin' && FX.has('qianJi4')) { const pz = foes.some(f => f.st.poison); const x = (!foes.every(f => f.st.poison) ? pick('venom') : null) || (pz ? pick('fan') || pick('bingpo') : null); if (x && !(P.ki >= P.kiMax && ready.some(k => k.fin))) return x; }
-  if (P.cls === 'necro' && pick('summon') && zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length < Math.min(2, P.minionCap)) return pick('summon');
+  if (P.cls === 'necro' && pick('summon') && zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length <= Math.max(1, (P.minionCap || 3) - 2)) return pick('summon');   // 空了两个尸位就补（原来要少于 2 具才补；阴兵会自爆，空得快）
   if (P.cls === 'paladin' && P.hp / P.maxHp < 0.5 && (pick('prayer') || pick('aegis'))) return pick('prayer') || pick('aegis');
   if (P.cls === 'berserker' && P.fury >= 80 && pick('bawang')) return pick('bawang');
   if (P.cls === 'assassin' && P.ki >= P.kiMax - 1) { const f = ready.find(k => k.fin && k.pay && has(k.pay.s)) || ready.find(k => k.fin); if (f) return f; }
@@ -3147,6 +3147,7 @@ function jinZhen(b, P, K, out) {
 }
 function resolveDeaths(b, out) {
   const run = b.run, P = b.P;
+  if (P && P.fx && P.fx.has('yinBing4') && P.hp > 0) for (const u of b.units) if (u.kind === 'minion' && u.hp > 0 && !u.dead && !ZOMBIES[u.zt].ult && u.hp < u.maxHp * YINBING_SELF) { u.hp = 0; u.selfBoom = true; }   // 阴兵借道 4 件：僵尸气血低于四成自己炸开（2026-11-25 用户：不然阴兵爆很少用到）
   for (const u of b.units) {
     if (u.hp > 0 || u.dead) continue;
     if (u.kind === 'hero' && u.fx && u.fx.has('lastBreath') && !b.lastBreath) { b.lastBreath = true; u.hp = 1; u.st.butui = 2; out.pops.push([u.id, '不死', 'buff']); out.lines.push('一口气吊着——你还站着！'); continue; }
@@ -3157,7 +3158,7 @@ function resolveDeaths(b, out) {
     if (u.kind === 'ally') { out.say = [u.id, u.cid === 'kang' ? '哎哟我的老腰……撤了撤了！' : '我、我先撤一下！你给我撑住！']; out.lines.push(`${u.name}退到了后面`); continue; }
     if (u.kind === 'ward') { b.wardDown = true; out.lines.push(`${u.name}倒下了……`); continue; }
     if (u.kind === 'minion' && P.cls === 'necro' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'b') / 100, out);
-    if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * 0.5); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1, tag: '阴兵爆' })); out.pops.push([u.id, '阴兵爆', 'fire']); }   // tag：本场统计里单列「阴兵爆」（原来算在「特效」里）
+    if (u.kind === 'minion' && P.fx.has('yinBing4')) { const dmg = Math.round(u.maxHp * YINBING_BOOM); aliveOf(b, 'e').forEach(f => hit(b, P, f, 0, 'magic', out, { flat: dmg, proc: 1, aoe: 1, tag: '阴兵爆' })); out.pops.push([u.id, u.selfBoom ? '自爆' : '阴兵爆', 'fire']); if (u.selfBoom) out.lines.push(`${u.name}撑不住了，自己炸开`); }   // tag：本场统计里单列「阴兵爆」（原来算在「特效」里）
     if (u.kind === 'minion' && P.fx.has('ganshiBelt') && P.hp > 0 && !ZOMBIES[u.zt].ult && !(b.revUsed = b.revUsed || {})[u.slot]) { b.revUsed[u.slot] = 1; (b.revQ = b.revQ || []).push({ zt: u.zt, slot: u.slot, t: 3 }); }
     if (u.side === 'e' && u.st && u.st.poison && P.fx.has('baiduOff')) { const nx = aliveOf(b, 'e').find(f => f !== u && !f.st.poison); if (nx) { nx.st.poison = { d: u.st.poison.d, t: 3 }; out.pops.push([nx.id, '毒传', 'poison', 1]); } }
     if (u.kind === 'minion' && P.fx.has('corpseBurst')) { aliveOf(b, 'e').forEach(f => stSet(P, f, 'burn', out)); out.lines.push('僵尸炸开，尸火四溅'); }

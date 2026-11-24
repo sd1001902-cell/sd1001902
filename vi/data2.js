@@ -273,7 +273,7 @@ SETS.push(
   { id: 'yinbing', n: "Âm Binh Mượn Đường", cls: 'necro', rift: true,
     pieces: [['helm', "Âm Binh Nón Lá"], ['chest', "Âm Binh Thọ Y"], ['gloves', "Âm Binh Chỉ Sáo"], ['boots', "Âm Binh Dép Cỏ"], ['ring', "Âm Binh Ban Chỉ"], ['amulet', "Âm Binh Chuông Đồng"]],
     b2: { minion: 1, minionPct: 20 }, b2d: "Thi vị +1, sức mạnh cương thi +20%",
-    b4: 'yinBing4', b4d: "Cương thi ngã xuống thì nổ tung, đánh mọi kẻ địch bằng 50% khí huyết tối đa của nó",
+    b4: 'yinBing4', b4d: "Cương thi khí huyết dưới 40% thì tự nổ tung (bị đánh chết cũng nổ), gây sát thương bằng 100% khí huyết tối đa của nó lên mọi kẻ địch",
     b6: 'yinBing6', b6d: "Sát thương cương thi ×2; mỗi cương thi có mặt, sát thương bạn phải nhận -7%; phần một đòn đánh mất quá 50% khí huyết của bạn sẽ do cương thi đỡ thay" },
   { id: 'qisha', n: "Thất Sát", cls: 'assassin', rift: true,
     pieces: [['helm', "Thất Sát Diện Tráo"], ['chest', "Thất Sát Dạ Hành Y"], ['gloves', "Thất Sát Chỉ Sáo"], ['boots', "Thất Sát Nhuyễn Ngoa"], ['ring', "Thất Sát Ban Chỉ"], ['amulet', "Thất Sát Ngọc Bội"]],
