@@ -70,7 +70,8 @@ function accPut(el, key, v, o) {
   if (o.kill) accFree(el, a);
   const b = p.querySelector('b'), sc = o.kill ? 1.45 : o.crit ? 1.35 : 1.12;
   if (o.crit || o.kill) { p.classList.add('hot'); clearTimeout(a.hot); a.hot = setTimeout(() => p.classList.remove('hot'), 300 * spdF()); }
-  if (p.animate) p.animate([{ transform: `translate(-50%,0) scale(${sc})` }, { transform: 'translate(-50%,0) scale(1)' }], { duration: (o.crit || o.kill ? 260 : 160) * spdF(), easing: 'ease-out' });
+  const now = performance.now();   // 2026-11-25 省电：普通的一下离上次弹跳不到 0.12 秒就不再叠一个动画（僵尸集火一口气六七下）
+  if (p.animate && (o.crit || o.kill || !(now - (a.pt || 0) < 120))) { a.pt = now; p.animate([{ transform: `translate(-50%,0) scale(${sc})` }, { transform: 'translate(-50%,0) scale(1)' }], { duration: (o.crit || o.kill ? 260 : 160) * spdF(), easing: 'ease-out' }); }
   clearTimeout(a.t);
   a.t = setTimeout(() => { a.out = true; if (!p.animate) return p.remove(); p.animate([{ transform: 'translate(-50%,0)', opacity: 1 }, { transform: 'translate(-50%,-44px)', opacity: 0 }], { duration: ACC_OUT * popSpd(), easing: 'ease-in', fill: 'forwards' }).onfinish = () => p.remove(); }, (o.kill ? ACC_KILL : ACC_IDLE) * popSpd());
 }
@@ -89,11 +90,13 @@ function accDead(el) {   // 妖物倒下时头上还挂着的累计数（比如�
 }
 function accHead(el, p) {
   const ar = document.getElementById('arena'); if (!ar) return;
+  if (B && B._lay && el._ahLay === B._lay && el._ahTop != null) { p.style.top = el._ahTop; return; }   // 2026-11-25 省电：同一个布局里头顶位置只量一次（原来每冒一个新数字都强制量一遍）
   const R = ar.getBoundingClientRect(), E = el.getBoundingClientRect(), sp = el.querySelector('.sp'), S = sp ? sp.getBoundingClientRect() : E;
   const h = p.offsetHeight || 20, w = Math.max(p.offsetWidth || 0, 44), cx = E.left + E.width / 2;
   let top = S.top - R.top - h;   // 场地坐标：数字底边贴着头顶
   for (const q of ar.querySelectorAll(':scope > .turnbar, :scope > .fbadge')) { const r = q.getBoundingClientRect(); if (r.height && cx + w / 2 + 4 > r.left && cx - w / 2 - 4 < r.right) top = Math.max(top, r.bottom - R.top + 2); }   // 顶上出手条挡着就往下让
   p.style.top = (Math.max(2, top) - (E.top - R.top)) + 'px';
+  if (B && B._lay) { el._ahLay = B._lay; el._ahTop = p.style.top; }
 }
 const accLow = el => { const ar = document.getElementById('arena'); return !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; };
 function popPut(el, cls, html, kind) {
@@ -2060,10 +2063,11 @@ function applyStep(o, anim) {
     el.classList.toggle('charging', !!u.charging && u.hp > 0);
     el.classList.toggle('dead', !!u.dead);
     el.classList.toggle('tgt', u.side === 'e' && B.target === u.id && u.hp > 0);
-    { const w = Math.max(0, u.hp / u.maxHp * 100), tr = el.querySelector('.hpbar .tr'); el.querySelector('.hpbar i').style.width = w + '%';   // 白色残影：掉血先留一截白，慢一拍再缩
-      if (tr) { const cur = parseFloat(tr.style.width); if (!(cur > w)) { tr.style.transition = 'none'; tr.style.width = w + '%'; void tr.offsetWidth; tr.style.transition = ''; } else tr.style.width = w + '%'; } }
-    el.querySelector('.hpbar .sh').style.width = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100) + '%' : '0';
-    el.querySelector('.hpbar span').textContent = u.escaped ? '溜走了' : u.kind === 'ally' && u.dead ? '暂时退下' : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`;
+    { const w = Math.max(0, u.hp / u.maxHp * 100).toFixed(1) + '%', shw = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100).toFixed(1) + '%' : '0';   // 2026-11-25 省电：血条只在变了的时候写。白色残影在红条底下，回血时慢慢涨也看不见，不用再「关过渡 + 强制重排」（原来每一步每个人都重排一次，人越多越烫，赶尸人最多）
+      const hb = el._hb || (el._hb = { i: el.querySelector('.hpbar i'), tr: el.querySelector('.hpbar .tr'), sh: el.querySelector('.hpbar .sh'), sp: el.querySelector('.hpbar span') });
+      if (hb.w !== w) { hb.w = w; hb.i.style.width = w; if (hb.tr) hb.tr.style.width = w; }
+      if (hb.shw !== shw) { hb.shw = shw; hb.sh.style.width = shw; }
+      const tx = u.escaped ? '溜走了' : u.kind === 'ally' && u.dead ? '暂时退下' : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`; if (hb.tx !== tx) { hb.tx = tx; hb.sp.textContent = tx; } }
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">守住他！</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} 回合后溜走</span>`);
@@ -2082,7 +2086,7 @@ function applyStep(o, anim) {
     el._ice = !!u.st.slow; el._shd = u.shield > 0;
     if (u.side === 'e' && u.kind === 'boss' && alive && u.charging && !el._chg && anim) { const ar = $('#arena'); if (ar) { const w = document.createElement('div'); w.className = 'bwarn'; w.textContent = '⚠ 它在蓄力——下一招很重'; ar.appendChild(w); setTimeout(() => w.remove(), 1800); } SFX.play('gong'); }
     el._chg = !!(u.charging && alive);
-    el.querySelector('.sts').innerHTML = st.join('');
+    { const h = st.join(''); if (el._stsH !== h) { el._stsH = h; el.querySelector('.sts').innerHTML = h; } }   // 2026-11-25 省电：状态小圆点没变就不重写（原来每一步每个人都重建一遍）
 
   }
   if (o) {
@@ -2094,6 +2098,7 @@ function applyStep(o, anim) {
     const ALL = !!SAVE.allNums;   // 设置里「伤害数字：全部显示」；默认只看主角
     // 2026-11-24 跳字再细：同一个目标这一下的数字合成一个（多段带「×n」）；普攻不跳；颜色只留白、金（暴击）、淡金（反震金刚震）、橙（灼烧）、绿（中毒）
     const G = new Map(), TX = [], REFL = new Set(['反震', '金刚震', '反伤', '玄甲玉']), SAVEP = new Set(['不朽', '同心', '草人', '不死', '蜕皮']);   // 免死、保命的字：任何时候都跳
+    let cmbN = 0;
     for (const [id, txt0, c, isSt, by, tag] of o.pops) {
       const el = document.getElementById('u-' + id); if (!el) continue;
       const tu = B.units.find(u => u.id === id);
@@ -2113,15 +2118,16 @@ function applyStep(o, anim) {
         const vv = +txt.replace(/\D/g, '') || 0; g.v += vv; g.vals.push(vv); g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
         G.set(kk, g);
       } else TX.push({ el, txt, c, onHero, save: SAVEP.has(txt) });
-      if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(1);
+      if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') cmbN++;   // 连击数一步里攒着，最后改一次（僵尸集火一步六七下，原来每下都重写一遍）
       if (anim && (txt === '闪避' || txt === '格挡') && el.animate) { el.animate([{ transform: 'none' }, { transform: txt === '闪避' ? 'translate(-22px,-6px)' : 'translateX(-6px)' }, { transform: 'none' }], { duration: 260 }); if (txt === '格挡') VFX.onBlock(id); }
       if (anim && dot && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); }
       if (anim && dot && c === 'poison') bump(el, 'drip', 450);
       if (anim && dmgN && el._shd) bump(el, 'crack', 320);
       const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08;
-      if (dmgN && anim && show) { if (SP < 3 || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
+      if (dmgN && anim && show) { if ((SP < 3 && by !== 'Z') || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }   // 僵尸的小伤害不抖妖物（2026-11-25 省电）
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
     }
+    if (cmbN) bumpCombo(cmbN);
     // 2026-11-24 跳字第七版「累计」：每个目标头上只留一个数，后面每打一下原地往上加、弹一下；暴击闪金；打死放大定格；停手一会儿整体上飘淡出。主角掉血、回血各一个
     let ji = 0;
     for (const g of G.values()) {
@@ -3507,6 +3513,17 @@ function chestHTML() {
   return sceneWrap(SPR.img('chest', 76), `<h2>宝箱</h2><p class="d">箱盖吱呀一声打开了。你得到了 ${CHEST ? CHEST.gold : 0} 两银子和：</p>${lootChips(CHEST && CHEST.items)}${CHEST && CHEST.gems.length ? `<p class="sub">还有一块${CHEST.gems[0]}</p>` : ''}
     <button class="btn big" data-act="leave">继续探索</button>`);
 }
+// 2026-11-25 幻境结算升灵玉：这个角色灵玉匣里带着的排最上面（按匣子顺序），其余照旧
+function lgUpOrder(cls) {
+  const ids = boxOf(cls).filter(Boolean), on = ids.map(id => SAVE.lgems.find(g => g.id === id)).filter(Boolean);
+  return [...on.map(g => Object.assign(Object.create(g), { on: 1 })), ...SAVE.lgems.filter(g => !ids.includes(g.id))];
+}
+// 2026-11-25 幻境结算：升完灵玉直接再打一层（层数可以在这里调，默认还是刚才选的那层）
+function ragainRow() {
+  const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
+  return `<div class="ragain"><span>下一局</span><button class="btn ghost" data-act="raglv" data-arg="-1" ${SAVE.riftLv <= 1 ? 'disabled' : ''} aria-label="少一层">‹</button><b>${SAVE.riftLv}<small> 层</small></b><button class="btn ghost" data-act="raglv" data-arg="1" ${SAVE.riftLv >= maxR ? 'disabled' : ''} aria-label="多一层">›</button>
+    ${maxR > SAVE.riftLv ? `<button class="btn ghost rtop" data-act="raglv" data-arg="${maxR - SAVE.riftLv}">最高 ${maxR}</button>` : ''}</div>`;
+}
 function endHTML() {
   const r = LASTRUN; if (!r) { VIEW = 'town'; return townHTML(); }
   const t = Math.round(((r.t1 || Date.now()) - r.t0) / 1000);
@@ -3530,7 +3547,7 @@ function endHTML() {
     if (boxOpen()) extra += `<div class="lgup"><h3>灵玉</h3>${r.newGem ? `<p class="evres">得到新的灵玉：<b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${r.upgPara ? `<p class="evres">灵玉都满 ${LGEM_CAP} 级了：${r.upgPara.n} 次升级机会换成修为经验 <b>+${fmtBig(r.upgPara.x)}</b>${r.upgPara.lv ? `（修为升了 ${r.upgPara.lv} 级）` : ''}</p>` : ''}
       ${SAVE.lgems.length && !r.upgPara ? `<p class="sub">还可以升级 <b style="color:var(--gold2)">${r.upg}</b> 次。成功率取决于幻境层数和灵玉等级，最高 ${LGEM_CAP} 级。</p>
-      <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
+      <div class="gems">${lgUpOrder(r.cls).map(g => `<div class="gemrow lg${g.on ? ' on' : ''}">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm">${g.on ? '<em class="lgon">带着</em>' : ''}<b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
         ${g.lv >= LGEM_CAP ? '<button class="btn sm" disabled>满级</button>' : `<button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button>`}</div>`).join('')}</div>` : ''}</div>`;
   }
   // 2026-11 一屏：上面标题，中间在框里滚，按钮固定在底部
@@ -3545,7 +3562,7 @@ function endHTML() {
       ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">这次得到 ${loot.length} 件装备（已放进储物箱）</p>${lootChips(loot)}
     ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>又打完一章。进度只存在这台设备上，备份一下更保险。</p><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bknudge">更多备份方式</button></div>` : ''}
-    </div><div class="endbtns">${r.loot && r.loot.length ? '<button class="btn ghost" data-act="bulkopen">清点战利品</button>' : ''}<button class="btn big" data-act="town">回青石镇</button></div></div></div>`;
+    </div>${rift && riftUnlocked() ? ragainRow() : ''}<div class="endbtns">${r.loot && r.loot.length ? '<button class="btn ghost" data-act="bulkopen">清点战利品</button>' : ''}<button class="btn ${rift && riftUnlocked() ? 'ghost' : 'big'}" data-act="town">回青石镇</button>${rift && riftUnlocked() ? '<button class="btn big" data-act="ragain">再次挑战</button>' : ''}</div></div></div>`;
 }
 function creditsHTML() {
   const E = (SAVE.wflags || {}).ending, EN = { 1: '结局一 · 一人一半', 2: '结局二 · 点灯', 3: '结局三 · 这次换我' }[E];
@@ -3718,10 +3735,20 @@ function itemModal(id, shopIdx) {
     return h;
   };
 }
+// 2026-11-25 乾坤袋选格子：神兵之魂一百多种，按门派（本门／通用／推荐／全部）、部位筛
+let CPF = { g: 'mine', s: '' };
+const CP_SLOTS = ['weapon', 'helm', 'chest', 'gloves', 'belt', 'boots', 'ring', 'amulet', 'offhand'];
 const cubeModal = slot => () => {
   const cls = SAVE.cls, ch = SAVE.chars[cls], learned = LEGENDS.filter(L => SAVE.cube[L.id]);
+  const rec = new Set((BUILDS[cls] || []).flatMap(B => B.cube || []));
+  const G = [['mine', '本门', L => L.cls === cls], ['any', '通用', L => !L.cls], ['rec', '流派推荐', L => rec.has(L.id)], ['all', '全部', () => true]].map(([k, n, f]) => [k, n, f, learned.filter(f).length]);
+  let g = G.find(x => x[0] === CPF.g); if (!g || !g[3]) g = G.find(x => x[3]) || G[3];
+  const pool = learned.filter(g[2]), sl = CP_SLOTS.filter(k => pool.some(L => L.slot === k)), sk = sl.includes(CPF.s) ? CPF.s : '';
+  const list = pool.filter(L => !sk || L.slot === sk).sort((x, y) => (ch.cube.includes(y.id) ? 1 : 0) - (ch.cube.includes(x.id) ? 1 : 0) || CP_SLOTS.indexOf(x.slot) - CP_SLOTS.indexOf(y.slot));
   return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">乾坤袋 · 格子 ${slot + 1}</h2><p class="sub">选一个已收藏的神兵之魂放进这个格子（${CLASSES[cls].n}）。</p>
-    <div class="cubepick">${ch.cube[slot] ? `<button class="cp" data-act="cubeset" data-arg="${slot}|"><b>清空这个格子</b></button>` : ''}${learned.map(L => `<button class="cp ${ch.cube.includes(L.id) ? 'on' : ''}" data-act="cubeset" data-arg="${slot}|${L.id}"><b class="r-legend">${L.n}</b><span>${L.d}</span><small>${SLOT_NAME[L.slot]}${ch.cube.includes(L.id) ? ' · 已放入' : ''}</small></button>`).join('')}</div>`;
+    <div class="chips cpf">${G.filter(x => x[3] || x[0] === 'all').map(([k, n, , c]) => `<button class="chip ${g[0] === k ? 'on' : ''}" data-act="cpf" data-arg="g|${k}">${n}<small>${c}</small></button>`).join('')}</div>
+    ${sl.length > 1 ? `<div class="chips cpf cps"><button class="chip ${sk ? '' : 'on'}" data-act="cpf" data-arg="s|">全部部位</button>${sl.map(k => `<button class="chip ${sk === k ? 'on' : ''}" data-act="cpf" data-arg="s|${k}">${SLOT_NAME[k]}<small>${pool.filter(L => L.slot === k).length}</small></button>`).join('')}</div>` : ''}
+    <div class="cubepick">${ch.cube[slot] ? `<button class="cp" data-act="cubeset" data-arg="${slot}|"><b>清空这个格子</b></button>` : ''}${list.length ? list.map(L => `<button class="cp ${ch.cube.includes(L.id) ? 'on' : ''}" data-act="cubeset" data-arg="${slot}|${L.id}"><b class="r-legend">${L.n}</b><span>${L.d}</span><small>${SLOT_NAME[L.slot]}${L.cls ? ' · ' + CLASSES[L.cls].n : ' · 通用'}${rec.has(L.id) ? ' · 流派推荐' : ''}${ch.cube.includes(L.id) ? ' · 已放入' : ''}</small></button>`).join('') : '<p class="sub">这一类还没有收藏。</p>'}</div>`;
 };
 const bagModal = () => () => `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button><div class="stabs"><button class="${BAGTAB === 'stat' ? 'on' : ''}" data-act="bagtab" data-arg="stat">属性</button><button class="${BAGTAB === 'gear' ? 'on' : ''}" data-act="bagtab" data-arg="gear">装备</button><button class="${BAGTAB === 'skill' ? 'on' : ''}" data-act="bagtab" data-arg="skill">武学</button><button class="${BAGTAB === 'tal' ? 'on' : ''}" data-act="bagtab" data-arg="tal">心法${talentInfo(ctxCls()).free ? ` <b class="upn">${talentInfo(ctxCls()).free}</b>` : ''}</button></div></div>
   ${BAGTAB === 'stat' ? `<div class="inbag bagstat"><h3 class="bs-h">${esc(CLASSES[ctxCls()].n)} · ${SAVE.chars[ctxCls()].level} 级</h3>${statBlock(ctxCls())}</div>` : BAGTAB === 'gear' ? `<div class="gearp inbag">${gearPanel(ctxCls(), true)}</div>` : BAGTAB === 'skill' ? skillPanel(ctxCls(), true) : `<p class="sub">心法可用 ${talentInfo(ctxCls()).free} 点${paraFree() ? ` · 修为可用 ${paraFree()} 点（回镇上分配）` : ''}</p>${talentGrid(ctxCls())}`}`;
@@ -3888,6 +3915,13 @@ const ACT = {
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
   town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); snowCatchUp(); },
+  raglv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); save(); refresh(); },
+  ragain: () => { const r = LASTRUN; if (SAVE.run || !riftUnlocked()) return;
+    const go = () => { closeModal(); LASTRUN = null; SAVE.mode = 'rift'; if (r && r.cls && SAVE.cls !== r.cls) SAVE.cls = r.cls; VIEW = 'town'; TT = 'go'; ACT.start(); };
+    const left = r && r.upg && !r.upgPara && boxOpen() && SAVE.lgems.some(g => g.lv < LGEM_CAP) ? r.upg : 0;
+    if (left) return openModal(() => `<h2 class="mh">灵玉还没升完</h2><p class="help-p">还有 <b>${left}</b> 次灵玉升级没用，开下一局就没了。</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">回去升级</button><button class="btn ghost" data-act="ragain2">不升了，开打</button></div>`);
+    go(); },
+  ragain2: () => { const r = LASTRUN; if (r) r.upg = 0; ACT.ragain(); },
   credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); markSeen('boxnote'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
   snowreplay: () => snowPrologue(),
   replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : /^w/.test(part) ? wReplayLines(+k, part) : C[part]; playDialog(lines, C.boss); },
@@ -3976,6 +4010,7 @@ const ACT = {
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`升阶完成：现在是${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),
+  cpf: a => { const [k, v] = split(a); if (k === 'g') { CPF.g = v; CPF.s = ''; } else CPF.s = v; if (MODALFN) sheet.innerHTML = MODALFN(); },
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
   combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast('没有能合的玉石'); SFX.play('rare'); toast(`合了 ${r.n} 次，得到 ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join('、')); save(); refresh(); },
   combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast('合成了 ' + gemName(r.key)); refresh(); },

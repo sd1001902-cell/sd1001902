@@ -274,7 +274,7 @@ SETS.push(
     pieces: [['helm', "Âm Binh Nón Lá"], ['chest', "Âm Binh Thọ Y"], ['gloves', "Âm Binh Chỉ Sáo"], ['boots', "Âm Binh Dép Cỏ"], ['ring', "Âm Binh Ban Chỉ"], ['amulet', "Âm Binh Chuông Đồng"]],
     b2: { minion: 1, minionPct: 20 }, b2d: "Thi vị +1, sức mạnh cương thi +20%",
     b4: 'yinBing4', b4d: "Cương thi ngã xuống thì nổ tung, đánh mọi kẻ địch bằng 50% khí huyết tối đa của nó",
-    b6: 'yinBing6', b6d: "Sát thương cương thi ×2; mỗi cương thi có mặt, sát thương bạn phải nhận -7%" },
+    b6: 'yinBing6', b6d: "Sát thương cương thi ×2; mỗi cương thi có mặt, sát thương bạn phải nhận -7%; phần một đòn đánh mất quá 25% khí huyết của bạn sẽ do cương thi đỡ thay" },
   { id: 'qisha', n: "Thất Sát", cls: 'assassin', rift: true,
     pieces: [['helm', "Thất Sát Diện Tráo"], ['chest', "Thất Sát Dạ Hành Y"], ['gloves', "Thất Sát Chỉ Sáo"], ['boots', "Thất Sát Nhuyễn Ngoa"], ['ring', "Thất Sát Ban Chỉ"], ['amulet', "Thất Sát Ngọc Bội"]],
     b2: { crit: 8, critDmg: 30, xDr: 45 }, b2d: "Tỉ lệ chí mạng +8%, sát thương chí mạng +30%, sát thương phải nhận -45%",

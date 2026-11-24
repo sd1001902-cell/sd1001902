@@ -706,6 +706,7 @@ const VFX = (() => {
     // ---- 召唤物（行尸 / 鬼卒） ----
     if (actor && actor.kind === 'minion') {
       if (!tp) return 0;
+      if (speed >= 2) return actor.ae === 'magic' ? T : mv;   // 2026-11-25 省电：两倍速以上僵尸、鬼卒出手不画爪痕和鬼火（赶尸人一场下来出手最多，手机最烫）
       if (actor.ae === 'magic' && ap) { proj('ghostorb small', ap, tp, T, GHOST); later(() => boom(tp, GHOST, 36, D * 0.6), T); return T; }
       dl(() => spawn('claw', tp.x, tp.y, D * 0.8, { c: '#9ab89a', rot: (Math.random() * 40 - 20) + 'deg' })); return mv;
     }

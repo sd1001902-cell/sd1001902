@@ -1979,7 +1979,7 @@ const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv &&
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, "Kiệt lực", 'curse', 1]); } };
 let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
-let YINBING_MUL = 2;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
+let YINBING_MUL = 2, YINBING_BIG = 0.25;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
 // 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
 let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
@@ -2941,6 +2941,10 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分
     const Z = zombiesOf(b).sort((x, y) => (y.taunt ? 1 : 0) - (x.taunt ? 1 : 0) || y.hp - x.hp)[0];
     if (Z) { const all = !!tgt.st.guardZ; if (all) delete tgt.st.guardZ; const part = Math.min(Z.hp, all ? d - 1 : Math.round(d * Math.min(60, sustV(tgt, 'a')) / 100)); if (part >= 1) { Z.hp -= part; d -= part; out.pops.push([Z.id, popN(Z, part), 'phys']); } }
+    if (tgt.fx.has('yinBing6')) {   // 阴兵借道 6 件：一下打掉你超过 YINBING_BIG 气血的部分由僵尸挡（2026-11-25：阴兵减伤十套里最低，高层死于一下打穿，平均 118% 气血）
+      const lim = tgt.maxHp * YINBING_BIG;
+      for (const Z2 of zombiesOf(b).sort((x, y) => (y.taunt ? 1 : 0) - (x.taunt ? 1 : 0) || y.hp - x.hp)) { if (d <= lim) break; const p2 = Math.min(Z2.hp, Math.round(d - lim)); if (p2 >= 1) { Z2.hp -= p2; d -= p2; out.pops.push([Z2.id, popN(Z2, p2), 'phys']); } }
+    }
   }
   if (tgt.kind === 'ally' && src.side === 'e' && b.P && b.P.fx && b.P.fx.has('cBodhi')) d = Math.max(1, Math.round(d * 0.7));   // 菩提子
   if (tgt.side === 'p' && src.side === 'e' && tgt.st.kangG && d > 1) {   // 康总管挡刀：替全队挡

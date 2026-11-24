@@ -70,7 +70,8 @@ function accPut(el, key, v, o) {
   if (o.kill) accFree(el, a);
   const b = p.querySelector('b'), sc = o.kill ? 1.45 : o.crit ? 1.35 : 1.12;
   if (o.crit || o.kill) { p.classList.add('hot'); clearTimeout(a.hot); a.hot = setTimeout(() => p.classList.remove('hot'), 300 * spdF()); }
-  if (p.animate) p.animate([{ transform: `translate(-50%,0) scale(${sc})` }, { transform: 'translate(-50%,0) scale(1)' }], { duration: (o.crit || o.kill ? 260 : 160) * spdF(), easing: 'ease-out' });
+  const now = performance.now();   // 2026-11-25 省电：普通的一下离上次弹跳不到 0.12 秒就不再叠一个动画（僵尸集火一口气六七下）
+  if (p.animate && (o.crit || o.kill || !(now - (a.pt || 0) < 120))) { a.pt = now; p.animate([{ transform: `translate(-50%,0) scale(${sc})` }, { transform: 'translate(-50%,0) scale(1)' }], { duration: (o.crit || o.kill ? 260 : 160) * spdF(), easing: 'ease-out' }); }
   clearTimeout(a.t);
   a.t = setTimeout(() => { a.out = true; if (!p.animate) return p.remove(); p.animate([{ transform: 'translate(-50%,0)', opacity: 1 }, { transform: 'translate(-50%,-44px)', opacity: 0 }], { duration: ACC_OUT * popSpd(), easing: 'ease-in', fill: 'forwards' }).onfinish = () => p.remove(); }, (o.kill ? ACC_KILL : ACC_IDLE) * popSpd());
 }
@@ -89,11 +90,13 @@ function accDead(el) {   // 妖物倒下时头上还挂着的累计数（比如�
 }
 function accHead(el, p) {
   const ar = document.getElementById('arena'); if (!ar) return;
+  if (B && B._lay && el._ahLay === B._lay && el._ahTop != null) { p.style.top = el._ahTop; return; }   // 2026-11-25 省电：同一个布局里头顶位置只量一次（原来每冒一个新数字都强制量一遍）
   const R = ar.getBoundingClientRect(), E = el.getBoundingClientRect(), sp = el.querySelector('.sp'), S = sp ? sp.getBoundingClientRect() : E;
   const h = p.offsetHeight || 20, w = Math.max(p.offsetWidth || 0, 44), cx = E.left + E.width / 2;
   let top = S.top - R.top - h;   // 场地坐标：数字底边贴着头顶
   for (const q of ar.querySelectorAll(':scope > .turnbar, :scope > .fbadge')) { const r = q.getBoundingClientRect(); if (r.height && cx + w / 2 + 4 > r.left && cx - w / 2 - 4 < r.right) top = Math.max(top, r.bottom - R.top + 2); }   // 顶上出手条挡着就往下让
   p.style.top = (Math.max(2, top) - (E.top - R.top)) + 'px';
+  if (B && B._lay) { el._ahLay = B._lay; el._ahTop = p.style.top; }
 }
 const accLow = el => { const ar = document.getElementById('arena'); return !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; };
 function popPut(el, cls, html, kind) {
@@ -2061,10 +2064,11 @@ function applyStep(o, anim) {
     el.classList.toggle('charging', !!u.charging && u.hp > 0);
     el.classList.toggle('dead', !!u.dead);
     el.classList.toggle('tgt', u.side === 'e' && B.target === u.id && u.hp > 0);
-    { const w = Math.max(0, u.hp / u.maxHp * 100), tr = el.querySelector('.hpbar .tr'); el.querySelector('.hpbar i').style.width = w + '%';   // 白色残影：掉血先留一截白，慢一拍再缩
-      if (tr) { const cur = parseFloat(tr.style.width); if (!(cur > w)) { tr.style.transition = 'none'; tr.style.width = w + '%'; void tr.offsetWidth; tr.style.transition = ''; } else tr.style.width = w + '%'; } }
-    el.querySelector('.hpbar .sh').style.width = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100) + '%' : '0';
-    el.querySelector('.hpbar span').textContent = u.escaped ? "chuồn rồi" : u.kind === 'ally' && u.dead ? "tạm lui" : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`;
+    { const w = Math.max(0, u.hp / u.maxHp * 100).toFixed(1) + '%', shw = u.shield > 0 ? Math.min(100, u.shield / u.maxHp * 100).toFixed(1) + '%' : '0';   // 2026-11-25 省电：血条只在变了的时候写。白色残影在红条底下，回血时慢慢涨也看不见，不用再「关过渡 + 强制重排」（原来每一步每个人都重排一次，人越多越烫，赶尸人最多）
+      const hb = el._hb || (el._hb = { i: el.querySelector('.hpbar i'), tr: el.querySelector('.hpbar .tr'), sh: el.querySelector('.hpbar .sh'), sp: el.querySelector('.hpbar span') });
+      if (hb.w !== w) { hb.w = w; hb.i.style.width = w; if (hb.tr) hb.tr.style.width = w; }
+      if (hb.shw !== shw) { hb.shw = shw; hb.sh.style.width = shw; }
+      const tx = u.escaped ? "chuồn rồi" : u.kind === 'ally' && u.dead ? "tạm lui" : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`; if (hb.tx !== tx) { hb.tx = tx; hb.sp.textContent = tx; } }
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">Giữ lấy ông ấy!</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} lượt nữa chuồn</span>`);
@@ -2083,7 +2087,7 @@ function applyStep(o, anim) {
     el._ice = !!u.st.slow; el._shd = u.shield > 0;
     if (u.side === 'e' && u.kind === 'boss' && alive && u.charging && !el._chg && anim) { const ar = $('#arena'); if (ar) { const w = document.createElement('div'); w.className = 'bwarn'; w.textContent = "⚠ Nó đang tụ lực — chiêu sau rất nặng"; ar.appendChild(w); setTimeout(() => w.remove(), 1800); } SFX.play('gong'); }
     el._chg = !!(u.charging && alive);
-    el.querySelector('.sts').innerHTML = st.join('');
+    { const h = st.join(''); if (el._stsH !== h) { el._stsH = h; el.querySelector('.sts').innerHTML = h; } }   // 2026-11-25 省电：状态小圆点没变就不重写（原来每一步每个人都重建一遍）
 
   }
   if (o) {
@@ -2095,6 +2099,7 @@ function applyStep(o, anim) {
     const ALL = !!SAVE.allNums;   // 设置里「伤害数字：全部显示」；默认只看主角
     // 2026-11-24 跳字再细：同一个目标这一下的数字合成一个（多段带「×n」）；普攻不跳；颜色只留白、金（暴击）、淡金（反震金刚震）、橙（灼烧）、绿（中毒）
     const G = new Map(), TX = [], REFL = new Set(["Phản chấn", "Kim Cương Chấn", "Phản thương", "Huyền Giáp Ngọc"]), SAVEP = new Set(["Bất hủ", "Đồng tâm", "Hình nhân", "Bất Tử", "Lột Da"]);   // 免死、保命的字：任何时候都跳
+    let cmbN = 0;
     for (const [id, txt0, c, isSt, by, tag] of o.pops) {
       const el = document.getElementById('u-' + id); if (!el) continue;
       const tu = B.units.find(u => u.id === id);
@@ -2114,15 +2119,16 @@ function applyStep(o, anim) {
         const vv = +txt.replace(/\D/g, '') || 0; g.v += vv; g.vals.push(vv); g.n++; if (c === 'crit') g.crit = true; if (tag && !g.tag) g.tag = tag; if (g.c === 'crit' && c !== 'crit') g.c = c;
         G.set(kk, g);
       } else TX.push({ el, txt, c, onHero, save: SAVEP.has(txt) });
-      if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') bumpCombo(1);
+      if (anim && dmgN && actorU && actorU.side === 'p' && tu && tu.side === 'e') cmbN++;   // 连击数一步里攒着，最后改一次（僵尸集火一步六七下，原来每下都重写一遍）
       if (anim && (txt === "Né tránh" || txt === "Đỡ đòn") && el.animate) { el.animate([{ transform: 'none' }, { transform: txt === "Né tránh" ? 'translate(-22px,-6px)' : 'translateX(-6px)' }, { transform: 'none' }], { duration: 260 }); if (txt === "Đỡ đòn") VFX.onBlock(id); }
       if (anim && dot && c === 'burn') { bump(el, 'flare', 450); VFX.onFlare(id); }
       if (anim && dot && c === 'poison') bump(el, 'drip', 450);
       if (anim && dmgN && el._shd) bump(el, 'crack', 320);
       const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08;
-      if (dmgN && anim && show) { if (SP < 3 || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }
+      if (dmgN && anim && show) { if ((SP < 3 && by !== 'Z') || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }   // 僵尸的小伤害不抖妖物（2026-11-25 省电）
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
     }
+    if (cmbN) bumpCombo(cmbN);
     // 2026-11-24 跳字第七版「累计」：每个目标头上只留一个数，后面每打一下原地往上加、弹一下；暴击闪金；打死放大定格；停手一会儿整体上飘淡出。主角掉血、回血各一个
     let ji = 0;
     for (const g of G.values()) {
@@ -3508,6 +3514,17 @@ function chestHTML() {
   return sceneWrap(SPR.img('chest', 76), `<h2>Rương báu</h2><p class="d">Nắp rương kẽo kẹt mở ra. Bạn nhận được ${CHEST ? CHEST.gold : 0} lượng bạc và:</p>${lootChips(CHEST && CHEST.items)}${CHEST && CHEST.gems.length ? `<p class="sub">Còn một viên ${CHEST.gems[0]}</p>` : ''}
     <button class="btn big" data-act="leave">Tiếp tục khám phá</button>`);
 }
+// 2026-11-25 幻境结算升灵玉：这个角色灵玉匣里带着的排最上面（按匣子顺序），其余照旧
+function lgUpOrder(cls) {
+  const ids = boxOf(cls).filter(Boolean), on = ids.map(id => SAVE.lgems.find(g => g.id === id)).filter(Boolean);
+  return [...on.map(g => Object.assign(Object.create(g), { on: 1 })), ...SAVE.lgems.filter(g => !ids.includes(g.id))];
+}
+// 2026-11-25 幻境结算：升完灵玉直接再打一层（层数可以在这里调，默认还是刚才选的那层）
+function ragainRow() {
+  const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
+  return `<div class="ragain"><span>Ván sau</span><button class="btn ghost" data-act="raglv" data-arg="-1" ${SAVE.riftLv <= 1 ? 'disabled' : ''} aria-label="Bớt một tầng">‹</button><b><small>tầng </small>${SAVE.riftLv}</b><button class="btn ghost" data-act="raglv" data-arg="1" ${SAVE.riftLv >= maxR ? 'disabled' : ''} aria-label="Thêm một tầng">›</button>
+    ${maxR > SAVE.riftLv ? `<button class="btn ghost rtop" data-act="raglv" data-arg="${maxR - SAVE.riftLv}">Cao nhất ${maxR}</button>` : ''}</div>`;
+}
 function endHTML() {
   const r = LASTRUN; if (!r) { VIEW = 'town'; return townHTML(); }
   const t = Math.round(((r.t1 || Date.now()) - r.t0) / 1000);
@@ -3531,7 +3548,7 @@ function endHTML() {
     if (boxOpen()) extra += `<div class="lgup"><h3>Linh ngọc</h3>${r.newGem ? `<p class="evres">Nhận linh ngọc mới: <b style="color:${LGEMS[r.newGem.t].c}">${LGEMS[r.newGem.t].n}</b></p>` : ''}
       ${r.upgPara ? `<p class="evres">Linh ngọc đều đã đạt cấp ${LGEM_CAP}: ${r.upgPara.n} lượt nâng đổi thành kinh nghiệm Tu vi <b>+${fmtBig(r.upgPara.x)}</b>${r.upgPara.lv ? ` (Tu vi lên ${r.upgPara.lv} cấp)` : ''}</p>` : ''}
       ${SAVE.lgems.length && !r.upgPara ? `<p class="sub">Còn nâng được <b style="color:var(--gold2)">${r.upg}</b> lần. Tỉ lệ thành công tùy tầng Ảo Cảnh và cấp linh ngọc, tối đa cấp ${LGEM_CAP}.</p>
-      <div class="gems">${SAVE.lgems.map(g => `<div class="gemrow lg">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm"><b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> cấp ${g.lv}<small>${LGEMS[g.t].d(g.lv)}</small></span>
+      <div class="gems">${lgUpOrder(r.cls).map(g => `<div class="gemrow lg${g.on ? ' on' : ''}">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm">${g.on ? "<em class=\"lgon\">Đang dùng</em>" : ''}<b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> cấp ${g.lv}<small>${LGEMS[g.t].d(g.lv)}</small></span>
         ${g.lv >= LGEM_CAP ? "<button class=\"btn sm\" disabled>Tối đa</button>" : `<button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">Nâng (${Math.round(lgemChance(g, r.riftLv) * 100)}%)</button>`}</div>`).join('')}</div>` : ''}</div>`;
   }
   // 2026-11 一屏：上面标题，中间在框里滚，按钮固定在底部
@@ -3546,7 +3563,7 @@ function endHTML() {
       ${SAVE.para.lv > r.paraStart ? `<div><small>Tu vi</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">Lần này nhận ${loot.length} món trang bị (đã cất vào kho)</p>${lootChips(loot)}
     ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>Lại xong một chương. Tiến trình chỉ nằm trên thiết bị này, sao lưu lại cho chắc.</p><button class="btn sm" data-act="export">Sao chép mã lưu</button><button class="btn sm ghost" data-act="bknudge">Cách sao lưu khác</button></div>` : ''}
-    </div><div class="endbtns">${r.loot && r.loot.length ? "<button class=\"btn ghost\" data-act=\"bulkopen\">Kiểm chiến lợi phẩm</button>" : ''}<button class="btn big" data-act="town">Về trấn Thanh Thạch</button></div></div></div>`;
+    </div>${rift && riftUnlocked() ? ragainRow() : ''}<div class="endbtns">${r.loot && r.loot.length ? "<button class=\"btn ghost\" data-act=\"bulkopen\">Kiểm chiến lợi phẩm</button>" : ''}<button class="btn ${rift && riftUnlocked() ? 'ghost' : 'big'}" data-act="town">Về trấn</button>${rift && riftUnlocked() ? "<button class=\"btn big\" data-act=\"ragain\">Đánh tiếp</button>" : ''}</div></div></div>`;
 }
 function creditsHTML() {
   const E = (SAVE.wflags || {}).ending, EN = { 1: "Kết cục 1 · Mỗi người một nửa", 2: "Kết cục 2 · Thắp đèn", 3: "Kết cục 3 · Lần này đến lượt tôi" }[E];
@@ -3719,10 +3736,20 @@ function itemModal(id, shopIdx) {
     return h;
   };
 }
+// 2026-11-25 乾坤袋选格子：神兵之魂一百多种，按门派（本门／通用／推荐／全部）、部位筛
+let CPF = { g: 'mine', s: '' };
+const CP_SLOTS = ['weapon', 'helm', 'chest', 'gloves', 'belt', 'boots', 'ring', 'amulet', 'offhand'];
 const cubeModal = slot => () => {
   const cls = SAVE.cls, ch = SAVE.chars[cls], learned = LEGENDS.filter(L => SAVE.cube[L.id]);
+  const rec = new Set((BUILDS[cls] || []).flatMap(B => B.cube || []));
+  const G = [['mine', "Bổn môn", L => L.cls === cls], ['any', "Dùng chung", L => !L.cls], ['rec', "Gợi ý lối chơi", L => rec.has(L.id)], ['all', "Tất cả", () => true]].map(([k, n, f]) => [k, n, f, learned.filter(f).length]);
+  let g = G.find(x => x[0] === CPF.g); if (!g || !g[3]) g = G.find(x => x[3]) || G[3];
+  const pool = learned.filter(g[2]), sl = CP_SLOTS.filter(k => pool.some(L => L.slot === k)), sk = sl.includes(CPF.s) ? CPF.s : '';
+  const list = pool.filter(L => !sk || L.slot === sk).sort((x, y) => (ch.cube.includes(y.id) ? 1 : 0) - (ch.cube.includes(x.id) ? 1 : 0) || CP_SLOTS.indexOf(x.slot) - CP_SLOTS.indexOf(y.slot));
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Túi Càn Khôn · ô ${slot + 1}</h2><p class="sub">Chọn một hồn thần binh đã cất để đặt vào ô này (${CLASSES[cls].n}).</p>
-    <div class="cubepick">${ch.cube[slot] ? `<button class="cp" data-act="cubeset" data-arg="${slot}|"><b>Bỏ trống ô này</b></button>` : ''}${learned.map(L => `<button class="cp ${ch.cube.includes(L.id) ? 'on' : ''}" data-act="cubeset" data-arg="${slot}|${L.id}"><b class="r-legend">${L.n}</b><span>${L.d}</span><small>${SLOT_NAME[L.slot]}${ch.cube.includes(L.id) ? " · đã đặt" : ''}</small></button>`).join('')}</div>`;
+    <div class="chips cpf">${G.filter(x => x[3] || x[0] === 'all').map(([k, n, , c]) => `<button class="chip ${g[0] === k ? 'on' : ''}" data-act="cpf" data-arg="g|${k}">${n}<small>${c}</small></button>`).join('')}</div>
+    ${sl.length > 1 ? `<div class="chips cpf cps"><button class="chip ${sk ? '' : 'on'}" data-act="cpf" data-arg="s|">Mọi vị trí</button>${sl.map(k => `<button class="chip ${sk === k ? 'on' : ''}" data-act="cpf" data-arg="s|${k}">${SLOT_NAME[k]}<small>${pool.filter(L => L.slot === k).length}</small></button>`).join('')}</div>` : ''}
+    <div class="cubepick">${ch.cube[slot] ? `<button class="cp" data-act="cubeset" data-arg="${slot}|"><b>Bỏ trống ô này</b></button>` : ''}${list.length ? list.map(L => `<button class="cp ${ch.cube.includes(L.id) ? 'on' : ''}" data-act="cubeset" data-arg="${slot}|${L.id}"><b class="r-legend">${L.n}</b><span>${L.d}</span><small>${SLOT_NAME[L.slot]}${L.cls ? ' · ' + CLASSES[L.cls].n : " · dùng chung"}${rec.has(L.id) ? " · Gợi ý lối chơi" : ''}${ch.cube.includes(L.id) ? " · đã đặt" : ''}</small></button>`).join('') : "<p class=\"sub\">Loại này chưa cất món nào.</p>"}</div>`;
 };
 const bagModal = () => () => `<div class="shead"><button class="btn sm ghost" data-act="close">Đóng</button><div class="stabs"><button class="${BAGTAB === 'stat' ? 'on' : ''}" data-act="bagtab" data-arg="stat">Chỉ số</button><button class="${BAGTAB === 'gear' ? 'on' : ''}" data-act="bagtab" data-arg="gear">Trang bị</button><button class="${BAGTAB === 'skill' ? 'on' : ''}" data-act="bagtab" data-arg="skill">Võ học</button><button class="${BAGTAB === 'tal' ? 'on' : ''}" data-act="bagtab" data-arg="tal">Tâm pháp${talentInfo(ctxCls()).free ? ` <b class="upn">${talentInfo(ctxCls()).free}</b>` : ''}</button></div></div>
   ${BAGTAB === 'stat' ? `<div class="inbag bagstat"><h3 class="bs-h">${esc(CLASSES[ctxCls()].n)} · cấp ${SAVE.chars[ctxCls()].level}</h3>${statBlock(ctxCls())}</div>` : BAGTAB === 'gear' ? `<div class="gearp inbag">${gearPanel(ctxCls(), true)}</div>` : BAGTAB === 'skill' ? skillPanel(ctxCls(), true) : `<p class="sub">Tâm pháp còn ${talentInfo(ctxCls()).free} điểm${paraFree() ? ` · tu vi còn ${paraFree()} điểm (về trấn để cộng)` : ''}</p>${talentGrid(ctxCls())}`}`;
@@ -3889,6 +3916,13 @@ const ACT = {
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
   town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); snowCatchUp(); },
+  raglv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); save(); refresh(); },
+  ragain: () => { const r = LASTRUN; if (SAVE.run || !riftUnlocked()) return;
+    const go = () => { closeModal(); LASTRUN = null; SAVE.mode = 'rift'; if (r && r.cls && SAVE.cls !== r.cls) SAVE.cls = r.cls; VIEW = 'town'; TT = 'go'; ACT.start(); };
+    const left = r && r.upg && !r.upgPara && boxOpen() && SAVE.lgems.some(g => g.lv < LGEM_CAP) ? r.upg : 0;
+    if (left) return openModal(() => `<h2 class="mh">Linh ngọc chưa nâng xong</h2><p class="help-p">Còn <b>${left}</b> lần nâng linh ngọc chưa dùng, mở ván mới là mất.</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">Quay lại nâng</button><button class="btn ghost" data-act="ragain2">Không nâng nữa, đánh</button></div>`);
+    go(); },
+  ragain2: () => { const r = LASTRUN; if (r) r.upg = 0; ACT.ragain(); },
   credend: () => { VIEW = 'end'; refresh(); window.scrollTo(0, 0); if (!seen('postg')) { markSeen('postg'); markSeen('npcsvc'); markSeen('boxnote'); save(); setTimeout(() => playDialog(POSTGAME_OPEN(), null, () => {}), 400); } },
   snowreplay: () => snowPrologue(),
   replay: a => { const [k, part] = split(a), C = CHAPTERS[+k - 1]; const lines = part === 'ending' ? ENDING : part === 'story' ? C.story.lines : /^w/.test(part) ? wReplayLines(+k, part) : C[part]; playDialog(lines, C.boss); },
@@ -3977,6 +4011,7 @@ const ACT = {
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`Thăng giai xong: giờ là ${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast("Hồn thần binh đã vào Túi Càn Khôn, sang trang “Trang bị” đặt nó vào ô"); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),
+  cpf: a => { const [k, v] = split(a); if (k === 'g') { CPF.g = v; CPF.s = ''; } else CPF.s = v; if (MODALFN) sheet.innerHTML = MODALFN(); },
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
   combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast("Không có ngọc nào ghép được"); SFX.play('rare'); toast(`Đã ghép ${r.n} lần, được ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join(", ")); save(); refresh(); },
   combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Đã ghép " + gemName(r.key)); refresh(); },
