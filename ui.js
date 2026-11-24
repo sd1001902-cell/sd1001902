@@ -2124,7 +2124,7 @@ function applyStep(o, anim) {
       if (anim && dot && c === 'poison') bump(el, 'drip', 450);
       if (anim && dmgN && el._shd) bump(el, 'crack', 320);
       const big = dmgN && tu && tu.maxHp && +txt / tu.maxHp >= 0.08;
-      if (dmgN && anim && show) { if ((SP < 3 && by !== 'Z') || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); const ar = $('#arena'); if (ar) bump(ar, 'hitstop', 90); } }   // 僵尸的小伤害不抖妖物（2026-11-25 省电）
+      if (dmgN && anim && show) { if ((SP < 3 && by !== 'Z') || big || c === 'crit') bump(el, 'hurt', 300); dmg = true; if (id === 'P') hurtHero = true; if (c === 'crit' && !onHero) { crit = true; VFX.onCrit(id); } }   // 僵尸的小伤害不抖妖物（2026-11-25 省电）   // 2026-11-25 暴击不再整场顿帧（顿帧交给 VFX：一倍速、1.2 秒最多一次）
       if (c === 'heal') { healed = true; if (anim) VFX.onHeal(id); }
     }
     if (cmbN) bumpCombo(cmbN);

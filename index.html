@@ -1281,7 +1281,7 @@ body[data-view=title] .wrap{max-width:none;padding:0}
 .a-cur::after{animation-delay:-.8s}
 @keyframes cOrb{from{transform:rotate(0) translateX(calc(var(--sz,48px) * .45)) }to{transform:rotate(360deg) translateX(calc(var(--sz,48px) * .45))}}
 /* 打击感：被打先白闪；暴击顿一下 */
-@keyframes hurt{0%{filter:brightness(3.2) saturate(0)}20%{transform:translateX(-6px);filter:brightness(2.2) sepia(1) hue-rotate(-50deg) saturate(5)}60%{transform:translateX(5px)}}
+@keyframes hurt{0%{filter:brightness(3.2) saturate(0)}20%{filter:brightness(2.2) sepia(1) hue-rotate(-50deg) saturate(5)}}   /* 2026-11-25 挨打只闪一下红，不再左右晃（原来 ±6 像素，人一多满屏在抖） */
 .arena.hitstop .unit .sp,.arena.hitstop .fx{animation-play-state:paused!important}
 /* 首领蓄力：脚下红光、四周泛红、警告条 */
 .unit.charging.k-boss::before{content:"";position:absolute;left:50%;bottom:44px;width:180px;height:40px;margin-left:-90px;border-radius:50%;background:radial-gradient(closest-side,rgba(255,40,20,.6),rgba(255,40,20,0));animation:rgPulse .45s ease-in-out infinite alternate;z-index:0}

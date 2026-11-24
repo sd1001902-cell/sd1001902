@@ -137,14 +137,19 @@ const VFX = (() => {
     el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${d}" stroke="${c}" stroke-width="9" fill="none" opacity=".35" stroke-linejoin="round"/><path d="${d}" stroke="#fff" stroke-width="2.5" fill="none" stroke-linejoin="round"/></svg>`;
     layer.appendChild(el); setTimeout(() => el.remove(), dur + 80);
   }
-  function shake(power) {
+  // 2026-11-25 用户：打斗画面老抖，看得眼睛累。整屏只为大事震：首领的大招、必杀、首领倒下、落地这类（力度 ≥ 7）；
+  // 两倍速以上只留 ≥ 9；1.5 秒里最多震一次；幅度压到原来六成、最多 6 像素。普通出手、暴击、连招、破盾都不再震屏
+  const SHAKE_MIN = 7; let shLast = 0;
+  function shake(power, force) {   // force：必杀、首领倒下——不看倍速和间隔
     if (!arena) return;
-    if (speed >= 4 && (power || 4) < 9) return;   // 4 倍速：小震屏不要了（每震一次都要逼页面重排）
-    if (OFF > 0) return deferred(shake, [power]);
-    arena.style.setProperty('--sh', (power || 4) + 'px');
-    const lv = GX() ? GFX.lvl() : 2; if (lv === 0) return; power = (power || 4) * (lv === 1 ? 0.7 : 1);
-    arena.style.setProperty('--sh', power + 'px');
-    if (GX() && power >= 8) GFX.punch(Math.min(0.06, power / 260));
+    power = power || 4;
+    if (!force && (power < SHAKE_MIN || (speed >= 2 && power < 9))) return;
+    if (OFF > 0) return deferred(shake, [power, force]);
+    const t = performance.now(); if (!force && t - shLast < 1500) return; shLast = t;
+    power = Math.min(6, power * 0.6);
+    const lv = GX() ? GFX.lvl() : 2; if (lv === 0) return; power = power * (lv === 1 ? 0.7 : 1);
+    arena.style.setProperty('--sh', power.toFixed(1) + 'px');
+    if (GX() && power >= 5.4) GFX.punch(0.03);
     const ar = arena; clearTimeout(ar._shT); const on = () => { ar.classList.add('shake'); ar._shT = setTimeout(() => ar.classList.remove('shake'), 320); };
     if (ar.classList.contains('shake')) { ar.classList.remove('shake'); requestAnimationFrame(() => requestAnimationFrame(on)); } else on();   // 不读 offsetWidth，免得逼重排
   }
@@ -558,7 +563,7 @@ const VFX = (() => {
   // 挨打：往后一仰、晃一下；暴击更狠，外加一圈冲击线
   function onHit(id, crit) {
     const r = rig(id); if (!r || !r.act || RM) return;
-    const f = fac(), k = crit ? 1.8 : 1, away = -r.face;
+    const f = fac(), k = (crit ? 1.4 : 1) * 0.45, away = -r.face;   // 2026-11-25 挨打后仰幅度压到原来不到一半（原来 9 像素、暴击 16 像素），看着不晃眼
     if (!(r.el._busy > performance.now())) frames(r, [['ht', 0]], 300 * f, 1);
     A(r.act, [tf('none'), tf(`translate(${(9 * away * k).toFixed(1)}px,${(-2 * k).toFixed(1)}px) rotate(${(7 * away * k).toFixed(1)}deg) scale(.96,1.03)`, 0.25), tf(`translate(${(3 * away * k).toFixed(1)}px,0) rotate(${(2 * away * k).toFixed(1)}deg)`, 0.6), tf('none')], 300 * f, 'ease-out');
     if (crit) impact(pos(id), '#fff3c0', 150);
@@ -566,8 +571,7 @@ const VFX = (() => {
     if (G && p) {
       G.whiteFlash(id);
       G.burst(p, { n: crit ? 16 : 7, c0: '#ffffff', c1: crit ? '#ffd23a' : '#ffb07a', speed: crit ? 380 : 240, life: 300, s: 2, shape: 'spark', drag: 3.5, grav: 200, len: 0.045, dir: away > 0 ? 0 : Math.PI, cone: 2.2 });
-      if (crit) { G.glow(p, '#fff3c0', 70, 220); G.hitstop(85); }
-      else G.hitstop(28);
+      if (crit) { G.glow(p, '#fff3c0', 70, 220); const t = performance.now(); if (speed < 2 && t - (onHit.hs || 0) > 1200) { onHit.hs = t; G.hitstop(60); } }   // 顿帧：普通的一下不再停（原来每一下都把全场动画停 28 毫秒，一秒十几下，画面一卡一卡）；暴击一倍速才停，1.2 秒最多一次
     }
   }
   // 返回命中延迟（毫秒）：有飞行物时，伤害数字等飞到再出现
@@ -647,15 +651,15 @@ const VFX = (() => {
     // ---- 必杀 ----
     if (c.id === 'ult') {
       const W = arena.clientWidth, H = arena.clientHeight, mid = { x: W * 0.62, y: H * 0.45 }, foes = fps.length ? fps : [mid];
-      if (c.cut) { inkWash(INK); glyphF(mid, ULTS.cutG || '断', '#ffd86a', 150, G * 1.2); shake(7); return Math.round(T * 0.5); }   // 自动出招：只打断蓄力
+      if (c.cut) { inkWash(INK); glyphF(mid, ULTS.cutG || '断', '#ffd86a', 150, G * 1.2); shake(7, 1); return Math.round(T * 0.5); }   // 自动出招：只打断蓄力
       inkWash(c.combo ? '#2a0a1a' : INK);
       const UG = (ULTS[c.cls] || {}).g;   // 2026-11-24 必杀改成职业增益：大字跟着新招名
       switch (c.cls) {
-        case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, UG, '#ff3a2a', 170, G * 1.4); shake(12); break;
-        case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, UG, '#e6e0ff', 170, G * 1.4); shake(10); break;
-        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyphF(mid, UG, GHOST, 170, G * 1.4); shake(8); break;
-        case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, '杀', G * 1.6); glyphF(mid, UG, '#ff3a3a', 150, G * 1.2); shake(8); break; }
-        case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyphF(mid, UG, GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10); break;
+        case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, UG, '#ff3a2a', 170, G * 1.4); shake(12, 1); break;
+        case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, UG, '#e6e0ff', 170, G * 1.4); shake(10, 1); break;
+        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyphF(mid, UG, GHOST, 170, G * 1.4); shake(8, 1); break;
+        case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, '杀', G * 1.6); glyphF(mid, UG, '#ff3a3a', 150, G * 1.2); shake(8, 1); break; }
+        case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyphF(mid, UG, GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10, 1); break;
       }
       if (c.combo) { const ap2 = pos('NG'); if (ap2) foes.forEach((p, i) => later(() => proj('foxfire', ap2, p, T, '#9ad8ff'), 200 + i * 40)); glyphF({ x: W * 0.3, y: H * 0.35 }, '狐', '#ffb3d8', 110, G * 1.3); }
       return Math.round(T * 0.7);
@@ -842,7 +846,7 @@ const VFX = (() => {
     const D = Math.round(700 * fac()), big = kind === 'boss';
     const G = GX(), el = document.getElementById('u-' + id);
     if (G && el) {
-      if (big) { const t = G.bossDeath(el, p); later(() => glyph(p, '灭', '#f1e2c6', 120, Math.round(1100 * fac()), 0, true), t * 0.55); shake(10); return t; }
+      if (big) { const t = G.bossDeath(el, p); later(() => glyph(p, '灭', '#f1e2c6', 120, Math.round(1100 * fac()), 0, true), t * 0.55); shake(10, 1); return t; }
       ink(p, kind === 'elite' ? 10 : 6, 50, D);
       G.disintegrate(el, { n: kind === 'elite' ? 260 : 170, dirx: el.closest('#foes') ? 1 : -1 });
       if (kind === 'goblin') parts(p, 16, '#f1c94a', 70, D, { cls: 'coin', size: 7 });
@@ -852,7 +856,7 @@ const VFX = (() => {
     ink(p, big ? 26 : 10, big ? 110 : 50, D);
     parts(p, big ? 20 : 8, '#5a4e46', big ? 80 : 40, D * 1.4, { cls: 'ash', rise: -60, size: 7 });
     if (kind === 'goblin') parts(p, 16, '#f1c94a', 70, D, { cls: 'coin', size: 7 });
-    if (big) { boom(p, BLOOD, 240, D); glyph(p, '灭', '#f1e2c6', 120, Math.round(1100 * fac()), 0, true); shake(10); }
+    if (big) { boom(p, BLOOD, 240, D); glyph(p, '灭', '#f1e2c6', 120, Math.round(1100 * fac()), 0, true); shake(10, 1); }
   }
   function onHeal(id) { const p = pos(id); if (p) parts(p, 6, '#7fff9a', 26, 520 * fac(), { rise: -40, cls: 'plus', size: 6 }); }
   // ======== 连招：每一种都有自己的组合特效 ========
@@ -916,6 +920,6 @@ const VFX = (() => {
   function onThaw(id) { const p = pos(id); if (p) { parts(p, 14, '#bfe8ff', 60, 600 * fac(), { cls: 'shard', size: 7 }); ring(p, '#8fd8ff', 90, 360 * fac(), 3); } }
   function onShieldBreak(id) { const p = pos(id); if (p) { parts(p, 16, '#ffe58a', 70, 600 * fac(), { cls: 'shard', size: 6 }); ring(p, GOLD, 120, 420 * fac(), 4); shake(3); } }
   function onFlare(id) { const p = pos(id); if (p) { flames(p, 6, '#ffb02a', 26, 520 * fac()); parts(p, 4, '#3a2a20', 24, 800 * fac(), { cls: 'ash', rise: -50 }); } }
-  function shakeNow(pw) { const o = OFF; OFF = 0; try { shake(pw); } finally { OFF = o; } }
+  function shakeNow(pw) { const o = OFF; OFF = 0; try { shake(pw, 1); } finally { OFF = o; } }
   return { setup, setSpeed, shakeNow, setPose, play, onDeath, onHeal, onCrit, onBlock, onReact, onJinzhen, onFoil, onThaw, onShieldBreak, onFlare, onHit, onLand, victory, rigHTML, idleCls, fac, lastMv: () => lastMv };
 })();
