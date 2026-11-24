@@ -324,6 +324,30 @@ STAT_NAMES.furyGain = STAT_NAMES.furyGain || "Nộ ý nhận được";
 STAT_NAMES.lianPct = STAT_NAMES.lianPct || "Sát thương mỗi tầng “Liên”";
 // 2026-11-24 反击并进反震，反击几率这个属性没有了
 
+// 九幽词条（2026-11-24）：九幽品质的装备多长一条，按部位各两种（一种偏输出、一种偏生存），通用效果，不放大套装机制。
+// st：直接算到这个属性上；没有 st 的在战斗里单独处理。两枚扳指共用扳指的池子；同一个词条穿两件不叠加，算高的那件
+const JY_AFF = {
+  liepo:    { slot: 'weapon',  n: "Liệt Phách", r: [30, 50],  st: 'xBoss',    d: v => `Sát thương lên thủ lĩnh, tinh anh +${v}%` },
+  tuntian:  { slot: 'weapon',  n: "Thôn Thiên", r: [2, 3],                    d: v => `Trong trận này, mỗi yêu vật ngã xuống, sát thương +${v}% (tối đa +${v * 10}%)` },
+  lingtai:  { slot: 'helm',    n: "Linh Đài", r: [40, 60],  st: 'xRage',    d: v => `Nộ khí tất sát tích nhanh hơn ${v}%` },
+  dingshen: { slot: 'helm',    n: "Định Thần", r: [30, 50],  st: 'xTen',     d: v => `Mỗi trận lần đầu bị choáng, đóng băng thì miễn luôn; sau đó bị khống chế có ${v}% tỉ lệ miễn` },
+  xuanming: { slot: 'chest',   n: "Huyền Minh", r: [25, 40],                  d: v => `Khi vào trận nhận hộ thể bằng ${v}% khí huyết tối đa` },
+  bumie:    { slot: 'chest',   n: "Hồi hồn", r: [20, 30],                  d: v => `Mỗi trận một lần: trúng đòn chí tử không ngã, hồi ${v}% khí huyết (tính riêng với các hiệu ứng miễn tử khác)` },
+  pojia:    { slot: 'gloves',  n: "Động Xuyên", r: [20, 35],                  d: v => `Bỏ qua ${v}% hộ giáp và kháng toàn bộ của yêu vật` },
+  lianhuan: { slot: 'gloves',  n: "Tật Ảnh", r: [8, 15],                   d: v => `Sau khi ra tay có ${v}% tỉ lệ ra tay thêm một lần ngay` },
+  tayou:    { slot: 'boots',   n: "Đạp U", r: [15, 25],  st: 'spd',      d: v => `Tốc độ +${v}%` },
+  xianji:   { slot: 'boots',   n: "Tiên Cơ", r: [60, 90],  st: 'xFirst',   d: v => `Vào trận thanh hành động +${v} ngay (gần như chắc chắn ra tay trước)` },
+  shihun:   { slot: 'ring',    n: "Phệ Hồn", r: [2, 4],                    d: v => `Khi chí mạng hồi khí huyết bằng ${v}% sát thương đòn đó` },
+  duoming:  { slot: 'ring',    n: "Tác Mệnh", r: [40, 60],  st: 'xExec',    d: v => `Sát thương lên kẻ địch dưới 30% khí huyết +${v}%` },
+  tongyou:  { slot: 'amulet',  n: "Thông U", r: [10, 15],                  d: v => `Mỗi lượt có ${v}% tỉ lệ làm một chiêu đang hồi chiêu hồi xong ngay` },
+  tongpao:  { slot: 'amulet',  n: "Đồng Bào", r: [30, 50],                  d: v => `Đồng hành mang theo: sát thương và khí huyết +${v}% (không tính cương thi)` },
+  huiyuan:  { slot: 'belt',    n: "Sinh Tức", r: [3, 5],    st: 'regenPct', d: v => `Mỗi lượt hồi ${v}% khí huyết tối đa` },
+  panshi:   { slot: 'belt',    n: "Kiên Nhạc", r: [15, 25],                  d: v => `Khi khí huyết trên bảy phần, sát thương phải nhận -${v}% (tính trong mức giảm sát thương tối đa bảy phần)` },
+  huixin:   { slot: 'offhand', n: "Toái Tâm", r: [80, 120], st: 'critDmg',  d: v => `Sát thương chí mạng +${v}%` },
+  shentong: { slot: 'offhand', n: "Thần Thông", r: [20, 30],                  d: v => `Sát thương mọi chiêu thức +${v}%` },
+};
+const jyText = jy => { const A = jy && JY_AFF[jy[0]]; return A ? `${A.n}: ${A.d(jy[1])}` : ''; };
+
 // 镇妖录：幻境里收服妖物的精魄。一章一页，层数越高精魄品级越高（一品到十品）
 // 一品 1–19 层，二品 20–39，三品 40–59，四品 60–79，五品 80–103；往上每 24 层一品：六品 104，七品 128，八品 152，九品 176，十品 200
 const zyGrade = N => N < 80 ? 1 + Math.floor(N / 20) : Math.min(10, 5 + Math.floor((N - 80) / 24));

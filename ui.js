@@ -146,7 +146,8 @@ function fmtStat(k, v) {
   return `${sign}${v}${PCT_STATS.has(k) ? '%' : ''} ${STAT_NAMES[k] || k}`;
 }
 const itemTitle = it => `${ancName(it)}${esc(it.name)}${it.plus ? ` +${it.plus}` : ''}`;
-const ancCls = it => it.anc === 2 ? 'primal' : it.anc === 1 ? 'ancient' : '';
+function jyBanner(it) { SFX.play('legend'); qtoast(`<span class="jyt">九幽出世</span><b class="r-${it.rarity}">${esc(itemTitle(it))}</b>${it.jy ? `<small>${esc(jyText(it.jy))}</small>` : ''}`, 4200); }
+const ancCls = it => it.anc === 3 ? 'jiuyou' : it.anc === 2 ? 'primal' : it.anc === 1 ? 'ancient' : '';
 function socketDots(it) { if (!it.sockets) return ''; return `<span class="dots">${Array.from({ length: it.sockets }, (_, i) => { const g = it.gems[i]; return `<i style="${g ? 'background:' + gemColor(g) : ''}"></i>`; }).join('')}</span>`; }
 function setCountFor(cls, setId) { let n = 0; const eq = SAVE.chars[cls].eq; for (const sl in eq) if (eq[sl] && eq[sl].set === setId) n++; return n; }
 const gemImg = (key, size) => SPR.img('gem', size, { G: gemColor(key) });
@@ -155,7 +156,8 @@ function itemCard(it, cls, label) {
   let h = `<div class="icard ${ancCls(it)}">${label ? `<div class="lab">${label}</div>` : ''}<div class="ihead">${SPR.item(it, 48)}<div>
     <div class="iname r-${it.rarity}">${itemTitle(it)}</div>
     <div class="isub"><b class="tierb">${TIER_N[it.tier || tierOf(it.ilvl)]}</b> ${RARITY[it.rarity].n} · ${SLOT_NAME[it.slot]} · ${esc(it.base)} · 装备等级 ${it.ilvl}</div></div></div>`;
-  if (it.anc) h += `<div class="ianc">${it.anc === 2 ? '太古：所有属性 +30%，随机词条全部满值' : '上古：所有属性 +30%'}</div>`;
+  if (it.anc) h += `<div class="ianc">${it.anc === 3 ? '九幽：所有属性 +69%（太古之上再 +30%），随机词条全部满值' : it.anc === 2 ? '太古：所有属性 +30%，随机词条全部满值' : '上古：所有属性 +30%'}</div>`;
+  if (it.jy && JY_AFF[it.jy[0]]) h += `<div class="ijy"><b>九幽</b> ${esc(jyText(it.jy))}<small>（这个部位还能洗出：${Object.keys(JY_AFF).filter(k => JY_AFF[k].slot === JY_AFF[it.jy[0]].slot && k !== it.jy[0]).map(k => JY_AFF[k].n).join('、')}）</small></div>`;
   if (it.cls) h += `<div class="ireq ${canEquip(it, cls) ? '' : 'bad'}">限 ${CLASSES[it.cls].n}</div>`;
   h += '<ul>' + Object.keys(it.imp).map(k => `<li class="imp">${fmtStat(k, Math.round(it.imp[k] * statMult(it, k)))}</li>`).join('')
        + it.aff.map(([k, v]) => `<li class="aff ${SP_AFFIXES.includes(k) ? 'spx' : ''}">${fmtStat(k, Math.round(v * statMult(it, k)))}${affTag(it, k, v)}</li>`).join('') + '</ul>'
@@ -263,7 +265,7 @@ function gearPanel(cls, inRun) {
 }
 function stashBody(cls, D) {
   const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 };
-  let list = SAVE.stash.filter(it => (!GSLOT || it.slot === slotType(GSLOT)) && (FILTER === 'all' || (FILTER === 'up' && D.get(it.id) > 0) || (FILTER === 'leg' && it.legend && !SAVE.cube[it.legend])));
+  let list = SAVE.stash.filter(it => (!GSLOT || it.slot === slotType(GSLOT)) && (FILTER === 'all' || (FILTER === 'up' && D.get(it.id) > 0) || (FILTER === 'leg' && it.legend && !SAVE.cube[it.legend]) || (FILTER === 'jy' && it.anc === 3)));
   list.sort((a, b) => GSLOT || FILTER === 'up' ? ((D.get(b.id) ?? -1e9) - (D.get(a.id) ?? -1e9)) : (order[a.rarity] - order[b.rarity] || (b.anc || 0) - (a.anc || 0) || b.ilvl - a.ilvl));
   const cur = GSLOT && SAVE.chars[cls].eq[GSLOT];
   // 点了部位：身上那件的完整属性直接摊开（以前只有一行名字，还得再点一下才看得到）
@@ -273,7 +275,7 @@ function stashBody(cls, D) {
     : GSLOT ? `<div class="gcur2"><div class="gcur-h"><span class="sub">身上的${SLOT_NAME[GSLOT]}</span>${cur ? `${VIEW === 'town' && wsTabs().length > 1 ? `<button class="btn sm ghost" data-act="wsopen" data-arg="enh|${cur.id}">去养成</button>` : ''}<button class="btn sm ghost" data-act="item" data-arg="${cur.id}">更多</button><button class="btn sm ghost" data-act="unequip" data-arg="${GSLOT}">卸下</button>` : ''}<button class="btn sm ghost" data-act="gsl" data-arg="${GSLOT}">收起</button></div>
       ${cur ? itemCard(cur, cls, '') : '<p class="sub" style="margin:6px 0 0">空着</p>'}</div>
       <h4 class="sub-h gcur-t">储物箱里能换的${SLOT_NAME[slotType(GSLOT)]}</h4>` : '';
-  const chips = [['all', '全部'], ['up', '只看能提升的'], ...(featureOn('cube') ? [['leg', '乾坤袋未收']] : [])];
+  const chips = [['all', '全部'], ['up', '只看能提升的'], ...(featureOn('cube') ? [['leg', '乾坤袋未收']] : []), ...(SAVE.stash.some(it => it.anc === 3) ? [['jy', '九幽']] : [])];
   return `${curRow}<div class="chips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
       ${VIEW === 'town' ? '<button class="chip bulkc" data-act="bulkopen">筛选分解 / 出售</button>' : ''}</div>
     <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `储物箱里没有可以换的${SLOT_NAME[slotType(GSLOT)]}。` : '这里没有符合条件的装备。'}</div>`}</div>
@@ -498,7 +500,7 @@ function wsCan(it, where) {
     else if ((it.sockets || 0) < MAX_SOCKETS[it.slot] && SAVE.gold >= sc.gold && SAVE.mats >= sc.mats) c.sock = '可以再打一个孔'; }
   if (featureOn('reroll') && it.aff.length) { const q = itemQ(it); if (busyRoll(it)) c.refine = '有一次洗炼／淬炼的结果还没选'; else if (q != null && q < 0.5) c.refine = `词条成色只有 ${Math.round(q * 100)}%，可以淬炼洗炼`; }
   if (featureOn('enhance') && upTierOK(it)) { const L = upTierTarget(cls); if (L > it.ilvl && tierOf(L) > tierOf(it.ilvl)) { const u = upTierCost(it, L); if (SAVE.gold >= u.gold && SAVE.mats >= u.mats) c.up = `可以升到${TIER_N[tierOf(L)]}`; } }
-  if (featureOn('enhance') && !c.up && ancOK(it) && SAVE.mats >= ancCost(it) && (!it.anc || primalGate())) c.up = `可以点化成${it.anc ? '太古' : '上古'}（${ancCost(it)} 魂晶）`;
+  if (featureOn('enhance') && !c.up && ancOK(it) && SAVE.mats >= ancCost(it) && (!it.anc || (it.anc === 1 ? primalGate() : jyGate() && (SAVE.jyx || 0) >= JY_XJ))) c.up = `可以点化成${it.anc === 2 ? '九幽' : it.anc ? '太古' : '上古'}（${ancCost(it)} 魂晶${it.anc === 2 ? ` + ${JY_XJ} 颗九幽玄晶` : ''}）`;
   if (featureOn('enhance') && where === 'eq' && SAVE.stash.some(x => canInherit(it, x))) c.inh = '储物箱里有旧装备的强化／玉可以传过来';
   return c;
 }
@@ -535,7 +537,7 @@ function wsModal() {
     body = `<div class="svc-list ws-stash">${L.map(({ it }) => `<button class="svc-row ${ancCls(it)} ${WS.item === it.id ? 'on' : ''}" data-act="wsitem" data-arg="${it.id}">${SPR.item(it, 28)}<span class="nm r-${it.rarity}">${itemTitle(it)}<small>${SLOT_NAME[it.slot]} · ${it.ilvl} 阶</small></span><em>${svcInfo(tab === 'ov' ? 'enh' : tab, it)}</em></button>`).join('') || '<div class="empty-note">储物箱里没有合适的装备。</div>'}</div>` + body; }
   if (tab === 'sock' && featureOn('gems')) body += `<details class="wxinfo"><summary>玉石合成</summary>${gemsBody()}</details>`;
   const Sp = T[3] && SPEAKERS[T[3]];
-  return `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button><b class="ws-title">养成台</b><span class="ws-res">${fmtBig(SAVE.gold)} 两 · ${fmtBig(SAVE.mats)} 魂晶</span></div>
+  return `<div class="shead"><button class="btn sm ghost" data-act="close">关闭</button><b class="ws-title">养成台</b><span class="ws-res">${fmtBig(SAVE.gold)} 两 · ${fmtBig(SAVE.mats)} 魂晶${SAVE.jyx || jyGate() ? ` · <b class="jyc">${SAVE.jyx || 0} 玄晶</b>` : ''}</span></div>
     ${tab === 'forge' ? '' : strip}
     <div class="ws-tabs">${tabs.map(t => `<button class="${t[0] === tab ? 'on' : ''}" data-act="wstab" data-arg="${t[0]}">${t[1]}${t[0] !== 'ov' && dot(t[0]) ? '<i></i>' : ''}</button>`).join('')}</div>
     ${Sp ? `<div class="ws-npc">${unitIcon(Sp.spr, 30, Sp.pal, '', 'stand')}<span>${Sp.n}</span></div>` : ''}${body}`;
@@ -592,7 +594,7 @@ function goTab() {
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
     const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], yi = (SAVE.chars[cls].yi || []).filter(id => yiGrade(id)), ar = ancRate(SAVE.riftLv);
-    const info = [['上古', `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · 太古 ${(ar[1] * 100).toFixed(2)}%` : ''}`], ['一炷香', `${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟`],
+    const info = [['上古', `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · 太古 ${(ar[1] * 100).toFixed(2)}%` : ''}${jyRate(SAVE.riftLv) ? ` · <b class="jyc">九幽 ${(jyRate(SAVE.riftLv) * 100).toFixed(2)}%</b>` : ''}`], ['一炷香', `${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟`],
       ['纪录', rec ? riftRecTxt(rec) : '还没有'], ['套装', SAVE.riftLv >= RSET2_LV ? '两套都掉' : SAVE.riftLv >= RSET_LV ? '掉一套' : `${RSET_LV} 层起`], ['精魄', ZY_CN[zyGrade(SAVE.riftLv)]], ['最高', `${maxR} 层`]];
     body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
         <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div>
@@ -667,7 +669,7 @@ const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
   return `<h2 class="mh">${rift ? '九幽幻境' : '主线剧情'}</h2>${rift ? `<p class="help-p">最多可以挑战 ${Math.max(1, SAVE.riftCap || 3)} 层。限时<b>一炷香</b>（${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟）。一局四层大地图，妖物成群：撞上一群，旁边的会一起卷进来。斩妖攒满进度，守关妖王现身；香烧完前打败它，剩的香越多，灵玉升级次数越多，下次能往上跳的层数也越多：剩一半以上 +${RIFT_GRADES[0].jump} 层，剩四分之一以上 +${RIFT_GRADES[1].jump} 层，打过就 +${RIFT_GRADES[2].jump} 层。倒下了不算输，会被吐回这一层的入口，香烧掉一截。</p>
     <p class="help-p">地图上按真实时间烧香；战斗里按回合折算（一轮算 3 秒），开几倍速、跳不跳过战斗都一样。</p>
-    <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
+    <p class="help-p">掉落的神兵、套装有一定几率是上古（30 层起，层数越高越容易出），90 层起还可能是太古，${JY_FROM} 层起还可能是九幽（守关妖王、精英还会掉九幽玄晶）。${RSET_LV} 层起掉幻境套装，${RSET2_LV} 层起两套都掉。精魄的品级跟着层数走，收进镇妖录。</p>
     <p class="help-p">带伙伴组队时，妖物会跟着变强：小怪血量变多，首领会带护法。</p>
     <p class="help-p">${R_HI[0]} 层往上妖物涨得更快；${R_SEG.slice(1).map(g => g[0]).join('、')} 层起各再快一档，每层涨的分别是原来的 ${R_SEG.slice(1).map(g => +(g[1] / R_SEG[0][1]).toFixed(1)).join('、')} 倍；精英 ${R_AFF_HI[0]} 层起多一个词缀、${R_AFF_HI[1]} 层起再多一个。</p>
     <p class="help-p">守关妖王：层数越高出手越快；${R_BOSS_AFF.join('、')} 层起各多带一条词缀；${R_BOSS_DUO[0]} 层起每出手 ${R_BOSS_DUO[1]} 次连动一次。打到七成血腾起护体真气（打破之前伤它只有一半），三成半血暴怒、喊帮手。它一下最多打掉你${CN[Math.round(R_BOSS_CAP * 10)]}成气血。</p>`
@@ -1518,14 +1520,15 @@ function endBattle() {
     const run = SAVE.run, n = B.dead.length, good = BRES.items.filter(i => i.anc || i.rarity === 'legend' || i.rarity === 'set');
     save(); flushBattleToasts(); SFX.play(good.length ? 'legend' : BRES.levels ? 'level' : 'win');
     qtoast(`斩 ${n} 只 · 进度 ${Math.floor(run.prog)}%${BRES.items.length ? ` · 装备 ${BRES.items.length} 件` : ''}`);
-    for (const it of good) qtoast(`得到 <b class="r-${it.rarity}">${esc(itemTitle(it))}</b>`);
+    for (const it of good) if (it.anc === 3) jyBanner(it); else qtoast(`得到 <b class="r-${it.rarity}">${esc(itemTitle(it))}</b>`);
+    if (BRES.jyx) qtoast(`九幽玄晶 +${BRES.jyx}`);
     if (BRES.zy && BRES.zy.length) qtoast(`精魄 +${BRES.zy.length}`);
     if (BRES.yiNew) qtoast(`解锁役使「<b>${YISHI[BRES.yiNew].n}</b>」${BRES.yiOn ? '，已经带上了' : '（去镇妖录换上）'}`);
     if (BRES.levels) qtoast(SAVE.chars[run.cls].level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}` : `升级！现在 ${SAVE.chars[run.cls].level} 级`);
     achToast(BRES.ach); BRES.items.forEach(i => delete i.auto);
     return setTimeout(() => { if (BRES && VIEW === 'battle') battleContinue(); }, 500);
   }
-  save(); showRes();
+  save(); showRes(); BRES.items.filter(i => i.anc === 3).forEach(jyBanner);
   if (!BRES.win && isRift(SAVE.run) && WAUTO && (RDEATH < 1 || (WKEY && WKEY.key && WKEY.key.rboss && rBossGain(B)))) setTimeout(() => { if (BRES && !BRES.win && VIEW === 'battle' && WAUTO) battleContinue(); }, 2400);   // 自动闯关：第一次倒下自己爬起来；打妖王时只要这次打掉了一截，就接着爬起来
   if (!BRES.win && !(WKEY && WKEY.key && WKEY.key.scripted)) SFX.play('lose');
   else if (BRES.items.some(i => i.anc || i.rarity === 'legend' || i.rarity === 'set')) SFX.play('legend');
@@ -1540,7 +1543,7 @@ function showRes() {
   flushBattleToasts();
   $('#bctl').hidden = true;
   const run = SAVE.run, ch = SAVE.chars[run.cls];
-  const extra = [BRES.mats ? `魂晶 +${BRES.mats}` : '', BRES.key ? '<b style="color:var(--gold2)">得到钥匙！</b>' : '',
+  const extra = [BRES.mats ? `魂晶 +${BRES.mats}` : '', BRES.jyx ? `<b class="jyx">九幽玄晶 +${BRES.jyx}</b>` : '', BRES.key ? '<b style="color:var(--gold2)">得到钥匙！</b>' : '',
     BRES.goblin === 'killed' ? '<b style="color:var(--gold2)">金蟾被你拿下了！</b>' : BRES.goblin === 'fled' ? '金蟾溜走了……' : ''].filter(Boolean).join('　·　');
   const lvText = BRES.levels ? `　<b style="color:var(--gold2)">${ch.level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}！` : `升级！现在 ${ch.level} 级，获得心法点`}</b>` : '';
   const cont = run.world ? '继续' : B.kind === 'boss' ? (run.mode === 'rift' ? '完成幻境' : run.floor < 3 ? '前往下一层' : '本章完结') : '继续探索';
@@ -3425,7 +3428,7 @@ function endHTML() {
     ${extra}
     <div class="endstats"><div><small>${rift && r.world ? '香烧了' : '用时'}</small><b>${rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)}</b></div><div><small>斩妖</small><b>${r.kills}</b></div>
       <div><small>等级</small><b>${r.lvStart} → ${SAVE.chars[r.cls].level}</b></div><div><small>银两</small><b>+${r.goldGot}</b></div>
-      <div><small>玉石</small><b>+${r.gemsGot}</b></div><div><small>魂晶</small><b>+${r.matsGot}</b></div>
+      <div><small>玉石</small><b>+${r.gemsGot}</b></div><div><small>魂晶</small><b>+${r.matsGot}</b></div>${r.jyxGot ? `<div><small>九幽玄晶</small><b>+${r.jyxGot}</b></div>` : ''}
       ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
     <p style="margin:0;color:var(--dim)">这次得到 ${loot.length} 件装备（已放进储物箱）</p>${lootChips(loot)}
     ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>又打完一章。进度只存在这台设备上，备份一下更保险。</p><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bknudge">更多备份方式</button></div>` : ''}
@@ -3487,7 +3490,10 @@ function smithHTML(it, where, W, title) {
       h += `<div class="srow"><span>升阶 ${TIER_N[tierOf(it.ilvl)]} → ${TIER_N[tierOf(L)]}<small>装备等级 ${it.ilvl} → ${L}，攻击、气血、护甲这些实数属性一起涨，百分比词条不变 · ${c.gold} 两 + ${c.mats} 魂晶</small></span><button class="btn sm" ${SAVE.gold >= c.gold && SAVE.mats >= c.mats ? '' : 'disabled'} data-act="uptier" data-arg="${it.id}">升阶</button></div>`; }
     else h += `<div class="srow">${upTierOK(it) ? '这件已经是眼下能到的最高阶了。' : '只有宝品、套装、神兵能升阶。'}</div>`;
     if (it.rarity === 'legend' || it.rarity === 'set') { const c = ancCost(it), can = SAVE.mats >= c;
-      h += it.anc === 2 ? '<div class="srow">这件是太古：全属性 +30%，词条全是满值。</div>'
+      const xj = SAVE.jyx || 0;
+      h += it.anc === 3 ? `<div class="srow">这件是九幽：全属性 +69%，词条全是满值，外加九幽词条。</div><div class="srow"><span>重洗九幽词条<small>现在：${esc(jyText(it.jy))}。在这个部位的两种里重抽，数值也重摇 · ${JY_WASH} 颗九幽玄晶（你有 ${xj}）</small></span><button class="btn sm" ${xj >= JY_WASH ? '' : 'disabled'} data-act="jywash" data-arg="${it.id}">重洗</button></div>`
+        : it.anc === 2 ? (jyGate() ? `<div class="srow"><span>点化成九幽<small>全属性再 +30%，补到 5–6 条满值词条，再长一条九幽词条；强化、玉不动 · ${c} 魂晶 + ${JY_XJ} 颗九幽玄晶（你有 ${fmtBig(SAVE.mats)} 魂晶、${xj} 颗玄晶）</small></span><button class="btn sm" ${can && xj >= JY_XJ ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`
+          : `<div class="srow">这件是太古：全属性 +30%，词条全是满值。幻境打到 ${JY_FROM} 层以后，可以花 ${c} 魂晶 + ${JY_XJ} 颗九幽玄晶点化成九幽。</div>`)
         : !it.anc ? `<div class="srow"><span>点化成上古<small>全属性 +30%，一半几率多长一条词条；强化、玉、原有词条都不动 · ${c} 魂晶（你有 ${fmtBig(SAVE.mats)}）。点成上古之后，还能再点化成太古。</small></span><button class="btn sm" ${can ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`
         : primalGate() ? `<div class="srow"><span>点化成太古<small>多长一条词条，所有词条变成满值；强化、玉不动 · ${c} 魂晶（你有 ${fmtBig(SAVE.mats)}）</small></span><button class="btn sm" ${can ? '' : 'disabled'} data-act="ancient" data-arg="${it.id}">点化</button></div>`
         : `<div class="srow">这件已经是上古。幻境打到 ${PRIMAL_FROM} 层以后，可以花 ${c} 魂晶再点化成太古。</div>`; }
@@ -3844,7 +3850,8 @@ const ACT = {
   ws: id => { const it = findOwned(id); const r = washStart(it, [...wlockOf(it)]); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   wspick: a => { const [id, i] = split(a); washPick(findOwned(id), +i); SFX.play('forge'); toast(+i ? '洗炼完成：换上了新词条' : '留下了原样'); refresh(); },
   inh: a => { const [d, s] = split(a); const r = inheritFrom(findOwned(d), findOwned(s)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`传承完成：现在 +${r.plus}${r.gems ? `，带过来 ${r.gems} 颗玉` : ''}`); refresh(); },
-  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); toast(`点化成了：<b>${esc(itemTitle(it))}</b>${r.add ? '，多长了一条词条' : ''}`); save(); refresh(); achToast(checkAch()); },
+  jywash: id => { const it = findOwned(id); const r = jyWash(it); if (r.err) return toast(r.err); SFX.play('rare'); toast(`九幽词条：${esc(jyText(it.jy))}`); save(); refresh(); },
+  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); if (r.jy) jyBanner(it); toast(`点化成了：<b>${esc(itemTitle(it))}</b>${r.jy ? `，九幽词条：${esc(jyText(it.jy))}` : r.add ? '，多长了一条词条' : ''}`); save(); refresh(); achToast(checkAch()); },
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`升阶完成：现在是${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => openModal(cubeModal(+i)),

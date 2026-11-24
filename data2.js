@@ -324,6 +324,30 @@ STAT_NAMES.furyGain = STAT_NAMES.furyGain || '怒意获得';
 STAT_NAMES.lianPct = STAT_NAMES.lianPct || '每层「连」伤害';
 // 2026-11-24 反击并进反震，反击几率这个属性没有了
 
+// 九幽词条（2026-11-24）：九幽品质的装备多长一条，按部位各两种（一种偏输出、一种偏生存），通用效果，不放大套装机制。
+// st：直接算到这个属性上；没有 st 的在战斗里单独处理。两枚扳指共用扳指的池子；同一个词条穿两件不叠加，算高的那件
+const JY_AFF = {
+  liepo:    { slot: 'weapon',  n: '裂魄', r: [30, 50],  st: 'xBoss',    d: v => `打首领、精英伤害 +${v}%` },
+  tuntian:  { slot: 'weapon',  n: '吞天', r: [2, 3],                    d: v => `这场每倒下一只妖物，伤害 +${v}%（最多 +${v * 10}%）` },
+  lingtai:  { slot: 'helm',    n: '灵台', r: [40, 60],  st: 'xRage',    d: v => `必杀怒气攒得快 ${v}%` },
+  dingshen: { slot: 'helm',    n: '定神', r: [30, 50],  st: 'xTen',     d: v => `每场第一次被眩晕、冰冻直接免掉；之后再被控制，有 ${v}% 几率免掉` },
+  xuanming: { slot: 'chest',   n: '玄冥', r: [25, 40],                  d: v => `开战获得最大气血 ${v}% 的护体` },
+  bumie:    { slot: 'chest',   n: '回魂', r: [20, 30],                  d: v => `每场一次：挨了致命伤不倒，回复 ${v}% 气血（和其他免死各算各的）` },
+  pojia:    { slot: 'gloves',  n: '洞穿', r: [20, 35],                  d: v => `无视妖物 ${v}% 的护甲和全抗` },
+  lianhuan: { slot: 'gloves',  n: '疾影', r: [8, 15],                   d: v => `出手后有 ${v}% 几率马上再出手一次` },
+  tayou:    { slot: 'boots',   n: '踏幽', r: [15, 25],  st: 'spd',      d: v => `速度 +${v}%` },
+  xianji:   { slot: 'boots',   n: '先机', r: [60, 90],  st: 'xFirst',   d: v => `开战读条直接 +${v}（几乎必定先手）` },
+  shihun:   { slot: 'ring',    n: '噬魂', r: [2, 4],                    d: v => `暴击时回复这一击伤害 ${v}% 的气血` },
+  duoming:  { slot: 'ring',    n: '索命', r: [40, 60],  st: 'xExec',    d: v => `对气血低于 30% 的敌人伤害 +${v}%` },
+  tongyou:  { slot: 'amulet',  n: '通幽', r: [10, 15],                  d: v => `每回合有 ${v}% 几率让一招冷却中的招式直接转好` },
+  tongpao:  { slot: 'amulet',  n: '同袍', r: [30, 50],                  d: v => `带的伙伴伤害和气血 +${v}%（僵尸不算）` },
+  huiyuan:  { slot: 'belt',    n: '生息', r: [3, 5],    st: 'regenPct', d: v => `每回合回复最大气血 ${v}%` },
+  panshi:   { slot: 'belt',    n: '坚岳', r: [15, 25],                  d: v => `气血高于七成时，受到的伤害 -${v}%（算在减伤七成封顶里）` },
+  huixin:   { slot: 'offhand', n: '碎心', r: [80, 120], st: 'critDmg',  d: v => `暴击伤害 +${v}%` },
+  shentong: { slot: 'offhand', n: '神通', r: [20, 30],                  d: v => `所有招式伤害 +${v}%` },
+};
+const jyText = jy => { const A = jy && JY_AFF[jy[0]]; return A ? `${A.n}：${A.d(jy[1])}` : ''; };
+
 // 镇妖录：幻境里收服妖物的精魄。一章一页，层数越高精魄品级越高（一品到十品）
 // 一品 1–19 层，二品 20–39，三品 40–59，四品 60–79，五品 80–103；往上每 24 层一品：六品 104，七品 128，八品 152，九品 176，十品 200
 const zyGrade = N => N < 80 ? 1 + Math.floor(N / 20) : Math.min(10, 5 + Math.floor((N - 80) / 24));
