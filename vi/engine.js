@@ -1971,7 +1971,9 @@ function applyPoison(src, tgt, pct, bonus) {
   const swK = src.kind === 'hero' && src.lgv && src.lgv.shiwang != null && BNOW ? LGV.swPoi(src.lgv.shiwang) * emptySlots(BNOW, src) : 0;   // 尸王玉：尸位空着，毒更狠
   const d = src.atk * pct / 100 * m * (1 + ((bonus || 0) + swK) / 100), old = tgt.st.poison;
   const own = src.kind === 'minion' ? null : src;   // 五毒独行：毒可以叠，最多叠到单次的 DUXING_STACK 倍
-  tgt.st.poison = { d: own && own.fx && own.fx.has('duXing6') && old ? Math.min(d * (own.fx.has('baiguBelt') ? 8 : DUXING_STACK), old.d + d) : d, t: 3 + stExt(own), by: stKey(src) || 'P' };
+  const stack = own && own.fx && own.fx.has('duXing6') && old, nd = stack ? Math.min(d * (own.fx.has('baiguBelt') ? 8 : DUXING_STACK), old.d + d) : d, nt = 3 + stExt(own);
+  if (old && !stack && old.d > nd) { old.t = Math.max(old.t, nt); return; }   // 2026-11-25 弱的毒不再盖掉强的（原来毒尸咬一口，身上每回合 5000 的毒变成 107）：留强的，回合数刷新
+  tgt.st.poison = { d: nd, t: nt, by: stKey(src) || 'P' };
 }
 const mageCap = P => SUST.mage.cap + (P.fx && P.fx.has('taijiOff') ? 20 : 0);
 const dariCap = u => u.fx && u.fx.has('dariBelt') ? 0.8 : DARI_CAP;
@@ -2008,7 +2010,7 @@ function makeZombie(b, P, zt, slot, rune) {
   const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
               maxHp: Math.round(P.maxHp * Z.hp * m * hpM), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? YINBING_MUL : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd * hq, crit: 5, critDmg: 150, g: 40, st: {},
               ae: Z.ae, wx: 'tu', taunt: Z.taunt, thornsP: Z.thornsP ? Z.thornsP + (P.ironPct || 0) / 150 : 0, poisonPct: P.poisonPct || 0, life: Z.life };
-  if (b.run && (b.run.mode === 'rift' || b.run.mode === 'tower')) { u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg; }   // 2026-11-25 通天塔也一样（原来塔里不吃，选伤害词条只加主角自己）   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
+  if (b.run && (b.run.mode === 'rift' || b.run.mode === 'tower')) { u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg; u.xBoss = P.xBoss || 0; }   // 2026-11-25 对首领、精英的伤害也跟着（屠魁、九幽裂魄、镇妖录那条）   // 2026-11-25 通天塔也一样（原来塔里不吃，选伤害词条只加主角自己）   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
   u.hp = u.maxHp; b.units.push(u); return u;
 }
 const zombiesOf = b => b.units.filter(u => u.kind === 'minion' && u.hp > 0);
@@ -2639,7 +2641,9 @@ function stClear(f, s) { for (const k of s === 'any' ? ['burn', 'slow', 'melt', 
 function stSet(src, f, s, out) {
   if (f.hp <= 0) return;
   if (s === 'burn' && f.cocoon && f.shield > 0) { f.shield = 0; f.cocoon = false; out.pops.push([f.id, "Kén tơ cháy thủng", 'react']); out.lines.push(`Kén tơ của ${f.name} bắt lửa rồi!`); }
-  if (s === 'burn') { f.st.burn = { d: dotIn(BNOW, src, f, src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1)), t: 3 + stExt(src), by: stKey(src) || 'P' }; out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); }
+  if (s === 'burn') { const nd = dotIn(BNOW, src, f, src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1)), nt = 3 + stExt(src), ob = f.st.burn;
+    if (ob && ob.d > nd) ob.t = Math.max(ob.t, nt); else f.st.burn = { d: nd, t: nt, by: stKey(src) || 'P' };   // 灼烧同毒：弱的不盖强的
+    out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); }
   else if (s === 'chill') { if (!f.st.slow) stAdd(BNOW, stKey(src) ? src : stActor(BNOW), 'ctrl', 1); f.st.slow = 3 + stExt(src); out.pops.push([f.id, "Đóng băng", 'cold', 1]); if (f.lavaShell && f.shield > 0) { f.shield = 0; f.lavaShell = false; out.pops.push([f.id, "Vỏ nứt", 'react']); out.lines.push(`Lớp vỏ dung nham của ${f.name} bị đông nứt!`); } }
   else if (s === 'armor') { f.st.melt = 3 + stExt(src); out.pops.push([f.id, "Phá giáp", 'crit', 1]); if (f.shield > 0 && (f.trait === 'shield' || f.silver)) { f.shield = 0; out.pops.push([f.id, f.silver ? "Giáp bạc vỡ rồi" : "Vỡ giáp", 'react']); if (f.silver) out.lines.push(`Giáp bạc của ${f.name} bị đánh vỡ!`); } }
   else if (s === 'stun') freezeU(f, out, "Choáng");
