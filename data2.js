@@ -125,7 +125,7 @@ const BUILDS = {
     { set: 'wanfu', d: '不管顺序，把状态挂满全场再引爆', sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
       leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
-    { set: 'yinbing', d: '尸群碾压：僵尸替你挨打，倒下还会炸', sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['corpse', 'a']],
+    { set: 'yinbing', d: '尸群碾压：僵尸替你挨打，倒下还会炸', sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['curse', 'b']],   /* 2026-11-25 尸爆换成摄魂咒·腐骨：尸爆把八成多的僵尸自己炸掉，550 层 66%/65% → 90%/80% */
       leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shisha'] },
     { set: 'duxing', d: '不带尸，一个人叠毒，再一次结算', sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
       leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['shiwang', 'pain', 'shigu'] } ],

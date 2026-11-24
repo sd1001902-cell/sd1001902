@@ -125,7 +125,7 @@ const BUILDS = {
     { set: 'wanfu', d: "Không cần thứ tự, treo đầy trạng thái lên cả sân rồi kích nổ", sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
       leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
-    { set: 'yinbing', d: "Bầy xác nghiền nát: cương thi chịu đòn thay bạn, ngã xuống còn nổ", sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['corpse', 'a']],
+    { set: 'yinbing', d: "Bầy xác nghiền nát: cương thi chịu đòn thay bạn, ngã xuống còn nổ", sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['curse', 'b']],   /* 2026-11-25 尸爆换成摄魂咒·腐骨：尸爆把八成多的僵尸自己炸掉，550 层 66%/65% → 90%/80% */
       leg: ['ganshisuo', 'shehunling'], cube: ['baigufan', 'shiwangguan', 'hanshipao'], gems: ['shiwang', 'bond', 'shisha'] },
     { set: 'duxing', d: "Không mang xác, một mình chồng độc rồi kết toán một lần", sk: [['shidu', 'a'], ['tudun', 'a'], ['curse', 'b'], ['bonestorm', 'b']],
       leg: ['baigunang', 'caoren'], cube: ['surge', 'earth', 'soul'], gems: ['shiwang', 'pain', 'shigu'] } ],

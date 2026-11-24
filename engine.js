@@ -1981,7 +1981,7 @@ const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv &&
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, '乏力', 'curse', 1]); } };
 let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
-let YINBING_MUL = 2, YINBING_BIG = 0.25;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
+let YINBING_MUL = 2, YINBING_BIG = 0.25, YINBING_DR = 0.07;   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
 // 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
 let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
@@ -2435,8 +2435,13 @@ function heroAct(b, P, out) {
     if (t2) { out.pops.push([t2.id, '狼影', 'crit']); out.yi = 'langwang'; hit(b, P, t2, 0.6 + P.yi.langwang * 0.2, 'phys', out, { proc: 1 }); } }
 }
 // 自动出招：有状态先收招，没状态先起手；职业各有讲究
+// 自动出招的尸爆：只炸快死的（血量低于四成），或者尸位满了才炸——原来好了就炸，高层一场妖王战自己炸掉三十多具，场上僵尸常年不满（2026-11-25）
+function corpseWorth(b, P) {
+  const zs = zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult); if (!zs.length) return false;
+  return zs.some(z => z.hp / z.maxHp < 0.4) || zs.length >= (P.minionCap || 3);
+}
 function autoPick(b, P, foes) {
-  const ready = P.skills.filter(k => k.cd && k.left <= 0 && skillReady(b, P, k, foes)), basic = P.skills.find(k => !k.cd);
+  const ready = P.skills.filter(k => k.cd && k.left <= 0 && skillReady(b, P, k, foes) && (k.id !== 'corpse' || P.cls !== 'necro' || corpseWorth(b, P))), basic = P.skills.find(k => !k.cd);
   const has = s => foes.some(f => stHas(f, s)), pick = id => ready.find(k => k.id === id);
   const FX = P.fx;
   if (P.cls === 'necro' && FX.has('duXing4')) {   // 五毒独行：不召尸。先让人人带毒，叠着毒等尸毒蔓、土遁葬来结算
@@ -2903,7 +2908,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   const dA = d;   // 减伤封顶用：这一段之前的数
   if (tfx) {
     if (tfx.has('xueHai4') && (tgt.fury || 0) >= 50) d *= 1 - XUEHAI_DR;
-    if (tfx.has('yinBing6')) d *= 1 - 0.07 * Math.min(6, zombiesOf(b).length);
+    if (tfx.has('yinBing6')) d *= 1 - YINBING_DR * Math.min(6, zombiesOf(b).length);
     if (tfx.has('luoHan6') && tgt.fonu) d *= 1 - 0.04 * tgt.fonu;
     if (tfx.has('duXing4') && tgt === b.P) d *= 1 - DUXING_DR * emptySlots(b, tgt);
     if (tgt.gDr && src.side === 'e') d *= 1 - Math.min(60, tgt.gDr * (tgt.hp / tgt.maxHp < 0.3 ? 2 : 1)) / 100;
