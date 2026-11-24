@@ -1752,7 +1752,7 @@ input,textarea,select{font-size:max(16px,1em)}
 .bk2-rar button{height:46px;border:1px solid var(--line);border-radius:8px;background:#0b0807;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;opacity:.55}
 .bk2-rar button b{font:700 14px "Noto Serif SC",serif;color:var(--rc)}.bk2-rar button small{font-size:11px;color:var(--dim)}
 .bk2-rar button.on{opacity:1;border-color:color-mix(in srgb,var(--rc) 70%,transparent);background:color-mix(in srgb,var(--rc) 12%,#0b0807)}
-.bk2-keep{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.bk2-keep{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}.bk2-keep button{grid-column:span 3}.bk2-keep button.w2{grid-column:span 2;padding:0 7px;gap:5px}
 .bk2-keep button{height:34px;display:flex;align-items:center;gap:7px;padding:0 9px;border:1px solid var(--line);border-radius:7px;background:#0b0807;color:var(--dim);font-size:13px;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden}
 .bk2-keep button i{flex:none;width:15px;height:15px;border:1.5px solid var(--line2);border-radius:4px;position:relative}
 .bk2-keep button.on{color:var(--ink);border-color:#4a3a28}.bk2-keep button.on i{background:var(--gold2);border-color:var(--gold2)}
@@ -1897,7 +1897,7 @@ html body .arena.sv .side.form.tb>.unit{pointer-events:auto}
 .bk2-keep button small{margin-left:auto;font-size:10.5px;color:var(--dim)}
 .bk2-g em{font-style:normal;font-size:10.5px;font-weight:400;padding:0 5px;border-radius:5px;line-height:15px}
 .bk2-g em.ga1{color:#ffc88a;border:1px solid #a06a2a}
-.bk2-g em.ga2{color:#ffb0a0;border:1px solid #d03a2a}
+.bk2-g em.ga2{color:#ffb0a0;border:1px solid #d03a2a}.bk2-g em.ga3{color:#c49bff;border:1px solid #7a4ad0}
 
 /* 2026-11-24 战斗省电（用户定）：
    1 常驻循环动画去掉——人物上下呼吸、武器摆动、神兵武器光晕、出手条当前那位的跳动（人物站姿两张图轮换的「换气」还在，vfx.js idleTick）

@@ -55,12 +55,13 @@ const popSpd = () => ({ 1: 1, 2: 0.85, 3: 0.72 }[SAVE.speed] || 1);
 const popMax = () => ({ 1: 3, 2: 3, 3: 2 }[SAVE.speed] || 3);   // 同一个目标同时留几个数字：倍速越高留得越少（3 倍速新数字直接顶掉旧的）
 const popHTML = h => `<i class="o">${h}</i><b>${h}</b>`;
 // 累计数字：每个目标一种（伤害 / 掉血 / 回血）只挂一个，往上加
-const ACC_IDLE = 900, ACC_KILL = 650, ACC_OUT = 650;
+const ACC_IDLE = 650, ACC_KILL = 500, ACC_OUT = 500;   // 2026-11-24 用户：再快一点点
 function accPut(el, key, v, o) {
   if (!el || !(v > 0)) return;
   el._acc = el._acc || {}; let a = el._acc[key];
   if (!a || !a.p.isConnected || a.out) {
-    const p = document.createElement('span'); p.className = 'pop acc ' + (o.cls || '') + (accLow(el) ? ' low' : ''); el.appendChild(p);
+    const p = document.createElement('span'); p.className = 'pop acc ' + (o.cls || '') + (!o.head && accLow(el) ? ' low' : ''); p.innerHTML = popHTML(`${o.sign || ''}${fmtBig(v)}`); el.appendChild(p);
+    if (o.head) accHead(el, p);   // 妖物：数字放在头顶上，不压在身上
     a = el._acc[key] = { p, v: 0, t: null, out: false };
     if (p.animate) p.animate([{ transform: 'translate(-50%,6px) scale(.7)', opacity: 0 }, { transform: 'translate(-50%,0) scale(1)', opacity: 1 }], { duration: 140 * spdF(), easing: 'ease-out' });
   }
@@ -84,6 +85,14 @@ function accDead(el) {   // 妖物倒下时头上还挂着的累计数（比如�
     accFree(el, a); const p = a.p;
     if (p.animate) p.animate([{ transform: 'translate(-50%,0) scale(1.45)' }, { transform: 'translate(-50%,0) scale(1)' }], { duration: 260 * spdF(), easing: 'ease-out' });
     clearTimeout(a.t); a.t = setTimeout(() => { a.out = true; if (!p.animate) return p.remove(); p.animate([{ transform: 'translate(-50%,0)', opacity: 1 }, { transform: 'translate(-50%,-44px)', opacity: 0 }], { duration: ACC_OUT * popSpd(), easing: 'ease-in', fill: 'forwards' }).onfinish = () => p.remove(); }, ACC_KILL * popSpd()); }
+}
+function accHead(el, p) {
+  const ar = document.getElementById('arena'); if (!ar) return;
+  const R = ar.getBoundingClientRect(), E = el.getBoundingClientRect(), sp = el.querySelector('.sp'), S = sp ? sp.getBoundingClientRect() : E;
+  const h = p.offsetHeight || 20, w = Math.max(p.offsetWidth || 0, 44), cx = E.left + E.width / 2;
+  let top = S.top - R.top - h;   // 场地坐标：数字底边贴着头顶
+  for (const q of ar.querySelectorAll(':scope > .turnbar, :scope > .fbadge')) { const r = q.getBoundingClientRect(); if (r.height && cx + w / 2 + 4 > r.left && cx - w / 2 - 4 < r.right) top = Math.max(top, r.bottom - R.top + 2); }   // 顶上出手条挡着就往下让
+  p.style.top = (Math.max(2, top) - (E.top - R.top)) + 'px';
 }
 const accLow = el => { const ar = document.getElementById('arena'); return !!ar && el.getBoundingClientRect().top - ar.getBoundingClientRect().top < 64; };
 function popPut(el, cls, html, kind) {
@@ -463,11 +472,12 @@ function bulkBody() {
   for (const it of SAVE.stash) cnt[it.rarity] = (cnt[it.rarity] || 0) + 1;
   const all = bulkPick(cls, f), list = all.filter(it => !BULKX.has(it.id));
   const tot = list.reduce((a, it) => a + (sell ? sellPrice(it) : salvageValue(it)), 0), risky = list.filter(it => it.rarity === 'set' || it.rarity === 'legend').length;
-  const keeps = [['keepUp', `能让${CLASSES[cls].n}变强的`], ['keepSp', '带特殊词条的'], ['keepAnc', '上古'], ['keepPri', '太古'], ['keepQ', '词条成色八成以上的'], ...(featureOn('cube') ? [['keepCube', '乾坤袋还没收的神兵']] : [])];
+  const keeps = [['keepUp', `能让${CLASSES[cls].n}变强的`], ['keepSp', '带特殊词条的'], ['keepAnc', '上古'], ['keepPri', '太古'], ['keepJy', '九幽'], ['keepQ', '词条成色八成以上的'], ...(featureOn('cube') ? [['keepCube', '乾坤袋还没收的神兵']] : [])];
   const order = { legend: 0, set: 1, rare: 2, magic: 3, normal: 4 }, shown = all.slice().sort((a, b) => order[a.rarity] - order[b.rarity] || b.ilvl - a.ilvl).slice(0, 80);
   // 2026-11-23 重排：品级一排五格、留下规则两列勾选、装备按品级分组排成整齐的方格；方格在框里滚，确认按钮钉在底部
-  const nA = n => SAVE.stash.filter(it => it.anc === n && f.r[it.rarity]).length;   // 选中的品级里有几件上古、太古
-  const keepsTxt = { keepUp: '能让你变强的', keepSp: '带特殊词条', keepAnc: `上古装备${nA(1) ? `<small>${nA(1)} 件</small>` : ''}`, keepPri: `太古装备${nA(2) ? `<small>${nA(2)} 件</small>` : ''}`, keepQ: '成色八成以上', keepCube: '乾坤袋没收的神兵' };
+  const nA = n => SAVE.stash.filter(it => it.anc === n && f.r[it.rarity]).length;   // 选中的品级里有几件上古、太古、九幽
+  const jyN = list.filter(it => it.anc === 3).length;
+  const keepsTxt = { keepUp: '能让你变强的', keepSp: '带特殊词条', keepAnc: `上古${nA(1) ? `<small>${nA(1)} 件</small>` : ''}`, keepPri: `太古${nA(2) ? `<small>${nA(2)} 件</small>` : ''}`, keepJy: `<span class="jyc">九幽</span>${nA(3) ? `<small>${nA(3)} 件</small>` : ''}`, keepQ: '成色八成以上', keepCube: '乾坤袋没收的神兵' };
   const groups = RARITY_ORDER.slice().reverse().map(r => [r, shown.filter(it => it.rarity === r)]).filter(g => g[1].length);
   const tile = it => `<button class="bk2-t r-${it.rarity} ${BULKX.has(it.id) ? 'off' : ''} ${ancCls(it)}" data-act="bulkx" data-arg="${it.id}">${SPR.item(it, 30)}<span>${esc(itemTitle(it))}</span>${BULKX.has(it.id) ? '<em>留</em>' : ''}</button>`;
   return `<div class="bulk bk2">
@@ -475,10 +485,10 @@ function bulkBody() {
     <h4 class="bk2-h">处理哪些品级</h4>
     <div class="bk2-rar">${RARITY_ORDER.map(r => `<button class="r-${r} ${f.r[r] ? 'on' : ''}" data-act="bulkr" data-arg="${r}"><b>${RARITY[r].n}</b><small>${cnt[r] || 0} 件</small></button>`).join('')}</div>
     <h4 class="bk2-h">这些留下<small>强化过、镶了玉、锁定的永远不动</small></h4>
-    <div class="bk2-keep">${keeps.map(([k]) => `<button class="${f[k] ? 'on' : ''}" data-act="bulkk" data-arg="${k}"><i></i>${keepsTxt[k]}</button>`).join('')}</div>
-    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => { const a1 = L.filter(it => it.anc === 1).length, a2 = L.filter(it => it.anc === 2).length; return `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}${a1 ? `<em class="ga1">上古 ${a1}</em>` : ''}${a2 ? `<em class="ga2">太古 ${a2}</em>` : ''}</div>${L.map(tile).join('')}`; }).join('') : '<p class="bk2-empty">没有符合条件的装备</p>'}${all.length > shown.length ? `<p class="bk2-empty">……还有 ${all.length - shown.length} 件没列出来</p>` : ''}</div>
+    <div class="bk2-keep">${keeps.map(([k]) => `<button class="${f[k] ? 'on' : ''}${['keepAnc', 'keepPri', 'keepJy'].includes(k) ? ' w2' : ''}" data-act="bulkk" data-arg="${k}"><i></i>${keepsTxt[k]}</button>`).join('')}</div>
+    <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => { const a1 = L.filter(it => it.anc === 1).length, a2 = L.filter(it => it.anc === 2).length, a3 = L.filter(it => it.anc === 3).length; return `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}${a1 ? `<em class="ga1">上古 ${a1}</em>` : ''}${a2 ? `<em class="ga2">太古 ${a2}</em>` : ''}${a3 ? `<em class="ga3">九幽 ${a3}</em>` : ''}</div>${L.map(tile).join('')}`; }).join('') : '<p class="bk2-empty">没有符合条件的装备</p>'}${all.length > shown.length ? `<p class="bk2-empty">……还有 ${all.length - shown.length} 件没列出来</p>` : ''}</div>
     <div class="bk2-foot"><p>${list.length ? `${sell ? '卖掉' : '分解'} <b>${list.length}</b> 件 → <b>${tot}</b> ${sell ? '两银子' : '颗魂晶'}` : '没有要处理的装备'}${all.length ? '<small>点装备可以单独留下</small>' : ''}</p>
-    <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? `里面有 ${risky} 件套装或神兵，再点一次确认` : `${sell ? '卖掉' : '分解'}这 ${list.length} 件`}</button></div></div>`;
+    <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? (jyN ? `里面有 ${jyN} 件九幽，再点一次确认` : `里面有 ${risky} 件套装或神兵，再点一次确认`) : `${sell ? '卖掉' : '分解'}这 ${list.length} 件`}</button></div></div>`;
 }
 const bulkModal = () => `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">清点库房</h2>${bulkBody()}`;
 function gambleBody() {
@@ -2045,7 +2055,7 @@ function applyStep(o, anim) {
       const side = g.onHero && !ALL ? (g.heal ? ' mr' : ' ml') : '';
       const sign = g.heal ? '+' : friend ? '-' : '';
       const delay = o.jzz && !g.onHero ? ji++ * 60 * spdF() : 0;   // 金刚震：一只只亮
-      const put = () => { accPut(g.el, key, g.v * K, { cls: cls + side, sign, crit: g.crit && !g.onHero, kill });
+      const put = () => { accPut(g.el, key, g.v * K, { cls: cls + side, sign, crit: g.crit && !g.onHero, kill, head: !g.onHero && !!(g.tu && g.tu.side === 'e') });
         if (anim && !g.onHero && !(g.tu && g.tu.hp <= 0)) VFX.onHit(g.id, g.crit); };
       if (delay) setTimeout(put, delay); else put();
     }
