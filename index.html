@@ -2017,7 +2017,16 @@ html body .pop.acc.hurt>b{color:#ff6a55}html body .pop.acc.heal>b{color:#7fe07a}
 .twpicks{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .twpick{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border:1px solid #6a5a3a;border-radius:7px;background:#211a12;color:var(--ink);cursor:pointer}
 .twpick b{font-size:14px}.twpick b small{margin-left:6px;font-size:11px;color:var(--dim);font-weight:400}.twpick span{font-size:12px;color:#cbbba0;line-height:1.45}
-.twpick:active{transform:scale(.98)}
+.twpick:active{transform:scale(.98)}.twpick.sel:active{transform:none}
+.twpick.sel{border-color:var(--gold2);background:#2a2014;cursor:default}
+.twmore{align-self:flex-end;font-style:normal;font-size:11px;color:var(--gold2);margin-top:-2px}
+.twdet{align-self:stretch;display:flex;flex-direction:column;gap:3px;margin-top:5px;padding-top:6px;border-top:1px dashed #5a4a30}
+.twdet p{margin:0;font-size:12px;line-height:1.45;color:#cbbba0}
+.twb{display:flex;gap:6px;align-items:baseline}.twb i{flex:none;font-style:normal;font-weight:700;min-width:30px;white-space:nowrap}.twb em{flex:none;margin-left:auto;font-style:normal;font-size:11px;padding-left:6px}
+.twb.on i,.twb.on em{color:#8fd18f}.twb.new{color:#ffe2a8}.twb.new i,.twb.new em{color:var(--gold2)}.twb.off{opacity:.5}
+.twol{color:var(--dim)!important}.twol .lo{color:#ff8a7a}.twrel{color:#a9d3ff!important}
+.twdet .btn{align-self:stretch;margin-top:4px}
+.twhead .tq{width:22px;height:22px;font:700 12px sans-serif;margin-left:8px;vertical-align:3px;padding:0}
 .twbtns{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .twkit2{max-height:62vh;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
 .twkrow{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;padding:5px 2px;border-bottom:1px solid var(--line);font-size:13px}.twkrow small{flex:none;width:56px;color:var(--dim)}.twkrow em{font-style:normal;font-size:11.5px;color:var(--gold2)}.twkrow span{flex-basis:100%;padding-left:62px;font-size:12px;color:#cbbba0}

@@ -1628,13 +1628,14 @@ function twPicks(cls, f, kit) {
     return out;
   });
 }
+function twEqPos(kit, it) {   // 塔装换上去落在哪一格：扳指先顶掉空的、宝品的那只
+  if (slotType(it.slot) !== 'ring') return it.slot;
+  const rank = x => !x ? -1 : x.rarity === 'rare' ? 0 : 1; return rank(kit.eq.ring2) < rank(kit.eq.ring) ? 'ring2' : 'ring';
+}
 function twApply(cls, p) {   // 选中一样：放进塔装
   const S = twState(cls), kit = S.kit;
   if (p.t === 'eq') {
-    const it = p.it, st = slotType(it.slot);
-    let pos = it.slot;
-    if (st === 'ring') { const r1 = kit.eq.ring, r2 = kit.eq.ring2, rank = x => !x ? -1 : x.rarity === 'rare' ? 0 : 1; pos = rank(r2) < rank(r1) ? 'ring2' : 'ring'; }
-    kit.eq[pos] = it;
+    kit.eq[twEqPos(kit, p.it)] = p.it;
   } else if (p.t === 'sk') { if (!kit.sk.includes(p.id) && kit.sk.length < LOADOUT_MAX) kit.sk.push(p.id); }
   else if (p.t === 'rn') kit.rn[p.id] = p.r;
   else if (p.t === 'cube') { if (!kit.cube.includes(p.lid) && kit.cube.length < 3) kit.cube.push(p.lid); }

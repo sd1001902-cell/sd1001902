@@ -729,7 +729,7 @@ function towerBody(cls) {
   const cube = kit.cube.map(id => (LEGENDS.find(l => l.id === id) || {}).n).filter(Boolean).join(", ") || "Chưa có";
   const lg = kit.lg.map(g => `${LGEMS[g.t].n} ${g.lv}`).join(", ") || "Chưa có";
   return `<div class="gobody tw" data-scroll="gobody">
-      <div class="twhead"><b>${esc(C.n)}</b><span>Tuần này tầng <em>${f}</em></span></div>
+      <div class="twhead"><b>${esc(C.n)}<button class="qhelp tq" data-act="twcls" aria-label="Lối chơi môn phái">?</button></b><span>Tuần này tầng <em>${f}</em></span></div>
       <div class="twstat"><div><small>Điểm lưu</small><b>tầng ${S.ck}</b></div><div><small>Cao nhất tuần</small><b>tầng ${S.best}</b></div><div><small>Kỷ lục</small><b>tầng ${rec}</b></div></div>
       <div class="twnext"><small>Tầng ${f}</small><b>${twKindTxt(cls, f)}</b></div>
       <div class="twkit" data-act="twkit"><div><small>Đồ tháp</small><span>${twKitLine(cls, kit)}</span></div><div><small>Chiêu</small><span>${sk}</span></div><div><small>Hồn thần binh</small><span>${cube}</span></div><div><small>Linh ngọc</small><span>${lg}</span></div><em>Xem đồ tháp ›</em></div>
@@ -747,18 +747,59 @@ function twGo() {
   banner(`Tháp Thông Thiên · tầng ${run.twF}`, run.twName || (kind === 'elite' ? "Có tinh anh" : "Một đàn yêu vật"), 1400);
   applyStep(null);
 }
+// 三选一：点一下展开看清楚（套装各档效果、换下什么、跟手上哪些东西有关），再按「就选它」（2026-11-25）
+let TWSEL = null;   // { f: 这是哪一层的三选一, i }
+const twSetCnt = kit => { const c = {}; for (const q of POS_IDS) { const it = kit.eq[q]; if (it && it.set) c[it.set] = (c[it.set] || 0) + 1; } return c; };
+const twSetTxt = S => [2, 4, 6].map(n => S['b' + n + 'd']).filter(Boolean).join("; ");
+const twTheme = (cls, sid) => { const b = (BUILDS[cls] || []).find(x => x.set === sid); return b ? b.d : ''; };
+// 一段说明里点名了哪些招式、哪些套装：只说有没有关系，不评好坏
+function twRelOut(cls, kit, txt, selfSet) {
+  const C = CLASSES[cls], cnt = twSetCnt(kit), own = id => kit.sk.includes(id) || !(C.skills.find(k => k.id === id) || {}).cd;
+  const ks = C.skills.filter(k => txt.includes(k.n)), out = [];
+  const need = ks.filter(k => !own(k.id)).map(k => k.n), have = ks.filter(k => own(k.id)).map(k => k.n);
+  if (need.length) out.push(`Cần dùng: <b>${need.join(", ")}</b> (ngươi chưa có)`);
+  if (have.length) out.push(`Tăng cho: ${have.join(", ")}`);
+  SETS.filter(S => S.id !== selfSet && txt.includes(S.n)).forEach(S => out.push(`Cần phối: ${S.n} (trên người ${cnt[S.id] || 0} món)`));
+  return out;
+}
+// 新招式、变招：塔装里哪些东西点名了这一招
+function twRelIn(cls, kit, name) {
+  const src = [], cnt = twSetCnt(kit);
+  for (const id in cnt) { const S = SETS.find(x => x.id === id); if (S && twSetTxt(S).includes(name)) src.push(`${S.n} (${cnt[id]} món)`); }
+  for (const q of POS_IDS) { const it = kit.eq[q], L = it && it.legend && LEGENDS.find(l => l.id === it.legend); if (L && L.d.includes(name)) src.push(L.n); }
+  kit.cube.forEach(id => { const L = LEGENDS.find(l => l.id === id); if (L && L.d.includes(name) && !src.includes(L.n)) src.push(L.n); });
+  kit.lg.forEach(g => { const G = LGEMS[g.t]; if (G && G.d(g.lv).includes(name)) src.push(G.n); });
+  return src.length ? [`Liên quan chiêu này: ${src.join(", ")}`] : [];
+}
 function twPickHTML(cls, p, i) {
-  const C = CLASSES[cls]; let h = '', d = '';
-  if (p.t === 'eq') { const it = p.it, S = it.set && SETS.find(x => x.id === it.set), L = it.legend && LEGENDS.find(l => l.id === it.legend), kit = twState(cls).kit;
-    const have = S ? POS_IDS.filter(q => kit.eq[q] && kit.eq[q].set === S.id && kit.eq[q].slot !== it.slot).length : 0;
+  const C = CLASSES[cls], S0 = twState(cls), kit = S0.kit, sel = TWSEL && TWSEL.f === S0.fl && TWSEL.i === i;
+  let h = '', d = '', det = [], rel = [];
+  if (p.t === 'eq') { const it = p.it, S = it.set && SETS.find(x => x.id === it.set), L = it.legend && LEGENDS.find(l => l.id === it.legend);
+    const pos = twEqPos(kit, it), old = kit.eq[pos], cnt = twSetCnt(kit);
     h = `<b class="r-${it.rarity}">${itemTitle(it)}</b><small>${(SLOTS.find(x => x.id === slotType(it.slot)) || {}).n || ''}</small>`;
-    d = S ? `${S.n}: mặc vào thành ${have + 1} món${have + 1 === 2 || have + 1 === 4 || have + 1 === 6 ? `, mở hiệu ứng ${have + 1} món` : ''}` : L ? esc(L.d) : ''; }
-  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>Chiêu mới · ${k.n}</b>`; d = esc(k.d); }
-  else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1]; h = `<b>Biến chiêu · ${k.n} «${R.n}»</b>`; d = esc(R.d); }
-  else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">Hồn thần binh · ${L.n}</b>`; d = esc(L.d); }
-  else if (p.t === 'lg') { const G = LGEMS[p.g.t]; h = `<b style="color:${G.c}">Linh ngọc · ${G.n} cấp ${p.g.lv}</b>`; d = esc(G.d(p.g.lv)); }
-  else if (p.t === 'lgup') { const g = twState(cls).kit.lg[p.i], G = LGEMS[g.t]; h = `<b style="color:${G.c}">${G.n} cấp ${g.lv} → ${g.lv + p.add}</b>`; d = esc(G.d(g.lv + p.add)); }
-  return `<button class="twpick" data-act="twpick" data-arg="${i}">${h}<span>${d}</span></button>`;
+    if (S) { const now = (cnt[S.id] || 0) - (old && old.set === S.id ? 1 : 0) + 1, th = twTheme(cls, S.id);
+      d = `${S.n}: mặc vào thành ${now} món${th ? ` · ${esc(th)}` : ''}`;
+      det = [2, 4, 6].filter(n => S['b' + n + 'd']).map(n => { const was = (cnt[S.id] || 0) >= n, on = now >= n;
+        return `<p class="twb ${on ? (was ? 'on' : 'new') : 'off'}"><i>${n} món</i>${esc(S['b' + n + 'd'])}<em>${on ? (was ? "Đã mở" : "Món này mở") : `Thiếu ${n - now} món`}</em></p>`; });
+      rel = twRelOut(cls, kit, twSetTxt(S), S.id);
+    } else if (L) { d = esc(L.d); rel = twRelOut(cls, kit, L.d); }
+    let ol = "Ô này đang trống";
+    if (old) { ol = `Thay ra: <b class="r-${old.rarity}">${itemTitle(old)}</b>`;
+      const OS = old.set && old.set !== it.set && SETS.find(x => x.id === old.set);
+      if (OS) { const c = cnt[OS.id], lost = [2, 4, 6].filter(n => OS['b' + n + 'd'] && c >= n && c - 1 < n);
+        ol += ` (${OS.n} ${c} → ${c - 1} món${lost.length ? `, <b class="lo">mất hiệu ứng ${lost.join(", ")} món</b>` : ''})`; } }
+    det.push(`<p class="twol">${ol}</p>`); }
+  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>Chiêu mới · ${k.n}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
+    const R = RUNES[k.id]; if (R) det.push(`<p class="twol">Sau này còn biến chiêu: «${R[0].n}» ${esc(R[0].d)}; «${R[1].n}» ${esc(R[1].d)}</p>`); }
+  else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1], cur = kit.rn[p.id], R0 = cur && RUNES[p.id][cur === 'a' ? 0 : 1];
+    h = `<b>Biến chiêu · ${k.n} «${R.n}»</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
+    det.push(`<p class="twol">${R0 ? `Thay «${R0.n}» hiện tại: ${esc(R0.d)}` : `${k.n} hiện chưa có biến chiêu`}</p>`); }
+  else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">Hồn thần binh · ${L.n}</b>`; d = esc(L.d); rel = twRelOut(cls, kit, L.d);
+    det.push(`<p class="twol">Hồn thần binh chỉ cho hiệu ứng, không chiếm ô trang bị (đã có ${kit.cube.length}/3)</p>`); }
+  else if (p.t === 'lg') { const G = LGEMS[p.g.t]; h = `<b style="color:${G.c}">Linh ngọc · ${G.n} cấp ${p.g.lv}</b>`; d = esc(G.d(p.g.lv)); rel = twRelOut(cls, kit, G.d(p.g.lv)); }
+  else if (p.t === 'lgup') { const g = kit.lg[p.i], G = LGEMS[g.t]; h = `<b style="color:${G.c}">${G.n} cấp ${g.lv} → ${g.lv + p.add}</b>`; d = esc(G.d(g.lv + p.add)); det.push(`<p class="twol">Hiện tại: ${esc(G.d(g.lv))}</p>`); }
+  const more = sel ? `<div class="twdet">${det.join('')}${rel.map(t => `<p class="twrel">${t}</p>`).join('')}<button class="btn sm" data-act="twpick" data-arg="${i}">Chọn món này</button></div>` : '';
+  return `<div class="twpick${sel ? ' sel' : ''}" data-act="twsel" data-arg="${i}">${h}<span>${d}</span>${sel ? '' : "<em class=\"twmore\">Chạm xem chi tiết ›</em>"}${more}</div>`;
 }
 function twResHTML() {
   const cls = SAVE.run.cls, S = twState(cls), R = BRES.tw;
@@ -782,6 +823,11 @@ const twKitModal = () => () => {
   const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>Linh ngọc</small><b style="color:${G.c}">${G.n} cấp ${g.lv}</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Đồ tháp · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">${eq}${sk}${cu}${lg}</div>`;
 };
+// 塔里用的是不熟的职业时：先看一眼它靠什么打、塔里会出哪几套（只说路子，不给配装）
+const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS_MECH[cls];
+  const sets = twSets(cls).map(id => { const S = SETS.find(x => x.id === id); return S ? `<div class="twkrow"><small>Bộ</small><b class="r-set">${S.n}</b><span>${esc(twTheme(cls, id))}</span></div>` : ''; }).join('');
+  return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">${esc(C.n)} · Cách đánh</h2><div class="twkit2" data-scroll="twcls"><p class="help-p">${esc(C.d)}</p>${M ? `<p class="help-p"><b>${M[0]}</b>: ${M[1]}</p>` : ''}
+    <p class="help-p sub">Trong tháp sẽ ra mấy bộ này, mỗi bộ một lối:</p>${sets}<p class="help-p sub">Khi chọn một trong ba, chạm vào thẻ để xem toàn bộ hiệu ứng, sẽ thay ra món gì, và liên quan tới chiêu nào ngươi đang có.</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp.</p>
   <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí tuyệt kỹ giữ qua từng tầng.</p>
   <p class="help-p">Qua mỗi tầng chọn một trong ba để mạnh lên: tầng thường lấy một món đồ tháp (bộ, thần binh, đều là Thái Cổ +10, dòng tối đa, khảm sẵn ngọc) hoặc một chiêu, một biến chiêu (tối đa năm chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp).</p>
@@ -3838,8 +3884,11 @@ const ACT = {
   twgo: () => twGo(),
   twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
   twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
-  twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls), p = S.pend && S.pend[+i]; if (!p) return; twApply(cls, p); save(); SFX.play('rare');
+  twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls), p = S.pend && S.pend[+i]; if (!p) return; twApply(cls, p); TWSEL = null; save(); SFX.play('rare');
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) el.innerHTML = twResHTML(); } else { closeModal(); refresh(); } },
+  twsel: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, f = twState(cls).fl; TWSEL = TWSEL && TWSEL.f === f && TWSEL.i === +i ? null : { f, i: +i };
+    if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
+  twcls: () => openModal(twClsModal()),
   twpend: () => openModal(twPendModal()),
   twkit: () => openModal(twKitModal()),
   twhelp: () => openModal(twHelpModal()),
