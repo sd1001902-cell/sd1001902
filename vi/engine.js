@@ -2037,12 +2037,13 @@ function kingUp(b, P) {
   u.gemKing = true; u.maxHp = u.hp = Math.round(u.maxHp * LGV.kgH(lv) / 100); u.atk *= LGV.kgA(lv) / 100; u.aura = LGV.kgU(lv) / 100; return u;
 }
 const kingAura = (b, u) => { const k = b.units.find(x => x.gemKing && x.hp > 0 && x !== u); return k ? 1 + k.aura : 1; };
+const ZOMBIE_HPK = 0.8;   // 2026-11-25 用户：僵尸气血整体下调 20%（尸王的在 LGV.kgH 里一起乘了）
 function makeZombie(b, P, zt, slot, rune) {
   const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + ((P.minionPct || 0) + (P.allyPct || 0)) / 100);   // 2026-11-25 僵尸强度和同伴加成改成相加（原来相乘，配齐后每只僵尸十几倍攻击）
   const hq = P.fx && P.fx.has('huangquan') ? 1.25 : 1;
   const hpM = (rune === 'b' ? 1.6 : 1) * (zt === 'tiejia' ? 1 + (P.ironPct || 0) / 100 : 1) * hq;
   const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
-              maxHp: Math.round(P.maxHp * Z.hp * m * hpM), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? YINBING_MUL : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd * hq, crit: 5, critDmg: 150, g: 40, st: {},
+              maxHp: Math.round(P.maxHp * Z.hp * m * hpM * (Z.ult ? 1 : ZOMBIE_HPK)), atk: P.atk * Z.atk * m * (P.fx && P.fx.has('yinBing6') ? YINBING_MUL : 1), armor: P.armor * Z.arm, res: P.res, spd: Z.spd * hq, crit: 5, critDmg: 150, g: 40, st: {},
               ae: Z.ae, wx: 'tu', taunt: Z.taunt, thornsP: Z.thornsP ? Z.thornsP + (P.ironPct || 0) / 150 : 0, poisonPct: P.poisonPct || 0, life: Z.life };
   if (b.run && (b.run.mode === 'rift' || b.run.mode === 'tower')) {   // 幻境、通天塔：你身上通用的增伤僵尸都吃（2026-11-25 用户：按道理僵尸都能吃）。只在你自己出手时才有的（连斩、会心、残血、反震、淬毒、某一招伤害、嗜杀这类灵玉）不算
     u.dmgPct = P.dmgPct || 0; u.crit = P.crit; u.critDmg = P.critDmg;
