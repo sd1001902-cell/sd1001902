@@ -196,7 +196,7 @@ const LEGENDS = [
   { id: 'zhenxiexia', n: '镇邪符匣', slot: 'offhand', cls: 'mage',      ch: 9, x: 1, imp: { elem: 12 },   fx: 'zhenxieOff',  d: '敌人身上每有一种状态，它对你造成的伤害 -8%' },
   { id: 'ganshisuo',  n: '赶尸索',   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'ganshiBelt',  d: '僵尸倒下 3 回合后自己爬起来（每个尸位每场一次）' },
   { id: 'shehunling', n: '摄魂铃',   slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { minionPct: 15 }, fx: 'shehunOff', d: '摇铃·集火之后，僵尸有 30% 几率再各出手一次' },
-  { id: 'baigunang',  n: '百蛊囊',   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baiguBelt',   d: '中毒叠加的上限从 5 层提高到 8 层（要配五毒独行 6 件）' },
+  { id: 'baigunang',  n: '百蛊囊',   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baiguBelt',   d: '中毒层数上限再 +2（要配五毒独行 6 件：8 层 → 10 层）' },
   { id: 'caoren',     n: '替身草人', slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { elem: 12 },   fx: 'caorenOff',   d: '每场战斗一次：致命的一击由草人代受，你留 25% 气血，并让所有敌人中毒' },
   { id: 'cangfengdai', n: '藏锋带',  slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'cangfengBelt', d: '开战自带 3 点杀意；终结技不会被闪开、不会落空' },
   { id: 'wuyingnang', n: '无影囊',   slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { spd: 6 },     fx: 'wuyingOff',   d: '闪开一次攻击后恢复 4% 最大气血，冷却最长的那一招冷却 -1' },
@@ -609,11 +609,11 @@ const COMPANIONS = {
 
 // ---------------- 状态配合 ----------------
 // 起手技能给敌人挂状态（ap），收招技能打带状态的敌人有额外效果（pay）
-const STATES = { burn: { n: '灼烧', c: '#ff6a2a', d: '每回合掉血；回春的妖物烧着时不能回血' },
+const STATES = { burn: { n: '灼烧', c: '#ff6a2a', d: '每回合掉一大截血（只有一层，强的留着）；回春的妖物烧着时不能回血' },
   chill: { n: '冰冻', c: '#5fb0ff', d: '出手变慢；飞行的妖物会掉下来' },
   armor: { n: '破甲', c: '#d8a05a', d: '护甲减半、抗性 -20；骨甲直接碎掉' },
   stun: { n: '眩晕', c: '#f1d34e', d: '跳过下一次出手' },
-  poison: { n: '中毒', c: '#7fe05a', d: '每回合掉血，持续 3 回合' } };
+  poison: { n: '中毒', c: '#7fe05a', d: '每回合掉血，可以叠层（最多 5 层，每层 3 回合）' } };
 const SKILL_COMBO = {
   liedi: { ap: 'armor' }, lieyan: { ap: 'burn' }, warcry: { ap: 'stun', apc: 0.3 }, hanren: { ap: 'chill', pay: { s: 'stun', x: 'crit', n: '断骨' } },
   bloodlust: { pay: { s: 'burn', x: 'dmg', v: 1.8, n: '饮火' } }, whirl: { pay: { s: 'armor', x: 'dmg', v: 1.7, n: '破军' } }, bawang: { pay: { s: 'armor', x: 'crit', n: '卸甲' } },

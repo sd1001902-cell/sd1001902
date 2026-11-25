@@ -1838,7 +1838,7 @@ const ST_INFO = {
   slow: ['冰冻', '#5fb0ff', 0, '出手变慢（速度 ×0.65）；飞行的妖物会掉下来。'],
   melt: ['破甲', '#d8a05a', 0, '护甲减半、全抗 -20；骨甲、银甲会被打碎。'],
   burn: ['灼烧', '#ff7a3a', 0, '每回合掉血；回春的妖物烧着时回不了血，丝茧一烧就穿。'],
-  poison: ['中毒', '#7fe05a', 0, '每回合掉血，持续 3 回合。九尾奶人时（好感 10）会顺手清掉。'],
+  poison: ['中毒', '#7fe05a', 0, '每回合掉血，每层持续 3 回合，最多叠 5 层（五毒独行更多）。九尾奶人时（好感 10）会顺手清掉。'],
   curse: ['摄魂', '#c39cff', 0, '造成的伤害降低三成。'],
   mark: ['夺命印', '#ff5a5a', 0, '被标记的敌人受到的伤害提高。'],
   warcry: ['振奋', '#ffb066', 1, '伤害 +40%，护甲 +50%（狮子吼、龙道长的正气都是这个）。'],
@@ -1869,7 +1869,7 @@ function unitSts(u) {
   if (u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)) add('enraged');
   if (u.phShield && u.shield > 0) add('phsh'); if (u.rageB) add('rageB'); if (u.duo) add('duo');
   for (const k of ['frozen', 'slow', 'melt', 'burn', 'poison', 'curse', 'mark', 'warcry', 'kangG', 'liuDr', 'tieArm', 'shadow', 'smoke', 'butui', 'chan', 'renew']) {
-    const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, t > 0 && t < 99 ? t : ''); }
+    const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, k === 'poison' && v.L && v.L.length > 1 ? `×${v.L.length}` : t > 0 && t < 99 ? t : ''); }   // 中毒显示层数
   if (u.shield > 0 && !u.cocoon && !u.silver) add('shield', fmtBig(Math.round(u.shield * uK(u))));
   if (u.kind === 'hero' && u.stacks) add('stacks', '×' + u.stacks);
   if (u.hufa) add('hufa'); if (u.callU) add('call');

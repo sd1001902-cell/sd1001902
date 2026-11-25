@@ -307,7 +307,7 @@ SETS.push(
     pieces: [['helm', "Độc Hành Nón Lá"], ['chest', "Độc Hành Cổ Y"], ['gloves', "Độc Hành Chỉ Sáo"], ['boots', "Độc Hành Dép Cỏ"], ['ring', "Độc Hành Ban Chỉ"], ['amulet', "Độc Hành Cổ Đàn"]],
     b2: { poisonPct: 60, hpPct: 15, xDr: 30 }, b2d: "Sát thương trúng độc +60%, khí huyết tối đa +15%, sát thương phải nhận -30%",
     b4: 'duXing4', b4d: "Thi vị mỗi trống một ô (tính tối đa 4 ô): sát thương của bạn +60%, sát thương phải nhận -13%; Trấn Hồn Đinh kèm trúng độc; không có cương thi vẫn dùng được Bách Quỷ Dạ Hành",
-    b6: 'duXing6', b6d: "Trúng độc có thể cộng dồn (tối đa 8 tầng); Thi Độc Lan, Thổ Độn Táng đánh trúng kẻ địch đang trúng độc thì kết toán ngay phần độc còn lại trên nó với mức gấp ba (độc không mất)",
+    b6: 'duXing6', b6d: "Giới hạn tầng trúng độc 5 → 8; Thi Độc Lan, Thổ Độn Táng đánh trúng địch đang trúng độc thì lập tức kết toán một phần tư sát thương độc còn lại trên người nó (độc không mất)",
     need: ['shidu', 'tudun'], tip: "Không gọi cương thi, một mình hạ độc. Mang Thi Độc Lan, Thổ Độn Táng; tháo Rung Chuông Gọi Xác xuống" },
   { id: 'qianji', n: "Thiên Cơ", cls: 'assassin', rift: true, rlv: RSET2_LV,
     pieces: [['helm', "Thiên Cơ Diện Tráo"], ['chest', "Thiên Cơ Dạ Hành Y"], ['gloves', "Thiên Cơ Chỉ Sáo"], ['boots', "Thiên Cơ Nhuyễn Ngoa"], ['ring', "Thiên Cơ Ban Chỉ"], ['amulet', "Thiên Cơ Hạp"]],

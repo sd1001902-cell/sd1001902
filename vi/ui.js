@@ -1839,7 +1839,7 @@ const ST_INFO = {
   slow: ["Đóng băng", '#5fb0ff', 0, "Ra tay chậm lại (tốc độ ×0,65); yêu vật biết bay sẽ rơi xuống."],
   melt: ["Phá giáp", '#d8a05a', 0, "Hộ giáp giảm một nửa, kháng toàn bộ -20; Cốt giáp, giáp bạc sẽ bị đánh vỡ."],
   burn: ["Thiêu đốt", '#ff7a3a', 0, "Mỗi lượt mất máu; yêu vật Hồi xuân đang cháy thì không hồi được máu, Kén tơ cháy là thủng."],
-  poison: ["Trúng độc", '#7fe05a', 0, "Mỗi lượt mất máu, kéo dài 3 lượt. Cửu Vĩ khi hồi máu (hảo cảm 10) sẽ tiện tay xóa."],
+  poison: ["Trúng độc", '#7fe05a', 0, "Mỗi lượt mất máu, mỗi tầng kéo dài 3 lượt, cộng dồn tối đa 5 tầng (Ngũ Độc Độc Hành nhiều hơn). Cửu Vĩ khi hồi máu (hảo cảm 10) sẽ tiện tay giải luôn."],
   curse: ["Nhiếp Hồn", '#c39cff', 0, "Sát thương gây ra giảm ba phần."],
   mark: ["Đoạt Mệnh Ấn", '#ff5a5a', 0, "Kẻ địch bị đánh dấu chịu sát thương cao hơn."],
   warcry: ["Phấn chấn", '#ffb066', 1, "Sát thương +40%, hộ giáp +50% (Sư Tử Hống, chính khí của Long đạo trưởng đều là cái này)."],
@@ -1870,7 +1870,7 @@ function unitSts(u) {
   if (u.enraged || (u.aff && u.aff.includes('enraged') && u.hp / u.maxHp < 0.5)) add('enraged');
   if (u.phShield && u.shield > 0) add('phsh'); if (u.rageB) add('rageB'); if (u.duo) add('duo');
   for (const k of ['frozen', 'slow', 'melt', 'burn', 'poison', 'curse', 'mark', 'warcry', 'kangG', 'liuDr', 'tieArm', 'shadow', 'smoke', 'butui', 'chan', 'renew']) {
-    const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, t > 0 && t < 99 ? t : ''); }
+    const v = u.st[k]; if (!v) continue; const t = typeof v === 'number' ? v : v && v.t; add(k, k === 'poison' && v.L && v.L.length > 1 ? `×${v.L.length}` : t > 0 && t < 99 ? t : ''); }   // 中毒显示层数
   if (u.shield > 0 && !u.cocoon && !u.silver) add('shield', fmtBig(Math.round(u.shield * uK(u))));
   if (u.kind === 'hero' && u.stacks) add('stacks', '×' + u.stacks);
   if (u.hufa) add('hufa'); if (u.callU) add('call');

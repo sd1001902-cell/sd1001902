@@ -1993,14 +1993,22 @@ function freezeU(u, out, label) {
   u.st.frozen = true; out.pops.push([u.id, label || "Choáng", 'cold', 1]); if (u.side === 'e') { const by = stActor(BNOW); u.frzA = !!(by && by.kind === 'ally'); stAdd(BNOW, by, 'ctrl', 1); }
   if (u.ghostForm) { u.ghostForm = false; out.pops.push([u.id, "Hiện hình", 'react']); out.lines.push(`${u.name} bị đánh choáng, quỷ thân hiện hình!`); }
 }
+// 持续伤害（2026-11-26 重做）：灼烧、中毒也吃你的伤害加成、打首领精英加成（不吃暴击）；中毒按层叠，灼烧单层但更狠
+let BURN_K = 4, POI_PCT = 5, POI_MAX = 5;   // 灼烧每回合 = 攻击 × 4；中毒每层 = 攻击 × 35% × 5；再乘伤害加成（模拟：千机持续伤害约 8%，五毒独行毒发跟着调）
+const dotMul = (src, tgt, el) => (1 + ((src.dmgPct || 0) + (el ? src.elem || 0 : 0)) / 100) * (tgt && (tgt.kind === 'boss' || tgt.kind === 'elite') ? 1 + (src.xBoss || 0) / 100 : 1);
+const burnD = (src, tgt) => src.atk * BURN_K * dotMul(src, tgt, 1) * (src.fx && src.fx.has('burn2') ? 2 : 1);
+const poiSync = ps => { ps.d = ps.L.reduce((a, l) => a + l.d, 0); ps.t = ps.L.reduce((a, l) => Math.max(a, l.t), 0); ps.n = ps.L.length; return ps; };
+const poiLeft = ps => ps.L ? ps.L.reduce((a, l) => a + l.d * l.t, 0) : ps.d * ps.t;   // 身上剩下的毒伤（毒发按这个结算）
 function applyPoison(src, tgt, pct, bonus) {
   const m = src.fx && src.fx.has('plague') ? 2.5 : 1;
   const swK = src.kind === 'hero' && src.lgv && src.lgv.shiwang != null && BNOW ? LGV.swPoi(src.lgv.shiwang) * emptySlots(BNOW, src) : 0;   // 尸王玉：尸位空着，毒更狠
-  const d = src.atk * pct / 100 * m * (1 + ((bonus || 0) + swK) / 100), old = tgt.st.poison;
-  const own = src.kind === 'minion' ? null : src;   // 五毒独行：毒可以叠，最多叠到单次的 DUXING_STACK 倍
-  const stack = own && own.fx && own.fx.has('duXing6') && old, nd = stack ? Math.min(d * (own.fx.has('baiguBelt') ? 8 : DUXING_STACK), old.d + d) : d, nt = 3 + stExt(own);
-  if (old && !stack && old.d > nd) { old.t = Math.max(old.t, nt); return; }   // 2026-11-25 弱的毒不再盖掉强的（原来毒尸咬一口，身上每回合 5000 的毒变成 107）：留强的，回合数刷新
-  tgt.st.poison = { d: nd, t: nt, by: stKey(src) || 'P' };
+  const d = src.atk * pct / 100 * POI_PCT * m * (1 + ((bonus || 0) + swK) / 100) * dotMul(src, tgt);
+  const own = src.kind === 'minion' ? (BNOW && BNOW.P) : src, ofx = (own && own.fx) || new Set();
+  const cap = ofx.has('duXing6') ? DUXING_STACK + (ofx.has('baiguBelt') ? 2 : 0) : POI_MAX, nt = 3 + stExt(src.kind === 'minion' ? null : src), by = stKey(src) || 'P';
+  let ps = tgt.st.poison; if (!ps || !ps.L) ps = tgt.st.poison = { L: ps ? [{ d: ps.d, t: ps.t, by: ps.by || 'P' }] : [] };
+  if (ps.L.length < cap) ps.L.push({ d, t: nt, by });
+  else { const w = ps.L.reduce((a, l) => l.d < a.d ? l : a); if (d > w.d) Object.assign(w, { d, t: nt, by }); else w.t = Math.max(w.t, nt); }   // 层满了：顶掉最弱的一层（弱的不盖强的，只刷新回合）
+  poiSync(ps);
 }
 const mageCap = P => SUST.mage.cap + (P.fx && P.fx.has('taijiOff') ? 20 : 0);
 const dariCap = u => u.fx && u.fx.has('dariBelt') ? 0.8 : DARI_CAP;
@@ -2012,7 +2020,7 @@ let YINBING_MUL = 1, YINBING_BIG = 0.5, YINBING_DR = 0.07, YINBING_SELF = 0.4, Y
 // 第二套幻境套装的数（调平衡只动这里）
 // 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
 let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
-let BUSI_HP = 0.04, BUSI_AOE = 5, WANFU_ST = 0.5, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.6, DUXING_DR = 0.13, DUXING_STACK = 8, DUXING_BURST = 3, QIANJI_MUL = 6, DARI_CAP = 0.5, DARI_DMG = 1.5, DARI_HIT = 2, DARI_REGEN = 0.12;
+let BUSI_HP = 0.04, BUSI_AOE = 5, WANFU_ST = 0.5, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.6, DUXING_DR = 0.13, DUXING_STACK = 8, DUXING_BURST = 0.25, QIANJI_MUL = 6, DARI_CAP = 0.5, DARI_DMG = 1.5, DARI_HIT = 2, DARI_REGEN = 0.12;
 const emptySlots = (b, P) => Math.max(0, Math.min(4, (P.minionCap || 3)) - zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length);
 const DART_SK = new Set(['venom', 'bingpo', 'fan']), BUSI_SK = new Set(['whirl', 'liedi']);
 // ---------------- 赶尸人的僵尸 ----------------
@@ -2147,6 +2155,15 @@ function battleStep(b) {
 function act(b, u, out) {
   for (const k of ['burn', 'poison']) {
     const d = u.st[k]; if (!d) continue;
+    if (d.L) {   // 中毒：每层各跳各的、各算各的回合
+      const keep = !(u.side === 'e' && b.P && b.P.fx.has('wWandu')); let dmg = 0;
+      for (const l of d.L) { const x = Math.max(1, Math.round(l.d)); dmg += x; if (u.side === 'e') stAddK(b, l.by || 'P', 'dmg', x); if (u.side === 'e' && (l.by || 'P') === 'P') hsDmg(b, "Sát thương duy trì", x); if (keep) l.t--; }
+      u.hp -= dmg; d.L = d.L.filter(l => l.t > 0);
+      out.pops.push([u.id, '-' + popN(u, dmg), k, 0, d.L.some(l => (l.by || 'P') === 'P') ? 'P' : 'Z']);
+      if (d.L.length) poiSync(d); else delete u.st[k];
+      if (u.hp <= 0 && u.kind === 'hero') heroSave(b, u, out);
+      if (u.hp <= 0) { out.lines.push(`${u.name} bị độc chết`); return; }
+      continue; }
     const dmg = Math.max(1, Math.round(d.d)); u.hp -= dmg; if (u.side === 'e') stAddK(b, d.by || 'P', 'dmg', Math.min(dmg, dmg + Math.min(0, u.hp)));
     if (u.side === 'e' && (d.by || 'P') === 'P') hsDmg(b, "Sát thương duy trì", Math.min(dmg, dmg + Math.min(0, u.hp))); else if (u === b.P) { const h = hsOf(b); h.raw += dmg; h.hp += dmg; }
     out.pops.push([u.id, '-' + popN(u, dmg), k, 0, (d.by || 'P') === 'P' ? 'P' : d.by === 'Z' || d.by === 'K' ? 'Z' : '']);
@@ -2315,8 +2332,8 @@ function ultimate(b, P, foes, out, autoCut) {
     case 'necro': {
       const solo = P.fx.has('duXing4');   // 五毒独行吃空尸位：不起尸，毒多结算一次
       const n = solo ? 0 : summonSkel(b, P, P.runes.summon || null, ULT.zomb); if (n) out.pops.push(['P', "Dậy xác", 'buff']);   // 尸位补满
-      const K = (ULT.duK + (solo ? 2 : 0)) * (P.fx.has('duXing6') ? DUXING_BURST : 1) * (P.fx.has('wWandu') ? 1 + P.wpK : 1);
-      foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(ps.d * ps.t * K), proc: 1, aoe: 1, raw: 1, ult: 1 }); } }); P.st.baigui = ULT.rmT; break; }   // duK＝结算几次
+      const K = (ULT.duK + (solo ? 2 : 0)) * (P.fx.has('wWandu') ? 1 + P.wpK : 1);   // 2026-11-26 中毒改成叠层、吃伤害加成以后，秘技毒发不再乘五毒独行 6 件的倍数
+      foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(poiLeft(ps) * K), proc: 1, aoe: 1, raw: 1, ult: 1 }); } }); P.st.baigui = ULT.rmT; break; }   // duK＝结算几次
     case 'assassin': { P.ki = Math.min(P.kiMax, (P.ki || 0) + (P.fx.has('qianJi4') ? 0 : ULT.ki)); if (!P.fx.has('qianJi4')) out.pops.push(['P', `Sát ý ${P.ki}`, 'buff']); out.pops.push(['P', `Sát ý ${P.ki}`, 'buff']);
       P.skills.forEach(k => { if (k.left > 0) k.left = Math.max(0, k.left - ULT.cdCut); });   // 所有招式冷却 -cdCut
       if (P.fx.has('qianJi4')) { foes.forEach(f => stSet(P, f, 'poison', out)); P.skills.forEach(k => { if (DART_SK.has(k.id)) k.left = 0; }); }   // 千机：全场上毒，暗器冷却清零
@@ -2550,7 +2567,7 @@ function castInner(b, P, sk, foes, out) {
     case 'warcry': P.st.warcry = 4; out.pops.push(['P', "Chiến hống", 'buff']); if (P.fx.has('cWarcry')) b.units.filter(u => (u.kind === 'ally' || u.kind === 'minion') && u.hp > 0).forEach(u => { u.st.warcry = 4; out.pops.push([u.id, "Chiến hống", 'buff']); }); if (R === 'a') foes.forEach(f => { f.st.curse = 4; out.pops.push([f.id, "Chấn Nhiếp", 'curse', 1]); }); break;
     case 'bloodlust': { const mm = 1.8 * m * (R === 'a' && t.hp / t.maxHp < 0.4 ? 2 : 1); const d = hit(b, P, t, mm, 'phys', out); if (d) heal(P, d * (R === 'b' ? 1 : 0.5) * (P.fx.has('bloodPlus') ? 2 : 1), out); break; }
     case 'fireball': {
-      const ign = f => { if (f.hp > 0 && P.fx.has('ignite')) { f.st.burn = { d: P.atk * 0.5 * (1 + P.elem / 100), t: 3 + stExt(P) }; out.pops.push([f.id, "Bốc cháy", 'fire', 1]); } };
+      const ign = f => { if (f.hp > 0 && P.fx.has('ignite')) stSet(P, f, 'burn', out); };
       if (R === 'a') RNG.shuffle(foes).slice(0, 3).forEach(f => { if (hit(b, P, f, 0.8 * m, 'fire', out, { aoe: 1 })) ign(f); });
       else { const d = hit(b, P, t, 1.8 * m, 'fire', out); if (d) { ign(t); if (R === 'b') foes.filter(f => f !== t).forEach(f => hit(b, P, f, m, 'fire', out, { proc: 1 })); } }
       break;
@@ -2633,7 +2650,7 @@ function castGen(b, P, sk, foes, out, m) {
   const t = foes[0], el = WX_ELEM[b.castWx] || 'phys', aoe = ['aoe', 'aoeburn', 'dotall', 'healaoe'].includes(sk.k);
   out.cast = { id: 'gen', sk: sk.id, elem: el, wx: b.castWx, aoe, target: t && t.id };
   const stun = f => { if (sk.stun && f.hp > 0 && RNG.ch(sk.stun)) freezeU(f, out, "Choáng"); };
-  const burn = f => { if (f.hp > 0) { f.st.burn = { d: P.atk * 0.45 * (1 + (P.elem || 0) / 100), t: 3 + stExt(P) }; out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); } };
+  const burn = f => { if (f.hp > 0) stSet(P, f, 'burn', out); };
   const FX = P.fx, R = P.runes[sk.id] || null;
   if (sk.id === 'lieyan' && FX.has('lieyanAll')) { foes.forEach(f => { if (hit(b, P, f, sk.m * m * 0.8, el, out, { aoe: 1 })) stSet(P, f, 'burn', out); }); out.cast.aoe = true; return; }
   if (sk.id === 'fuhu' && FX.has('fuhu2')) { if (hit(b, P, t, sk.m * m, el, out)) { stSet(P, t, 'armor', out); if (RNG.ch(0.3)) stSet(P, t, 'stun', out); if (t.hp > 0) setWeak(t, R === 'b' ? 3 : 2, R === 'b' ? 0.3 : 0.15, out); } return; }
@@ -2670,7 +2687,7 @@ function castGen(b, P, sk, foes, out, m) {
     case 'aoe': { let nh = 0; foes.forEach(f => { if (hit(b, P, f, sk.m * m, el, out, { aoe: 1 })) { nh++; stun(f); if (sk.id === 'liedi' && R === 'b') setWeak(f, 2, 0.2, out); if (sk.id === 'shidu' && R === 'a') stSet(P, f, 'armor', out); } });
       if (sk.id === 'tudun' && R === 'b') heal(P, P.maxHp * 0.15 * (1 + (P.healPct || 0) / 100), out);
       if (sk.id === 'liedi' && FX.has('buSi4') && nh) heal(P, P.maxHp * 0.03 * nh, out);
-      if ((sk.id === 'shidu' || sk.id === 'tudun') && FX.has('duXing6')) foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(ps.d * ps.t * DUXING_BURST * (FX.has('wWandu') ? 1 + P.wpK : 1)), proc: 1, aoe: 1, raw: 1 }); } }); }
+      if ((sk.id === 'shidu' || sk.id === 'tudun') && FX.has('duXing6')) foes.forEach(f => { const ps = f.st.poison; if (f.hp > 0 && ps) { out.pops.push([f.id, "Độc phát", 'poison']); hit(b, P, f, 0, 'poison', out, { flat: Math.round(poiLeft(ps) * DUXING_BURST * (FX.has('wWandu') ? 1 + P.wpK : 1)), proc: 1, aoe: 1, raw: 1 }); } }); }
       if (sk.heal === 'minion') aliveOf(b, 'p').filter(u => u.kind === 'minion').forEach(u => heal(u, u.maxHp * 0.3, out));
       if (sk.shield) { P.shield = Math.max(P.shield || 0, Math.round(P.maxHp * sk.shield * (FX.has('budong2') ? 2 : 1))); out.pops.push(['P', "Hộ Thể", 'buff']); }
       break;
@@ -2692,7 +2709,7 @@ function stClear(f, s) { for (const k of s === 'any' ? ['burn', 'slow', 'melt', 
 function stSet(src, f, s, out) {
   if (f.hp <= 0) return;
   if (s === 'burn' && f.cocoon && f.shield > 0) { f.shield = 0; f.cocoon = false; out.pops.push([f.id, "Kén tơ cháy thủng", 'react']); out.lines.push(`Kén tơ của ${f.name} bắt lửa rồi!`); }
-  if (s === 'burn') { const nd = dotIn(BNOW, src, f, src.atk * 0.45 * (1 + (src.elem || 0) / 100) * (src.fx && src.fx.has('burn2') ? 2 : 1)), nt = 3 + stExt(src), ob = f.st.burn;
+  if (s === 'burn') { const nd = f.side === 'p' ? dotIn(BNOW, src, f, src.atk * 0.45 * (1 + (src.elem || 0) / 100)) : burnD(src, f), nt = 3 + stExt(src), ob = f.st.burn;
     if (ob && ob.d > nd) ob.t = Math.max(ob.t, nt); else f.st.burn = { d: nd, t: nt, by: stKey(src) || 'P' };   // 灼烧同毒：弱的不盖强的
     out.pops.push([f.id, "Thiêu đốt", 'fire', 1]); }
   else if (s === 'chill') { if (!f.st.slow) stAdd(BNOW, stKey(src) ? src : stActor(BNOW), 'ctrl', 1); f.st.slow = 3 + stExt(src); out.pops.push([f.id, "Đóng băng", 'cold', 1]); if (f.lavaShell && f.shield > 0) { f.shield = 0; f.lavaShell = false; out.pops.push([f.id, "Vỏ nứt", 'react']); out.lines.push(`Lớp vỏ dung nham của ${f.name} bị đông nứt!`); } }

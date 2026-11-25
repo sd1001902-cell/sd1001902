@@ -196,7 +196,7 @@ const LEGENDS = [
   { id: 'zhenxiexia', n: "Hộp Bùa Trấn Tà", slot: 'offhand', cls: 'mage',      ch: 9, x: 1, imp: { elem: 12 },   fx: 'zhenxieOff',  d: "Kẻ địch mỗi có một loại trạng thái thì sát thương nó gây lên bạn -8%" },
   { id: 'ganshisuo',  n: "Dây Cản Thi",   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'ganshiBelt',  d: "Cương thi ngã 3 lượt sau tự bò dậy (mỗi thi vị mỗi trận một lần)" },
   { id: 'shehunling', n: "Chuông Nhiếp Hồn",   slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { minionPct: 15 }, fx: 'shehunOff', d: "Sau Rung Chuông · Tập Hỏa, cương thi có 30% tỉ lệ mỗi con ra tay thêm một lần" },
-  { id: 'baigunang',  n: "Túi Bách Cổ",   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baiguBelt',   d: "Giới hạn cộng dồn trúng độc từ 5 tầng lên 8 tầng (cần Ngũ Độc Độc Hành 6 món)" },
+  { id: 'baigunang',  n: "Túi Bách Cổ",   slot: 'belt',    cls: 'necro',     ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'baiguBelt',   d: "Giới hạn tầng trúng độc +2 nữa (cần Ngũ Độc Độc Hành 6 món: 8 tầng → 10 tầng)" },
   { id: 'caoren',     n: "Hình Nhân Thế Mạng", slot: 'offhand', cls: 'necro',     ch: 9, x: 1, imp: { elem: 12 },   fx: 'caorenOff',   d: "Mỗi trận một lần: đòn chí tử do hình nhân chịu thay, bạn còn 25% khí huyết, và mọi kẻ địch trúng độc" },
   { id: 'cangfengdai', n: "Tàng Phong Đai",  slot: 'belt',    cls: 'assassin',  ch: 9, x: 1, imp: { hpPct: 8 },   fx: 'cangfengBelt', d: "Vào trận có sẵn 3 điểm Sát ý; đòn kết liễu không bị né, không đánh hụt" },
   { id: 'wuyingnang', n: "Túi Vô Ảnh",   slot: 'offhand', cls: 'assassin',  ch: 9, x: 1, imp: { spd: 6 },     fx: 'wuyingOff',   d: "Né được một đòn thì hồi 4% khí huyết tối đa, chiêu đang hồi lâu nhất hồi chiêu -1" },
@@ -609,11 +609,11 @@ const COMPANIONS = {
 
 // ---------------- 状态配合 ----------------
 // 起手技能给敌人挂状态（ap），收招技能打带状态的敌人有额外效果（pay）
-const STATES = { burn: { n: "Thiêu đốt", c: '#ff6a2a', d: "Mỗi lượt mất máu; yêu vật hồi xuân đang cháy thì không hồi máu được" },
+const STATES = { burn: { n: "Thiêu đốt", c: '#ff6a2a', d: "Mỗi lượt mất một mảng máu lớn (chỉ một tầng, giữ cái mạnh); yêu vật hồi xuân đang cháy thì không hồi máu được" },
   chill: { n: "Đóng băng", c: '#5fb0ff', d: "Ra đòn chậm lại; yêu vật biết bay sẽ rơi xuống" },
   armor: { n: "Phá giáp", c: '#d8a05a', d: "Hộ giáp giảm nửa, kháng -20; cốt giáp vỡ ngay" },
   stun: { n: "Choáng", c: '#f1d34e', d: "Bỏ qua lần ra đòn kế tiếp" },
-  poison: { n: "Trúng độc", c: '#7fe05a', d: "Mỗi lượt mất máu, kéo dài 3 lượt" } };
+  poison: { n: "Trúng độc", c: '#7fe05a', d: "Mỗi lượt mất máu, có thể cộng dồn tầng (tối đa 5 tầng, mỗi tầng 3 lượt)" } };
 const SKILL_COMBO = {
   liedi: { ap: 'armor' }, lieyan: { ap: 'burn' }, warcry: { ap: 'stun', apc: 0.3 }, hanren: { ap: 'chill', pay: { s: 'stun', x: 'crit', n: "Đoạn Cốt" } },
   bloodlust: { pay: { s: 'burn', x: 'dmg', v: 1.8, n: "Ẩm Hỏa" } }, whirl: { pay: { s: 'armor', x: 'dmg', v: 1.7, n: "Phá Quân" } }, bawang: { pay: { s: 'armor', x: 'crit', n: "Giải Giáp" } },
