@@ -736,8 +736,12 @@ function towerBody(cls) {
       <p class="twrew"><small>Chủ tháp tầng ${nx}</small>${(T.wr[cls] || 0) >= nx ? "Thưởng tuần này đã nhận" : `Hồn tinh ${TW_REW.mats * nx / 10} · Bạc ${fmtBig(TW_REW.gold * nx / 10)} · một viên ngọc`}${(T.ms[cls] || 0) >= nx ? '' : ` · <b class="jyc">Lần đầu: Huyền Tinh ${TW_REW.jyx * nx / 10}</b>`}</p>
       <p class="sub twnote">Vào tháp ai cũng như nhau, không mang đồ luyện của mình · thứ Hai đổi tháp</p>
     </div>
-    <div class="gostart">${S.pend ? `<button class="btn big" data-act="twpend">Chọn thưởng tầng ${f - 1} trước</button>` : `<button class="btn big" data-act="twgo">Khiêu chiến tầng ${f}</button>`}</div>`;
+    <div class="gostart">${f > 1 ? `<button class="btn sm ghost twrs" data-act="twreset">Leo lại từ tầng 1</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">Chọn thưởng tầng ${f - 1} trước</button>` : `<button class="btn big" data-act="twgo">Khiêu chiến tầng ${f}</button>`}</div>`;
 }
+const twResetModal = () => () => { const cls = SAVE.cls, S = twState(cls), T = twSave(), wr = T.wr[cls] || 0;
+  return `<h2 class="mh">Leo lại từ tầng 1?</h2><p class="help-p">Hiện ở tầng ${S.fl}. Leo lại thì đồ tháp, chiêu, hồn thần binh, linh ngọc đều về bộ lúc đầu, leo lại từ tầng 1, chọn một trong ba có thể đổi lối khác.</p>
+  <p class="help-p">Cao nhất tuần ${S.best} tầng và kỷ lục đều giữ nguyên. Thưởng chỉ lấy mức cao nhất: ${wr ? `tuần này đã nhận tới chủ tháp tầng ${wr}, leo lại thì chủ tháp từ tầng ${wr} trở xuống không cho thưởng nữa, hạ được tầng cao hơn mới cho` : "tuần này chưa nhận thưởng chủ tháp, hạ chủ tháp vẫn cho như thường"}; Cửu U Huyền Tinh lần đầu mỗi tầng cũng chỉ cho một lần.</p>
+  <div class="sheet-act"><button class="btn" data-act="twreset2">Leo lại</button><button class="btn ghost" data-act="close">Thôi</button></div>`; };
 const twPendModal = () => () => { const cls = SAVE.cls, S = twState(cls); return `<h2 class="mh">Tầng ${S.fl - 1} · chọn một thứ mang lên tầng</h2><div class="twpicks">${twPicksHTML(cls)}</div>`; };
 function twGo() {
   if (SAVE.run) return toast("Hãy kết thúc chuyến phiêu lưu đang dở trước đã");
@@ -855,7 +859,7 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
 const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp.</p>
   <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí tuyệt kỹ giữ qua từng tầng.</p>
   <p class="help-p">Qua mỗi tầng chọn một trong ba để mạnh lên: tầng thường lấy một món đồ tháp (bộ, thần binh, đều là Thái Cổ +10, dòng tối đa, khảm sẵn ngọc) hoặc một chiêu, một biến chiêu (tối đa năm chiêu, đủ rồi vẫn còn ra chiêu mới, chọn nó thì phải bỏ một chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp). Không muốn món nào thì chọn «Không lấy», đổi lấy sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL}%, cộng dồn mãi.</p>
-  <p class="help-p">Mỗi lần hạ chủ tháp là lưu một lần. Ngã thì về tầng đã lưu, đồ tháp cũng về bộ lúc lưu. Thứ Hai hằng tuần đổi tháp mới, leo lại từ tầng một; cùng tuần, cùng nghề thì yêu vật và lựa chọn ai cũng giống nhau.</p>
+  <p class="help-p">Mỗi lần hạ chủ tháp là lưu một lần. Ngã thì về tầng đã lưu, đồ tháp cũng về bộ lúc lưu. Muốn đổi lối thì có thể «Leo lại từ tầng 1», thưởng chỉ lấy mức cao nhất. Thứ Hai hằng tuần đổi tháp mới, leo lại từ tầng một; cùng tuần, cùng nghề thì yêu vật và lựa chọn ai cũng giống nhau.</p>
   <p class="help-p">Thưởng: mỗi chủ tháp hạ được, lần đầu trong tuần nhận hồn tinh, bạc và một viên ngọc; mỗi nghề lần đầu hạ một chủ tháp còn được Cửu U Huyền Tinh. Kỷ lục cao nhất được giữ mãi.</p></div>`;
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
@@ -3914,6 +3918,8 @@ const ACT = {
   twsel: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, f = twState(cls).fl; const k = i === 'x' ? 'x' : +i; TWSEL = TWSEL && TWSEL.f === f && TWSEL.i === k ? null : { f, i: k };
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
   twswap: id => { if (!TWSEL) return; TWSEL.sw = TWSEL.sw === id ? null : id; if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
+  twreset: () => { if (SAVE.run) return toast("Hãy kết thúc chuyến phiêu lưu đang dở trước đã"); openModal(twResetModal()); },
+  twreset2: () => { twReset(SAVE.cls); TWSEL = null; save(); closeModal(); refresh(); toast("Về tầng 1, đồ tháp về bộ lúc đầu"); },
   twcls: () => openModal(twClsModal()),
   twpend: () => openModal(twPendModal()),
   twkit: () => openModal(twKitModal()),

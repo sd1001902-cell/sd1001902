@@ -1540,6 +1540,8 @@ function twSave() {
   return T;
 }
 function twState(cls) { const T = twSave(); return T.c[cls] || (T.c[cls] = twNew(cls)); }
+function twReset(cls) {   // 从第 1 层重来：塔装、招式、灵玉回到开局，本周最高、奖励记录都留着（奖励只给比已领更高的塔主）
+  const T = twSave(), o = twState(cls), n = twNew(cls); n.best = o.best; T.c[cls] = n; return n; }
 function twNew(cls) { const kit = twStartKit(cls); return { fl: 1, ck: 0, best: 0, kit, ckKit: twClone(kit), pend: null }; }
 const twSets = cls => BUILDS[cls].map(B => B.set);
 function twItem(cls, slot, rarity, extra) {   // 一件塔装：宝品照常；套装、神兵一律太古 +10、词条满值；孔开满、镶通灵玉
@@ -1554,7 +1556,7 @@ function twStartKit(cls) {
   const T = twSave();
   return twWith(twHash(T.wk, cls, 'start'), () => {
     const eq = {}; for (const sl of POS_IDS) { const it = twItem(cls, sl, 'rare'); it.slot = sl === 'ring2' ? 'ring' : it.slot; eq[sl] = it; }
-    const sk = TW.start[cls] || CLASSES[cls].skills.filter(k => k.cd).sort((a, b) => a.lv - b.lv).slice(0, TW.nStart).map(k => k.id);
+    const sk = (TW.start[cls] || []).slice(); if (!sk.length) sk.push(...CLASSES[cls].skills.filter(k => k.cd).sort((a, b) => a.lv - b.lv).slice(0, TW.nStart).map(k => k.id));
     return { eq, sk, rn: {}, cube: [], lg: [], rage: 25 };
   });
 }

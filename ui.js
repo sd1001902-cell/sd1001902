@@ -735,8 +735,12 @@ function towerBody(cls) {
       <p class="twrew"><small>第 ${nx} 层塔主</small>${(T.wr[cls] || 0) >= nx ? '本周奖励已领' : `魂晶 ${TW_REW.mats * nx / 10} · 银两 ${fmtBig(TW_REW.gold * nx / 10)} · 玉一颗`}${(T.ms[cls] || 0) >= nx ? '' : ` · <b class="jyc">首通玄晶 ${TW_REW.jyx * nx / 10}</b>`}</p>
       <p class="sub twnote">进塔人人一样，不带自己的养成 · 每周一换塔</p>
     </div>
-    <div class="gostart">${S.pend ? `<button class="btn big" data-act="twpend">先选第 ${f - 1} 层的奖励</button>` : `<button class="btn big" data-act="twgo">挑战第 ${f} 层</button>`}</div>`;
+    <div class="gostart">${f > 1 ? `<button class="btn sm ghost twrs" data-act="twreset">从第 1 层重来</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">先选第 ${f - 1} 层的奖励</button>` : `<button class="btn big" data-act="twgo">挑战第 ${f} 层</button>`}</div>`;
 }
+const twResetModal = () => () => { const cls = SAVE.cls, S = twState(cls), T = twSave(), wr = T.wr[cls] || 0;
+  return `<h2 class="mh">从第 1 层重来？</h2><p class="help-p">现在第 ${S.fl} 层。重来后塔装、招式、神兵之魂、灵玉都回到开局那身，从第 1 层重新爬，三选一可以换个路子选。</p>
+  <p class="help-p">本周最高 ${S.best} 层、历史最高都留着。奖励只拿最高的：${wr ? `这周已经领到第 ${wr} 层塔主，重爬时 ${wr} 层以下的塔主不再给奖励，打过更高的才给` : '这周还没领过塔主奖励，打过塔主照常给'}；首通玄晶每层也只给一次。</p>
+  <div class="sheet-act"><button class="btn" data-act="twreset2">重来</button><button class="btn ghost" data-act="close">算了</button></div>`; };
 const twPendModal = () => () => { const cls = SAVE.cls, S = twState(cls); return `<h2 class="mh">第 ${S.fl - 1} 层 · 选一样带上楼</h2><div class="twpicks">${twPicksHTML(cls)}</div>`; };
 function twGo() {
   if (SAVE.run) return toast('先把进行中的冒险结束了再来');
@@ -854,7 +858,7 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
 const twHelpModal = () => () => `<h2 class="mh">通天塔</h2><div class="help-scroll"><p class="help-p">一层一场仗，打完直接上楼。普通层是一群妖物（第 3 层起带精英），逢 5 层是精英首领带两个护法，逢 10 层是塔主。</p>
   <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，必杀的怒气一层层留着。</p>
   <p class="help-p">每过一层三选一往上长：普通层拿一件塔装（套装、神兵，都是太古 +10、词条满值、孔里镶好玉）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
-  <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
+  <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。想换个路子，可以「从第 1 层重来」，奖励只拿最高的。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
   <p class="help-p">奖励：每打过一个塔主，这周第一次领魂晶、银两和一颗玉；每个职业第一次打过某一层塔主，再给九幽玄晶。历史最高层永远记着。</p></div>`;
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
@@ -3913,6 +3917,8 @@ const ACT = {
   twsel: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, f = twState(cls).fl; const k = i === 'x' ? 'x' : +i; TWSEL = TWSEL && TWSEL.f === f && TWSEL.i === k ? null : { f, i: k };
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
   twswap: id => { if (!TWSEL) return; TWSEL.sw = TWSEL.sw === id ? null : id; if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
+  twreset: () => { if (SAVE.run) return toast('先把进行中的冒险结束了再来'); openModal(twResetModal()); },
+  twreset2: () => { twReset(SAVE.cls); TWSEL = null; save(); closeModal(); refresh(); toast('回到第 1 层，塔装回到开局'); },
   twcls: () => openModal(twClsModal()),
   twpend: () => openModal(twPendModal()),
   twkit: () => openModal(twKitModal()),
