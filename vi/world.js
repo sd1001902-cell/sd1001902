@@ -1695,7 +1695,8 @@ function twEnd(cls, b) {
       const R = twRewOf(f); T.wr[cls] = T.wr[cls] || 0; T.ms[cls] = T.ms[cls] || 0;
       if (f > T.wr[cls]) { T.wr[cls] = f; const gk = gemKey(RNG.pick(['ruby', 'sapphire', 'topaz', 'emerald', 'amethyst', 'diamond']), Math.min(gemCap(), R.tier));
         SAVE.mats += R.m; SAVE.gold += R.g; addGem(gk); res.rew.push({ t: 'wk', m: R.m, g: R.g, gem: gk }); }
-      if (f > T.ms[cls]) { T.ms[cls] = f; if (R.x) { SAVE.jyx = (SAVE.jyx || 0) + R.x; res.rew.push({ t: 'first', x: R.x }); } }
+      if (f > T.ms[cls]) { T.ms[cls] = f; if (R.x) { if (shelved('jy')) { const m = R.x * 100; SAVE.mats += m; res.rew.push({ t: 'first', m }); }   // 九幽封存：首通的玄晶改给魂晶（1 颗折 100）
+        else { SAVE.jyx = (SAVE.jyx || 0) + R.x; res.rew.push({ t: 'first', x: R.x }); } } }
     }
   } else { S.kit = twClone(S.ckKit); S.fl = S.ck + 1; S.pend = null; S.ckWait = false; res.back = S.fl; }
   return res;

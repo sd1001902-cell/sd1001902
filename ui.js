@@ -994,7 +994,7 @@ function gearTab() {
 }
 const boxModal = () => `${boxBody(SAVE.cls)}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">好了</button></div>`;
 const cubeBagModal = () => `<h2 class="mh">乾坤袋</h2>${cubeBody(SAVE.cls)}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">好了</button></div>`;
-const kitsModal = () => `<h2 class="mh">配装</h2><p class="help-p">把现在这一身存成一套：装备、乾坤袋、招式和变招、灵玉、役使、心法点。以后点一下整套换上。强化和玉记在部位上，换哪套都在。</p>${kitRow(SAVE.cls)}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">好了</button></div>`;
+const kitsModal = () => `<h2 class="mh">配装</h2><p class="help-p">把现在这一身存成一套：装备、乾坤袋、招式和变招、灵玉、役使、心法点。以后点一下整套换上。强化和孔记在部位上，换哪套都在；每套镶什么玉各记各的。</p>${kitRow(SAVE.cls)}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">好了</button></div>`;
 // 背包页：装备、玉石。五个门派共用这一个背包
 let BAGV = 'eq';
 function bagTab() {
@@ -4628,7 +4628,7 @@ if (SAVE.story.ended && seen('postg') && seen('npcsvc') && !seen('boxnote')) { m
 if (SAVE.story.ended && seen('postg') && !seen('npcsvc')) { markSeen('npcsvc'); if (!SAVE.gearNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle') openModal(svcNoteModal); }, 1400); }
 // 减法改版（2026-11-26）：老存档第一次打开，说一遍改了什么、这份存档动了哪里
 const slimNoteModal = () => { const N = SAVE.slimNote || {};
-  return `<h2 class="mh">这一版做了减法</h2>
+  return `<h2 class="mh">这一版做了减法</h2><div class="slimbox">
     <p class="help-p">东西太多、变强的地方太多，这一版收了一收。<b>变强只剩四条线：装备、流派、灵玉、修为。</b></p>
     <ul class="help slimn">
       <li><b>强化、孔、玉记在部位上</b>：换装备不掉，传承取消了。</li>
@@ -4637,7 +4637,7 @@ const slimNoteModal = () => { const N = SAVE.slimNote || {};
       <li><b>先收起来、以后再开</b>：阵法、镇妖录、九幽、加难度。役使还在，在出征页。</li>
       <li><b>心法、修为默认自动加点</b>，想自己点可以在修炼页关掉。</li>
     </ul>
-    <p class="help-p"><b>你的存档</b>：已经开的功能都还在${N.jy ? `；${N.jy} 件九幽装备先当太古用，词条留着，九幽重开时原样变回来，玄晶也给你存着` : ''}${N.mats || N.gold ? `；背包里装备上的强化和孔退成了 <b>${fmtBig(N.mats || 0)}</b> 魂晶、<b>${fmtBig(N.gold || 0)}</b> 两` : ''}${N.gems ? `，${N.gems} 颗玉放回了玉石包` : ''}；幻境纪录和排行榜重新记（老纪录在「江湖录 → 纪录」里还看得到）。</p>
+    <p class="help-p"><b>你的存档</b>：已经开的功能都还在${N.jy ? `；${N.jy} 件九幽装备先当太古用，词条留着，九幽重开时原样变回来，玄晶也给你存着` : ''}${N.mats || N.gold ? `；背包里装备上的强化和孔退成了 <b>${fmtBig(N.mats || 0)}</b> 魂晶、<b>${fmtBig(N.gold || 0)}</b> 两` : ''}${N.gems ? `，${N.gems} 颗玉放回了玉石包` : ''}；幻境纪录和排行榜重新记（老纪录在「江湖录 → 纪录」里还看得到）。</p></div>
     <div class="row" style="justify-content:center"><button class="btn" data-act="slimok">知道了</button></div>`; };
 if (SAVE.slimNote) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && SAVE.slimNote) openModal(slimNoteModal); }, 1200);
 if (SAVE.gearNote) { delete SAVE.gearNote; persist(); setTimeout(() => openModal(() => `<h2 class="mh">装备词条改了规矩</h2>

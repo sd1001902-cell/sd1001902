@@ -187,7 +187,7 @@ const BUILDINGS = [
   { id: 'smith', n: "Lò Rèn Trương Đại Chùy", ch: 0, max: 5, gold: 600, mats: 15, npc: 'smith',
     d: lv => `Giới hạn cường hóa +${5 + lv}, tỉ lệ cường hóa thành công +${lv * 3}%` },
   { id: 'warehouse', n: "Nhà kho", ch: 0, max: 4, gold: 400, mats: 5,
-    d: lv => `Sức chứa kho ${120 + lv * 40} ô` },
+    d: lv => `Sức chứa túi đồ ${120 + lv * 40} ô` },
   { id: 'merchant', n: "Tiền Trang Tiền Đa Đa", ch: 1, max: 4, gold: 700, mats: 8, npc: 'merchant',
     d: lv => `Người bán rong dưới đất bán thêm ${lv} món, đổ thạch rẻ hơn ${lv * 8}%, giá bán +${lv * 10}%` },
   { id: 'barracks', n: "Tiêu Cục Lôi Lão Hổ", ch: 2, max: 3, gold: 800, mats: 12, npc: 'biaotou',
@@ -212,7 +212,7 @@ const BOUNTY_POOL = [
   { id: 'event', t: n => `Hoàn thành ${n} kỳ ngộ`, n: [3, 6], ev: 'event' },
   { id: 'boss',  t: n => `Đánh bại ${n} thủ lĩnh`, n: [2, 4], ev: 'boss' },
   { id: 'room',  t: n => `Khám phá ${n} phòng`, n: [40, 80], ev: 'room' },
-  { id: 'forge', t: n => `Cường hóa ở Lò Rèn ${n} lần`, n: [2, 4], ev: 'forge' },
+  { id: 'forge', t: n => `Cường hóa ${n} lần`, n: [2, 4], ev: 'forge' },
 ];
 
 const BESTIARY_TIERS = [50, 200, 1000];
