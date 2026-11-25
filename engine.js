@@ -117,6 +117,9 @@ function slimMigrate(s) {
   { const ended = !!(s.story && s.story.ended), rp = s.path === 'rift', top = s.riftMax || 0, cl = (s.story && s.story.cleared && s.story.cleared.normal) || 0; s.unl = s.unl || {};
     for (const k of ['enhance', 'sockets', 'gems', 'bounty', 'reroll', 'cube', 'anc', 'lgem', 'para', 'runes'])
       if ((rp && RIFT_UNLOCK_OLD[k] != null && top >= RIFT_UNLOCK_OLD[k]) || (POSTGAME.has(k) ? ended : (FEATURE_CH[k] != null && cl >= FEATURE_CH[k]))) s.unl[k] = 1; }
+  // 「幻境之路」的提示：老存档已经开着的功能，不再来人说一遍
+  { const m = { 3: 'enhance', 7: 'runes', 8: 'sockets', 10: 'bounty', 15: 'reroll', 20: 'cube', 25: 'anc', 30: 'lgem', 40: 'para' }; s.flags = s.flags || {};
+    for (const lv in m) if (s.unl[m[lv]] || (s.riftMax || 0) >= +lv) s.flags['rp' + lv] = 1; }
   // 九幽封存：九幽装备先当太古用（词条留着），九幽词条存在 jy0 里，重开时原样回来；玄晶数量不动，只是不显示
   if (shelved('jy')) walkItems(s, it => { if (it.anc === 3) { it.anc = 2; it.j9 = 1; if (it.jy) { it.jy0 = it.jy; delete it.jy; } note.jy++; } });
   if (shelved('mods')) { s.mods = []; if (s.run && Array.isArray(s.run.mods)) s.run.mods = []; }
@@ -600,6 +603,33 @@ function paraFree() { let n = 0; for (const k in SAVE.para.pts) n += SAVE.para.p
 function paraCanAdd(k) { const P = PARAGON_STATS.find(x => x.k === k); const cur = SAVE.para.pts[k] || 0; return paraFree() > 0 && (!P.cap || (cur + 1) * P.v <= P.cap); }
 function addPara(k, n = 1) { let done = 0; while (done < n && paraCanAdd(k)) { SAVE.para.pts[k] = (SAVE.para.pts[k] || 0) + 1; done++; } return done; }
 function resetPara() { SAVE.para.pts = {}; }
+// ---------------- 自动加点（2026-11-26 减法改版）----------------
+// 心法、修为默认自动加：只分配还没用掉的点，已经点的不动；在修炼页随时能关掉自己点。
+// 心法：先把本门那一路点满，再杀伐、内功哪边少点哪边。修为：先根基（攻击、气血、护甲轮着来，各 50 点封顶），再按 伤害 3：气血 2：暴击、暴伤、速度、全抗、护甲各 1 轮着加，到顶的跳过
+const autoTalOn = () => !!SAVE && SAVE.autoTal !== false, autoParaOn = () => !!SAVE && SAVE.autoPara !== false;
+function autoTalent(cls) {
+  if (!autoTalOn()) return 0; let n = 0;
+  const first = br => { const Bq = talentBranches(cls).find(b => b.id === br); if (!Bq) return -1; for (let i = 0; i < Bq.t.length; i++) if (canLearn(cls, br, i)) return i; return -1; };
+  for (let g = 0; g < 200 && talentInfo(cls).free > 0; g++) {
+    let br = 'class', i = first(br);
+    if (i < 0) { const rest = talentBranches(cls).map(b => b.id).filter(b => b !== 'class' && first(b) >= 0).sort((a, b) => branchSpent(cls, a) - branchSpent(cls, b) || (a === 'slay' ? -1 : 1)); if (!rest.length) break; br = rest[0]; i = first(br); }
+    if (!learnTalent(cls, br, i)) break; n++;
+  }
+  return n;
+}
+const PARA_AUTO = ['dmgPct', 'hpPct', 'crit', 'dmgPct', 'spd', 'res', 'dmgPct', 'hpPct', 'critDmg', 'armorPct'];
+function autoPara() {
+  if (!autoParaOn() || !featureOn('para')) return 0; let n = 0, k = 0;
+  const roots = ['pAtk', 'pHp', 'pArmor'];
+  for (let g = 0; g < 100000 && paraFree() > 0; g++) {
+    const r = roots.filter(paraCanAdd).sort((a, b) => (SAVE.para.pts[a] || 0) - (SAVE.para.pts[b] || 0))[0];
+    if (r) { addPara(r, 1); n++; continue; }
+    let done = false; for (let t = 0; t < PARA_AUTO.length && !done; t++) { const key = PARA_AUTO[(k + t) % PARA_AUTO.length]; if (paraCanAdd(key)) { addPara(key, 1); n++; k = (k + t + 1) % PARA_AUTO.length; done = true; } }
+    if (!done) break;
+  }
+  return n;
+}
+function autoAllot() { let n = 0; try { for (const c of CLASS_IDS) n += autoTalent(c); n += autoPara(); } catch (e) {} return n; }
 
 // ---------------- 镇妖录与役使 ----------------
 function zyEntries(i) { const C = CHAPTERS[i], out = [], seen = new Set();
@@ -819,6 +849,7 @@ function gainXp(cls, x) {
     SAVE.para.xp += x;
     while (SAVE.para.xp >= paraNeed(SAVE.para.lv)) { SAVE.para.xp -= paraNeed(SAVE.para.lv); SAVE.para.lv++; pups++; }
   }
+  if (ups) autoTalent(cls); if (pups) autoPara();
   return ups + pups;
 }
 
@@ -1186,7 +1217,7 @@ const wpnIlvl = () => Math.max(30, Math.min(70, riftD(Math.max(WPN_LV, SAVE.rift
 function forgeWeapon(cls, lid) {
   const L = LEGENDS.find(l => l.id === lid && l.w && l.cls === cls); if (!L) return { err: '打不了这把' };
   if ((SAVE.bp || 0) < WPN_COST) return { err: '兵魄不够' };
-  if (SAVE.stash.length >= stashMax()) return { err: '储物箱满了，先清一清' };
+  if (SAVE.stash.length >= stashMax()) return { err: '背包满了，先清一清' };
   SAVE.bp -= WPN_COST; SAVE.flags.wpnForged = 1; const it = storeItem(null, makeItem({ ilvl: wpnIlvl(), rarity: 'legend', cls, legendId: lid })); return { ok: true, it };
 }
 // 专属兵器每强化 +1，特效再涨 WPN_UP

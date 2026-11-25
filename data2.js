@@ -187,7 +187,7 @@ const BUILDINGS = [
   { id: 'smith', n: '张大锤铸剑坊', ch: 0, max: 5, gold: 600, mats: 15, npc: 'smith',
     d: lv => `强化上限 +${5 + lv}，强化成功率 +${lv * 3}%` },
   { id: 'warehouse', n: '库房', ch: 0, max: 4, gold: 400, mats: 5,
-    d: lv => `储物箱容量 ${120 + lv * 40} 格` },
+    d: lv => `背包容量 ${120 + lv * 40} 格` },
   { id: 'merchant', n: '钱多多钱庄', ch: 1, max: 4, gold: 700, mats: 8, npc: 'merchant',
     d: lv => `地底货郎多卖 ${lv} 件货，赌石便宜 ${lv * 8}%，出售价格 +${lv * 10}%` },
   { id: 'barracks', n: '雷老虎镖局', ch: 2, max: 3, gold: 800, mats: 12, npc: 'biaotou',
@@ -212,7 +212,7 @@ const BOUNTY_POOL = [
   { id: 'event', t: n => `完成 ${n} 次奇遇`, n: [3, 6], ev: 'event' },
   { id: 'boss',  t: n => `击败 ${n} 个首领`, n: [2, 4], ev: 'boss' },
   { id: 'room',  t: n => `探索 ${n} 个房间`, n: [40, 80], ev: 'room' },
-  { id: 'forge', t: n => `在铸剑坊强化 ${n} 次`, n: [2, 4], ev: 'forge' },
+  { id: 'forge', t: n => `强化 ${n} 次`, n: [2, 4], ev: 'forge' },
 ];
 
 const BESTIARY_TIERS = [50, 200, 1000];
