@@ -428,10 +428,11 @@ const TOWN_TABS = [['go', '出征'], ['gear', '人物'], ['bag', '背包'], ['he
 function dots() {
   const d = {}, cls = SAVE.cls;
   d.col = featureOn('bounty') && SAVE.bounty && SAVE.bounty.list.some(b => b.prog >= b.need && !b.claimed);
-  d.hero = talentInfo(cls).free > 0 || (featureOn('para') && paraFree() > 0);
+  d.hero = talTodo(cls) || (featureOn('para') && paraFree() > 0 && !autoParaOn());
   return d;
 }
 function townHTML() {
+  try { if (autoAllot()) persist(true); } catch (e) {}   // 自动加点：有没用掉的心法、修为点就先加上
   const cls = SAVE.cls, C = CLASSES[cls], ch = SAVE.chars[cls], s = charStats(cls), need = xpNeed(ch.level), dt = dots(), top = ch.level >= MAX_LV;
   const tabs = CLASS_IDS.map(id => `<button class="ct ${id === cls ? 'on' : ''}" data-act="tab" data-arg="${id}" title="${CLASSES[id].n}">${heroSpr(id, 30)}<span>${SAVE.chars[id].level}</span></button>`).join('');
   const body = ({ go: goTab, gear: gearTab, bag: bagTab, hero: heroTab, col: colTab, set: setTab }[TT] || goTab)();
@@ -720,7 +721,7 @@ function riftPathCheck() {
   const sty = !riftPath();   // 走主线通关的人：剧情里教过的（变招、乾坤袋）不再提，伙伴也早认识了
   SAVE.flags = SAVE.flags || {}; const all = RIFT_STEPS.filter(x => x.lv > 0 && rTop() >= x.lv && !SAVE.flags['rp' + x.lv]); if (!all.length) return;
   all.forEach(x => { SAVE.flags['rp' + x.lv] = 1; }); save();
-  const st = all.filter(x => !(sty && x.sp)).map(x => sty && x.sl ? { ...x, lines: x.sl } : x); if (!st.length) return;
+  const st = all.filter(x => !(sty && x.sp)).map(x => sty && x.sl ? { ...x, lines: x.sl } : x); if (!st.length || st.length > 3) return;   // 一口气跳过好多步的（老存档、测试号）：不排队念了
   setTimeout(() => { if (DLG || VIEW === 'battle') return; playDialog(st.flatMap(x => [...(x.lines || []), ['narr', `（幻境之路 · 第 ${x.lv} 层：新开放「${x.n}」。在哪：${x.where}）`]]), null, () => refresh()); }, 600);
 }
 // 出征页的说明（原来整段摊在页面上，现在点「?」才出来）
@@ -1138,6 +1139,8 @@ const defHelpModal = () => () => {
   <button class="btn ghost" data-act="close">好</button>`;
 };
 // 全部属性（人物页点属性框弹出）：原来修炼页的「属性」整页搬到这里
+// 还有心法点、而且真有能点的（满级会多出 1 点没处用，不算）
+const talTodo = cls => talentInfo(cls).free > 0 && talentBranches(cls).some(Bq => Bq.t.some((T, i) => canLearn(cls, Bq.id, i)));
 function statPage(cls) {
   const s = charStats(cls);
     const fxList = [...s.fx].map(f => { const L = LEGENDS.find(l => l.fx === f); if (L) return `<li><b class="r-legend">${L.n}</b>：${L.d}</li>`;
@@ -1151,7 +1154,7 @@ function statPage(cls) {
 }
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
-  const tabs = [['skill', '武学'], ['tal', `心法${ti.free ? ` <b class="upn">${ti.free}</b>` : ''}`], ...(featureOn('para') ? [['para', `修为${pf ? ` <b class="upn">${pf}</b>` : ''}`]] : [])];
+  const tabs = [['skill', '武学'], ['tal', `心法${talTodo(cls) ? ` <b class="upn">${ti.free}</b>` : ''}`], ...(featureOn('para') ? [['para', `修为${pf && !autoParaOn() ? ` <b class="upn">${pf}</b>` : ''}`]] : [])];
   if (!tabs.some(t => t[0] === HTAB)) HTAB = 'skill';
   const bar = `<div class="gsubs htabs" style="--n:${tabs.length}">${tabs.map(([k, n]) => `<button class="${HTAB === k ? 'on' : ''}" data-act="htab" data-arg="${k}">${n}</button>`).join('')}</div>`;
   let body = '';
@@ -1380,7 +1383,7 @@ function lbRows() {   // 现在该上传的：每个职业的幻境纪录、本�
   return rows;
 }
 async function lbSync(force) {   // 有新纪录就传上去；没起名字不传
-  if (!SAVE || !SAVE.lb || !SAVE.lb.name || lbBlocked() || LBV.syncing) return;
+  if (!SAVE || !SAVE.lb || !SAVE.lb.name || lbBlocked() || LBV.syncing || (location.protocol === 'file:' && !window.CS_TEST)) return;   // 本地测试不往榜上传
   const L = lbMe(), key = r => r.kind + '|' + r.cls + '|' + r.period, rows = lbRows().filter(r => force || L.sent[key(r)] !== r.val + '|' + r.sub);
   if (!rows.length) return;
   LBV.syncing = true;
@@ -1429,10 +1432,18 @@ function csQueue() {   // 存一次档就排一次上传：最快 20 秒后，�
 async function csBoot() {   // 开游戏：先看云上有没有别的设备传的、更新的存档，有就问一声；没有就开始自动上传
   if (!csOn()) return;
   const C = csMe();
-  try { const L = await lbCall('cs_list', { p_code: C.code }), top = L && L[0];
-    if (top && top.dev !== csDev() && top.meta && (top.meta.t || 0) > (SAVE.t || 0) + 2000) { CS.pend = top; openModal(csNewerModal); return; } }
+  try { const L = await lbCall('cs_list', { p_code: C.code }), top = (L || []).filter(r => r.dev !== csDev() && r.meta && !r.meta.pre).sort((a, b) => (b.meta.t || 0) - (a.meta.t || 0))[0];
+    if (top && (top.meta.t || 0) > (SAVE.t || 0) + 2000) { CS.pend = top; openModal(csNewerModal); return; } }
   catch (e) { CS.err = String(e && e.message || e); }
-  csStart();
+  csStart(); csPreBackup();
+}
+// 减法改版前的存档（读档时原样留在本机的那份）也往云上放一份，单独算一台「设备」，不会被平时的上传挤掉。只传一次
+async function csPreBackup() {
+  try { const raw = localStorage.getItem(PRESLIM_KEY); if (!raw || localStorage.getItem(PRESLIM_KEY + '_up')) return;
+    const o = JSON.parse(raw), u8 = new TextEncoder().encode(JSON.stringify(slimSave(o)));
+    const data = canDeflate() ? SAVE_TAG2 + '.' + u8.length.toString(36) + '.' + sum32b(u8).toString(36) + '.' + b64u(await pipeBytes(u8, new CompressionStream('deflate'))) : packSaveObj(slimSave(o));
+    await lbCall('cs_put', { p_code: csMe().code, p_dev: csDev() + 'P', p_data: data, p_meta: { ...saveBrief(o), rift: o.riftMax || 0, t: o.t || 0, pre: 1 } });
+    localStorage.setItem(PRESLIM_KEY + '_up', '1'); } catch (e) {}
 }
 function csStart() { CS.hold = false; if (!CS.started) { CS.started = 1; const prev = onPersist; onPersist = prev ? () => { prev(); csQueue(); } : csQueue; } csQueue(); }
 const csNewerModal = () => { const P = CS.pend, m = P.meta;
@@ -1447,7 +1458,7 @@ async function csTake(code, id) {   // 下载一份，读成存档对象，带�
 }
 const csListModal = () => { const F = CS.found, me = csDev();
   return `<h2 class="mh">取回云存档</h2><p class="help-p">取回码 ${csFmt(F.code)} 下面有 ${F.list.length} 份，新的在上面：</p>
-    <div class="cslist">${F.list.map(r => `<div class="csr"><span><b>${briefLine(r.meta || {})}</b><small>${fmtDay((r.meta && r.meta.t) || Date.parse(r.t))} · ${r.dev === me ? '这台设备传的' : '其他设备传的'}${r.meta && r.meta.rift ? ` · 幻境 ${r.meta.rift} 层` : ''}</small></span><button class="btn sm" data-act="cspick" data-arg="${r.id}">用这份</button></div>`).join('')}</div>
+    <div class="cslist">${F.list.map(r => `<div class="csr"><span><b>${briefLine(r.meta || {})}</b><small>${fmtDay((r.meta && r.meta.t) || Date.parse(r.t))} · ${r.meta && r.meta.pre ? '改版前的备份' : r.dev === me ? '这台设备传的' : '其他设备传的'}${r.meta && r.meta.rift ? ` · 幻境 ${r.meta.rift} 层` : ''}</small></span><button class="btn sm" data-act="cspick" data-arg="${r.id}">用这份</button></div>`).join('')}</div>
     <div class="row" style="justify-content:center"><button class="btn ghost" data-act="close">取消</button></div>`; };
 function csPanel() {
   if (!CS_ON) return '';

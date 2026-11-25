@@ -495,7 +495,7 @@ function addAffixes(it, n) { const L = it.legend && LEGENDS.find(l => l.id === i
   it.aff.push(...more); return more.length; }
 function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
-  it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
+  it.plus = 0; it.gems = []; it.sockets = 0;   // 2026-11-26 孔记在部位上，掉落的装备不再自带孔
   if (it.rarity === 'legend' || it.rarity === 'set') {
     const ap = ancNow(), ak = mfAnc(DROP_MF); it.anc = jyOK() && RNG.ch(jyRate(SAVE.run.riftLv) * ak) ? 3 : primalOK() && RNG.ch(ap[1] * ak) ? 2 : RNG.ch(ap[0] * ak) ? 1 : 0;
     if (it.anc === 3) jyUp(it);
