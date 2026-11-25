@@ -1522,7 +1522,7 @@ const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0')
 const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} ${b.lv} 级 · ${b.ended ? '已通关全部十章' : `已通关 ${b.cleared} 章`} · 银两 ${b.gold}`;
 const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
 function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
-const setSave = () => (prepZ(), '') + `<section class="panel bkp"><h3>存档备份</h3>
+const setSave = () => (prepZ(), '') + `<section class="panel"><h3>兑换码</h3><div class="row rdm-row"><input id="rdmIn" placeholder="输入兑换码" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="redeem">兑换</button></div></section><section class="panel bkp"><h3>存档备份</h3>
       <p class="help-p">进度只存在这台设备的这个浏览器里：清理缓存、换手机、换浏览器打开，进度都会丢。建议每打完一章备份一次。</p>
       <p class="bk-now"><b>现在的进度</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `上次备份：${fmtDay(SAVE.bk.t)}` : '还没有备份过'}</small></p>
       <div class="row"><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bkfile">保存成文件</button></div>
@@ -4330,6 +4330,8 @@ const ACT = {
     } catch (e) { toast('这个浏览器没法保存文件，请改用「复制存档码」'); }
   },
   bkpick: () => { const f = $('#bkf'); if (!f) return; f.onchange = () => { const file = f.files && f.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => tryImport(String(rd.result || '')); rd.onerror = () => toast('文件读不出来'); rd.readAsText(file); f.value = ''; }; f.click(); },
+  redeem: () => { const v = ($('#rdmIn') || {}).value || ''; if (!v.trim()) return toast('先把兑换码填进去'); const r = redeemCode(v); if (r.err) return toast(r.err);
+    save(); SFX.play('forge'); toast(`兑换成功：${({ M: '魂晶', G: '银两', X: '九幽玄晶' })[r.k]} +${fmtBig(r.n)}`); refresh(); },
   import: () => { const v = ($('#imp') || {}).value || ''; if (!v.trim()) return toast('先把存档码粘贴到输入框里'); tryImport(v); },
   imcancel: () => { IMPORTING = null; closeModal(); },
   doimport: () => { if (!IMPORTING) return; clearOverlays(); SAVE = IMPORTING; IMPORTING = null; persist(true); toast('已恢复，正在重新载入……'); setTimeout(() => location.reload(), 500); },

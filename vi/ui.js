@@ -1523,7 +1523,7 @@ const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0')
 const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} cấp ${b.lv} · ${b.ended ? "đã qua cả mười chương" : `đã qua ${b.cleared} chương`} · Bạc ${b.gold}`;
 const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
 function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
-const setSave = () => (prepZ(), '') + `<section class="panel bkp"><h3>Sao lưu tiến trình</h3>
+const setSave = () => (prepZ(), '') + `<section class="panel"><h3>Mã đổi thưởng</h3><div class="row rdm-row"><input id="rdmIn" placeholder="Nhập mã đổi thưởng" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="redeem">Đổi</button></div></section><section class="panel bkp"><h3>Sao lưu tiến trình</h3>
       <p class="help-p">Tiến trình chỉ nằm trong trình duyệt này trên thiết bị này: xóa bộ nhớ đệm, đổi điện thoại hay mở bằng trình duyệt khác là mất. Nên sao lưu sau mỗi chương.</p>
       <p class="bk-now"><b>Tiến trình hiện tại</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `Sao lưu lần trước: ${fmtDay(SAVE.bk.t)}` : "Chưa sao lưu lần nào"}</small></p>
       <div class="row"><button class="btn sm" data-act="export">Sao chép mã lưu</button><button class="btn sm ghost" data-act="bkfile">Lưu thành tệp</button></div>
@@ -4331,6 +4331,8 @@ const ACT = {
     } catch (e) { toast("Trình duyệt này không lưu tệp được, hãy dùng “Sao chép mã lưu”"); }
   },
   bkpick: () => { const f = $('#bkf'); if (!f) return; f.onchange = () => { const file = f.files && f.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => tryImport(String(rd.result || '')); rd.onerror = () => toast("Không đọc được tệp"); rd.readAsText(file); f.value = ''; }; f.click(); },
+  redeem: () => { const v = ($('#rdmIn') || {}).value || ''; if (!v.trim()) return toast("Hãy nhập mã đổi thưởng trước"); const r = redeemCode(v); if (r.err) return toast(r.err);
+    save(); SFX.play('forge'); toast(`Đổi thành công: ${({ M: "Hồn tinh", G: "Bạc", X: "Cửu U Huyền Tinh" })[r.k]} +${fmtBig(r.n)}`); refresh(); },
   import: () => { const v = ($('#imp') || {}).value || ''; if (!v.trim()) return toast("Hãy dán mã lưu vào ô trước"); tryImport(v); },
   imcancel: () => { IMPORTING = null; closeModal(); },
   doimport: () => { if (!IMPORTING) return; clearOverlays(); SAVE = IMPORTING; IMPORTING = null; persist(true); toast("Đã khôi phục, đang tải lại…"); setTimeout(() => location.reload(), 500); },
