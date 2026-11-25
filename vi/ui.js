@@ -839,6 +839,7 @@ function twEndUI() {
   flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
 }
 // 看塔装：在城里也能看清楚每样东西干嘛的——套装各档效果、神兵特效、招式和变招说明、还没学的招式（2026-11-25）
+let TWKSEL = 0;
 const twKitModal = () => () => {
   const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls], cnt = twSetCnt(kit), H = t => `<h4 class="twkh">${t}</h4>`;
   const sets = Object.keys(cnt).map(id => { const S = SETS.find(x => x.id === id); if (!S) return ''; const n = cnt[id], th = twTheme(cls, id);
@@ -852,11 +853,14 @@ const twKitModal = () => () => {
   const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>Hồn thần binh</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
   const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>Linh ngọc</small><b style="color:${G.c}">${G.n} cấp ${g.lv}</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
   const all = kit.allN ? `<div class="twkrow"><small>Toàn thuộc tính</small><b>Sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL * kit.allN}%</b><span>Đổi từ những lần không lấy gì, đã lấy ${kit.allN} lần</span></div>` : '';
+  const Sx = skSlots(cls, kit.sk); if (TWKSEL !== 'basic' && !(TWKSEL >= 0 && TWKSEL <= 4)) TWKSEL = 0;
+  const ks = TWKSEL === 'basic' ? basic[0] : Sx[TWKSEL] && C.skills.find(x => x.id === Sx[TWKSEL]);
+  const skSec = `${H(`Chiêu · ${skRuleTxt(cls, kit.sk)}`)}${slotGrid(cls, kit.sk, kit.rn, 'twksel', TWKSEL)}<div class="slx"><button class="${TWKSEL === 'basic' ? 'on' : ''}" data-act="twksel" data-arg="basic">Cơ bản · ${basic[0].n}</button></div>
+    ${ks ? skRow(ks, true) : `<p class="help-p sub">Ô ${TWKSEL + 1} (${slotName(TWKSEL)}) đang trống, lấy chiêu ở lựa chọn một trong ba để điền vào</p>`}`;
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Đồ tháp · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">
-    ${sets ? H("Hiệu ứng bộ") + sets : ''}${H("Trang bị")}${eq}
-    ${H(`Chiêu (${own.length}/${LOADOUT_MAX} · ${skRuleTxt(cls, kit.sk)})`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
-    ${rest.length ? H("Chiêu chưa học · sẽ ra khi chọn một trong ba") + rest.map(k => skRow(k, false)).join('') : ''}
-    ${cu || lg || all ? H("Hồn thần binh · Linh ngọc") + cu + lg + all : ''}</div>`;
+    ${skSec}${sets ? H("Hiệu ứng bộ") + sets : ''}${H("Trang bị")}${eq}
+    ${cu || lg || all ? H("Hồn thần binh · Linh ngọc") + cu + lg + all : ''}
+    ${rest.length ? `<details class="wxinfo skfold"><summary>Chiêu chưa học · sẽ ra khi chọn một trong ba (${rest.length})</summary>${rest.map(k => skRow(k, false)).join('')}</details>` : ''}</div>`;
 };
 // 塔里用的是不熟的职业时：先看一眼它靠什么打、塔里会出哪几套（只说路子，不给配装）
 const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS_MECH[cls];
@@ -1250,28 +1254,56 @@ function formHTML(cls) {
 const skcTag = (cls, k) => { const c = k.cd ? (k.cat || 'core') : 'base'; return `<i class="skc c-${c}">${c === 'base' ? "Cơ bản" : SK_CAT[c]}</i>`; };
 const skRuleTxt = (cls, L) => { const c = skCnt(cls, L); return `Cốt lõi ${c.core} · Trạng thái ${c.buff} · Khống chế ${c.ctrl} · Ô tự do ${skFree(cls, L)}/${SK_FREE}`; };
 const SK_RULE = `Võ học xuất chiến chia ba loại: <b>Cốt lõi</b> là chiêu gây sát thương chính, <b>Trạng thái</b> là tăng lực, hộ thể, hồi máu, <b>Khống chế</b> là choáng, đóng băng, làm yếu, khiêu khích. Trong năm ô, Cốt lõi, Trạng thái, Khống chế mỗi loại một ô, hai ô còn lại là ô tự do, loại nào cũng được.`;
-function skillPanel(cls, inBag) {
-  const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
-  const eqIds = new Set(act.map(k => k.id));
-  const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
-      <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="Lên">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="Xuống">▼</button>` : ''}
-      ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? "Tháo" : "Mang"}</button>`}</span></div>
-      <p>${k.d}${s.sk[k.id] ? `<span class="skb"> (tâm pháp +${s.sk[k.id]}%)</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
-      ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
-  const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv), L = act.map(k => k.id);
-  const restG = SK_CATS.map(c => { const ks = rest.filter(k => (k.cat || 'core') === c); return ks.length ? `<p class="skgh">${skcTag(cls, { cd: 1, cat: c })}${c === 'core' ? "Sát thương chính" : c === 'buff' ? "Tăng lực, hộ thể, hồi máu" : "Choáng, đóng băng, làm yếu, khiêu khích"}</p>${ks.map(k => row(k, 0, false)).join('')}` : ''; }).join('');
-  return `${mechCard(cls)}${inBag ? '' : buildCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>Phối hợp trạng thái · cách đánh liên hoàn</summary>
-      <p class="help-p">Chiêu mở đòn “gây trạng thái” lên địch, chiêu kết đòn đánh vào địch đang mang trạng thái đó sẽ có thêm hiệu ứng (gấp đôi sát thương, chắc chắn chí mạng, đập vỡ, lây lan…).</p>
-      <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
-      <p class="help-p">Đồng hành cũng gây trạng thái: Ngoc thiêu đốt, cô Trân phá giáp, Long đạo trưởng đóng băng. Dẫn đúng người, chiêu kết đòn của bạn mới có đất dụng võ.</p></details>
-    <h4 class="sub-h">Võ học xuất chiến <small>${act.length}/${LOADOUT_MAX} · khi tự động ra chiêu thì ưu tiên từ trên xuống${rOn ? " · mỗi chiêu được chọn một biến chiêu" : ''}</small></h4>
-    <details class="wxinfo skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
-    ${comboHints(act, SAVE.comp)}
-    <div class="skl">${act.map((k, i) => row(k, i, true)).join('') || "<div class=\"empty-note\">Chưa mang võ học nào</div>"}
-      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b>${skcTag(cls, basic)}<small>Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
-    ${rest.length ? `<h4 class="sub-h">Võ học chưa mang</h4><div class="skl">${restG}</div>` : ''}`;
+// 武学页（2026-11-25 重做）：上面 5 个格子（核心·状态·控制·自由·自由），点格子弹出能选的招式；下面是选中那一格的详情
+let SKSEL = 0, SKPK = null;   // SKSEL：选中第几格（0–4）或 'basic'、'ult'；SKPK：弹窗里展开的那一招
+const SLOT_CAT = ['core', 'buff', 'ctrl', null, null];
+const slotName = i => SLOT_CAT[i] ? SK_CAT[SLOT_CAT[i]] : "Tự do";
+const runeOf = (cls, id, rmap) => { const r = (rmap || SAVE.chars[cls].runes || {})[id]; return r && RUNES[id] ? RUNES[id][r === 'a' ? 0 : 1] : null; };
+// 5 格（武学页、看塔装共用）：act 点格子用的动作，sel 选中的格
+function slotGrid(cls, L, rmap, act, sel) {
+  const C = CLASSES[cls], S = skSlots(cls, L);
+  return `<div class="slg">${S.map((id, i) => { const k = id && C.skills.find(x => x.id === id), R = k && runeOf(cls, id, rmap), n = id ? L.indexOf(id) + 1 : 0;
+    return `<button class="slc ${k ? 'c-' + (k.cat || 'core') : 'empty'} ${sel === i ? 'on' : ''}" data-act="${act}" data-arg="${i}"><small>${slotName(i)}${n ? `<em>${n}</em>` : ''}</small>${k ? `<b>${wxBadge(k, rmap ? null : cls)}${k.n}</b><i>${R ? R.n : " "}</i>` : "<b class=\"add\">＋ Chọn</b><i>　</i>"}</button>`; }).join('')}</div>`;
 }
+function skillPanel(cls, inBag) {
+  const ch = SAVE.chars[cls], s = charStats(cls), { act, basic } = skillList(cls), rOn = featureOn('runes'), L = act.map(k => k.id), S = skSlots(cls, L), U = ULTS[cls];
+  if (typeof SKSEL === 'number' && (SKSEL < 0 || SKSEL > 4)) SKSEL = 0;
+  const sel = SKSEL === 'basic' ? basic : SKSEL === 'ult' ? null : (S[SKSEL] && CLASSES[cls].skills.find(x => x.id === S[SKSEL]));
+  let det;
+  if (SKSEL === 'ult') det = `<div class="skd"><div class="skh"><b>Tuyệt kỹ · ${U.n}</b><small>tích đầy thanh tuyệt kỹ rồi tự bấm</small></div><p>${U.d}</p></div>`;
+  else if (!sel) det = `<div class="skd empty"><p>Ô ${SKSEL + 1} (${slotName(SKSEL)}) đang trống.</p><button class="btn" data-act="skpick" data-arg="${SKSEL}">Chọn một chiêu</button></div>`;
+  else { const k = sel, r = ch.runes[k.id], i = L.indexOf(k.id);
+    det = `<div class="skd"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>${k.cd ? "Hồi chiêu " + k.cd : "Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu"}</small></div>
+      <p>${k.d}${s.sk[k.id] ? `<span class="skb"> (tâm pháp +${s.sk[k.id]}%)</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${skillBoosts(cls, k)}
+      ${k.cd && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}
+      ${k.cd ? `<div class="skord"><span>Thứ tự ra chiêu ${i + 1}/${L.length}</span><button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}">Lên trước</button><button class="mini" ${i < L.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}">Lùi sau</button></div>
+      <div class="skbtns"><button class="btn" data-act="skpick" data-arg="${SKSEL}">Đổi chiêu</button><button class="btn ghost" data-act="skoff" data-arg="${k.id}">Tháo</button></div>` : ''}</div>`; }
+  const fold = (h, body, key) => body ? `<details class="wxinfo skfold" ${window['SKF_' + key] ? 'open' : ''} ontoggle="window.SKF_${key}=this.open"><summary>${h}</summary>${body}</details>` : '';
+  const combo = `<p class="help-p">Chiêu mở đòn “gây trạng thái” lên địch, chiêu kết đòn đánh vào địch đang mang trạng thái đó sẽ có thêm hiệu ứng (gấp đôi sát thương, chắc chắn chí mạng, đập vỡ, lây lan…).</p>
+      <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>${comboHints(act, SAVE.comp)}
+      <p class="help-p">Đồng hành cũng gây trạng thái: Ngoc thiêu đốt, cô Trân phá giáp, Long đạo trưởng đóng băng. Dẫn đúng người, chiêu kết đòn của bạn mới có đất dụng võ.</p>`;
+  return `${mechCard(cls)}
+    <h4 class="sub-h">Võ học xuất chiến <small>chạm ô để đổi chiêu · số là thứ tự ra chiêu</small></h4>
+    ${slotGrid(cls, L, null, 'sksel', SKSEL)}
+    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">Cơ bản · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">Tuyệt kỹ · ${U.n}</button></div>
+    ${det}
+    <details class="wxinfo skfold skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
+    ${inBag ? '' : buildCard(cls)}${fold("Thi trận", formHTML(cls), 'form')}${fold("Phối hợp trạng thái · cách đánh liên hoàn", combo, 'combo')}`;
+}
+// 点格子弹出：这一类能选的招式（自由格列全部，按类别分组）
+const skPickModal = (cls, si) => () => {
+  const ch = SAVE.chars[cls], C = CLASSES[cls], L = syncLoadout(cls), S = skSlots(cls, L), cur = S[si], cat = SLOT_CAT[si];
+  const cand = C.skills.filter(k => k.cd && (!cat || (k.cat || 'core') === cat));
+  const row = k => { const lock = k.lv > ch.level, here = k.id === cur, eqd = L.includes(k.id), N = cur ? L.map(x => x === cur ? k.id : x) : L.concat(k.id);
+    const swap = eqd && !here && cat && cur, can = !lock && !here && (swap || (!eqd && skFits(cls, N)));
+    const tag = here ? "<span class=\"pkt on\">Ở ô này</span>" : eqd ? `<span class="pkt">Ô ${S.indexOf(k.id) + 1}</span>` : lock ? `<span class="pkt">Cấp ${k.lv} lĩnh ngộ</span>` : !can ? "<span class=\"pkt no\">Không còn chỗ</span>" : '';
+    const open = SKPK === k.id, RR = RUNES[k.id];
+    return `<div class="pki ${can ? '' : 'dim'} ${open ? 'open' : ''}" data-act="skpk" data-arg="${k.id}"><div class="pkh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>Hồi chiêu ${k.cd}</small>${tag}</div>
+      ${open ? `<p>${k.d}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${RR ? `<p class="pkr">Biến chiêu: «${RR[0].n}» ${RR[0].d}; «${RR[1].n}» ${RR[1].d}</p>` : ''}
+        ${can ? `<button class="btn" data-act="skput" data-arg="${si}|${k.id}">${swap ? "Đổi sang ô này" : "Lắp vào"}</button>` : !lock && !here && !eqd ? `<p class="pkr no">Hai ô tự do đã dùng hết, hãy gỡ bớt một chiêu thừa ở ô khác trước</p>` : eqd && !here ? `<p class="pkr">Đã lắp ở ô ${S.indexOf(k.id) + 1}</p>` : ''}` : `<p class="pkd">${k.d}</p>`}</div>`; };
+  const body = cat ? cand.map(row).join('') : SK_CATS.map(c => { const ks = cand.filter(k => (k.cat || 'core') === c); return ks.length ? `<p class="skgh">${skcTag(cls, { cd: 1, cat: c })}</p>${ks.map(row).join('')}` : ''; }).join('');
+  return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Ô ${si + 1} · chọn chiêu ${cat ? SK_CAT[cat] : ''}</h2><div class="pkl" data-scroll="skpk">${body}</div>`;
+};
 function talentGrid(cls) {
   const tal = SAVE.chars[cls].tal, brs = talentBranches(cls); if (TBR >= brs.length) TBR = 0;
   return `<div class="tbr-chips">${brs.map((Bq, i) => `<button class="chip ${TBR === i ? 'on' : ''}" data-act="tbr" data-arg="${i}">${Bq.n}<small>${branchSpent(cls, Bq.id)}</small></button>`).join('')}</div><div class="tbr-wrap">${brs.map((Bq, bi) => { const sp = branchSpent(cls, Bq.id);
@@ -3936,7 +3968,8 @@ const ACT = {
   twreset2: () => { twReset(SAVE.cls); TWSEL = null; save(); closeModal(); refresh(); toast("Về tầng 1, đồ tháp về bộ lúc đầu"); },
   twcls: () => openModal(twClsModal()),
   twpend: () => openModal(twPendModal()),
-  twkit: () => openModal(twKitModal()),
+  twkit: () => { TWKSEL = 0; openModal(twKitModal()); },
+  twksel: i => { TWKSEL = i === 'basic' ? i : +i; if (MODALFN) setSheet(MODALFN()); },
   twhelp: () => openModal(twHelpModal()),
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
@@ -4123,6 +4156,11 @@ const ACT = {
     toast(`Đã phối xong: mang ${r.sk} chiêu${r.miss ? ` (${r.miss} chiêu chưa học)` : ''}${r.cube ? `, Túi Càn Khôn đặt ${r.cube} món` : ''}${r.gems ? `, linh ngọc đặt ${r.gems} viên` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
+  sksel: i => { SKSEL = i === 'basic' || i === 'ult' ? i : +i; refresh(); },
+  skpick: i => { SKPK = null; const cls = ctxCls(); if (MODALFN) BACK = MODALFN; openModal(skPickModal(cls, +i)); },
+  skpk: id => { SKPK = SKPK === id ? null : id; if (MODALFN) setSheet(MODALFN()); },
+  skput: a => { const [i, id] = split(a), cls = ctxCls(), r = setSkillSlot(cls, +i, id); if (r === 'cat') return toast("Hai ô tự do đã dùng hết, hãy gỡ bớt một chiêu thừa trước"); SFX.play('buff'); const at = skSlots(cls, syncLoadout(cls)).indexOf(id); SKSEL = at >= 0 ? at : +i; SKPK = null; closeModal(); refresh(); },
+  skoff: id => { equipSkill(ctxCls(), id); SFX.play('click'); refresh(); },
   skeq: id => { const cls = ctxCls(), r = equipSkill(cls, id); if (r === 'full') return toast(`Mang tối đa ${LOADOUT_MAX} võ học, tháo bớt một cái trước`);
     if (r === 'cat') { const c = skCat(cls, id); return toast(`Hai ô tự do đã dùng hết, không còn chỗ cho chiêu ${SK_CAT[c]} này: hãy gỡ bớt một chiêu thừa trước`); } SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
   bclaim: i => { const r = claimBounty(+i); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal("Rương truy nã", r)); achToast(checkAch()); },

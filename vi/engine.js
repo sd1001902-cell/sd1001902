@@ -1265,6 +1265,21 @@ const skCat = (cls, id) => { const k = CLASSES[cls].skills.find(x => x.id === id
 const skCnt = (cls, L) => { const c = { core: 0, buff: 0, ctrl: 0 }; for (const id of L) c[skCat(cls, id)]++; return c; };
 const skFree = (cls, L) => { const c = skCnt(cls, L); return SK_CATS.reduce((a, k) => a + Math.max(0, c[k] - 1), 0); };   // 用掉了几个自由格
 const skFits = (cls, L) => L.length <= LOADOUT_MAX && skFree(cls, L) <= SK_FREE;
+// 5 个格子：0 核心、1 状态、2 控制、3/4 自由。按出招顺序，每类第一个进本类的格，多出来的进自由格
+function skSlots(cls, L) { const S = [null, null, null, null, null];
+  for (const id of L) { const ci = SK_CATS.indexOf(skCat(cls, id)); if (S[ci] == null) S[ci] = id; else if (S[3] == null) S[3] = id; else if (S[4] == null) S[4] = id; }
+  return S; }
+// 没带上的招式都记成「手动卸下」：以后只有新学会的才自动补进空格（不然一卸下，空格马上被别的招补上）
+function skMarkRest(cls) { const ch = SAVE.chars[cls]; ch.unequipped = ch.unequipped || {}; const L = ch.loadout || []; for (const k of CLASSES[cls].skills) if (k.cd && k.lv <= ch.level && !L.includes(k.id)) ch.unequipped[k.id] = 1; }
+// 在第 si 格放 id：本类格换掉原来那招；已经带在别的格里的同类招式就互换位置
+function setSkillSlot(cls, si, id) {
+  const ch = SAVE.chars[cls], L = syncLoadout(cls).slice(), cur = skSlots(cls, L)[si]; ch.loadoutManual = 1; ch.unequipped = ch.unequipped || {};
+  if (cur === id) return 'same';
+  if (L.includes(id)) { if (!cur) return 'same'; const i = L.indexOf(id), j = L.indexOf(cur); [L[i], L[j]] = [L[j], L[i]]; ch.loadout = L; skMarkRest(cls); return 'swap'; }
+  const N = cur ? L.map(x => x === cur ? id : x) : L.concat(id);
+  if (!skFits(cls, N)) return 'cat';
+  delete ch.unequipped[id]; ch.loadout = N; skMarkRest(cls); return 'on';
+}
 const skFitTrim = (cls, L) => { L = L.slice(); while (L.length && !skFits(cls, L)) { const c = skCnt(cls, L); let i = L.length - 1; while (i > 0 && c[skCat(cls, L[i])] <= 1) i--; L.splice(i, 1); } return L; };   // 从后往前拿掉多出来的那一类
 const SKILL_PRIO = { berserker: ['liedi', 'lieyan', 'whirl', 'bloodlust', 'bawang', 'hanren', 'warcry', 'butui'],
   mage: ['fireball', 'luoshi', 'jinguang', 'zhenyue', 'frostnova', 'chain', 'lunzhuan', 'meteor', 'wulei'],
@@ -1288,10 +1303,10 @@ function skillList(cls) {
 }
 function equipSkill(cls, id) {
   const ch = SAVE.chars[cls], L = syncLoadout(cls); ch.unequipped = ch.unequipped || {}; ch.loadoutManual = 1;
-  if (L.includes(id)) { ch.loadout = L.filter(x => x !== id); ch.unequipped[id] = 1; return 'off'; }
+  if (L.includes(id)) { ch.loadout = L.filter(x => x !== id); ch.unequipped[id] = 1; skMarkRest(cls); return 'off'; }
   if (L.length >= LOADOUT_MAX) return 'full';
   if (!skFits(cls, L.concat(id))) return 'cat';
-  delete ch.unequipped[id]; ch.loadout = L.concat(id); return 'on';
+  delete ch.unequipped[id]; ch.loadout = L.concat(id); skMarkRest(cls); return 'on';
 }
 function moveSkill(cls, id, dir) {
   const ch = SAVE.chars[cls], L = syncLoadout(cls).slice(), i = L.indexOf(id), j = i + dir;
