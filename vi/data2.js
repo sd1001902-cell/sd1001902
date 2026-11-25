@@ -77,7 +77,7 @@ const LGV = {
   zhLow: lv => 1 + lv * 0.05, zhHalf: lv => 10 + lv * 0.5,     // 战魂：气血每少 10%，伤害再 +x%；怒意过半时伤害 +x%
   wxCh: lv => Math.min(60, 15 + lv * 0.3),                      // 五行：换五行时挂状态的几率
   swPoi: lv => 5 + lv * 0.2,                                   // 尸王：每个空尸位，中毒伤害 +x%
-  kgH: lv => (100 + lv) * 0.68, kgA: lv => 60 + lv * 0.75, kgU: lv => 16 + lv * 0.2,   // 尸王玉召出的尸王：气血、攻击（你的 %）、光环（其他僵尸伤害 +%）。2026-11-25 用户定：120 级 220% / 150% / 40%
+  kgH: lv => (100 + lv) * 0.58, kgA: lv => 60 + lv * 0.75, kgU: lv => 16 + lv * 0.2,   // 尸王玉召出的尸王：气血、攻击（你的 %）、光环（其他僵尸伤害 +%）。2026-11-25 用户定：120 级 220% / 150% / 40%
   dpKi: lv => Math.min(60, 20 + lv * 0.3), dpFin: lv => 25 + lv * 0.75,   // 夺魄：暗器打中 +1 杀意的几率；终结技伤害
   jsSh: lv => 3 + lv * 0.04,                                    // 金身：挨打反震时得护体（最大气血 %）。2026-11-24 反击并进反震，次数多了，数值降到原来的八成左右
   lhK: lv => 5 + lv * 0.15,                                     // 连环：群攻每多打中一个敌人 +x%
@@ -275,7 +275,7 @@ SETS.push(
   { id: 'yinbing', n: "Âm Binh Mượn Đường", cls: 'necro', rift: true,
     pieces: [['helm', "Âm Binh Nón Lá"], ['chest', "Âm Binh Thọ Y"], ['gloves', "Âm Binh Chỉ Sáo"], ['boots', "Âm Binh Dép Cỏ"], ['ring', "Âm Binh Ban Chỉ"], ['amulet', "Âm Binh Chuông Đồng"]],
     b2: { minion: 1, minionPct: 20 }, b2d: "Thi vị +1, sức mạnh cương thi +20%",
-    b4: 'yinBing4', b4d: "Cương thi khí huyết dưới 40% thì tự nổ tung (bị đánh chết cũng nổ), gây sát thương bằng 100% khí huyết tối đa của nó lên mọi kẻ địch",
+    b4: 'yinBing4', b4d: "Cương thi khí huyết dưới 40% thì tự nổ tung (bị đánh chết cũng nổ), gây sát thương bằng 200% khí huyết tối đa của nó lên mọi kẻ địch",
     b6: 'yinBing6', b6d: "Mỗi cương thi có mặt, sát thương bạn phải nhận -7%; phần một đòn đánh mất quá 50% khí huyết của bạn sẽ do cương thi đỡ thay" },
   { id: 'qisha', n: "Thất Sát", cls: 'assassin', rift: true,
     pieces: [['helm', "Thất Sát Diện Tráo"], ['chest', "Thất Sát Dạ Hành Y"], ['gloves', "Thất Sát Chỉ Sáo"], ['boots', "Thất Sát Nhuyễn Ngoa"], ['ring', "Thất Sát Ban Chỉ"], ['amulet', "Thất Sát Ngọc Bội"]],
