@@ -1399,7 +1399,13 @@ async function lbLoad(force) {
   if (lbBlocked() || (!force && D && Date.now() - D.t < 30000)) return;
   LBV.busy = true; LBV.err = '';
   try { await lbSync();
-    const j = await lbCall('lb_board', { p_kind: LBV.kind, p_period: LBV.kind === 'tower' ? lbWeek() : 'all', p_cls: LBV.cls === 'all' ? 'all' : (LB_CLS[LBV.cls] || LBV.cls), p_pid: SAVE.lb && SAVE.lb.pid || null, p_limit: 50 });
+    const ask = () => lbCall('lb_board', { p_kind: LBV.kind, p_period: LBV.kind === 'tower' ? lbWeek() : 'all', p_cls: LBV.cls === 'all' ? 'all' : (LB_CLS[LBV.cls] || LBV.cls), p_pid: SAVE.lb && SAVE.lb.pid || null, p_limit: 50 });
+    let j = await ask();
+    // 榜上没有我手上已经有的成绩（比如榜清过一次）：把纪录重传一遍，每个榜每次打开游戏只补一回
+    if (SAVE.lb && SAVE.lb.name && !(LBV.healed = LBV.healed || {})[k]) {
+      const want = lbRows().filter(r => r.kind === LBV.kind && (LBV.cls === 'all' || r.cls === (LB_CLS[LBV.cls] || LBV.cls))), have = (j && j.me) || [];
+      if (want.some(r => !have.some(m => m.cls === r.cls && m.val >= r.val))) { LBV.healed[k] = 1; await lbSync(true); j = await ask(); }
+    }
     LBV.data[k] = { t: Date.now(), j }; }
   catch (e) { LBV.err = /fetch|network|abort|load/i.test(String(e && e.message || e)) ? "Không kết nối được bảng xếp hạng, kiểm tra mạng nhé" : "Bảng xếp hạng bị lỗi: " + (e && e.message || e); }
   finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if ((TT === 'col' && CTAB === 'lb' && VIEW === 'town') || MODALFN === lbModal) refresh(); }
