@@ -193,7 +193,7 @@ const CHAPTERS = [
       ['ngoc', "Thôi, không thể nào. Ông ấy sửa cầu làm đường cho trấn, còn tặng nhân sâm cho tiệm thuốc của ta nữa."],
     ],
     page: "Năm vị trấn yêu sư mỗi người giữ một phương: Thanh Phong Tử trấn đông, Minh Nguyệt Tử trấn tây, Huyền Băng Tử giữ Hang Băng Côn Lôn, Xích Tiêu Tử giữ Hang Hỏa Diệm, Bạch Vân Tử giữ hồi lang trung tâm. Ba trăm năm qua, bốn người lần lượt tọa hóa, chỉ có Bạch Vân Tử bặt vô âm tín.",
-    unlock: "Lò Rèn của Trương Đại Chùy mở cửa: trang bị có thể cường hóa rồi" },
+    unlock: '' },
 
   { n: "Đầm Vạn Độc", sub: "Mỗi bọt nước trong đầm lầy đều là một ngụm khí độc.", bg: '#0f160c', base: 16,
     mons: [
@@ -241,7 +241,7 @@ const CHAPTERS = [
       ['narr', "Lúc nói câu đó, cô ấy chẳng dám nhìn bạn. Chuyện “máu hồ” Xà Mẫu nói, bạn không kể với cô."],
     ],
     page: "Bạch Vân Tử là người trẻ nhất trong năm người, cũng sợ già nhất, sợ chết nhất. Sau khi phong ấn, hắn thường ngồi một mình ở lối vào hồi lang, hỏi gió: “Ba trăm năm sau, ta sẽ ở đâu?”",
-    unlock: "Mở đục lỗ khảm ngọc: trang bị có thể đục lỗ, khảm ngọc" },
+    unlock: '' },
 
   { n: "Hang Băng Côn Lôn", sub: "Bị băng phong ba trăm năm, không chỉ có yêu quái.", bg: '#0c1218', base: 20,
     mons: [
@@ -466,7 +466,7 @@ const CHAPTERS = [
     ],
     outro: [],
     page: "Ba trăm năm trước, Cửu Vĩ Thiên Hồ một mình đi vào Cửu U. Ba trăm năm sau, hậu nhân của nàng, không còn đi một mình.",
-    unlock: "Mở toàn bộ: Ảo Cảnh Cửu U, độ khó Tu La, tu vi, linh ngọc, tẩy luyện, truy nã giang hồ, tăng độ khó" },
+    unlock: "Mở Ảo Cảnh Cửu U, độ khó Tu La; cường hóa, khảm ngọc, tẩy luyện… mở dần theo số tầng Ảo Cảnh đã thông" },
 ];
 
 const ENDING = [
