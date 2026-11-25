@@ -2008,7 +2008,7 @@ const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv &&
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, '乏力', 'curse', 1]); } };
 let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
-let YINBING_MUL = 2, YINBING_BIG = 0.5, YINBING_DR = 0.07, YINBING_SELF = 0.4, YINBING_BOOM = 1;   // 4 件：气血低于 SELF 自己炸，炸掉最大气血 × BOOM（2026-11-25：原来只在倒下时炸 50%）   // 2026-11-25 挡大招门槛 25% → 50%：推荐配装不放尸爆以后僵尸墙一直在，阴兵 550 层 89%/88% 太强（用户定的温和削法）   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
+let YINBING_MUL = 1.5, YINBING_BIG = 0.5, YINBING_DR = 0.07, YINBING_SELF = 0.4, YINBING_BOOM = 1;   // 4 件：气血低于 SELF 自己炸，炸掉最大气血 × BOOM（2026-11-25：原来只在倒下时炸 50%）   // 2026-11-25 挡大招门槛 25% → 50%：推荐配装不放尸爆以后僵尸墙一直在，阴兵 550 层 89%/88% 太强（用户定的温和削法）   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
 // 第二套幻境套装的数（调平衡只动这里）
 // 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
 let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
@@ -2038,7 +2038,7 @@ function kingUp(b, P) {
 }
 const kingAura = (b, u) => { const k = b.units.find(x => x.gemKing && x.hp > 0 && x !== u); return k ? 1 + k.aura : 1; };
 function makeZombie(b, P, zt, slot, rune) {
-  const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + (P.minionPct || 0) / 100) * (1 + (P.allyPct || 0) / 100);
+  const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + ((P.minionPct || 0) + (P.allyPct || 0)) / 100);   // 2026-11-25 僵尸强度和同伴加成改成相加（原来相乘，配齐后每只僵尸十几倍攻击）
   const hq = P.fx && P.fx.has('huangquan') ? 1.25 : 1;
   const hpM = (rune === 'b' ? 1.6 : 1) * (zt === 'tiejia' ? 1 + (P.ironPct || 0) / 100 : 1) * hq;
   const u = { id: uid(), side: 'p', kind: 'minion', zt, slot, name: Z.n, lv: P.lv, spr: Z.spr, pal: Z.pal,
