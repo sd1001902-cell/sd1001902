@@ -733,10 +733,10 @@ function towerBody(cls) {
       <div class="twstat"><div><small>存档</small><b>${S.ck} 层</b></div><div><small>本周最高</small><b>${S.best} 层</b></div><div><small>历史最高</small><b>${rec} 层</b></div></div>
       <div class="twnext"><small>${top ? '塔顶' : `第 ${f} 层`}</small><b>${top ? `${TW.top} 层都打过了` : `${twKindTxt(cls, f)}${f === TW.top ? ' · 塔顶' : ''}`}</b></div>
       <div class="twkit" data-act="twkit"><div><small>塔装</small><span>${twKitLine(cls, kit)}</span></div><div><small>招式</small><span>${sk}</span></div><div><small>神兵之魂</small><span>${cube}</span></div><div><small>灵玉</small><span>${lg}</span></div><em>看塔装 ›</em></div>
-      ${top ? `<p class="twrew twtop">本周已登顶 · 第 ${TW.top} 层，下周一换新塔</p>` : `<p class="twrew"><small>第 ${nx} 层塔主</small>${(T.wr[cls] || 0) >= nx ? '本周奖励已领' : `魂晶 ${RW.m} · 银两 ${fmtBig(RW.g)} · 玉一颗`}${(T.ms[cls] || 0) >= nx || !RW.x ? '' : ` · <b class="jyc">首通玄晶 ${RW.x}</b>`}</p>`}
+      ${top ? `<p class="twrew twtop">已登顶第 ${TW.top} 层 · 可以马上从第 1 层再爬，塔主奖励每周只领一次</p>` : `<p class="twrew"><small>第 ${nx} 层塔主</small>${(T.wr[cls] || 0) >= nx ? '本周奖励已领' : `魂晶 ${RW.m} · 银两 ${fmtBig(RW.g)} · 玉一颗`}${(T.ms[cls] || 0) >= nx || !RW.x ? '' : ` · <b class="jyc">首通玄晶 ${RW.x}</b>`}</p>`}
       <p class="sub twnote">进塔人人一样，不带自己的养成 · 每周一换塔</p>
     </div>
-    <div class="gostart">${f > 1 ? `<button class="btn sm ghost twrs" data-act="twreset">从第 1 层重来</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">先选第 ${f - 1} 层的奖励</button>` : top ? `<button class="btn big" disabled>本周已登顶</button>` : `<button class="btn big" data-act="twgo">挑战第 ${f} 层</button>`}</div>`;
+    <div class="gostart">${f > 1 && !top ? `<button class="btn sm ghost twrs" data-act="twreset">从第 1 层重来</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">先选第 ${f - 1} 层的奖励</button>` : top ? `<button class="btn big" data-act="twagain">从第 1 层再爬一次</button>` : `<button class="btn big" data-act="twgo">挑战第 ${f} 层</button>`}</div>`;
 }
 const twResetModal = () => () => { const cls = SAVE.cls, S = twState(cls), T = twSave(), wr = T.wr[cls] || 0;
   return `<h2 class="mh">从第 1 层重来？</h2><p class="help-p">现在第 ${S.fl} 层。重来后塔装、招式、神兵之魂、灵玉都回到开局那身，从第 1 层重新爬，三选一可以换个路子选。</p>
@@ -746,7 +746,7 @@ const twPendModal = () => () => { const cls = SAVE.cls, S = twState(cls); return
 function twGo() {
   if (SAVE.run) return toast('先把进行中的冒险结束了再来');
   if (twState(SAVE.cls).pend) return openModal(twPendModal());
-  if (twState(SAVE.cls).fl > TW.top) return toast('本周已经登顶了');
+  if (twState(SAVE.cls).fl > TW.top) return openModal(twResetModal());
   const cls = SAVE.cls, { run, kind } = twRun(cls); AUTO = false;
   SAVE.run = run; beginBattle(kind);
   banner(`通天塔 · 第 ${run.twF} 层`, run.twName || (kind === 'elite' ? '有精英' : '一群妖物'), 1400);
@@ -778,6 +778,7 @@ function twRelSrc(cls, kit, name) {
   kit.lg.forEach(g => { const G = LGEMS[g.t]; if (G && G.d(g.lv).includes(name)) src.push(G.n); });
   return src;
 }
+const twSwOk = (kit, p, sw) => p.t === 'sk' ? kit.sk.includes(sw) : p.t === 'cube' ? kit.cube.includes(sw) : p.t === 'lg' ? !!kit.lg[+sw] : false;
 function twPickHTML(cls, p, i) {
   const C = CLASSES[cls], S0 = twState(cls), kit = S0.kit, sel = TWSEL && TWSEL.f === S0.fl && TWSEL.i === i;
   let h = '', d = '', det = [], rel = [];
@@ -808,12 +809,17 @@ function twPickHTML(cls, p, i) {
   else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1], cur = kit.rn[p.id], R0 = cur && RUNES[p.id][cur === 'a' ? 0 : 1];
     h = `<b>变招 · ${k.n}「${R.n}」${skcTag(cls, k)}</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
     det.push(`<p class="twol">${R0 ? `换掉现在的「${R0.n}」：${esc(R0.d)}` : `${k.n}现在没有变招`}</p>`); }
-  else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">神兵之魂 · ${L.n}</b>`; d = esc(L.d); rel = twRelOut(cls, kit, L.d);
-    det.push(`<p class="twol">神兵之魂只给特效，不占装备格（已有 ${kit.cube.length}/3）</p>`); }
-  else if (p.t === 'lg') { const G = LGEMS[p.g.t]; h = `<b style="color:${G.c}">灵玉 · ${G.n} ${p.g.lv} 级</b>`; d = esc(G.d(p.g.lv)); rel = twRelOut(cls, kit, G.d(p.g.lv)); }
+  else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">神兵之魂 · ${L.n}${p.swap ? '<small>满了，换掉一个</small>' : ''}</b>`; d = esc(L.d); rel = twRelOut(cls, kit, L.d);
+    det.push(`<p class="twol">神兵之魂只给特效，不占装备格（已有 ${kit.cube.length}/3）</p>`);
+    if (p.swap) { const sw = sel && TWSEL.sw; det.push(`<p class="twol">换掉哪一个：</p><div class="twsw">${kit.cube.map(id => { const o = LEGENDS.find(l => l.id === id); return o ? `<button class="${id === sw ? 'on' : ''}" data-act="twswap" data-arg="${id}">${o.n}</button>` : ''; }).join('')}</div>`);
+      const o = sw && LEGENDS.find(l => l.id === sw); if (o && kit.cube.includes(sw)) det.push(`<p class="twol">换下：<b>${o.n}</b>：${esc(o.d)}</p>`); } }
+  else if (p.t === 'lg') { const G = LGEMS[p.g.t], sw = p.swap && sel ? TWSEL.sw : null, o = sw != null && kit.lg[+sw], lv = o ? Math.max(p.g.lv, o.lv) : p.g.lv;
+    h = `<b style="color:${G.c}">灵玉 · ${G.n} ${p.swap ? (o ? lv + ' 级' : '') : p.g.lv + ' 级'}${p.swap ? '<small>满了，换掉一颗</small>' : ''}</b>`; d = esc(G.d(lv)); rel = twRelOut(cls, kit, G.d(lv));
+    if (p.swap) { det.push(`<p class="twol">换掉哪一颗（新灵玉接过它的等级）：</p><div class="twsw">${kit.lg.map((g, j) => `<button class="${String(j) === String(sw) ? 'on' : ''}" data-act="twswap" data-arg="${j}">${LGEMS[g.t].n}<small>${g.lv} 级</small></button>`).join('')}</div>`);
+      if (o) det.push(`<p class="twol">换下：<b>${LGEMS[o.t].n} ${o.lv} 级</b>：${esc(LGEMS[o.t].d(o.lv))}</p>`); } }
   else if (p.t === 'lgup') { const g = kit.lg[p.i], G = LGEMS[g.t]; h = `<b style="color:${G.c}">${G.n} ${g.lv} → ${g.lv + p.add} 级</b>`; d = esc(G.d(g.lv + p.add)); det.push(`<p class="twol">现在：${esc(G.d(g.lv))}</p>`); }
-  const need = p.t === 'sk' && p.swap && !(sel && TWSEL.sw && kit.sk.includes(TWSEL.sw));
-  const more = sel ? `<div class="twdet">${det.join('')}${rel.map(t => `<p class="twrel">${t}</p>`).join('')}<button class="btn sm${need ? ' off' : ''}" data-act="twpick" data-arg="${i}">${need ? '先点要换掉的招式' : '就选它'}</button></div>` : '';
+  const need = p.swap && !(sel && TWSEL.sw != null && twSwOk(kit, p, TWSEL.sw));
+  const more = sel ? `<div class="twdet">${det.join('')}${rel.map(t => `<p class="twrel">${t}</p>`).join('')}<button class="btn sm${need ? ' off' : ''}" data-act="twpick" data-arg="${i}">${need ? `先点要换掉的${p.t === 'sk' ? '招式' : p.t === 'cube' ? '神兵之魂' : '灵玉'}` : '就选它'}</button></div>` : '';
   return `<div class="twpick${sel ? ' sel' : ''}" data-act="twsel" data-arg="${i}">${h}<span>${d}</span>${sel ? '' : '<em class="twmore">点开看详情 ›</em>'}${more}</div>`;
 }
 function twSkipHTML(cls) {   // 三样都不要：换全属性
@@ -827,7 +833,7 @@ function twResHTML() {
   if (!R.win) return `<div class="res lose tw"><h3>败</h3><p>倒在第 ${R.f} 层。回到第 ${R.back} 层，塔装回到存档时那身。</p>
     <div class="twbtns"><button class="btn big" data-act="twnext">再来第 ${R.back} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
   const ck = R.f % 10 === 0 ? `<p class="twrw">存档：第 ${R.f} 层</p>` : '';
-  if (R.top) return `<div class="res win tw"><h3>登顶</h3><p>第 ${TW.top} 层塔主打过了，这周的通天塔爬到顶了。</p>${rew}<div class="twbtns"><button class="btn big" data-act="twhome">回青石镇</button></div></div>`;
+  if (R.top) return `<div class="res win tw"><h3>登顶</h3><p>第 ${TW.top} 层塔主打过了。可以马上从第 1 层再爬一次，换个路子玩；塔主奖励每周只领一次。</p>${rew}<div class="twbtns"><button class="btn big" data-act="twagain">从第 1 层再爬一次</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
   if (S.pend) return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<p class="sub">选一样带上楼</p><div class="twpicks">${twPicksHTML(cls)}</div></div>`;
   let nf = R.f + 1; while (nf < TW.top && !twPickFl(nf)) nf++;
   return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<p class="sub">下一次三选一：打过第 ${nf} 层</p><div class="twbtns"><button class="btn big" data-act="twnext">上第 ${S.fl} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
@@ -868,9 +874,9 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
     <p class="help-p sub">塔里会出这几套，每套各走一条路。同一套凑齐 4 件、6 件还有共鸣加成：</p>${sets}<p class="help-p sub">三选一时点一下卡片，能看到这件东西的全部效果、会换下什么、跟你手上哪些招式有关。</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">通天塔</h2><div class="help-scroll"><p class="help-p">一层一场仗，打完直接上楼，塔顶是第 ${TW.top} 层。普通层是一群妖物（第 3 层起带精英），逢 5 层是精英首领带两个护法，逢 10 层是塔主。妖物一层比一层强一点，慢慢往上涨。</p>
   <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，必杀的怒气一层层留着。</p>
-  <p class="help-p">每 3 层三选一往上长（逢 5 层、逢 10 层也有）：普通的三选一拿一件塔装（套装、神兵。换上时沿用这一格原来的词条和孔，只换特效）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
+  <p class="help-p">每 3 层三选一往上长（逢 5 层、逢 10 层也有）：普通的三选一拿一件塔装（套装、神兵。换上时沿用这一格原来的词条和孔，只换特效）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个，满了还会出新的，选它要换掉一个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级，或者拿一颗新的换掉身上一颗，新的接过它的等级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
   <p class="help-p">套装共鸣：塔里同一套凑齐 ${TW_RES[0][0]} 件，伤害 +${TW_RES[0][1]}%、气血 +${TW_RES[0][2]}%；凑齐 ${TW_RES[1][0]} 件，再加伤害 +${TW_RES[1][1]}%、气血 +${TW_RES[1][2]}%。东拼西凑拿不到，想走一套就得一路集中选。</p>
-  <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。想换个路子，可以「从第 1 层重来」，奖励只拿最高的。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
+  <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。想换个路子，可以「从第 1 层重来」；登顶以后也能马上再爬。塔主奖励每周只领一次，只拿最高的。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
   <p class="help-p">奖励：每打过一个塔主，这周第一次领魂晶、银两和一颗玉，越高给得越多，爬到顶一周约 ${Math.round(Array.from({ length: TW.top / 10 }, (_, i) => twRewOf((i + 1) * 10).m).reduce((a, b) => a + b, 0) / 100) * 100} 魂晶；第 ${TW_REW.jyFrom} 层起，每个职业第一次打过某一层塔主，再给九幽玄晶。历史最高层永远记着。</p></div>`;
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
@@ -3958,11 +3964,12 @@ const ACT = {
   twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
   twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
   twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls); let p = S.pend && (i === 'x' ? { t: 'all' } : S.pend[+i]); if (!p) return;
-    if (p.t === 'sk' && p.swap) { const sw = TWSEL && TWSEL.i === +i && TWSEL.sw; if (!sw || !S.kit.sk.includes(sw)) return toast('先点要换掉哪一招'); p = { ...p, out: sw }; } twApply(cls, p); TWSEL = null; save(); SFX.play('rare');
+    if (p.swap) { const sw = TWSEL && TWSEL.i === +i ? TWSEL.sw : null; if (sw == null || !twSwOk(S.kit, p, sw)) return toast(p.t === 'sk' ? '先点要换掉哪一招' : p.t === 'cube' ? '先点要换掉哪一个神兵之魂' : '先点要换掉哪一颗灵玉'); p = { ...p, out: sw }; } twApply(cls, p); TWSEL = null; save(); SFX.play('rare');
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) el.innerHTML = twResHTML(); } else { closeModal(); refresh(); } },
   twsel: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, f = twState(cls).fl; const k = i === 'x' ? 'x' : +i; TWSEL = TWSEL && TWSEL.f === f && TWSEL.i === k ? null : { f, i: k };
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
   twswap: id => { if (!TWSEL) return; TWSEL.sw = TWSEL.sw === id ? null : id; if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
+  twagain: () => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls; SAVE.run = null; B = null; BRES = null; twReset(cls); TWSEL = null; save(); twGo(); },
   twreset: () => { if (SAVE.run) return toast('先把进行中的冒险结束了再来'); openModal(twResetModal()); },
   twreset2: () => { twReset(SAVE.cls); TWSEL = null; save(); closeModal(); refresh(); toast('回到第 1 层，塔装回到开局'); },
   twcls: () => openModal(twClsModal()),

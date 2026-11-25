@@ -1602,14 +1602,17 @@ function twPicks(cls, f, kit) {
   return twWith(twHash(T.wk, cls, 'pick', f), () => {
     const out = [], B = BUILDS[cls];
     const lgPool = () => { const own = new Set(kit.lg.map(g => g.t)); const want = [];   // 2026-11-25 不再优先出流派推荐的：懂搭配才挑得准
-      const gen = Object.keys(LGEMS).filter(t => !own.has(t) && t !== 'greed' && !want.includes(t) && (!LGEMS[t].cls || LGEMS[t].cls === cls)); return RNG.shuffle(want).concat(RNG.shuffle(gen)); };
+      const gen = Object.keys(LGEMS).filter(t => !own.has(t) && t !== 'greed' && t !== 'reforge' && !want.includes(t) && (!LGEMS[t].cls || LGEMS[t].cls === cls)); return RNG.shuffle(want).concat(RNG.shuffle(gen)); };
     const cubePool = () => { const own = new Set(kit.cube); const want = [];
       const gen = LEGENDS.filter(l => !l.w && (!l.cls || l.cls === cls) && !own.has(l.id) && !want.includes(l.id) && l.fx).map(l => l.id); return RNG.shuffle(want).slice(0, 2).concat(RNG.shuffle(gen)); };
     if (f % 10 === 0) {
       const lv = twLgLv(f);
       if (kit.lg.length < 3) lgPool().slice(0, 3).forEach(t => out.push({ t: 'lg', g: { t, lv } }));
-      else kit.lg.forEach((g, i) => out.push({ t: 'lgup', i, add: 30 }));   // 三颗满了：选一颗升 30 级
-    } else if (f % 5 === 0 && kit.cube.length < 3) cubePool().slice(0, 3).forEach(lid => out.push({ t: 'cube', lid }));
+      else {   // 三颗满了：两颗升 30 级，再给一颗新的（换掉身上一颗，接过它的等级）（2026-11-25）
+        RNG.shuffle(kit.lg.map((g, i) => i)).slice(0, 2).sort((a, b) => a - b).forEach(i => out.push({ t: 'lgup', i, add: 30 }));
+        const nt = lgPool()[0]; if (nt) out.push({ t: 'lg', g: { t: nt, lv }, swap: 1 });
+      }
+    } else if (f % 5 === 0) cubePool().slice(0, 3).forEach(lid => out.push(kit.cube.length < 3 ? { t: 'cube', lid } : { t: 'cube', lid, swap: 1 }));   // 满了也出，选了换掉一个
     else {
       const sets = twSets(cls), gear = () => {
         if (RNG.ch(0.62)) { const sid = RNG.pick(sets), S = SETS.find(x => x.id === sid), [sl] = RNG.pick(S.pieces); return { t: 'eq', it: twItem(cls, sl, 'set', { setId: sid }) }; }
@@ -1658,8 +1661,9 @@ function twApply(cls, p) {   // 选中一样：放进塔装
     kit.eq[pos] = it;
   } else if (p.t === 'sk') { if (kit.sk.includes(p.id)) {} else if (p.out && kit.sk.includes(p.out)) { const L = kit.sk.map(x => x === p.out ? p.id : x); if (skFits(cls, L)) { kit.sk = L; delete kit.rn[p.out]; } } else if (skFits(cls, kit.sk.concat(p.id))) kit.sk.push(p.id); }
   else if (p.t === 'rn') kit.rn[p.id] = p.r;
-  else if (p.t === 'cube') { if (!kit.cube.includes(p.lid) && kit.cube.length < 3) kit.cube.push(p.lid); }
-  else if (p.t === 'lg') { if (kit.lg.length < 3) kit.lg.push(p.g); }
+  else if (p.t === 'cube') { if (kit.cube.includes(p.lid)) {} else if (p.out != null && kit.cube.includes(p.out)) kit.cube[kit.cube.indexOf(p.out)] = p.lid; else if (kit.cube.length < 3) kit.cube.push(p.lid); }
+  else if (p.t === 'lg') { const o = p.out != null && kit.lg[+p.out];
+    if (o) kit.lg[+p.out] = { ...p.g, lv: Math.max(p.g.lv, o.lv) }; else if (kit.lg.length < 3) kit.lg.push(p.g); }
   else if (p.t === 'all') kit.allN = (kit.allN || 0) + 1;
   else if (p.t === 'lgup') { const g = kit.lg[p.i]; if (g) g.lv = Math.min(TW.lgMax + 60, g.lv + p.add); }
   S.pend = null;
