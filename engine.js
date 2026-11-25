@@ -329,7 +329,7 @@ const AFF_OFF_MAX = 2;   // 一件装备最多两条攻击类词条（攻击、�
 const affBase = k => k && k.startsWith('sk_') ? 'skd' : k;
 const affDef = k => AFFIXES.find(a => a.k === affBase(k));
 const AFF_ST = Object.fromEntries(AFFIXES.filter(a => a.st).map(a => [a.k, a.st]));
-const SKD_EX = new Set(['warcry', 'butui', 'summon', 'jihuo', 'yangshi', 'curse', 'shadowstep', 'yandun', 'aegis', 'prayer', 'chanhou']);
+const SKD_EX = new Set(['zhenyue', 'warcry', 'butui', 'summon', 'jihuo', 'yangshi', 'curse', 'shadowstep', 'yandun', 'aegis', 'prayer', 'chanhou']);
 let AFF_CLS = null;   // 掉落、洗炼时这件装备算哪个职业的（挑「某一招」用）
 function skdKey(cls) { const C = CLASSES[cls || AFF_CLS || (SAVE && SAVE.run && SAVE.run.cls) || (SAVE && SAVE.cls)] || CLASSES.berserker; return 'sk_' + RNG.pick(C.skills.filter(x => !SKD_EX.has(x.id))).id; }
 const affPgOK = a => !a.pg || pgOr(10);
@@ -1164,7 +1164,7 @@ function applyBuild(cls, i) {
   const ch = SAVE.chars[cls], C = CLASSES[cls], before = runMaxHpIf(cls), r = { sk: 0, miss: 0, cube: 0, gems: 0 };
   const L = [];
   for (const [id, rn] of B.sk) { const k = C.skills.find(x => x.id === id); if (!k || k.lv > ch.level) { r.miss++; continue; } L.push(id); if (featureOn('runes') && rn) ch.runes[id] = rn; }
-  ch.loadout = L.slice(0, LOADOUT_MAX); ch.loadoutManual = 1; ch.unequipped = {}; for (const k of C.skills) if (k.cd && !L.includes(k.id)) ch.unequipped[k.id] = 1;
+  ch.loadout = skFitTrim(cls, L.slice(0, LOADOUT_MAX)); ch.loadoutManual = 1; ch.unequipped = {}; for (const k of C.skills) if (k.cd && !L.includes(k.id)) ch.unequipped[k.id] = 1;
   r.sk = L.length;
   if (featureOn('cube')) { const have = B.cube.filter(lid => SAVE.cube[lid]); if (have.length) { ch.cube = [0, 1, 2].map(j => have[j] || null); r.cube = have.length; } }
   if (boxOpen()) { const have = B.gems.map(t => SAVE.lgems.find(g => g.t === t)).filter(Boolean); if (have.length) { ch.lgs = [0, 1, 2].map(j => have[j] ? have[j].id : null); r.gems = have.length; } }
@@ -1257,8 +1257,17 @@ function rollGem(run) {
 
 // ---------------- 技能顺序与符文 ----------------
 const LOADOUT_MAX = 5;
+// 武学分类（2026-11-25）：核心（主力输出）、状态（增益、护体、回血）、控制（眩晕、冰冻、削弱、嘲讽）。
+// 5 格 = 核心 1 + 状态 1 + 控制 1 + 自由 2：同一类多带的最多 2 个
+var ZHENYUE_DMG = 0.4;   // 镇岳符增伤：0.4 时五行归元 500 层和换招前持平（120 局）
+const SK_CAT = { core: '核心', buff: '状态', ctrl: '控制' }, SK_CATS = ['core', 'buff', 'ctrl'], SK_FREE = 2;
+const skCat = (cls, id) => { const k = CLASSES[cls].skills.find(x => x.id === id); return (k && k.cat) || 'core'; };
+const skCnt = (cls, L) => { const c = { core: 0, buff: 0, ctrl: 0 }; for (const id of L) c[skCat(cls, id)]++; return c; };
+const skFree = (cls, L) => { const c = skCnt(cls, L); return SK_CATS.reduce((a, k) => a + Math.max(0, c[k] - 1), 0); };   // 用掉了几个自由格
+const skFits = (cls, L) => L.length <= LOADOUT_MAX && skFree(cls, L) <= SK_FREE;
+const skFitTrim = (cls, L) => { L = L.slice(); while (L.length && !skFits(cls, L)) { const c = skCnt(cls, L); let i = L.length - 1; while (i > 0 && c[skCat(cls, L[i])] <= 1) i--; L.splice(i, 1); } return L; };   // 从后往前拿掉多出来的那一类
 const SKILL_PRIO = { berserker: ['liedi', 'lieyan', 'whirl', 'bloodlust', 'bawang', 'hanren', 'warcry', 'butui'],
-  mage: ['fireball', 'luoshi', 'jinguang', 'frostnova', 'chain', 'lunzhuan', 'meteor', 'wulei'],
+  mage: ['fireball', 'luoshi', 'jinguang', 'zhenyue', 'frostnova', 'chain', 'lunzhuan', 'meteor', 'wulei'],
   necro: ['summon', 'shidu', 'jihuo', 'corpse', 'bonestorm', 'yangshi', 'curse', 'tudun'],
   assassin: ['venom', 'deathmark', 'bingpo', 'shadowkill', 'dici', 'fan', 'shadowstep', 'yandun'],
   paladin: ['hammer', 'fuhu', 'aegis', 'ganlu', 'budong', 'judgement', 'prayer', 'chanhou'] };
@@ -1267,9 +1276,10 @@ function syncLoadout(cls) {
   const ch = SAVE.chars[cls], C = CLASSES[cls];
   const ok = id => C.skills.some(k => k.id === id && k.cd && k.lv <= ch.level);
   // 没手动换过技能的话，按推荐顺序自动带上最搭的几招
-  if (!ch.loadoutManual && SKILL_PRIO[cls]) { const L0 = SKILL_PRIO[cls].filter(ok).slice(0, LOADOUT_MAX); for (const k of C.skills) if (L0.length < LOADOUT_MAX && k.cd && ok(k.id) && !L0.includes(k.id)) L0.push(k.id); ch.loadout = L0; return L0; }
-  let L = (ch.loadout || []).filter(ok);
-  for (const k of C.skills) if (L.length < LOADOUT_MAX && k.cd && k.lv <= ch.level && !L.includes(k.id) && !(ch.unequipped || {})[k.id]) L.push(k.id);
+  const fill = (L, ids) => { for (const id of ids) if (L.length < LOADOUT_MAX && ok(id) && !L.includes(id) && skFits(cls, L.concat(id))) L.push(id); return L; };
+  if (!ch.loadoutManual && SKILL_PRIO[cls]) { const L0 = fill(fill([], SKILL_PRIO[cls]), C.skills.map(k => k.id)); ch.loadout = L0; return L0; }
+  let L = skFitTrim(cls, (ch.loadout || []).filter(ok));   // 旧存档里不合分类规则的，从后往前拿掉多的
+  fill(L, C.skills.filter(k => !(ch.unequipped || {})[k.id]).map(k => k.id));
   ch.loadout = L; return L;
 }
 function skillList(cls) {
@@ -1280,6 +1290,7 @@ function equipSkill(cls, id) {
   const ch = SAVE.chars[cls], L = syncLoadout(cls); ch.unequipped = ch.unequipped || {}; ch.loadoutManual = 1;
   if (L.includes(id)) { ch.loadout = L.filter(x => x !== id); ch.unequipped[id] = 1; return 'off'; }
   if (L.length >= LOADOUT_MAX) return 'full';
+  if (!skFits(cls, L.concat(id))) return 'cat';
   delete ch.unequipped[id]; ch.loadout = L.concat(id); return 'on';
 }
 function moveSkill(cls, id, dir) {
@@ -2128,7 +2139,7 @@ function act(b, u, out) {
   }
   if (u.st.frozen) { delete u.st.frozen; if (u.frzA) { u.frzA = false; if (u.side === 'e' && b.P && b.P.cls === 'paladin') thornHit(b, b.P, u, out, { thf: 1 }); if (u.hp <= 0) { out.actor = null; return; } } if (u.charging) { delete u.charging; out.pops.push([u.id, '打断', 'buff']); out.lines.push(`${u.name}被打晕，蓄力断了！`); } else out.lines.push(`${u.name}晕住了`); out.actor = null; return; }
   if (u.trait === 'regen' && u.hp > 0 && !u.st.burn && !(riftB(b) && u.st.poison)) heal(u, u.maxHp * (riftB(b) ? R_REGEN : 0.05), out);   // 幻境里精英血厚三倍多，回 5% 打不动：改成 2%，中毒也压得住
-  for (const k of ['warcry', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'tg', 'rumo', 'jsh', 'qianren', 'guiyi', 'baigui', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG', 'liuDr', 'tieArm']) if (u.st[k] && --u.st[k] <= 0) {
+  for (const k of ['warcry', 'zhenyue', 'curse', 'shadow', 'mark', 'melt', 'slow', 'butui', 'smoke', 'chan', 'tg', 'rumo', 'jsh', 'qianren', 'guiyi', 'baigui', 'yang', 'weak', 'vuln', 'shijia', 'gourd', 'kangG', 'liuDr', 'tieArm']) if (u.st[k] && --u.st[k] <= 0) {
     delete u.st[k];
     if (k === 'smoke' && u.kind === 'hero' && u.fx && u.fx.has('cJinchan') && u.hp > 0) {   // 金蝉手：烟遁散了，回血、清负面
       heal(u, u.maxHp * 0.15, out); for (const z of ['frozen', 'poison', 'burn', 'slow', 'curse', 'weak', 'vuln', 'melt']) delete u.st[z]; delete u.st.weakV; out.pops.push([u.id, '金蝉', 'buff']); }
@@ -2304,6 +2315,7 @@ function skillReady(b, P, sk, foes) {
     case 'whirl': return foes.length >= 2 || P.fx.has('buSi4');
     case 'fan': return foes.length >= 2 || P.fx.has('qianJi4');
     case 'warcry': return !P.st.warcry;
+    case 'zhenyue': return !P.st.zhenyue;
     case 'summon': return zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length < P.minionCap;
     case 'jihuo': return zombiesOf(b).length > 0;
     case 'bonestorm': return zombiesOf(b).length > 0 || P.fx.has('duXing4');
@@ -2552,6 +2564,9 @@ function castInner(b, P, sk, foes, out) {
     case 'bonestorm': all(0.45 * Math.max(1, zombiesOf(b).length) * m * (R === 'b' ? 1.4 : 1), 'magic', f => { if (R === 'a' && RNG.ch(0.4)) freezeU(f, out); else if (P.fx.has('stormStun') && f.hp > 0 && RNG.ch(0.35)) freezeU(f, out, '眩晕'); }); break;
     case 'shadowkill': { const n = Math.max(1, P.ki); P.ki = 0; for (let i = 0; i < n; i++) { const al = aliveOf(b, 'e'), tt = R === 'a' ? RNG.pick(al) : (t.hp > 0 ? t : al[0]); if (!tt) break;
         const dd = hit(b, P, tt, 0.9 * m * (1 + (P.kiPct || 0) / 100), 'phys', out, { crit: 1, aoe: R === 'a' ? 1 : 0 }); if (dd && R === 'b') heal(P, P.maxHp * 0.02, out, true); } break; }
+    case 'zhenyue': { const capS = Math.round(P.maxHp * mageCap(P) / 100), cur = P.shield || 0;   // 镇岳符：护身符箓 + 三回合增伤
+      P.shield = Math.max(cur, Math.min(capS, cur + Math.round(P.maxHp * (R === 'a' ? 0.4 : 0.2)))); P.st.zhenyue = 4; out.pops.push(['P', '镇岳', 'buff']);
+      if (R === 'b') foes.forEach(f => { if (f.hp > 0) stSet(P, f, 'armor', out); }); break; }
     case 'yandun': P.st.smoke = R === 'b' ? 4 : 3; out.pops.push(['P', '烟遁', 'buff']);
       if (R === 'a') foes.forEach(f => { applyPoison(P, f, 40, Math.max(P.sk.venom || 0, P.poisonPct || 0)); out.pops.push([f.id, '中毒', 'poison', 1]); }); break;
     case 'bawang': { const f = P.fury || 0, eat = P.fx.has('xueHai4') ? f - Math.floor(f / 2) : f; P.fury = f - eat;
@@ -2604,12 +2619,12 @@ function castGen(b, P, sk, foes, out, m) {
   const burn = f => { if (f.hp > 0) { f.st.burn = { d: P.atk * 0.45 * (1 + (P.elem || 0) / 100), t: 3 + stExt(P) }; out.pops.push([f.id, '灼烧', 'fire', 1]); } };
   const FX = P.fx, R = P.runes[sk.id] || null;
   if (sk.id === 'lieyan' && FX.has('lieyanAll')) { foes.forEach(f => { if (hit(b, P, f, sk.m * m * 0.8, el, out, { aoe: 1 })) stSet(P, f, 'burn', out); }); out.cast.aoe = true; return; }
-  if (sk.id === 'fuhu' && FX.has('fuhu2')) { if (hit(b, P, t, sk.m * m, el, out)) { stSet(P, t, 'armor', out); if (RNG.ch(0.3)) stSet(P, t, 'stun', out); } return; }
+  if (sk.id === 'fuhu' && FX.has('fuhu2')) { if (hit(b, P, t, sk.m * m, el, out)) { stSet(P, t, 'armor', out); if (RNG.ch(0.3)) stSet(P, t, 'stun', out); if (t.hp > 0) setWeak(t, R === 'b' ? 3 : 2, R === 'b' ? 0.3 : 0.15, out); } return; }
   if (sk.id === 'bingpo' && FX.has('needle6')) sk = { ...sk, hits: 6 };
   // 变招：改数值的先把这一招的参数改掉（hit() 里读的是 b.castSk，所以一起换）
   const tune = o => { sk = { ...sk, ...o }; b.castSk = sk; };
   if (sk.id === 'liedi') { if (R === 'a') tune({ m: sk.m * 1.6 }); if (R === 'b') tune({ stun: 0.4 }); if (FX.has('liediOff')) tune({ stun: Math.max(sk.stun || 0, 0.5) }); }
-  if (sk.id === 'luoshi') { if (R === 'a') tune({ m: sk.m * 1.3 }); if (R === 'b') tune({ stun: 0.3 }); }
+  if (sk.id === 'luoshi') { if (R === 'a') tune({ m: sk.m * 1.3 }); if (R === 'b') tune({ stun: 0.45 }); }
   if (sk.id === 'jinguang') { if (R === 'a') tune({ ap: 'chill' }); if (R === 'b' && t.st.melt) tune({ m: sk.m * 1.6 }); }
   if (sk.id === 'lieyan' && R === 'b' && t.st.burn) tune({ m: sk.m * 1.8 });
   if (sk.id === 'shidu' && R === 'a') tune({ m: sk.m * 2 });
@@ -2631,7 +2646,7 @@ function castGen(b, P, sk, foes, out, m) {
         if (dy && t.hp > 0) { stSet(P, t, 'armor', out); stSet(P, t, 'burn', out); }
         if (sk.id === 'hanren' && R === 'a' && t.hp > 0) { t.st.vuln = 3; out.pops.push([t.id, '碎骨', 'curse', 1]); }
         if (sk.id === 'hanren' && R === 'b') { P.shield = (P.shield || 0) + Math.round(P.maxHp * 0.08); out.pops.push(['P', '护体', 'buff']); }
-        if (sk.id === 'fuhu' && R === 'b') setWeak(t, 3, 0.3, out);
+        if (sk.id === 'fuhu' && t.hp > 0) setWeak(t, R === 'b' ? 3 : 2, R === 'b' ? 0.3 : 0.15, out);   // 伏虎拳本身带一点削弱，卸劲加强
         if (sk.id === 'lunzhuan' && R === 'b' && t.hp > 0) stSet(P, t, 'burn', out); }
       if (sk.id === 'lunzhuan' && R === 'a') { const capS = Math.round(P.maxHp * mageCap(P) / 100); if ((P.shield || 0) < capS) { P.shield = Math.min(capS, (P.shield || 0) + Math.round(P.maxHp * sustV(P, 'a') / 100)); out.pops.push(['P', '护体', 'buff']); } }
       break;
@@ -2790,6 +2805,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src === b.P && fx.has('gGamble') && !opt.proc && opt.flat == null && tgt.side === 'e') { const r = Math.random(); if (r < 0.1) { gam = 3; out.pops.push(['P', '孤注', 'crit']); } else if (r < 0.2) { out.pops.push([tgt.id, '打空', 'miss']); return 0; } }
   let d = opt.flat != null ? opt.flat : src.atk * mult * (1 + (src.dmgPct || 0) / 100 + (elem !== 'phys' ? (src.elem || 0) / 100 : 0));
   if (src.st.warcry) d *= 1.4;
+  if (src.st.zhenyue) d *= 1 + ZHENYUE_DMG;   // 镇岳符
   if (src.st.rumo) d *= 1 + ULT.rmDmg;   // 狂刀客必杀「入魔」
   if (src.st.qianren) d *= 1 + ULT.qrDmg;   // 刺客必杀「无影千刃」
   if (src.st.guiyi) d *= 1 + ULT.gyDmg;   // 道士必杀「五行归一」

@@ -6,12 +6,13 @@ const MAX_LEVEL = 50;
 
 const RUNES = {
   // 2026-11 补齐：每招两个变招，一攻一守（或一辅）。道士标「改为 X 行」的会换五行，方便凑齐一圈相生
-  liedi:      [{ n: '崩山', d: '伤害 +60%' }, { n: '震地', d: '40% 几率眩晕；打中的敌人 2 回合内伤害 -20%' }],
+  liedi:      [{ n: '崩山', d: '伤害 +60%' }, { n: '震地', d: '眩晕几率提高到 40%；打中的敌人 2 回合内伤害 -20%' }],
   lieyan:     [{ n: '燎原', d: '灼烧蔓延给所有敌人' }, { n: '焚身', d: '对已经灼烧的敌人伤害 +80%' }],
   hanren:     [{ n: '碎骨', d: '打中的敌人 3 回合内受到的伤害 +20%' }, { n: '寒甲', d: '打中后获得 8% 最大气血的护体' }],
   bawang:     [{ n: '破釜', d: '怒意满时必定暴击' }, { n: '卸力', d: '按吃掉的怒意回血：每点 0.3% 最大气血' }],
   butui:      [{ n: '死战', d: '不退期间伤害 +40%' }, { n: '铁壁', d: '多持续 1 回合，期间反震翻倍' }],
-  luoshi:     [{ n: '陨铁诀', d: '改为金行，伤害 +30%' }, { n: '山崩', d: '30% 几率眩晕每个敌人' }],
+  zhenyue:    [{ n: '坤元', d: '护身符箓提高到 40% 最大气血' }, { n: '地脉', d: '同时让所有敌人破甲' }],
+  luoshi:     [{ n: '陨铁诀', d: '改为金行，伤害 +30%' }, { n: '山崩', d: '眩晕几率提高到 45%' }],
   jinguang:   [{ n: '玄水咒', d: '改为水行，打中的敌人冰冻' }, { n: '破甲金光', d: '对破甲的敌人伤害 +60%' }],
   lunzhuan:   [{ n: '厚土符', d: '改为土行，引爆后自己得一层护身符箓' }, { n: '余烬', d: '引爆后目标重新灼烧' }],
   wulei:      [{ n: '青木雷', d: '改为木行，「连」满 3 层就劈中所有敌人' }, { n: '天罚', d: '对眩晕的敌人伤害翻倍' }],
@@ -24,7 +25,7 @@ const RUNES = {
   shadowkill: [{ n: '影分', d: '连刺分给所有敌人' }, { n: '嗜血影', d: '每刺一下恢复 2% 最大气血' }],
   yandun:     [{ n: '毒烟', d: '烟遁时让所有敌人中毒' }, { n: '金蝉', d: '多持续 1 回合，期间每回合恢复 5% 最大气血' }],
   ganlu:      [{ n: '净世', d: '伤害 +80%' }, { n: '甘霖', d: '回血翻倍，不再伤敌' }],
-  fuhu:       [{ n: '降龙', d: '对眩晕的敌人必定暴击' }, { n: '卸劲', d: '打中的敌人 3 回合内伤害 -30%' }],
+  fuhu:       [{ n: '降龙', d: '对眩晕的敌人必定暴击' }, { n: '卸劲', d: '削弱提高到 3 回合内伤害 -30%' }],
   budong:     [{ n: '明王怒', d: '伤害 +60%' }, { n: '金身', d: '护体翻倍，冷却 +1' }],
   chanhou:    [{ n: '当头棒喝', d: '施放时 50% 几率眩晕每个敌人' }, { n: '禅定', d: '嘲讽多 1 回合' }],
   whirl:      [{ n: '血旋', d: '每击中一个敌人恢复 2% 最大气血' }, { n: '飓风刀', d: '伤害 +50%，冷却 +1' }],
@@ -121,9 +122,9 @@ const BUILDS = {
     { set: 'busi', d: '压着血线转旋风刀，越残越疯，清群怪最快', sk: [['liedi', 'b'], ['whirl', 'a'], ['bloodlust', 'b'], ['warcry', 'a'], ['butui', 'b']],
       leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['zhanhun', 'guard', 'lianhuan'] } ],
   mage: [
-    { set: 'guiyuan', d: '木火土金水一圈圈接下去，「连」满了每招四倍', sk: [['chain', 'b'], ['fireball', 'b'], ['luoshi', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
+    { set: 'guiyuan', d: '木火土金水一圈圈接下去，「连」满了每招四倍', sk: [['chain', 'b'], ['fireball', 'b'], ['zhenyue', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
       leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['wuxing', 'guard', 'shigu'] },
-    { set: 'wanfu', d: '不管顺序，把状态挂满全场再引爆', sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
+    { set: 'wanfu', d: '不管顺序，把状态挂满全场再引爆', sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['zhenyue', 'b']],
       leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
     { set: 'yinbing', d: '尸群碾压：僵尸替你挨打，倒下还会炸', sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['curse', 'b']],   /* 2026-11-25 尸爆换成摄魂咒·腐骨：尸爆把八成多的僵尸自己炸掉，550 层 66%/65% → 90%/80% */

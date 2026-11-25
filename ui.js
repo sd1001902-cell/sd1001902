@@ -797,15 +797,16 @@ function twPickHTML(cls, p, i) {
       if (OS) { const c = cnt[OS.id], lost = [2, 4, 6].filter(n => OS['b' + n + 'd'] && c >= n && c - 1 < n);
         ol += `（${OS.n} ${c} → ${c - 1} 件${lost.length ? `，<b class="lo">${lost.join('、')} 件效果会掉</b>` : ''}）`; } }
     det.push(`<p class="twol">${ol}</p>`); }
-  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>新招式 · ${k.n}${p.swap ? '<small>招式满了，换掉一招</small>' : ''}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
+  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>新招式 · ${k.n}${skcTag(cls, k)}${p.swap ? `<small>${kit.sk.length < LOADOUT_MAX ? `${SK_CAT[k.cat || 'core']}放不下了` : '招式满了'}，换掉一招</small>` : ''}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
     const R = RUNES[k.id]; if (R) det.push(`<p class="twol">以后还能变招：「${R[0].n}」${esc(R[0].d)}；「${R[1].n}」${esc(R[1].d)}</p>`);
     if (p.swap) { const sw = sel && TWSEL.sw, ok = sw && kit.sk.includes(sw);
-      det.push(`<p class="twol">换掉哪一招：</p><div class="twsw">${kit.sk.map(id => { const o = C.skills.find(x => x.id === id); return o ? `<button class="${id === sw ? 'on' : ''}" data-act="twswap" data-arg="${id}">${o.n}</button>` : ''; }).join('')}</div>`);
+      det.push(`<p class="twol">换掉哪一招：</p><div class="twsw">${kit.sk.map(id => { const o = C.skills.find(x => x.id === id); const fit = skFits(cls, kit.sk.map(x => x === id ? k.id : x)); return o ? `<button class="${id === sw ? 'on' : ''}" ${fit ? '' : 'disabled'} data-act="twswap" data-arg="${id}">${o.n}<small>${SK_CAT[o.cat || 'core']}</small></button>` : ''; }).join('')}</div>`);
+      if (kit.sk.some(id => !skFits(cls, kit.sk.map(x => x === id ? k.id : x)))) det.push(`<p class="twol">灰着的换掉以后不合分类（核心、状态、控制各一格，另有 ${SK_FREE} 个自由格）</p>`);
       if (ok) { const o = C.skills.find(x => x.id === sw), r = kit.rn[sw], OR = r && RUNES[sw][r === 'a' ? 0 : 1], lose = twRelSrc(cls, kit, o.n);
         det.push(`<p class="twol">换下：<b>${o.n}</b>${OR ? `，它的变招「${OR.n}」一起丢掉` : ''}</p>`);
         if (lose.length) det.push(`<p class="twol"><b class="lo">这些跟${o.n}有关，换掉后会用不上：${lose.join('、')}</b></p>`); } } }
   else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1], cur = kit.rn[p.id], R0 = cur && RUNES[p.id][cur === 'a' ? 0 : 1];
-    h = `<b>变招 · ${k.n}「${R.n}」</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
+    h = `<b>变招 · ${k.n}「${R.n}」${skcTag(cls, k)}</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
     det.push(`<p class="twol">${R0 ? `换掉现在的「${R0.n}」：${esc(R0.d)}` : `${k.n}现在没有变招`}</p>`); }
   else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">神兵之魂 · ${L.n}</b>`; d = esc(L.d); rel = twRelOut(cls, kit, L.d);
     det.push(`<p class="twol">神兵之魂只给特效，不占装备格（已有 ${kit.cube.length}/3）</p>`); }
@@ -845,14 +846,14 @@ const twKitModal = () => () => {
     return `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}${L ? `<span>${esc(L.d)}</span>` : ''}</div>`; }).join('');
   const skRow = (k, own) => { const r = kit.rn[k.id], RR = RUNES[k.id] || [], R = r && RR[r === 'a' ? 0 : 1];
     const rn = own ? (R ? `<span class="twrn">变招「${R.n}」：${esc(R.d)}</span>` : RR.length ? `<span class="twrn dim">还没变招，三选一会出：「${RR[0].n}」${esc(RR[0].d)}；「${RR[1].n}」${esc(RR[1].d)}</span>` : '') : '';
-    return `<div class="twkrow${own ? '' : ' dim'}"><small>${k.cd ? `冷却 ${k.cd}` : '基本招式'}</small><b>${k.n}</b>${wxBadge(k)}<span>${esc(k.d)}</span>${rn}</div>`; };
+    return `<div class="twkrow${own ? '' : ' dim'}"><small>${k.cd ? `冷却 ${k.cd}` : '基本招式'}</small><b>${k.n}</b>${wxBadge(k)}${skcTag(cls, k)}<span>${esc(k.d)}</span>${rn}</div>`; };
   const basic = C.skills.filter(k => !k.cd), own = kit.sk.map(id => C.skills.find(x => x.id === id)).filter(Boolean), rest = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
   const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>神兵之魂</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
   const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>灵玉</small><b style="color:${G.c}">${G.n} ${g.lv} 级</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
   const all = kit.allN ? `<div class="twkrow"><small>全属性</small><b>伤害、气血、护甲各 +${TW_ALL * kit.allN}%</b><span>三选一都不要换来的，已拿 ${kit.allN} 次</span></div>` : '';
   return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">塔装 · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">
     ${sets ? H('套装效果') + sets : ''}${H('装备')}${eq}
-    ${H(`招式（${own.length}/${LOADOUT_MAX}）`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
+    ${H(`招式（${own.length}/${LOADOUT_MAX} · ${skRuleTxt(cls, kit.sk)}）`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
     ${rest.length ? H('还没学的招式 · 三选一里会出') + rest.map(k => skRow(k, false)).join('') : ''}
     ${cu || lg || all ? H('神兵之魂 · 灵玉') + cu + lg + all : ''}</div>`;
 };
@@ -1244,25 +1245,31 @@ function formHTML(cls) {
       return `<button class="fz ${form[i] === z ? 'on' : ''}" ${lock ? 'disabled' : ''} data-act="form" data-arg="${i}|${z}">${SPR.img(Z.spr, 26, Z.pal)}<b>${Z.n}</b><small>${lock ? Z.lv + ' 级' : esc(Z.d.split('，')[0])}</small></button>`; }).join('')}</div>`).join('')}
     <p class="help-p">${ZOMBIE_ORDER.map(z => `<b>${ZOMBIES[z].n}</b>（${ZOMBIES[z].lv} 级）：${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
 }
+// 武学分类（2026-11-25）：每招标核心、状态、控制；带招按「核心 1 + 状态 1 + 控制 1 + 自由 2」
+const skcTag = (cls, k) => { const c = k.cd ? (k.cat || 'core') : 'base'; return `<i class="skc c-${c}">${c === 'base' ? '基础' : SK_CAT[c]}</i>`; };
+const skRuleTxt = (cls, L) => { const c = skCnt(cls, L); return `核心 ${c.core} · 状态 ${c.buff} · 控制 ${c.ctrl} · 自由格 ${skFree(cls, L)}/${SK_FREE}`; };
+const SK_RULE = `出战武学分三类：<b>核心</b>是主力输出，<b>状态</b>是增益、护体、回血，<b>控制</b>是眩晕、冰冻、削弱、嘲讽。五个格子里核心、状态、控制各一格，另外两格是自由格，放哪一类都行。`;
 function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
   const eqIds = new Set(act.map(k => k.id));
   const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b><small>${lock ? k.lv + ' 级领悟' : '冷却 ' + k.cd}</small>
+    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>${lock ? k.lv + ' 级领悟' : '冷却 ' + k.cd}</small>
       <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="上移">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="下移">▼</button>` : ''}
       ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? '卸下' : '装配'}</button>`}</span></div>
       <p>${k.d}${s.sk[k.id] ? `<span class="skb">（心法 +${s.sk[k.id]}%）</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
       ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
-  const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv);
+  const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv), L = act.map(k => k.id);
+  const restG = SK_CATS.map(c => { const ks = rest.filter(k => (k.cat || 'core') === c); return ks.length ? `<p class="skgh">${skcTag(cls, { cd: 1, cat: c })}${c === 'core' ? '主力输出' : c === 'buff' ? '增益、护体、回血' : '眩晕、冰冻、削弱、嘲讽'}</p>${ks.map(k => row(k, 0, false)).join('')}` : ''; }).join('');
   return `${mechCard(cls)}${inBag ? '' : buildCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>状态配合 · 怎么打连招</summary>
       <p class="help-p">起手技能给敌人「挂状态」，收招技能打带这个状态的敌人，会有额外效果（伤害翻倍、必定暴击、打碎、传染……）。</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
       <p class="help-p">同伴也会挂状态：Ngoc 灼烧，珍姑娘破甲，龙道长冰冻。带对了同伴，你的收招就有得打。</p></details>
     <h4 class="sub-h">出战武学 <small>${act.length}/${LOADOUT_MAX} · 自动出招时从上到下优先${rOn ? ' · 可以给每招选一种变招' : ''}</small></h4>
+    <details class="wxinfo skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
     ${comboHints(act, SAVE.comp)}
     <div class="skl">${act.map((k, i) => row(k, i, true)).join('') || '<div class="empty-note">还没有装配武学</div>'}
-      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b><small>基本招式，其他武学都在冷却时使用</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
-    ${rest.length ? `<h4 class="sub-h">没带上的武学</h4><div class="skl">${rest.map(k => row(k, 0, false)).join('')}</div>` : ''}`;
+      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b>${skcTag(cls, basic)}<small>基本招式，其他武学都在冷却时使用</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
+    ${rest.length ? `<h4 class="sub-h">没带上的武学</h4><div class="skl">${restG}</div>` : ''}`;
 }
 function talentGrid(cls) {
   const tal = SAVE.chars[cls].tal, brs = talentBranches(cls); if (TBR >= brs.length) TBR = 0;
@@ -4115,7 +4122,8 @@ const ACT = {
     toast(`照配好了：带上 ${r.sk} 招${r.miss ? `（${r.miss} 招还没学会）` : ''}${r.cube ? `，乾坤袋放了 ${r.cube} 个` : ''}${r.gems ? `，灵玉放了 ${r.gems} 颗` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
-  skeq: id => { const r = equipSkill(ctxCls(), id); if (r === 'full') return toast(`最多带 ${LOADOUT_MAX} 个武学，先卸下一个`); SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
+  skeq: id => { const cls = ctxCls(), r = equipSkill(cls, id); if (r === 'full') return toast(`最多带 ${LOADOUT_MAX} 个武学，先卸下一个`);
+    if (r === 'cat') { const c = skCat(cls, id); return toast(`两个自由格都用掉了，放不下这个${SK_CAT[c]}招式：先卸下一个多带的招式`); } SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
   bclaim: i => { const r = claimBounty(+i); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal('悬赏宝箱', r)); achToast(checkAch()); },
   bbonus: () => { const r = claimBountyBonus(); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal('赏金大箱', r)); achToast(checkAch()); },
   lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? '灵玉升级成功！' : '升级失败'); refresh(); achToast(checkAch()); },

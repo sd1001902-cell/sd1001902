@@ -798,15 +798,16 @@ function twPickHTML(cls, p, i) {
       if (OS) { const c = cnt[OS.id], lost = [2, 4, 6].filter(n => OS['b' + n + 'd'] && c >= n && c - 1 < n);
         ol += ` (${OS.n} ${c} → ${c - 1} món${lost.length ? `, <b class="lo">mất hiệu ứng ${lost.join(", ")} món</b>` : ''})`; } }
     det.push(`<p class="twol">${ol}</p>`); }
-  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>Chiêu mới · ${k.n}${p.swap ? "<small>Đã đủ chiêu, phải bỏ một chiêu</small>" : ''}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
+  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>Chiêu mới · ${k.n}${skcTag(cls, k)}${p.swap ? `<small>${kit.sk.length < LOADOUT_MAX ? `Không còn chỗ cho ${SK_CAT[k.cat || 'core']}` : "Đã đủ chiêu"}, phải bỏ một chiêu</small>` : ''}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
     const R = RUNES[k.id]; if (R) det.push(`<p class="twol">Sau này còn biến chiêu: «${R[0].n}» ${esc(R[0].d)}; «${R[1].n}» ${esc(R[1].d)}</p>`);
     if (p.swap) { const sw = sel && TWSEL.sw, ok = sw && kit.sk.includes(sw);
-      det.push(`<p class="twol">Bỏ chiêu nào:</p><div class="twsw">${kit.sk.map(id => { const o = C.skills.find(x => x.id === id); return o ? `<button class="${id === sw ? 'on' : ''}" data-act="twswap" data-arg="${id}">${o.n}</button>` : ''; }).join('')}</div>`);
+      det.push(`<p class="twol">Bỏ chiêu nào:</p><div class="twsw">${kit.sk.map(id => { const o = C.skills.find(x => x.id === id); const fit = skFits(cls, kit.sk.map(x => x === id ? k.id : x)); return o ? `<button class="${id === sw ? 'on' : ''}" ${fit ? '' : 'disabled'} data-act="twswap" data-arg="${id}">${o.n}<small>${SK_CAT[o.cat || 'core']}</small></button>` : ''; }).join('')}</div>`);
+      if (kit.sk.some(id => !skFits(cls, kit.sk.map(x => x === id ? k.id : x)))) det.push(`<p class="twol">Ô mờ là bỏ đi sẽ không hợp phân loại (Cốt lõi, Trạng thái, Khống chế mỗi loại một ô, thêm ${SK_FREE} ô tự do)</p>`);
       if (ok) { const o = C.skills.find(x => x.id === sw), r = kit.rn[sw], OR = r && RUNES[sw][r === 'a' ? 0 : 1], lose = twRelSrc(cls, kit, o.n);
         det.push(`<p class="twol">Thay ra: <b>${o.n}</b>${OR ? `, biến chiêu «${OR.n}» của nó cũng mất` : ''}</p>`);
         if (lose.length) det.push(`<p class="twol"><b class="lo">Mấy thứ này liên quan tới ${o.n}, bỏ rồi sẽ vô dụng: ${lose.join(", ")}</b></p>`); } } }
   else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1], cur = kit.rn[p.id], R0 = cur && RUNES[p.id][cur === 'a' ? 0 : 1];
-    h = `<b>Biến chiêu · ${k.n} «${R.n}»</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
+    h = `<b>Biến chiêu · ${k.n} «${R.n}»${skcTag(cls, k)}</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
     det.push(`<p class="twol">${R0 ? `Thay «${R0.n}» hiện tại: ${esc(R0.d)}` : `${k.n} hiện chưa có biến chiêu`}</p>`); }
   else if (p.t === 'cube') { const L = LEGENDS.find(l => l.id === p.lid); h = `<b class="r-legend">Hồn thần binh · ${L.n}</b>`; d = esc(L.d); rel = twRelOut(cls, kit, L.d);
     det.push(`<p class="twol">Hồn thần binh chỉ cho hiệu ứng, không chiếm ô trang bị (đã có ${kit.cube.length}/3)</p>`); }
@@ -846,14 +847,14 @@ const twKitModal = () => () => {
     return `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}${L ? `<span>${esc(L.d)}</span>` : ''}</div>`; }).join('');
   const skRow = (k, own) => { const r = kit.rn[k.id], RR = RUNES[k.id] || [], R = r && RR[r === 'a' ? 0 : 1];
     const rn = own ? (R ? `<span class="twrn">Biến chiêu «${R.n}»: ${esc(R.d)}</span>` : RR.length ? `<span class="twrn dim">Chưa biến chiêu, chọn một trong ba sẽ ra: «${RR[0].n}» ${esc(RR[0].d)}; «${RR[1].n}» ${esc(RR[1].d)}</span>` : '') : '';
-    return `<div class="twkrow${own ? '' : ' dim'}"><small>${k.cd ? `Hồi chiêu ${k.cd}` : "Chiêu cơ bản"}</small><b>${k.n}</b>${wxBadge(k)}<span>${esc(k.d)}</span>${rn}</div>`; };
+    return `<div class="twkrow${own ? '' : ' dim'}"><small>${k.cd ? `Hồi chiêu ${k.cd}` : "Chiêu cơ bản"}</small><b>${k.n}</b>${wxBadge(k)}${skcTag(cls, k)}<span>${esc(k.d)}</span>${rn}</div>`; };
   const basic = C.skills.filter(k => !k.cd), own = kit.sk.map(id => C.skills.find(x => x.id === id)).filter(Boolean), rest = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
   const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>Hồn thần binh</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
   const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>Linh ngọc</small><b style="color:${G.c}">${G.n} cấp ${g.lv}</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
   const all = kit.allN ? `<div class="twkrow"><small>Toàn thuộc tính</small><b>Sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL * kit.allN}%</b><span>Đổi từ những lần không lấy gì, đã lấy ${kit.allN} lần</span></div>` : '';
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Đồ tháp · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">
     ${sets ? H("Hiệu ứng bộ") + sets : ''}${H("Trang bị")}${eq}
-    ${H(`Chiêu (${own.length}/${LOADOUT_MAX})`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
+    ${H(`Chiêu (${own.length}/${LOADOUT_MAX} · ${skRuleTxt(cls, kit.sk)})`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
     ${rest.length ? H("Chiêu chưa học · sẽ ra khi chọn một trong ba") + rest.map(k => skRow(k, false)).join('') : ''}
     ${cu || lg || all ? H("Hồn thần binh · Linh ngọc") + cu + lg + all : ''}</div>`;
 };
@@ -1245,25 +1246,31 @@ function formHTML(cls) {
       return `<button class="fz ${form[i] === z ? 'on' : ''}" ${lock ? 'disabled' : ''} data-act="form" data-arg="${i}|${z}">${SPR.img(Z.spr, 26, Z.pal)}<b>${Z.n}</b><small>${lock ? Z.lv + " cấp" : esc(Z.d.split(", ")[0])}</small></button>`; }).join('')}</div>`).join('')}
     <p class="help-p">${ZOMBIE_ORDER.map(z => `<b>${ZOMBIES[z].n}</b> (cấp ${ZOMBIES[z].lv}): ${ZOMBIES[z].d}`).join('<br>')}</p></div>`;
 }
+// 武学分类（2026-11-25）：每招标核心、状态、控制；带招按「核心 1 + 状态 1 + 控制 1 + 自由 2」
+const skcTag = (cls, k) => { const c = k.cd ? (k.cat || 'core') : 'base'; return `<i class="skc c-${c}">${c === 'base' ? "Cơ bản" : SK_CAT[c]}</i>`; };
+const skRuleTxt = (cls, L) => { const c = skCnt(cls, L); return `Cốt lõi ${c.core} · Trạng thái ${c.buff} · Khống chế ${c.ctrl} · Ô tự do ${skFree(cls, L)}/${SK_FREE}`; };
+const SK_RULE = `Võ học xuất chiến chia ba loại: <b>Cốt lõi</b> là chiêu gây sát thương chính, <b>Trạng thái</b> là tăng lực, hộ thể, hồi máu, <b>Khống chế</b> là choáng, đóng băng, làm yếu, khiêu khích. Trong năm ô, Cốt lõi, Trạng thái, Khống chế mỗi loại một ô, hai ô còn lại là ô tự do, loại nào cũng được.`;
 function skillPanel(cls, inBag) {
   const ch = SAVE.chars[cls], s = charStats(cls), { act, basic, all } = skillList(cls), rOn = featureOn('runes');
   const eqIds = new Set(act.map(k => k.id));
   const row = (k, i, eq) => { const lock = ch.level < k.lv, r = ch.runes[k.id];
-    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b><small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
+    return `<div class="sk ${lock ? 'locked' : ''} ${eq ? 'eq' : ''}"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>${lock ? k.lv + " cấp lĩnh ngộ" : "Hồi chiêu " + k.cd}</small>
       <span class="ord">${eq ? `<button class="mini" ${i ? '' : 'disabled'} data-act="skup" data-arg="${k.id}" aria-label="Lên">▲</button><button class="mini" ${i < act.length - 1 ? '' : 'disabled'} data-act="skdn" data-arg="${k.id}" aria-label="Xuống">▼</button>` : ''}
       ${lock ? '' : `<button class="mini wide ${eq ? '' : 'go'}" data-act="skeq" data-arg="${k.id}">${eq ? "Tháo" : "Mang"}</button>`}</span></div>
       <p>${k.d}${s.sk[k.id] ? `<span class="skb"> (tâm pháp +${s.sk[k.id]}%)</span>` : ''}</p>${k.ap || k.pay ? `<div class="sktags">${skTags(k)}</div>` : ''}${lock ? '' : skillBoosts(cls, k)}
       ${eq && rOn && RUNES[k.id] ? `<div class="runes">${RUNES[k.id].map((R, j) => { const id = j ? 'b' : 'a'; return `<button class="rune ${r === id ? 'on' : ''}" data-act="rune" data-arg="${k.id}|${id}"><b>${R.n}</b><span>${R.d}</span></button>`; }).join('')}</div>` : ''}</div>`; };
-  const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv);
+  const rest = all.filter(k => !eqIds.has(k.id)).sort((a, b) => a.lv - b.lv), L = act.map(k => k.id);
+  const restG = SK_CATS.map(c => { const ks = rest.filter(k => (k.cat || 'core') === c); return ks.length ? `<p class="skgh">${skcTag(cls, { cd: 1, cat: c })}${c === 'core' ? "Sát thương chính" : c === 'buff' ? "Tăng lực, hộ thể, hồi máu" : "Choáng, đóng băng, làm yếu, khiêu khích"}</p>${ks.map(k => row(k, 0, false)).join('')}` : ''; }).join('');
   return `${mechCard(cls)}${inBag ? '' : buildCard(cls)}${formHTML(cls)}<details class="wxinfo"><summary>Phối hợp trạng thái · cách đánh liên hoàn</summary>
       <p class="help-p">Chiêu mở đòn “gây trạng thái” lên địch, chiêu kết đòn đánh vào địch đang mang trạng thái đó sẽ có thêm hiệu ứng (gấp đôi sát thương, chắc chắn chí mạng, đập vỡ, lây lan…).</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>
       <p class="help-p">Đồng hành cũng gây trạng thái: Ngoc thiêu đốt, cô Trân phá giáp, Long đạo trưởng đóng băng. Dẫn đúng người, chiêu kết đòn của bạn mới có đất dụng võ.</p></details>
     <h4 class="sub-h">Võ học xuất chiến <small>${act.length}/${LOADOUT_MAX} · khi tự động ra chiêu thì ưu tiên từ trên xuống${rOn ? " · mỗi chiêu được chọn một biến chiêu" : ''}</small></h4>
+    <details class="wxinfo skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
     ${comboHints(act, SAVE.comp)}
     <div class="skl">${act.map((k, i) => row(k, i, true)).join('') || "<div class=\"empty-note\">Chưa mang võ học nào</div>"}
-      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b><small>Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
-    ${rest.length ? `<h4 class="sub-h">Võ học chưa mang</h4><div class="skl">${rest.map(k => row(k, 0, false)).join('')}</div>` : ''}`;
+      <div class="sk basic"><div class="skh"><b>${wxBadge(basic)}${basic.n}</b>${skcTag(cls, basic)}<small>Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu</small></div><p>${basic.d}</p>${basic.ap || basic.pay ? `<div class="sktags">${skTags(basic)}</div>` : ''}${skillBoosts(cls, basic)}</div></div>
+    ${rest.length ? `<h4 class="sub-h">Võ học chưa mang</h4><div class="skl">${restG}</div>` : ''}`;
 }
 function talentGrid(cls) {
   const tal = SAVE.chars[cls].tal, brs = talentBranches(cls); if (TBR >= brs.length) TBR = 0;
@@ -4116,7 +4123,8 @@ const ACT = {
     toast(`Đã phối xong: mang ${r.sk} chiêu${r.miss ? ` (${r.miss} chiêu chưa học)` : ''}${r.cube ? `, Túi Càn Khôn đặt ${r.cube} món` : ''}${r.gems ? `, linh ngọc đặt ${r.gems} viên` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
-  skeq: id => { const r = equipSkill(ctxCls(), id); if (r === 'full') return toast(`Mang tối đa ${LOADOUT_MAX} võ học, tháo bớt một cái trước`); SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
+  skeq: id => { const cls = ctxCls(), r = equipSkill(cls, id); if (r === 'full') return toast(`Mang tối đa ${LOADOUT_MAX} võ học, tháo bớt một cái trước`);
+    if (r === 'cat') { const c = skCat(cls, id); return toast(`Hai ô tự do đã dùng hết, không còn chỗ cho chiêu ${SK_CAT[c]} này: hãy gỡ bớt một chiêu thừa trước`); } SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
   bclaim: i => { const r = claimBounty(+i); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal("Rương truy nã", r)); achToast(checkAch()); },
   bbonus: () => { const r = claimBountyBonus(); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal("Rương thưởng lớn", r)); achToast(checkAch()); },
   lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? "Nâng linh ngọc thành công!" : "Nâng thất bại"); refresh(); achToast(checkAch()); },

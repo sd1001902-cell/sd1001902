@@ -6,12 +6,13 @@ const MAX_LEVEL = 50;
 
 const RUNES = {
   // 2026-11 补齐：每招两个变招，一攻一守（或一辅）。道士标「改为 X 行」的会换五行，方便凑齐一圈相生
-  liedi:      [{ n: "Băng Sơn", d: "Sát thương +60%" }, { n: "Chấn Địa", d: "40% tỉ lệ gây choáng; kẻ địch trúng đòn trong 2 lượt sát thương -20%" }],
+  liedi:      [{ n: "Băng Sơn", d: "Sát thương +60%" }, { n: "Chấn Địa", d: "Tỉ lệ choáng tăng lên 40%; địch trúng đòn trong 2 lượt sát thương -20%" }],
   lieyan:     [{ n: "Liệu Nguyên", d: "Thiêu đốt lan sang mọi kẻ địch" }, { n: "Phần Thân", d: "Sát thương lên kẻ địch đang bị thiêu đốt +80%" }],
   hanren:     [{ n: "Toái Cốt", d: "Kẻ địch trúng đòn trong 3 lượt nhận sát thương +20%" }, { n: "Hàn Giáp", d: "Đánh trúng thì nhận hộ thể bằng 8% khí huyết tối đa" }],
   bawang:     [{ n: "Phá Phủ", d: "Nộ ý đầy thì chắc chắn chí mạng" }, { n: "Tá Lực", d: "Hồi máu theo Nộ ý đã tiêu: mỗi điểm 0,3% khí huyết tối đa" }],
   butui:      [{ n: "Tử Chiến", d: "Trong lúc Bất Thoái sát thương +40%" }, { n: "Thiết Bích", d: "Kéo dài thêm 1 lượt, trong lúc đó phản chấn gấp đôi" }],
-  luoshi:     [{ n: "Vẫn Thiết Quyết", d: "Đổi thành hành Kim, sát thương +30%" }, { n: "Sơn Băng", d: "30% tỉ lệ gây choáng mỗi kẻ địch" }],
+  zhenyue:    [{ n: "Khôn Nguyên", d: "Bùa hộ thân tăng lên 40% khí huyết tối đa" }, { n: "Địa Mạch", d: "Đồng thời làm mọi kẻ địch bị phá giáp" }],
+  luoshi:     [{ n: "Vẫn Thiết Quyết", d: "Đổi thành hành Kim, sát thương +30%" }, { n: "Sơn Băng", d: "Tỉ lệ choáng tăng lên 45%" }],
   jinguang:   [{ n: "Huyền Thủy Chú", d: "Đổi thành hành Thủy, kẻ địch trúng đòn bị đóng băng" }, { n: "Kim Quang Phá Giáp", d: "Sát thương lên kẻ địch đang phá giáp +60%" }],
   lunzhuan:   [{ n: "Hậu Thổ Phù", d: "Đổi thành hành Thổ, kích nổ xong bản thân nhận một lớp bùa hộ thân" }, { n: "Dư Tẫn", d: "Kích nổ xong mục tiêu bị thiêu đốt lại" }],
   wulei:      [{ n: "Thanh Mộc Lôi", d: "Đổi thành hành Mộc, “Liên” đủ 3 tầng là đánh trúng mọi kẻ địch" }, { n: "Thiên Phạt", d: "Sát thương lên kẻ địch đang choáng gấp đôi" }],
@@ -24,7 +25,7 @@ const RUNES = {
   shadowkill: [{ n: "Ảnh Phân", d: "Chuỗi đâm chia đều cho mọi kẻ địch" }, { n: "Thị Huyết Ảnh", d: "Mỗi nhát đâm hồi 2% khí huyết tối đa" }],
   yandun:     [{ n: "Độc Yên", d: "Khi Yên Độn làm mọi kẻ địch trúng độc" }, { n: "Kim Thiền", d: "Kéo dài thêm 1 lượt, trong lúc đó mỗi lượt hồi 5% khí huyết tối đa" }],
   ganlu:      [{ n: "Tịnh Thế", d: "Sát thương +80%" }, { n: "Cam Lâm", d: "Hồi máu gấp đôi, không còn gây sát thương" }],
-  fuhu:       [{ n: "Hàng Long", d: "Chắc chắn chí mạng lên kẻ địch đang choáng" }, { n: "Tá Kình", d: "Kẻ địch trúng đòn trong 3 lượt sát thương -30%" }],
+  fuhu:       [{ n: "Hàng Long", d: "Chắc chắn chí mạng lên kẻ địch đang choáng" }, { n: "Tá Kình", d: "Làm yếu tăng lên trong 3 lượt sát thương -30%" }],
   budong:     [{ n: "Minh Vương Nộ", d: "Sát thương +60%" }, { n: "Kim Thân", d: "Hộ thể gấp đôi, hồi chiêu +1" }],
   chanhou:    [{ n: "Đương Đầu Bổng Hát", d: "Khi dùng có 50% tỉ lệ gây choáng mỗi kẻ địch" }, { n: "Thiền Định", d: "Khiêu khích thêm 1 hiệp" }],
   whirl:      [{ n: "Huyết Toàn", d: "Mỗi lần đánh trúng một kẻ địch hồi 2% khí huyết tối đa" }, { n: "Phi Phong Đao", d: "Sát thương +50%, hồi chiêu +1" }],
@@ -121,9 +122,9 @@ const BUILDS = {
     { set: 'busi', d: "Giữ máu thấp mà xoay Toàn Phong Đao, càng tàn càng điên, dọn bầy nhanh nhất", sk: [['liedi', 'b'], ['whirl', 'a'], ['bloodlust', 'b'], ['warcry', 'a'], ['butui', 'b']],
       leg: ['xiuluodai', 'liediqiao'], cube: ['xuexuan', 'madman', 'pojunkui'], gems: ['zhanhun', 'guard', 'lianhuan'] } ],
   mage: [
-    { set: 'guiyuan', d: "Ngũ hành Mộc Hỏa Thổ Kim Thủy nối nhau từng vòng, “Liên” đầy thì mỗi chiêu gấp bốn", sk: [['chain', 'b'], ['fireball', 'b'], ['luoshi', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
+    { set: 'guiyuan', d: "Ngũ hành Mộc Hỏa Thổ Kim Thủy nối nhau từng vòng, “Liên” đầy thì mỗi chiêu gấp bốn", sk: [['chain', 'b'], ['fireball', 'b'], ['zhenyue', 'b'], ['jinguang', 'b'], ['frostnova', 'b']],
       leg: ['wuxingtao', 'taijixia'], cube: ['surge', 'hourglass', 'sanmei'], gems: ['wuxing', 'guard', 'shigu'] },
-    { set: 'wanfu', d: "Không cần thứ tự, treo đầy trạng thái lên cả sân rồi kích nổ", sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['meteor', 'a']],
+    { set: 'wanfu', d: "Không cần thứ tự, treo đầy trạng thái lên cả sân rồi kích nổ", sk: [['frostnova', 'a'], ['luoshi', 'b'], ['fireball', 'b'], ['lunzhuan', 'b'], ['zhenyue', 'b']],
       leg: ['baifudai', 'zhenxiexia'], cube: ['yinbaozhu', 'sanmei', 'surge'], gems: ['wuxing', 'shigu', 'guard'] } ],
   necro: [
     { set: 'yinbing', d: "Bầy xác nghiền nát: cương thi chịu đòn thay bạn, ngã xuống còn nổ", sk: [['summon', 'a'], ['jihuo', 'a'], ['yangshi', 'a'], ['bonestorm', 'b'], ['curse', 'b']],   /* 2026-11-25 尸爆换成摄魂咒·腐骨：尸爆把八成多的僵尸自己炸掉，550 层 66%/65% → 90%/80% */
