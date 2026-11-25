@@ -1619,7 +1619,8 @@ function twPicks(cls, f, kit) {
       const skill = () => {
         const notIn = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
         if (kit.sk.length < LOADOUT_MAX && notIn.length) return { t: 'sk', id: RNG.pick(notIn).id };
-        const has = kit.sk.filter(id => RUNES[id]); if (!has.length) return gear();
+        if (notIn.length && RNG.ch(0.4)) return { t: 'sk', id: RNG.pick(notIn).id, swap: 1 };   // 招式满了也出新招，选的时候换掉一招（2026-11-25）
+        const has = kit.sk.filter(id => RUNES[id]); if (!has.length) return notIn.length ? { t: 'sk', id: RNG.pick(notIn).id, swap: 1 } : gear();
         const id = RNG.pick(has), cur = kit.rn[id], r = cur ? (cur === 'a' ? 'b' : 'a') : RNG.pick(['a', 'b']); return { t: 'rn', id, r };
       };
       out.push(gear()); out.push(RNG.ch(kit.sk.length < LOADOUT_MAX ? 0.6 : 0.35) ? skill() : gear()); out.push(skill());
@@ -1639,7 +1640,7 @@ function twApply(cls, p) {   // 选中一样：放进塔装
   const S = twState(cls), kit = S.kit;
   if (p.t === 'eq') {
     kit.eq[twEqPos(kit, p.it)] = p.it;
-  } else if (p.t === 'sk') { if (!kit.sk.includes(p.id) && kit.sk.length < LOADOUT_MAX) kit.sk.push(p.id); }
+  } else if (p.t === 'sk') { if (kit.sk.includes(p.id)) {} else if (p.out && kit.sk.includes(p.out)) { kit.sk[kit.sk.indexOf(p.out)] = p.id; delete kit.rn[p.out]; } else if (kit.sk.length < LOADOUT_MAX) kit.sk.push(p.id); }
   else if (p.t === 'rn') kit.rn[p.id] = p.r;
   else if (p.t === 'cube') { if (!kit.cube.includes(p.lid) && kit.cube.length < 3) kit.cube.push(p.lid); }
   else if (p.t === 'lg') { if (kit.lg.length < 3) kit.lg.push(p.g); }

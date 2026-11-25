@@ -762,13 +762,14 @@ function twRelOut(cls, kit, txt, selfSet) {
   return out;
 }
 // 新招式、变招：塔装里哪些东西点名了这一招
-function twRelIn(cls, kit, name) {
+const twRelIn = (cls, kit, name) => { const src = twRelSrc(cls, kit, name); return src.length ? [`跟这招有关：${src.join('、')}`] : []; };
+function twRelSrc(cls, kit, name) {
   const src = [], cnt = twSetCnt(kit);
   for (const id in cnt) { const S = SETS.find(x => x.id === id); if (S && twSetTxt(S).includes(name)) src.push(`${S.n}（${cnt[id]} 件）`); }
   for (const q of POS_IDS) { const it = kit.eq[q], L = it && it.legend && LEGENDS.find(l => l.id === it.legend); if (L && L.d.includes(name)) src.push(L.n); }
   kit.cube.forEach(id => { const L = LEGENDS.find(l => l.id === id); if (L && L.d.includes(name) && !src.includes(L.n)) src.push(L.n); });
   kit.lg.forEach(g => { const G = LGEMS[g.t]; if (G && G.d(g.lv).includes(name)) src.push(G.n); });
-  return src.length ? [`跟这招有关：${src.join('、')}`] : [];
+  return src;
 }
 function twPickHTML(cls, p, i) {
   const C = CLASSES[cls], S0 = twState(cls), kit = S0.kit, sel = TWSEL && TWSEL.f === S0.fl && TWSEL.i === i;
@@ -788,8 +789,13 @@ function twPickHTML(cls, p, i) {
       if (OS) { const c = cnt[OS.id], lost = [2, 4, 6].filter(n => OS['b' + n + 'd'] && c >= n && c - 1 < n);
         ol += `（${OS.n} ${c} → ${c - 1} 件${lost.length ? `，<b class="lo">${lost.join('、')} 件效果会掉</b>` : ''}）`; } }
     det.push(`<p class="twol">${ol}</p>`); }
-  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>新招式 · ${k.n}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
-    const R = RUNES[k.id]; if (R) det.push(`<p class="twol">以后还能变招：「${R[0].n}」${esc(R[0].d)}；「${R[1].n}」${esc(R[1].d)}</p>`); }
+  else if (p.t === 'sk') { const k = C.skills.find(x => x.id === p.id); h = `<b>新招式 · ${k.n}${p.swap ? '<small>招式满了，换掉一招</small>' : ''}</b>`; d = esc(k.d); rel = twRelIn(cls, kit, k.n);
+    const R = RUNES[k.id]; if (R) det.push(`<p class="twol">以后还能变招：「${R[0].n}」${esc(R[0].d)}；「${R[1].n}」${esc(R[1].d)}</p>`);
+    if (p.swap) { const sw = sel && TWSEL.sw, ok = sw && kit.sk.includes(sw);
+      det.push(`<p class="twol">换掉哪一招：</p><div class="twsw">${kit.sk.map(id => { const o = C.skills.find(x => x.id === id); return o ? `<button class="${id === sw ? 'on' : ''}" data-act="twswap" data-arg="${id}">${o.n}</button>` : ''; }).join('')}</div>`);
+      if (ok) { const o = C.skills.find(x => x.id === sw), r = kit.rn[sw], OR = r && RUNES[sw][r === 'a' ? 0 : 1], lose = twRelSrc(cls, kit, o.n);
+        det.push(`<p class="twol">换下：<b>${o.n}</b>${OR ? `，它的变招「${OR.n}」一起丢掉` : ''}</p>`);
+        if (lose.length) det.push(`<p class="twol"><b class="lo">这些跟${o.n}有关，换掉后会用不上：${lose.join('、')}</b></p>`); } } }
   else if (p.t === 'rn') { const k = C.skills.find(x => x.id === p.id), R = RUNES[p.id][p.r === 'a' ? 0 : 1], cur = kit.rn[p.id], R0 = cur && RUNES[p.id][cur === 'a' ? 0 : 1];
     h = `<b>变招 · ${k.n}「${R.n}」</b>`; d = esc(R.d); rel = twRelIn(cls, kit, k.n).concat(twRelOut(cls, kit, R.d).filter(x => !x.includes(k.n)));
     det.push(`<p class="twol">${R0 ? `换掉现在的「${R0.n}」：${esc(R0.d)}` : `${k.n}现在没有变招`}</p>`); }
@@ -797,7 +803,8 @@ function twPickHTML(cls, p, i) {
     det.push(`<p class="twol">神兵之魂只给特效，不占装备格（已有 ${kit.cube.length}/3）</p>`); }
   else if (p.t === 'lg') { const G = LGEMS[p.g.t]; h = `<b style="color:${G.c}">灵玉 · ${G.n} ${p.g.lv} 级</b>`; d = esc(G.d(p.g.lv)); rel = twRelOut(cls, kit, G.d(p.g.lv)); }
   else if (p.t === 'lgup') { const g = kit.lg[p.i], G = LGEMS[g.t]; h = `<b style="color:${G.c}">${G.n} ${g.lv} → ${g.lv + p.add} 级</b>`; d = esc(G.d(g.lv + p.add)); det.push(`<p class="twol">现在：${esc(G.d(g.lv))}</p>`); }
-  const more = sel ? `<div class="twdet">${det.join('')}${rel.map(t => `<p class="twrel">${t}</p>`).join('')}<button class="btn sm" data-act="twpick" data-arg="${i}">就选它</button></div>` : '';
+  const need = p.t === 'sk' && p.swap && !(sel && TWSEL.sw && kit.sk.includes(TWSEL.sw));
+  const more = sel ? `<div class="twdet">${det.join('')}${rel.map(t => `<p class="twrel">${t}</p>`).join('')}<button class="btn sm${need ? ' off' : ''}" data-act="twpick" data-arg="${i}">${need ? '先点要换掉的招式' : '就选它'}</button></div>` : '';
   return `<div class="twpick${sel ? ' sel' : ''}" data-act="twsel" data-arg="${i}">${h}<span>${d}</span>${sel ? '' : '<em class="twmore">点开看详情 ›</em>'}${more}</div>`;
 }
 function twSkipHTML(cls) {   // 三样都不要：换全属性
@@ -846,7 +853,7 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
     <p class="help-p sub">塔里会出这几套，每套各走一条路：</p>${sets}<p class="help-p sub">三选一时点一下卡片，能看到这件东西的全部效果、会换下什么、跟你手上哪些招式有关。</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">通天塔</h2><div class="help-scroll"><p class="help-p">一层一场仗，打完直接上楼。普通层是一群妖物（第 3 层起带精英），逢 5 层是精英首领带两个护法，逢 10 层是塔主。</p>
   <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，必杀的怒气一层层留着。</p>
-  <p class="help-p">每过一层三选一往上长：普通层拿一件塔装（套装、神兵，都是太古 +10、词条满值、孔里镶好玉）或者一个招式、变招（最多五招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
+  <p class="help-p">每过一层三选一往上长：普通层拿一件塔装（套装、神兵，都是太古 +10、词条满值、孔里镶好玉）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
   <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
   <p class="help-p">奖励：每打过一个塔主，这周第一次领魂晶、银两和一颗玉；每个职业第一次打过某一层塔主，再给九幽玄晶。历史最高层永远记着。</p></div>`;
 const goHelpModal = () => () => {
@@ -3900,10 +3907,12 @@ const ACT = {
   twgo: () => twGo(),
   twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
   twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
-  twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls), p = S.pend && (i === 'x' ? { t: 'all' } : S.pend[+i]); if (!p) return; twApply(cls, p); TWSEL = null; save(); SFX.play('rare');
+  twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls); let p = S.pend && (i === 'x' ? { t: 'all' } : S.pend[+i]); if (!p) return;
+    if (p.t === 'sk' && p.swap) { const sw = TWSEL && TWSEL.i === +i && TWSEL.sw; if (!sw || !S.kit.sk.includes(sw)) return toast('先点要换掉哪一招'); p = { ...p, out: sw }; } twApply(cls, p); TWSEL = null; save(); SFX.play('rare');
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) el.innerHTML = twResHTML(); } else { closeModal(); refresh(); } },
   twsel: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, f = twState(cls).fl; const k = i === 'x' ? 'x' : +i; TWSEL = TWSEL && TWSEL.f === f && TWSEL.i === k ? null : { f, i: k };
     if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
+  twswap: id => { if (!TWSEL) return; TWSEL.sw = TWSEL.sw === id ? null : id; if (VIEW === 'battle' && BRES && BRES.tw) { const el = $('#bres'); if (el) { const st = el.scrollTop; el.innerHTML = twResHTML(); el.scrollTop = st; } } else if (MODALFN) setSheet(MODALFN()); },
   twcls: () => openModal(twClsModal()),
   twpend: () => openModal(twPendModal()),
   twkit: () => openModal(twKitModal()),
