@@ -724,19 +724,19 @@ function twKitLine(cls, kit) {   // 身上塔装的一句话概括
   return [st, leg ? `Thần binh ${leg} món` : '', rare ? `Bảo phẩm ${rare} món` : '', kit.allN ? `Toàn thuộc tính +${TW_ALL * kit.allN}%` : ''].filter(Boolean).join(' · ');
 }
 function towerBody(cls) {
-  const T = twSave(), S = twState(cls), f = S.fl, kit = S.kit, C = CLASSES[cls], rec = T.rec[cls] || 0, nx = twNextRew(f);
+  const T = twSave(), S = twState(cls), f = S.fl, kit = S.kit, C = CLASSES[cls], rec = T.rec[cls] || 0, nx = Math.min(TW.top, twNextRew(f)), RW = twRewOf(nx), top = f > TW.top;
   const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id]; return k ? `${k.n}${r ? `<small>·${RUNES[id][r === 'a' ? 0 : 1].n}</small>` : ''}` : ''; }).join(", ");
   const cube = kit.cube.map(id => (LEGENDS.find(l => l.id === id) || {}).n).filter(Boolean).join(", ") || "Chưa có";
   const lg = kit.lg.map(g => `${LGEMS[g.t].n} ${g.lv}`).join(", ") || "Chưa có";
   return `<div class="gobody tw" data-scroll="gobody">
       <div class="twhead"><b>${esc(C.n)}<button class="qhelp tq" data-act="twcls" aria-label="Lối chơi môn phái">?</button></b><span>Tuần này tầng <em>${f}</em></span></div>
       <div class="twstat"><div><small>Điểm lưu</small><b>tầng ${S.ck}</b></div><div><small>Cao nhất tuần</small><b>tầng ${S.best}</b></div><div><small>Kỷ lục</small><b>tầng ${rec}</b></div></div>
-      <div class="twnext"><small>Tầng ${f}</small><b>${twKindTxt(cls, f)}</b></div>
+      <div class="twnext"><small>${top ? "Đỉnh tháp" : `Tầng ${f}`}</small><b>${top ? `Đã qua hết ${TW.top} tầng` : `${twKindTxt(cls, f)}${f === TW.top ? " · Đỉnh tháp" : ''}`}</b></div>
       <div class="twkit" data-act="twkit"><div><small>Đồ tháp</small><span>${twKitLine(cls, kit)}</span></div><div><small>Chiêu</small><span>${sk}</span></div><div><small>Hồn thần binh</small><span>${cube}</span></div><div><small>Linh ngọc</small><span>${lg}</span></div><em>Xem đồ tháp ›</em></div>
-      <p class="twrew"><small>Chủ tháp tầng ${nx}</small>${(T.wr[cls] || 0) >= nx ? "Thưởng tuần này đã nhận" : `Hồn tinh ${TW_REW.mats * nx / 10} · Bạc ${fmtBig(TW_REW.gold * nx / 10)} · một viên ngọc`}${(T.ms[cls] || 0) >= nx ? '' : ` · <b class="jyc">Lần đầu: Huyền Tinh ${TW_REW.jyx * nx / 10}</b>`}</p>
+      ${top ? `<p class="twrew twtop">Tuần này đã lên đỉnh · tầng ${TW.top}, thứ Hai đổi tháp mới</p>` : `<p class="twrew"><small>Chủ tháp tầng ${nx}</small>${(T.wr[cls] || 0) >= nx ? "Thưởng tuần này đã nhận" : `Hồn tinh ${RW.m} · Bạc ${fmtBig(RW.g)} · một viên ngọc`}${(T.ms[cls] || 0) >= nx || !RW.x ? '' : ` · <b class="jyc">Lần đầu: Huyền Tinh ${RW.x}</b>`}</p>`}
       <p class="sub twnote">Vào tháp ai cũng như nhau, không mang đồ luyện của mình · thứ Hai đổi tháp</p>
     </div>
-    <div class="gostart">${f > 1 ? `<button class="btn sm ghost twrs" data-act="twreset">Leo lại từ tầng 1</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">Chọn thưởng tầng ${f - 1} trước</button>` : `<button class="btn big" data-act="twgo">Khiêu chiến tầng ${f}</button>`}</div>`;
+    <div class="gostart">${f > 1 ? `<button class="btn sm ghost twrs" data-act="twreset">Leo lại từ tầng 1</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">Chọn thưởng tầng ${f - 1} trước</button>` : top ? `<button class="btn big" disabled>Tuần này đã lên đỉnh</button>` : `<button class="btn big" data-act="twgo">Khiêu chiến tầng ${f}</button>`}</div>`;
 }
 const twResetModal = () => () => { const cls = SAVE.cls, S = twState(cls), T = twSave(), wr = T.wr[cls] || 0;
   return `<h2 class="mh">Leo lại từ tầng 1?</h2><p class="help-p">Hiện ở tầng ${S.fl}. Leo lại thì đồ tháp, chiêu, hồn thần binh, linh ngọc đều về bộ lúc đầu, leo lại từ tầng 1, chọn một trong ba có thể đổi lối khác.</p>
@@ -746,6 +746,7 @@ const twPendModal = () => () => { const cls = SAVE.cls, S = twState(cls); return
 function twGo() {
   if (SAVE.run) return toast("Hãy kết thúc chuyến phiêu lưu đang dở trước đã");
   if (twState(SAVE.cls).pend) return openModal(twPendModal());
+  if (twState(SAVE.cls).fl > TW.top) return toast("Tuần này đã lên đỉnh rồi");
   const cls = SAVE.cls, { run, kind } = twRun(cls); AUTO = false;
   SAVE.run = run; beginBattle(kind);
   banner(`Tháp Thông Thiên · tầng ${run.twF}`, run.twName || (kind === 'elite' ? "Có tinh anh" : "Một đàn yêu vật"), 1400);
@@ -819,10 +820,11 @@ function twSkipHTML(cls) {   // 三样都不要：换全属性
 const twPicksHTML = cls => (twState(cls).pend || []).map((p, i) => twPickHTML(cls, p, i)).join('') + twSkipHTML(cls);
 function twResHTML() {
   const cls = SAVE.run.cls, S = twState(cls), R = BRES.tw;
-  const rew = R.rew.map(x => x.t === 'wk' ? `Thưởng tuần: Hồn tinh +${x.m} · Bạc +${fmtBig(x.g)} · ${gemName(x.gem)}` : `Thưởng lần đầu: <b class="jyx">Cửu U Huyền Tinh +${x.x}</b> · Hồn tinh +${x.m}`).map(t => `<p class="twrw">${t}</p>`).join('');
+  const rew = R.rew.map(x => x.t === 'wk' ? `Thưởng tuần: Hồn tinh +${x.m} · Bạc +${fmtBig(x.g)} · ${gemName(x.gem)}` : `Thưởng lần đầu: <b class="jyx">Cửu U Huyền Tinh +${x.x}</b>`).map(t => `<p class="twrw">${t}</p>`).join('');
   if (!R.win) return `<div class="res lose tw"><h3>Bại</h3><p>Ngã ở tầng ${R.f}. Quay về tầng ${R.back}, đồ tháp trở về bộ lúc lưu.</p>
     <div class="twbtns"><button class="btn big" data-act="twnext">Đánh lại tầng ${R.back}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
   const ck = R.f % 10 === 0 ? `<p class="twrw">Đã lưu: tầng ${R.f}</p>` : '';
+  if (R.top) return `<div class="res win tw"><h3>Lên đỉnh</h3><p>Đã hạ chủ tháp tầng ${TW.top}, Tháp Thông Thiên tuần này đã leo tới đỉnh.</p>${rew}<div class="twbtns"><button class="btn big" data-act="twhome">Về trấn</button></div></div>`;
   if (S.pend) return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<p class="sub">Chọn một thứ mang lên tầng</p><div class="twpicks">${twPicksHTML(cls)}</div></div>`;
   return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<div class="twbtns"><button class="btn big" data-act="twnext">Lên tầng ${S.fl}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
 }
@@ -856,11 +858,11 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
   const sets = twSets(cls).map(id => { const S = SETS.find(x => x.id === id); return S ? `<div class="twkrow"><small>Bộ</small><b class="r-set">${S.n}</b><span>${esc(twTheme(cls, id))}</span></div>` : ''; }).join('');
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">${esc(C.n)} · Cách đánh</h2><div class="twkit2" data-scroll="twcls"><p class="help-p">${esc(C.d)}</p>${M ? `<p class="help-p"><b>${M[0]}</b>: ${M[1]}</p>` : ''}
     <p class="help-p sub">Trong tháp sẽ ra mấy bộ này, mỗi bộ một lối:</p>${sets}<p class="help-p sub">Khi chọn một trong ba, chạm vào thẻ để xem toàn bộ hiệu ứng, sẽ thay ra món gì, và liên quan tới chiêu nào ngươi đang có.</p></div>`; };
-const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp.</p>
+const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên, đỉnh tháp là tầng ${TW.top}. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp. Yêu vật mỗi tầng mạnh hơn một chút, tăng dần từ từ.</p>
   <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí tuyệt kỹ giữ qua từng tầng.</p>
   <p class="help-p">Qua mỗi tầng chọn một trong ba để mạnh lên: tầng thường lấy một món đồ tháp (bộ, thần binh, đều là Thái Cổ +10, dòng tối đa, khảm sẵn ngọc) hoặc một chiêu, một biến chiêu (tối đa năm chiêu, đủ rồi vẫn còn ra chiêu mới, chọn nó thì phải bỏ một chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp). Không muốn món nào thì chọn «Không lấy», đổi lấy sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL}%, cộng dồn mãi.</p>
   <p class="help-p">Mỗi lần hạ chủ tháp là lưu một lần. Ngã thì về tầng đã lưu, đồ tháp cũng về bộ lúc lưu. Muốn đổi lối thì có thể «Leo lại từ tầng 1», thưởng chỉ lấy mức cao nhất. Thứ Hai hằng tuần đổi tháp mới, leo lại từ tầng một; cùng tuần, cùng nghề thì yêu vật và lựa chọn ai cũng giống nhau.</p>
-  <p class="help-p">Thưởng: mỗi chủ tháp hạ được, lần đầu trong tuần nhận hồn tinh, bạc và một viên ngọc; mỗi nghề lần đầu hạ một chủ tháp còn được Cửu U Huyền Tinh. Kỷ lục cao nhất được giữ mãi.</p></div>`;
+  <p class="help-p">Thưởng: mỗi chủ tháp hạ được, lần đầu trong tuần nhận hồn tinh, bạc và một viên ngọc, càng cao cho càng nhiều, leo tới đỉnh một tuần khoảng ${Math.round(Array.from({ length: TW.top / 10 }, (_, i) => twRewOf((i + 1) * 10).m).reduce((a, b) => a + b, 0) / 100) * 100} hồn tinh; từ tầng ${TW_REW.jyFrom}, mỗi nghề lần đầu hạ một chủ tháp còn được Cửu U Huyền Tinh. Kỷ lục cao nhất được giữ mãi.</p></div>`;
 const goHelpModal = () => () => {
   const rift = featureOn('rift') && SAVE.mode === 'rift';
   return `<h2 class="mh">${rift ? "Ảo Cảnh Cửu U" : "Cốt truyện chính"}</h2>${rift ? `<p class="help-p">Thử thách tối đa tầng ${Math.max(1, SAVE.riftCap || 3)}. Giới hạn <b>một nén hương</b> (${Math.round(riftLimit(SAVE.riftLv) / 60000)} phút). Một ván bốn tầng bản đồ lớn, yêu vật đi thành bầy: đụng một bầy, các bầy bên cạnh bị cuốn vào cùng. Diệt yêu tích đầy tiến độ thì yêu vương giữ ải hiện thân; hạ nó trước khi hương tàn, hương còn càng nhiều thì linh ngọc càng được nâng nhiều lần, lần sau càng nhảy được nhiều tầng: còn trên một nửa +${RIFT_GRADES[0].jump} tầng, còn trên một phần tư +${RIFT_GRADES[1].jump} tầng, qua được là +${RIFT_GRADES[2].jump} tầng. Ngã xuống không tính thua: bạn bị ném về lối vào của tầng này, hương cháy mất một đoạn.</p>

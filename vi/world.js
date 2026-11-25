@@ -1520,7 +1520,7 @@ function rStep(ch, x, y, run) {
 // 逢 5 层拿神兵之魂（乾坤袋，最多三格），逢 10 层拿灵玉（最多三颗）。每层回满血，不带丹药；怒气在塔里一层层留着。
 // 每十层存一次档，倒下回到存档那层（带着存档时那身塔装）。每周换一座塔（楼层、妖物、三选一按周和职业定好，大家一样），从第一层重爬；
 // 每个职业的历史最高层、首通奖励永久保留。
-var TW = { bossK: [0.45, 0.6], ilvl: 70, plus: 10, gemT: 6, lgLv0: 20, lgLvK: 1.2, lgMax: 150, nStart: 2, n0: 24, nK: 5, box: 200,
+var TW = { bossK: [0.45, 0.6], ilvl: 70, plus: 10, gemT: 6, lgLv0: 20, lgLvK: 1.2, lgMax: 150, nStart: 2, n0: 24, nK: 1.5, top: 200, box: 200,
   para: { pAtk: 25, pArmor: 25, pHp: 25, crit: 60, spd: 40, res: 80, dmgPct: 90, hpPct: 60, armorPct: 25 },
   cls: { berserker: { hpPct: 20, dmgPct: 30 }, mage: { hpPct: 80, dmgPct: 40 }, necro: { hpPct: 80, dmgPct: 80, minionPct: 60 }, assassin: { hpPct: 40, dmgPct: 40 }, paladin: {} },
   start: { necro: ['summon', 'shidu'], assassin: ['venom', 'bingpo'] } };   // 2026-11-25 塔里僵尸改成吃你的伤害、暴击（同幻境），赶尸人伤害补偿 150 → 80：打塔主步数 227 → 121，最高层中位约 30 → 33（60 局）   // 起手两招（没写的按等级取前两招）   // 塔里不带伙伴：各职业的底子按模拟补一点（和尚自己扛得住，不补）
@@ -1661,18 +1661,22 @@ function twRun(cls) {
   return { run, kind: fl.kind };
 }
 // 打完一层：赢了记层数、给三选一、发奖；输了回存档
-const TW_REW = { mats: 60, gold: 20000, jyx: 2, mats1: 150 };
+// 塔主奖励（2026-11-25 塔顶 200 层后重定）：每周魂晶 100 起、每个塔主多 5，爬到顶一周约 3000；九幽玄晶只在 100 层以上首通给
+const TW_REW = { mats: 100, matsK: 5, goldX: 200, jyFrom: 110 };
+function twRewOf(f) { const k = f / 10, m = TW_REW.mats + TW_REW.matsK * (k - 1);
+  return { m, g: m * TW_REW.goldX, tier: 2 + Math.ceil(f / 40), x: f >= TW_REW.jyFrom ? (f > 150 ? 3 : 2) : 0 }; }
 function twEnd(cls, b) {
   const T = twSave(), S = twState(cls), f = S.fl, res = { win: !!b.win, f, rew: [] };
   if (b.win) {
     S.kit.rage = Math.round(b.P.rage || 0); S.best = Math.max(S.best, f); T.rec[cls] = Math.max(T.rec[cls] || 0, f); S.fl = f + 1;
-    S.pend = twPicks(cls, f, S.kit); if (!S.pend.length) S.pend = null;
+    S.pend = f >= TW.top ? null : twPicks(cls, f, S.kit); if (S.pend && !S.pend.length) S.pend = null;   // 塔顶打完就不用再选了
+    if (f >= TW.top) res.top = true;
     if (f % 10 === 0) {
       S.ck = f; if (S.pend) S.ckWait = true; else S.ckKit = twClone(S.kit);
-      const k = f / 10; T.wr[cls] = T.wr[cls] || 0; T.ms[cls] = T.ms[cls] || 0;
-      if (f > T.wr[cls]) { T.wr[cls] = f; const m = TW_REW.mats * k, g = TW_REW.gold * k, gk = gemKey(RNG.pick(['ruby', 'sapphire', 'topaz', 'emerald', 'amethyst', 'diamond']), Math.min(gemCap(), 2 + k));
-        SAVE.mats += m; SAVE.gold += g; addGem(gk); res.rew.push({ t: 'wk', m, g, gem: gk }); }
-      if (f > T.ms[cls]) { T.ms[cls] = f; const x = TW_REW.jyx * k, m = TW_REW.mats1 * k; SAVE.jyx = (SAVE.jyx || 0) + x; SAVE.mats += m; res.rew.push({ t: 'first', x, m }); }
+      const R = twRewOf(f); T.wr[cls] = T.wr[cls] || 0; T.ms[cls] = T.ms[cls] || 0;
+      if (f > T.wr[cls]) { T.wr[cls] = f; const gk = gemKey(RNG.pick(['ruby', 'sapphire', 'topaz', 'emerald', 'amethyst', 'diamond']), Math.min(gemCap(), R.tier));
+        SAVE.mats += R.m; SAVE.gold += R.g; addGem(gk); res.rew.push({ t: 'wk', m: R.m, g: R.g, gem: gk }); }
+      if (f > T.ms[cls]) { T.ms[cls] = f; if (R.x) { SAVE.jyx = (SAVE.jyx || 0) + R.x; res.rew.push({ t: 'first', x: R.x }); } }
     }
   } else { S.kit = twClone(S.ckKit); S.fl = S.ck + 1; S.pend = null; S.ckWait = false; res.back = S.fl; }
   return res;
