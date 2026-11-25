@@ -602,7 +602,7 @@ const COMPANIONS = {
   lei: { n: "Lôi Lão Hổ", spr: 'blade', wx: 'jin', ap: 'armor', hp: 0.9, atk: 0.65, spd: 100, d: "Thợ săn già tiền tuyến: chuyên chém kẻ ít máu nhất; Chém làm địch phá giáp, mỗi ba chiêu một nhát “Đoạn Đầu Đao”, gây sát thương gấp đôi lên địch tàn máu", row: 'front', role: "Kết liễu · Phá giáp", pg: 1,
     lock: "Hoàn thành 10 lần truy nã", up: ["Hảo cảm 10: Đoạn Đầu Đao gấp đôi khi địch dưới nửa máu", "Hảo cảm 20: Đoạn Đầu Đao chém chết người thì bồi thêm một đao cho kẻ kế tiếp"] },
   liu: { n: "Sư phụ Lưu", spr: 'oldman', wx: 'shui', ap: 'stun', apc: 0.3, hp: 0.55, atk: 0.45, spd: 92, d: "Lão sư gia nhà quàn ở hậu tuyến: mỗi ba chiêu tụng một đoạn An Hồn Kinh, cả đội giảm 20% sát thương phải nhận trong hai lượt; lắc chuông làm địch choáng", row: 'back', role: "Cả đội giảm sát thương · Choáng", pg: 1,
-    lock: "Trấn Yêu Lục đủ 3 trang", up: ["Hảo cảm 10: tụng kinh giảm sát thương lên 30%", "Hảo cảm 20: khi tụng kinh tiện tay gõ choáng một kẻ địch"] },
+    lock: "Thu phục 3 yêu vương giữ ải trong Ảo Cảnh", up: ["Hảo cảm 10: tụng kinh giảm sát thương lên 30%", "Hảo cảm 20: khi tụng kinh tiện tay gõ choáng một kẻ địch"] },
   tie: { n: "Thiết Đản", spr: 'smith', wx: 'huo', ap: 'burn', hp: 0.6, atk: 0.6, spd: 96, d: "Đồ đệ thợ rèn ở hậu tuyến: hỏa súng làm địch thiêu đốt; mỗi ba chiêu “Gia cố” cho tiền tuyến ba lượt, hộ giáp +40%", row: 'back', role: "Thiêu đốt · Tăng giáp tiền tuyến", pg: 1,
     lock: "Rèn một món binh khí chuyên thuộc chỗ Trương Đại Chùy", up: ["Hảo cảm 10: Gia cố cả hậu tuyến", "Hảo cảm 20: hỏa súng bắn tất cả địch"] },
 };
