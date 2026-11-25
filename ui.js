@@ -1887,12 +1887,15 @@ function stDesc(u, k) {
   const t = u.st[k], left = typeof t === 'number' ? t : t && t.t;
   return { n: I[0] + (left > 0 && left < 99 ? ` · 还剩 ${left} 回合` : ''), c: I[1], d: I[3] };
 }
-document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],[data-act=castq],#stpop,#statc')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
+document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],[data-act=castq],[data-act=ult],#stpop,#statc')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
 function drawStPop() {
   const el = document.getElementById('stpop'); if (!el) return;
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
   if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">本场统计</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
   el.classList.remove('full'); el._h = '';
+  if (STPOP && STPOP.ult && B) {   // 点右下角的必杀：看说明（攒满了就顺手放出去）
+    const U = ULTS[B.P.cls], r = Math.round(B.P.rage || 0);
+    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">必杀 · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? '放出去了' : `攒满 ${Math.floor(r / 100)} 格`) : `还差 ${100 - r}%`} · 最多存两格，不占出手</p>`; return; }
   if (STPOP && STPOP.sk && B) {   // 战斗里点招式：看说明（2026-11-25）
     const k = B.P.skills.find(x => x.id === STPOP.sk); if (!k) { STPOP = null; el.hidden = true; return; }
     const r = B.P.runes && B.P.runes[k.id], R = r && RUNES[k.id] ? RUNES[k.id][r === 'a' ? 0 : 1] : null;
@@ -4189,7 +4192,7 @@ const ACT = {
   lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? '灵玉升级成功！' : '升级失败'); refresh(); achToast(checkAch()); },
   cell: i => { stopAuto(); walkTo(i); },
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
-  ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast('怒气还没满'); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
+  ult: () => { if (!B || B.over) return; STPOP = { ult: 1 }; drawStPop(); if ((B.P.rage || 0) < 100) return; B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? '自动<br>出招' : '手动<br>出招'; }
     toast(SAVE.ultAuto ? '自动出招：技能自动放；必杀攒满两格时，只用第二格替你打断妖物蓄力，想要增益就自己点「必杀」' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」（不占出手）'); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;

@@ -1888,12 +1888,15 @@ function stDesc(u, k) {
   const t = u.st[k], left = typeof t === 'number' ? t : t && t.t;
   return { n: I[0] + (left > 0 && left < 99 ? ` · còn ${left} lượt` : ''), c: I[1], d: I[3] };
 }
-document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],[data-act=castq],#stpop,#statc')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
+document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],[data-act=castq],[data-act=ult],#stpop,#statc')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
 function drawStPop() {
   const el = document.getElementById('stpop'); if (!el) return;
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
   if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">Thống kê trận này</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
   el.classList.remove('full'); el._h = '';
+  if (STPOP && STPOP.ult && B) {   // 点右下角的必杀：看说明（攒满了就顺手放出去）
+    const U = ULTS[B.P.cls], r = Math.round(B.P.rage || 0);
+    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">Tuyệt kỹ · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? "Đã tung ra" : `Đã đầy ${Math.floor(r / 100)} ô`) : `Còn thiếu ${100 - r}%`} · tối đa tích hai ô, không chiếm lượt</p>`; return; }
   if (STPOP && STPOP.sk && B) {   // 战斗里点招式：看说明（2026-11-25）
     const k = B.P.skills.find(x => x.id === STPOP.sk); if (!k) { STPOP = null; el.hidden = true; return; }
     const r = B.P.runes && B.P.runes[k.id], R = r && RUNES[k.id] ? RUNES[k.id][r === 'a' ? 0 : 1] : null;
@@ -4190,7 +4193,7 @@ const ACT = {
   lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? "Nâng linh ngọc thành công!" : "Nâng thất bại"); refresh(); achToast(checkAch()); },
   cell: i => { stopAuto(); walkTo(i); },
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
-  ult: () => { if (!B || B.over) return; if ((B.P.rage || 0) < 100) return toast("Nộ khí chưa đầy"); B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
+  ult: () => { if (!B || B.over) return; STPOP = { ult: 1 }; drawStPop(); if ((B.P.rage || 0) < 100) return; B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? "Tự động<br>ra chiêu" : "Thủ công<br>ra chiêu"; }
     toast(SAVE.ultAuto ? "Tự động ra chiêu: kỹ năng tự tung; tuyệt kỹ đầy hai ô thì chỉ dùng ô thứ hai để cắt yêu vật tụ lực, muốn hiệu ứng tăng cường thì tự chạm «Tuyệt kỹ»" : "Thủ công ra chiêu: chạm kỹ năng phía trên, chiêu sau nhân vật sẽ tung nó; không chạm thì dùng chiêu cơ bản. Nộ khí đầy thì chạm «Tuyệt kỹ» (không tốn lượt)"); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;
