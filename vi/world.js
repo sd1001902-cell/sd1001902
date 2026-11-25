@@ -1628,6 +1628,9 @@ function twPicks(cls, f, kit) {
     return out;
   });
 }
+// 三选一都不要：换一点全属性，一层层叠（2026-11-25）
+const TW_ALL = 3;   // 每次：伤害、气血、护甲各 +3%
+function twBuffs(cls, kit) { const b = { ...(TW.cls[cls] || {}) }, a = TW_ALL * (kit.allN || 0); if (a) for (const k of ['dmgPct', 'hpPct', 'armorPct']) b[k] = (b[k] || 0) + a; return b; }
 function twEqPos(kit, it) {   // 塔装换上去落在哪一格：扳指先顶掉空的、宝品的那只
   if (slotType(it.slot) !== 'ring') return it.slot;
   const rank = x => !x ? -1 : x.rarity === 'rare' ? 0 : 1; return rank(kit.eq.ring2) < rank(kit.eq.ring) ? 'ring2' : 'ring';
@@ -1640,6 +1643,7 @@ function twApply(cls, p) {   // 选中一样：放进塔装
   else if (p.t === 'rn') kit.rn[p.id] = p.r;
   else if (p.t === 'cube') { if (!kit.cube.includes(p.lid) && kit.cube.length < 3) kit.cube.push(p.lid); }
   else if (p.t === 'lg') { if (kit.lg.length < 3) kit.lg.push(p.g); }
+  else if (p.t === 'all') kit.allN = (kit.allN || 0) + 1;
   else if (p.t === 'lgup') { const g = kit.lg[p.i]; if (g) g.lv = Math.min(TW.lgMax + 60, g.lv + p.add); }
   S.pend = null;
   if (S.ckWait) { S.ckWait = false; S.ckKit = twClone(kit); }   // 塔主层：选完再存档（存档里带着这次拿的灵玉）
@@ -1648,7 +1652,7 @@ function twApply(cls, p) {   // 选中一样：放进塔装
 function twRun(cls) {
   const S = twState(cls), f = S.fl, fl = twFloor(cls, f), ch = twCh(cls, S.kit);
   const sth = (() => { try { return wmap(fl.c).def.theme; } catch (e) { return null; } })();
-  const run = { cls, mode: 'tower', world: true, chapter: 1, riftLv: fl.N, theme: fl.c - 1, sth, mods: [], buffs: { ...(TW.cls[cls] || {}) }, potions: 0, team: [], twCh: ch, twF: f, twC: fl.c, twName: fl.name,
+  const run = { cls, mode: 'tower', world: true, chapter: 1, riftLv: fl.N, theme: fl.c - 1, sth, mods: [], buffs: twBuffs(cls, S.kit), potions: 0, team: [], twCh: ch, twF: f, twC: fl.c, twName: fl.name,
     rage: S.kit.rage, hp: 1e15, encCell: { lv: fl.lv }, encUnits: fl.units, loot: [], goldGot: 0, xpGot: 0, gemsGot: 0, matsGot: 0, kills: 0, t0: Date.now(), prog: 0, food: null };
   run.hp = runStats(run).maxHp;
   return { run, kind: fl.kind };
