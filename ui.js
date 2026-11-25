@@ -1338,9 +1338,9 @@ function lbMe() { const L = SAVE.lb || (SAVE.lb = { pid: '', sec: '', name: '', 
   if (!L.pid) { const b = lbRand(16); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128; const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
     L.pid = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; L.sec = [...lbRand(24)].map(x => 'abcdefghijkmnpqrstuvwxyz23456789'[x & 31]).join(''); }
   L.sent = L.sent || {}; return L; }
-async function lbCall(fn, body) {
+async function lbCall(fn, body, keep) {
   const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { if (ctl) ctl.abort(); }, 12000);
-  try { const r = await fetch(LB_URL + fn, { method: 'POST', headers: { apikey: LB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined });
+  try { const r = await fetch(LB_URL + fn, { method: 'POST', headers: { apikey: LB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined, keepalive: !!keep });
     const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.message) || ('HTTP ' + r.status)); return j; }
   finally { clearTimeout(to); }
 }
@@ -1376,8 +1376,75 @@ async function lbLoad(force) {
     const j = await lbCall('lb_board', { p_kind: LBV.kind, p_period: LBV.kind === 'tower' ? lbWeek() : 'all', p_cls: LBV.cls === 'all' ? 'all' : (LB_CLS[LBV.cls] || LBV.cls), p_pid: SAVE.lb && SAVE.lb.pid || null, p_limit: 50 });
     LBV.data[k] = { t: Date.now(), j }; }
   catch (e) { LBV.err = /fetch|network|abort|load/i.test(String(e && e.message || e)) ? '连不上排行榜，检查一下网络' : '排行榜出错了：' + (e && e.message || e); }
-  finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if (TT === 'col' && CTAB === 'lb') refresh(); }
+  finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if ((TT === 'col' && CTAB === 'lb' && VIEW === 'town') || MODALFN === lbModal) refresh(); }
 }
+// ---------- 云存档（2026-11-26，Supabase）：打着打着自动上传；取回码（16 位）换设备时取回。只在网页版能用 ----------
+// 库里每个取回码每台设备留最近 3 份、总共 8 份；一台旧设备乱传也挤不掉另一台的最新存档
+const CS_ON = false;
+const CS_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let CS = { hold: true, busy: false, timer: null, err: '', pend: null, found: null };
+function csDev() { try { let d = localStorage.getItem('jy_dev'); if (!d) { d = 'd' + [...lbRand(10)].map(x => CS_ABC[x & 31]).join(''); localStorage.setItem('jy_dev', d); } return d; } catch (e) { return 'dnostore'; } }
+const csFmt = c => 'JY-' + c.match(/.{4}/g).join('-');
+const csNorm = v => { let c = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c.length === 18 && c.startsWith('JY')) c = c.slice(2); return /^[A-HJ-NP-Z2-9]{16}$/.test(c) ? c : null; };
+const csOn = () => CS_ON && !lbBlocked() && storageOK;
+function csMe() { const C = SAVE.cs || (SAVE.cs = {}); if (!C.code) { C.code = [...lbRand(16)].map(x => CS_ABC[x & 31]).join(''); persist(true); } return C; }
+async function csUpload(force, keep) {
+  if (!csOn() || CS.hold || CS.busy || !hasProgress()) return;
+  const C = csMe(); if (!force && (SAVE.t || 0) <= (C.ut || 0)) return;
+  CS.busy = true;
+  try { const t = SAVE.t || Date.now(), data = await exportSaveZ();
+    const r = await lbCall('cs_put', { p_code: C.code, p_dev: csDev(), p_data: data, p_meta: { ...saveBrief(SAVE), rift: SAVE.riftMax || 0, t } }, keep);
+    C.ut = t; C.at = Date.now(); C.last = r && r.id; CS.err = ''; persist(true);
+    if (!C.told) { C.told = 1; persist(true); toast('云存档已开启：取回码在「设置 → 存档」，截图存好'); } }
+  catch (e) { CS.err = String(e && e.message || e); }
+  finally { CS.busy = false; }
+}
+function csQueue() {   // 存一次档就排一次上传：最快 20 秒后，离上次上传至少 90 秒；玩着的时候不会一直往后推
+  if (!csOn() || CS.hold || CS.timer) return;
+  const wait = Math.max(20000, 90000 - (Date.now() - ((SAVE.cs && SAVE.cs.at) || 0)));
+  CS.timer = setTimeout(() => { CS.timer = null; csUpload(); }, wait);
+}
+async function csBoot() {   // 开游戏：先看云上有没有别的设备传的、更新的存档，有就问一声；没有就开始自动上传
+  if (!csOn()) return;
+  const C = csMe();
+  try { const L = await lbCall('cs_list', { p_code: C.code }), top = L && L[0];
+    if (top && top.dev !== csDev() && top.meta && (top.meta.t || 0) > (SAVE.t || 0) + 2000) { CS.pend = top; openModal(csNewerModal); return; } }
+  catch (e) { CS.err = String(e && e.message || e); }
+  csStart();
+}
+function csStart() { CS.hold = false; if (!CS.started) { CS.started = 1; const prev = onPersist; onPersist = prev ? () => { prev(); csQueue(); } : csQueue; } csQueue(); }
+const csNewerModal = () => { const P = CS.pend, m = P.meta;
+  return `<h2 class="mh">云上有更新的存档</h2>
+    <div class="bk-cmp"><div class="in"><small>云上（另一台设备传的）</small><b>${briefLine(m)}</b><small>保存于 ${fmtDay(m.t)}</small></div>
+    <div><small>这台设备</small><b>${briefLine(saveBrief(SAVE))}</b>${SAVE.t ? `<small>保存于 ${fmtDay(SAVE.t)}</small>` : ''}</div></div>
+    <div class="row"><button class="btn" data-act="cscloud">用云上的</button><button class="btn ghost" data-act="cskeep">用这台的</button></div>
+    <p class="help-p">选「用这台的」，云上那份还留着，在「设置 → 存档 → 云存档」里用取回码还能拿回来。</p>`; };
+async function csTake(code, id) {   // 下载一份，读成存档对象，带上取回码
+  const data = await lbCall('cs_get', { p_code: code, p_id: id }); if (!data) throw new Error('gone');
+  const o = await decodeSaveAny(data); o.cs = { code, ut: o.t || 0, at: Date.now(), last: id, told: 1 }; return o;
+}
+const csListModal = () => { const F = CS.found, me = csDev();
+  return `<h2 class="mh">取回云存档</h2><p class="help-p">取回码 ${csFmt(F.code)} 下面有 ${F.list.length} 份，新的在上面：</p>
+    <div class="cslist">${F.list.map(r => `<div class="csr"><span><b>${briefLine(r.meta || {})}</b><small>${fmtDay((r.meta && r.meta.t) || Date.parse(r.t))} · ${r.dev === me ? '这台设备传的' : '其他设备传的'}${r.meta && r.meta.rift ? ` · 幻境 ${r.meta.rift} 层` : ''}</small></span><button class="btn sm" data-act="cspick" data-arg="${r.id}">用这份</button></div>`).join('')}</div>
+    <div class="row" style="justify-content:center"><button class="btn ghost" data-act="close">取消</button></div>`; };
+function csPanel() {
+  if (!CS_ON) return '';
+  if (lbBlocked()) return `<section class="panel"><h3>云存档</h3><p class="help-p">这里用不了云存档（claude.ai 的页面不让连外部网站）。用网页版玩会自动上传：${LB_SITE}</p></section>`;
+  const C = csMe();
+  const line = CS.err && !C.at ? '上传没成功，稍后会自动再试' : C.at ? `自动上传中 · 上次 ${fmtDay(C.at)}` : hasProgress() ? '还没上传过，玩一会儿就会自动传' : '开始玩以后会自动上传';
+  return `<section class="panel"><h3>云存档</h3><p class="help-p">${line}</p>
+    <div class="cscode"><small>取回码</small><b>${csFmt(C.code)}</b><button class="btn sm ghost" data-act="cscopy">复制</button></div>
+    <p class="sub">换手机、清了缓存，在新设备上输入这串码就能取回。截图存好，别发给别人。</p>
+    <div class="row rdm-row"><input id="csIn" placeholder="在新设备上输入取回码" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="csfind">取回</button></div></section>`;
+}
+// 开始界面的排行榜按钮：小字写幻境榜首
+let LBTOP = null, LBTOPT = 0;
+function lbTitleLine() {
+  if (!lbBlocked() && Date.now() - LBTOPT > 60000) { LBTOPT = Date.now();
+    lbCall('lb_board', { p_kind: 'rift', p_period: 'all', p_cls: 'all', p_pid: null, p_limit: 1 }).then(j => { LBTOP = j && j.top && j.top[0] || null; if (VIEW === 'title' && !MODALFN) render(); }).catch(() => {}); }
+  return LBTOP ? `幻境榜首 ${esc(LBTOP.n)} · ${LBTOP.val} 层` : '看看谁爬得最高';
+}
+const lbModal = () => `<h2 class="mh">排行榜</h2>${lbHTML()}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">关闭</button></div>`;
 function lbHTML() {
   if (lbBlocked()) return `<section class="panel"><h3>排行榜</h3><p class="help-p">这里打不开排行榜（claude.ai 的页面不让连外部网站）。用网页版玩就能看：</p><p class="help-p"><a href="${LB_SITE}" target="_blank" rel="noopener">${LB_SITE}</a></p><p class="help-p">存档可以用「设置 → 存档」里的存档码搬过去。</p></section>`;
   const L = SAVE.lb, named = !!(L && L.name), D = LBV.data[lbKey()], j = D && D.j;
@@ -1469,9 +1536,10 @@ function titleHTML() {
     <div class="tl-head"><h1>九幽回廊</h1><p>三百年前，五人为钉，天狐为锁。</p></div>
     <div class="tl-menu">
       ${prog ? `<button class="btn big" data-act="tcont">继续游戏<small>${esc(CLASSES[cls].n)} ${lv} 级 · ${riftPath() && !SAVE.run && !storyCleared('normal') ? `九幽幻境 · 最高 ${rTop()} 层` : esc(chTitle(ch))}${SAVE.test ? ' · 试玩角色' : ''}</small></button>
-        <button class="btn ghost" data-act="tnew">重新开始</button>` : `<button class="btn big" data-act="tpath" data-arg="story">主线剧情<small>跟着故事走，一章一章解锁 · 第一次玩推荐</small></button>
-        <button class="btn big tl-rift" data-act="tpath" data-arg="rift">幻境挑战<small>跳过剧情直接刷，打得越深，开的东西越多</small></button>`}
-      <div class="tl-row"><button class="btn ghost" data-act="tsave">存档</button><button class="btn ghost" data-act="tset">设置</button></div>
+        <button class="btn big tl-lb" data-act="tlb">排行榜<small>${lbTitleLine()}</small></button>` : `<button class="btn big" data-act="tpath" data-arg="story">主线剧情<small>跟着故事走，一章一章解锁 · 第一次玩推荐</small></button>
+        <button class="btn big tl-rift" data-act="tpath" data-arg="rift">幻境挑战<small>跳过剧情直接刷，打得越深，开的东西越多</small></button>
+        <button class="btn big tl-lb" data-act="tlb">排行榜<small>${lbTitleLine()}</small></button>`}
+      <div class="tl-row">${prog ? '<button class="btn ghost" data-act="tnew">重新开始</button>' : ''}<button class="btn ghost" data-act="tsave">存档</button><button class="btn ghost" data-act="tset">设置</button></div>
     </div>
     <p class="tl-sign">涂与豪作品</p>
     <p class="tl-lang">${[['zh', '中文'], ['vi', 'Tiếng Việt']].map(([k, n]) => `<a data-act="lang" data-arg="${k}" class="${(window.LANG || 'zh') === k ? 'on' : ''}">${n}</a>`).join(' · ')}</p>
@@ -1591,7 +1659,7 @@ const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0')
 const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} ${b.lv} 级 · ${b.ended ? '已通关全部十章' : `已通关 ${b.cleared} 章`} · 银两 ${b.gold}`;
 const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
 function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
-const setSave = () => (prepZ(), '') + `<section class="panel"><h3>兑换码</h3><div class="row rdm-row"><input id="rdmIn" placeholder="输入兑换码" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="redeem">兑换</button></div></section><section class="panel bkp"><h3>存档备份</h3>
+const setSave = () => (prepZ(), '') + csPanel() + `<section class="panel"><h3>兑换码</h3><div class="row rdm-row"><input id="rdmIn" placeholder="输入兑换码" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="redeem">兑换</button></div></section><section class="panel bkp"><h3>存档备份</h3>
       <p class="help-p">进度只存在这台设备的这个浏览器里：清理缓存、换手机、换浏览器打开，进度都会丢。建议每打完一章备份一次。</p>
       <p class="bk-now"><b>现在的进度</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `上次备份：${fmtDay(SAVE.bk.t)}` : '还没有备份过'}</small></p>
       <div class="row"><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bkfile">保存成文件</button></div>
@@ -4070,6 +4138,14 @@ const ACT = {
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },
+  tlb: () => { openModal(lbModal); },
+  cskeep: () => { CS.pend = null; closeModal(); csStart(); csUpload(true); },
+  cscloud: async () => { const P = CS.pend; if (!P) return; try { IMPORTING = await csTake(csMe().code, P.id); ACT.doimport(); } catch (e) { toast('没拿到云上的存档，检查一下网络再试'); } },
+  cscopy: () => { const c = csFmt(csMe().code); try { navigator.clipboard.writeText(c).then(() => toast('取回码已复制'), () => toast(c)); } catch (e) { toast(c); } },
+  csfind: async () => { const code = csNorm(($('#csIn') || {}).value); if (!code) return toast('取回码不对：JY 后面是 16 位字母和数字');
+    try { const L = await lbCall('cs_list', { p_code: code }); if (!L || !L.length) return toast('这个取回码下面还没有存档'); CS.found = { code, list: L }; BACK = MODALFN; openModal(csListModal); }
+    catch (e) { toast('连不上云存档，检查一下网络'); } },
+  cspick: async a => { const F = CS.found; if (!F) return; try { IMPORTING = await csTake(F.code, +a); BACK = MODALFN; openModal(importModal()); } catch (e) { toast('这份存档读不出来，换一份试试'); } },
   lbkind: k => { LBV.kind = k; refresh(); },
   lbcls: k => { LBV.cls = k; refresh(); },
   lbreload: () => { lbLoad(true); refresh(); },
@@ -4504,6 +4580,8 @@ function render() {
 VIEW = 'title';
 render();
 setTimeout(() => { try { lbSync(); } catch (e) {} }, 5000);   // 排行榜：开游戏时把没传过的纪录补上
+setTimeout(() => { try { csBoot(); } catch (e) {} }, 2500);   // 云存档：先对一下云上的，再开始自动上传
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { try { csUpload(false, true); } catch (e) {} } });   // 切到后台、关页面时补传一次
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次

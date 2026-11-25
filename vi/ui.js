@@ -1339,9 +1339,9 @@ function lbMe() { const L = SAVE.lb || (SAVE.lb = { pid: '', sec: '', name: '', 
   if (!L.pid) { const b = lbRand(16); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128; const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
     L.pid = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; L.sec = [...lbRand(24)].map(x => 'abcdefghijkmnpqrstuvwxyz23456789'[x & 31]).join(''); }
   L.sent = L.sent || {}; return L; }
-async function lbCall(fn, body) {
+async function lbCall(fn, body, keep) {
   const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { if (ctl) ctl.abort(); }, 12000);
-  try { const r = await fetch(LB_URL + fn, { method: 'POST', headers: { apikey: LB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined });
+  try { const r = await fetch(LB_URL + fn, { method: 'POST', headers: { apikey: LB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined, keepalive: !!keep });
     const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.message) || ('HTTP ' + r.status)); return j; }
   finally { clearTimeout(to); }
 }
@@ -1377,8 +1377,75 @@ async function lbLoad(force) {
     const j = await lbCall('lb_board', { p_kind: LBV.kind, p_period: LBV.kind === 'tower' ? lbWeek() : 'all', p_cls: LBV.cls === 'all' ? 'all' : (LB_CLS[LBV.cls] || LBV.cls), p_pid: SAVE.lb && SAVE.lb.pid || null, p_limit: 50 });
     LBV.data[k] = { t: Date.now(), j }; }
   catch (e) { LBV.err = /fetch|network|abort|load/i.test(String(e && e.message || e)) ? "Không kết nối được bảng xếp hạng, kiểm tra mạng nhé" : "Bảng xếp hạng bị lỗi: " + (e && e.message || e); }
-  finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if (TT === 'col' && CTAB === 'lb') refresh(); }
+  finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if ((TT === 'col' && CTAB === 'lb' && VIEW === 'town') || MODALFN === lbModal) refresh(); }
 }
+// ---------- 云存档（2026-11-26，Supabase）：打着打着自动上传；取回码（16 位）换设备时取回。只在网页版能用 ----------
+// 库里每个取回码每台设备留最近 3 份、总共 8 份；一台旧设备乱传也挤不掉另一台的最新存档
+const CS_ON = false;
+const CS_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let CS = { hold: true, busy: false, timer: null, err: '', pend: null, found: null };
+function csDev() { try { let d = localStorage.getItem('jy_dev'); if (!d) { d = 'd' + [...lbRand(10)].map(x => CS_ABC[x & 31]).join(''); localStorage.setItem('jy_dev', d); } return d; } catch (e) { return 'dnostore'; } }
+const csFmt = c => 'JY-' + c.match(/.{4}/g).join('-');
+const csNorm = v => { let c = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c.length === 18 && c.startsWith('JY')) c = c.slice(2); return /^[A-HJ-NP-Z2-9]{16}$/.test(c) ? c : null; };
+const csOn = () => CS_ON && !lbBlocked() && storageOK;
+function csMe() { const C = SAVE.cs || (SAVE.cs = {}); if (!C.code) { C.code = [...lbRand(16)].map(x => CS_ABC[x & 31]).join(''); persist(true); } return C; }
+async function csUpload(force, keep) {
+  if (!csOn() || CS.hold || CS.busy || !hasProgress()) return;
+  const C = csMe(); if (!force && (SAVE.t || 0) <= (C.ut || 0)) return;
+  CS.busy = true;
+  try { const t = SAVE.t || Date.now(), data = await exportSaveZ();
+    const r = await lbCall('cs_put', { p_code: C.code, p_dev: csDev(), p_data: data, p_meta: { ...saveBrief(SAVE), rift: SAVE.riftMax || 0, t } }, keep);
+    C.ut = t; C.at = Date.now(); C.last = r && r.id; CS.err = ''; persist(true);
+    if (!C.told) { C.told = 1; persist(true); toast("Đã bật lưu đám mây: mã lấy lại ở \"Cài đặt → Lưu trữ\", chụp màn hình giữ lại nhé"); } }
+  catch (e) { CS.err = String(e && e.message || e); }
+  finally { CS.busy = false; }
+}
+function csQueue() {   // 存一次档就排一次上传：最快 20 秒后，离上次上传至少 90 秒；玩着的时候不会一直往后推
+  if (!csOn() || CS.hold || CS.timer) return;
+  const wait = Math.max(20000, 90000 - (Date.now() - ((SAVE.cs && SAVE.cs.at) || 0)));
+  CS.timer = setTimeout(() => { CS.timer = null; csUpload(); }, wait);
+}
+async function csBoot() {   // 开游戏：先看云上有没有别的设备传的、更新的存档，有就问一声；没有就开始自动上传
+  if (!csOn()) return;
+  const C = csMe();
+  try { const L = await lbCall('cs_list', { p_code: C.code }), top = L && L[0];
+    if (top && top.dev !== csDev() && top.meta && (top.meta.t || 0) > (SAVE.t || 0) + 2000) { CS.pend = top; openModal(csNewerModal); return; } }
+  catch (e) { CS.err = String(e && e.message || e); }
+  csStart();
+}
+function csStart() { CS.hold = false; if (!CS.started) { CS.started = 1; const prev = onPersist; onPersist = prev ? () => { prev(); csQueue(); } : csQueue; } csQueue(); }
+const csNewerModal = () => { const P = CS.pend, m = P.meta;
+  return `<h2 class="mh">Trên mây có bản lưu mới hơn</h2>
+    <div class="bk-cmp"><div class="in"><small>Trên mây (thiết bị khác tải lên)</small><b>${briefLine(m)}</b><small>Lưu lúc ${fmtDay(m.t)}</small></div>
+    <div><small>Thiết bị này</small><b>${briefLine(saveBrief(SAVE))}</b>${SAVE.t ? `<small>Lưu lúc ${fmtDay(SAVE.t)}</small>` : ''}</div></div>
+    <div class="row"><button class="btn" data-act="cscloud">Dùng bản trên mây</button><button class="btn ghost" data-act="cskeep">Dùng bản máy này</button></div>
+    <p class="help-p">Chọn "Dùng bản máy này" thì bản trên mây vẫn còn, vào "Cài đặt → Lưu trữ → Lưu đám mây" dùng mã lấy lại là lấy về được.</p>`; };
+async function csTake(code, id) {   // 下载一份，读成存档对象，带上取回码
+  const data = await lbCall('cs_get', { p_code: code, p_id: id }); if (!data) throw new Error('gone');
+  const o = await decodeSaveAny(data); o.cs = { code, ut: o.t || 0, at: Date.now(), last: id, told: 1 }; return o;
+}
+const csListModal = () => { const F = CS.found, me = csDev();
+  return `<h2 class="mh">Lấy lại bản lưu đám mây</h2><p class="help-p">Mã ${csFmt(F.code)} có ${F.list.length} bản, mới nhất ở trên:</p>
+    <div class="cslist">${F.list.map(r => `<div class="csr"><span><b>${briefLine(r.meta || {})}</b><small>${fmtDay((r.meta && r.meta.t) || Date.parse(r.t))} · ${r.dev === me ? "máy này tải lên" : "máy khác tải lên"}${r.meta && r.meta.rift ? ` · Ảo Cảnh tầng ${r.meta.rift}` : ''}</small></span><button class="btn sm" data-act="cspick" data-arg="${r.id}">Dùng bản này</button></div>`).join('')}</div>
+    <div class="row" style="justify-content:center"><button class="btn ghost" data-act="close">Hủy</button></div>`; };
+function csPanel() {
+  if (!CS_ON) return '';
+  if (lbBlocked()) return `<section class="panel"><h3>Lưu đám mây</h3><p class="help-p">Ở đây không dùng được lưu đám mây (trang trên claude.ai không cho kết nối ra ngoài). Chơi bản web sẽ tự tải lên: ${LB_SITE}</p></section>`;
+  const C = csMe();
+  const line = CS.err && !C.at ? "Tải lên chưa được, lát nữa sẽ tự thử lại" : C.at ? `Đang tự tải lên · Lần trước ${fmtDay(C.at)}` : hasProgress() ? "Chưa tải lên lần nào, chơi một lúc sẽ tự tải" : "Bắt đầu chơi rồi sẽ tự tải lên";
+  return `<section class="panel"><h3>Lưu đám mây</h3><p class="help-p">${line}</p>
+    <div class="cscode"><small>Mã lấy lại</small><b>${csFmt(C.code)}</b><button class="btn sm ghost" data-act="cscopy">Sao chép</button></div>
+    <p class="sub">Đổi điện thoại, xóa bộ nhớ đệm thì nhập mã này trên máy mới để lấy lại. Chụp màn hình giữ lại, đừng gửi cho người khác.</p>
+    <div class="row rdm-row"><input id="csIn" placeholder="Nhập mã lấy lại trên máy mới" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="csfind">Lấy lại</button></div></section>`;
+}
+// 开始界面的排行榜按钮：小字写幻境榜首
+let LBTOP = null, LBTOPT = 0;
+function lbTitleLine() {
+  if (!lbBlocked() && Date.now() - LBTOPT > 60000) { LBTOPT = Date.now();
+    lbCall('lb_board', { p_kind: 'rift', p_period: 'all', p_cls: 'all', p_pid: null, p_limit: 1 }).then(j => { LBTOP = j && j.top && j.top[0] || null; if (VIEW === 'title' && !MODALFN) render(); }).catch(() => {}); }
+  return LBTOP ? `Đứng đầu Ảo Cảnh: ${esc(LBTOP.n)} · tầng ${LBTOP.val}` : "Xem ai leo cao nhất";
+}
+const lbModal = () => `<h2 class="mh">Bảng xếp hạng</h2>${lbHTML()}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">Đóng</button></div>`;
 function lbHTML() {
   if (lbBlocked()) return `<section class="panel"><h3>Bảng xếp hạng</h3><p class="help-p">Ở đây không mở được bảng xếp hạng (trang trên claude.ai không cho kết nối ra ngoài). Chơi bản web là xem được:</p><p class="help-p"><a href="${LB_SITE}" target="_blank" rel="noopener">${LB_SITE}</a></p><p class="help-p">Dữ liệu có thể chuyển sang bằng mã lưu trong "Cài đặt → Lưu trữ".</p></section>`;
   const L = SAVE.lb, named = !!(L && L.name), D = LBV.data[lbKey()], j = D && D.j;
@@ -1470,9 +1537,10 @@ function titleHTML() {
     <div class="tl-head"><h1>Cửu U Hồi Lang</h1><p>Ba trăm năm trước, năm người làm đinh, thiên hồ làm khóa.</p></div>
     <div class="tl-menu">
       ${prog ? `<button class="btn big" data-act="tcont">Tiếp tục<small>${esc(CLASSES[cls].n)} cấp ${lv} · ${riftPath() && !SAVE.run && !storyCleared('normal') ? `Ảo Cảnh Cửu U · cao nhất tầng ${rTop()}` : esc(chTitle(ch))}${SAVE.test ? " · nhân vật chơi thử" : ''}</small></button>
-        <button class="btn ghost" data-act="tnew">Chơi lại từ đầu</button>` : `<button class="btn big" data-act="tpath" data-arg="story">Cốt truyện chính<small>Đi theo câu chuyện, mở khóa từng chương · Khuyên chơi lần đầu</small></button>
-        <button class="btn big tl-rift" data-act="tpath" data-arg="rift">Thử thách Ảo Cảnh<small>Bỏ qua cốt truyện, cày thẳng; càng sâu mở càng nhiều</small></button>`}
-      <div class="tl-row"><button class="btn ghost" data-act="tsave">Lưu trữ</button><button class="btn ghost" data-act="tset">Cài đặt</button></div>
+        <button class="btn big tl-lb" data-act="tlb">Bảng xếp hạng<small>${lbTitleLine()}</small></button>` : `<button class="btn big" data-act="tpath" data-arg="story">Cốt truyện chính<small>Đi theo câu chuyện, mở khóa từng chương · Khuyên chơi lần đầu</small></button>
+        <button class="btn big tl-rift" data-act="tpath" data-arg="rift">Thử thách Ảo Cảnh<small>Bỏ qua cốt truyện, cày thẳng; càng sâu mở càng nhiều</small></button>
+        <button class="btn big tl-lb" data-act="tlb">Bảng xếp hạng<small>${lbTitleLine()}</small></button>`}
+      <div class="tl-row">${prog ? "<button class=\"btn ghost\" data-act=\"tnew\">Chơi lại</button>" : ''}<button class="btn ghost" data-act="tsave">Lưu trữ</button><button class="btn ghost" data-act="tset">Cài đặt</button></div>
     </div>
     <p class="tl-sign">Tác phẩm của Đồ Dữ Hào</p>
     <p class="tl-lang">${[['zh', "中文"], ['vi', 'Tiếng Việt']].map(([k, n]) => `<a data-act="lang" data-arg="${k}" class="${(window.LANG || 'zh') === k ? 'on' : ''}">${n}</a>`).join(' · ')}</p>
@@ -1592,7 +1660,7 @@ const fmtDay = t => { const d = new Date(t), z = n => String(n).padStart(2, '0')
 const briefLine = b => `${esc(CLASSES[b.cls] ? CLASSES[b.cls].n : b.cls)} cấp ${b.lv} · ${b.ended ? "đã qua cả mười chương" : `đã qua ${b.cleared} chương`} · Bạc ${b.gold}`;
 const bkDue = () => hasProgress() && (!SAVE.bk || (SAVE.bk.c || 0) < storyCleared('normal'));   // 打过新的一章还没备份
 function markBackup() { SAVE.bk = { t: Date.now(), c: storyCleared('normal') }; }
-const setSave = () => (prepZ(), '') + `<section class="panel"><h3>Mã đổi thưởng</h3><div class="row rdm-row"><input id="rdmIn" placeholder="Nhập mã đổi thưởng" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="redeem">Đổi</button></div></section><section class="panel bkp"><h3>Sao lưu tiến trình</h3>
+const setSave = () => (prepZ(), '') + csPanel() + `<section class="panel"><h3>Mã đổi thưởng</h3><div class="row rdm-row"><input id="rdmIn" placeholder="Nhập mã đổi thưởng" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn sm" data-act="redeem">Đổi</button></div></section><section class="panel bkp"><h3>Sao lưu tiến trình</h3>
       <p class="help-p">Tiến trình chỉ nằm trong trình duyệt này trên thiết bị này: xóa bộ nhớ đệm, đổi điện thoại hay mở bằng trình duyệt khác là mất. Nên sao lưu sau mỗi chương.</p>
       <p class="bk-now"><b>Tiến trình hiện tại</b>${briefLine(saveBrief(SAVE))}<small>${SAVE.bk ? `Sao lưu lần trước: ${fmtDay(SAVE.bk.t)}` : "Chưa sao lưu lần nào"}</small></p>
       <div class="row"><button class="btn sm" data-act="export">Sao chép mã lưu</button><button class="btn sm ghost" data-act="bkfile">Lưu thành tệp</button></div>
@@ -4071,6 +4139,14 @@ const ACT = {
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },
+  tlb: () => { openModal(lbModal); },
+  cskeep: () => { CS.pend = null; closeModal(); csStart(); csUpload(true); },
+  cscloud: async () => { const P = CS.pend; if (!P) return; try { IMPORTING = await csTake(csMe().code, P.id); ACT.doimport(); } catch (e) { toast("Không lấy được bản trên mây, kiểm tra mạng rồi thử lại"); } },
+  cscopy: () => { const c = csFmt(csMe().code); try { navigator.clipboard.writeText(c).then(() => toast("Đã sao chép mã lấy lại"), () => toast(c)); } catch (e) { toast(c); } },
+  csfind: async () => { const code = csNorm(($('#csIn') || {}).value); if (!code) return toast("Mã không đúng: sau JY là 16 chữ cái và số");
+    try { const L = await lbCall('cs_list', { p_code: code }); if (!L || !L.length) return toast("Mã này chưa có bản lưu nào"); CS.found = { code, list: L }; BACK = MODALFN; openModal(csListModal); }
+    catch (e) { toast("Không kết nối được lưu đám mây, kiểm tra mạng nhé"); } },
+  cspick: async a => { const F = CS.found; if (!F) return; try { IMPORTING = await csTake(F.code, +a); BACK = MODALFN; openModal(importModal()); } catch (e) { toast("Bản lưu này đọc không được, thử bản khác"); } },
   lbkind: k => { LBV.kind = k; refresh(); },
   lbcls: k => { LBV.cls = k; refresh(); },
   lbreload: () => { lbLoad(true); refresh(); },
@@ -4505,6 +4581,8 @@ function render() {
 VIEW = 'title';
 render();
 setTimeout(() => { try { lbSync(); } catch (e) {} }, 5000);   // 排行榜：开游戏时把没传过的纪录补上
+setTimeout(() => { try { csBoot(); } catch (e) {} }, 2500);   // 云存档：先对一下云上的，再开始自动上传
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { try { csUpload(false, true); } catch (e) {} } });   // 切到后台、关页面时补传一次
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次
