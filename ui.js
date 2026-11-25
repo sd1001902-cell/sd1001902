@@ -1380,20 +1380,20 @@ async function lbLoad(force) {
 }
 // ---------- 云存档（2026-11-26，Supabase）：打着打着自动上传；取回码（16 位）换设备时取回。只在网页版能用 ----------
 // 库里每个取回码每台设备留最近 3 份、总共 8 份；一台旧设备乱传也挤不掉另一台的最新存档
-const CS_ON = false;
+const CS_ON = true;
 const CS_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let CS = { hold: true, busy: false, timer: null, err: '', pend: null, found: null };
 function csDev() { try { let d = localStorage.getItem('jy_dev'); if (!d) { d = 'd' + [...lbRand(10)].map(x => CS_ABC[x & 31]).join(''); localStorage.setItem('jy_dev', d); } return d; } catch (e) { return 'dnostore'; } }
 const csFmt = c => 'JY-' + c.match(/.{4}/g).join('-');
 const csNorm = v => { let c = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (c.length === 18 && c.startsWith('JY')) c = c.slice(2); return /^[A-HJ-NP-Z2-9]{16}$/.test(c) ? c : null; };
-const csOn = () => CS_ON && !lbBlocked() && storageOK;
+const csOn = () => CS_ON && !lbBlocked() && storageOK && (location.protocol !== 'file:' || window.CS_TEST);   // 本地测试不往库里传
 function csMe() { const C = SAVE.cs || (SAVE.cs = {}); if (!C.code) { C.code = [...lbRand(16)].map(x => CS_ABC[x & 31]).join(''); persist(true); } return C; }
 async function csUpload(force, keep) {
   if (!csOn() || CS.hold || CS.busy || !hasProgress()) return;
   const C = csMe(); if (!force && (SAVE.t || 0) <= (C.ut || 0)) return;
   CS.busy = true;
   try { const t = SAVE.t || Date.now(), data = await exportSaveZ();
-    const r = await lbCall('cs_put', { p_code: C.code, p_dev: csDev(), p_data: data, p_meta: { ...saveBrief(SAVE), rift: SAVE.riftMax || 0, t } }, keep);
+    const r = await lbCall('cs_put', { p_code: C.code, p_dev: csDev(), p_data: data, p_meta: { ...saveBrief(SAVE), rift: SAVE.riftMax || 0, t } }, keep && data.length < 60000);   // keepalive 最多 64KB
     C.ut = t; C.at = Date.now(); C.last = r && r.id; CS.err = ''; persist(true);
     if (!C.told) { C.told = 1; persist(true); toast('云存档已开启：取回码在「设置 → 存档」，截图存好'); } }
   catch (e) { CS.err = String(e && e.message || e); }
