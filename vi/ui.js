@@ -820,13 +820,25 @@ function twEndUI() {
   if (B.win) VFX.victory('P'); SFX.play(B.win ? (BRES.tw.rew.length ? 'legend' : 'win') : 'lose');
   flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
 }
+// 看塔装：在城里也能看清楚每样东西干嘛的——套装各档效果、神兵特效、招式和变招说明、还没学的招式（2026-11-25）
 const twKitModal = () => () => {
-  const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls];
-  const eq = POS_IDS.map(p => { const it = kit.eq[p]; return it ? `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}</div>` : ''; }).join('');
-  const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id], R = r && RUNES[id][r === 'a' ? 0 : 1]; return `<div class="twkrow"><small>Chiêu</small><b>${k.n}</b>${R ? `<em>Biến chiêu «${R.n}»</em>` : ''}</div>`; }).join('');
+  const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls], cnt = twSetCnt(kit), H = t => `<h4 class="twkh">${t}</h4>`;
+  const sets = Object.keys(cnt).map(id => { const S = SETS.find(x => x.id === id); if (!S) return ''; const n = cnt[id], th = twTheme(cls, id);
+    return `<div class="twkset"><b class="r-set">${S.n}</b><small>trên người ${n} món</small>${th ? `<span>${esc(th)}</span>` : ''}${[2, 4, 6].filter(k => S['b' + k + 'd']).map(k => `<p class="twb ${n >= k ? 'on' : 'off'}"><i>${k} món</i>${esc(S['b' + k + 'd'])}<em>${n >= k ? "Đã mở" : `Thiếu ${k - n} món`}</em></p>`).join('')}</div>`; }).join('');
+  const eq = POS_IDS.map(p => { const it = kit.eq[p]; if (!it) return ''; const L = it.legend && LEGENDS.find(l => l.id === it.legend);
+    return `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}${L ? `<span>${esc(L.d)}</span>` : ''}</div>`; }).join('');
+  const skRow = (k, own) => { const r = kit.rn[k.id], RR = RUNES[k.id] || [], R = r && RR[r === 'a' ? 0 : 1];
+    const rn = own ? (R ? `<span class="twrn">Biến chiêu «${R.n}»: ${esc(R.d)}</span>` : RR.length ? `<span class="twrn dim">Chưa biến chiêu, chọn một trong ba sẽ ra: «${RR[0].n}» ${esc(RR[0].d)}; «${RR[1].n}» ${esc(RR[1].d)}</span>` : '') : '';
+    return `<div class="twkrow${own ? '' : ' dim'}"><small>${k.cd ? `Hồi chiêu ${k.cd}` : "Chiêu cơ bản"}</small><b>${k.n}</b>${wxBadge(k)}<span>${esc(k.d)}</span>${rn}</div>`; };
+  const basic = C.skills.filter(k => !k.cd), own = kit.sk.map(id => C.skills.find(x => x.id === id)).filter(Boolean), rest = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
   const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>Hồn thần binh</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
   const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>Linh ngọc</small><b style="color:${G.c}">${G.n} cấp ${g.lv}</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
-  return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Đồ tháp · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">${eq}${sk}${cu}${lg}${kit.allN ? `<div class="twkrow"><small>Toàn thuộc tính</small><b>Sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL * kit.allN}%</b><span>Đổi từ những lần không lấy gì, đã lấy ${kit.allN} lần</span></div>` : ''}</div>`;
+  const all = kit.allN ? `<div class="twkrow"><small>Toàn thuộc tính</small><b>Sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL * kit.allN}%</b><span>Đổi từ những lần không lấy gì, đã lấy ${kit.allN} lần</span></div>` : '';
+  return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Đồ tháp · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">
+    ${sets ? H("Hiệu ứng bộ") + sets : ''}${H("Trang bị")}${eq}
+    ${H(`Chiêu (${own.length}/${LOADOUT_MAX})`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
+    ${rest.length ? H("Chiêu chưa học · sẽ ra khi chọn một trong ba") + rest.map(k => skRow(k, false)).join('') : ''}
+    ${cu || lg || all ? H("Hồn thần binh · Linh ngọc") + cu + lg + all : ''}</div>`;
 };
 // 塔里用的是不熟的职业时：先看一眼它靠什么打、塔里会出哪几套（只说路子，不给配装）
 const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS_MECH[cls];

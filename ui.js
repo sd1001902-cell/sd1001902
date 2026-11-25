@@ -819,13 +819,25 @@ function twEndUI() {
   if (B.win) VFX.victory('P'); SFX.play(B.win ? (BRES.tw.rew.length ? 'legend' : 'win') : 'lose');
   flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
 }
+// 看塔装：在城里也能看清楚每样东西干嘛的——套装各档效果、神兵特效、招式和变招说明、还没学的招式（2026-11-25）
 const twKitModal = () => () => {
-  const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls];
-  const eq = POS_IDS.map(p => { const it = kit.eq[p]; return it ? `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}</div>` : ''; }).join('');
-  const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id], R = r && RUNES[id][r === 'a' ? 0 : 1]; return `<div class="twkrow"><small>招式</small><b>${k.n}</b>${R ? `<em>变招「${R.n}」</em>` : ''}</div>`; }).join('');
+  const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls], cnt = twSetCnt(kit), H = t => `<h4 class="twkh">${t}</h4>`;
+  const sets = Object.keys(cnt).map(id => { const S = SETS.find(x => x.id === id); if (!S) return ''; const n = cnt[id], th = twTheme(cls, id);
+    return `<div class="twkset"><b class="r-set">${S.n}</b><small>身上 ${n} 件</small>${th ? `<span>${esc(th)}</span>` : ''}${[2, 4, 6].filter(k => S['b' + k + 'd']).map(k => `<p class="twb ${n >= k ? 'on' : 'off'}"><i>${k} 件</i>${esc(S['b' + k + 'd'])}<em>${n >= k ? '已开' : `还差 ${k - n} 件`}</em></p>`).join('')}</div>`; }).join('');
+  const eq = POS_IDS.map(p => { const it = kit.eq[p]; if (!it) return ''; const L = it.legend && LEGENDS.find(l => l.id === it.legend);
+    return `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}${L ? `<span>${esc(L.d)}</span>` : ''}</div>`; }).join('');
+  const skRow = (k, own) => { const r = kit.rn[k.id], RR = RUNES[k.id] || [], R = r && RR[r === 'a' ? 0 : 1];
+    const rn = own ? (R ? `<span class="twrn">变招「${R.n}」：${esc(R.d)}</span>` : RR.length ? `<span class="twrn dim">还没变招，三选一会出：「${RR[0].n}」${esc(RR[0].d)}；「${RR[1].n}」${esc(RR[1].d)}</span>` : '') : '';
+    return `<div class="twkrow${own ? '' : ' dim'}"><small>${k.cd ? `冷却 ${k.cd}` : '基本招式'}</small><b>${k.n}</b>${wxBadge(k)}<span>${esc(k.d)}</span>${rn}</div>`; };
+  const basic = C.skills.filter(k => !k.cd), own = kit.sk.map(id => C.skills.find(x => x.id === id)).filter(Boolean), rest = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
   const cu = kit.cube.map(id => { const L = LEGENDS.find(l => l.id === id); return `<div class="twkrow"><small>神兵之魂</small><b class="r-legend">${L.n}</b><span>${esc(L.d)}</span></div>`; }).join('');
   const lg = kit.lg.map(g => { const G = LGEMS[g.t]; return `<div class="twkrow"><small>灵玉</small><b style="color:${G.c}">${G.n} ${g.lv} 级</b><span>${esc(G.d(g.lv))}</span></div>`; }).join('');
-  return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">塔装 · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">${eq}${sk}${cu}${lg}${kit.allN ? `<div class="twkrow"><small>全属性</small><b>伤害、气血、护甲各 +${TW_ALL * kit.allN}%</b><span>三选一都不要换来的，已拿 ${kit.allN} 次</span></div>` : ''}</div>`;
+  const all = kit.allN ? `<div class="twkrow"><small>全属性</small><b>伤害、气血、护甲各 +${TW_ALL * kit.allN}%</b><span>三选一都不要换来的，已拿 ${kit.allN} 次</span></div>` : '';
+  return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">塔装 · ${esc(C.n)}</h2><div class="twkit2" data-scroll="twkit">
+    ${sets ? H('套装效果') + sets : ''}${H('装备')}${eq}
+    ${H(`招式（${own.length}/${LOADOUT_MAX}）`)}${basic.concat(own).map(k => skRow(k, true)).join('')}
+    ${rest.length ? H('还没学的招式 · 三选一里会出') + rest.map(k => skRow(k, false)).join('') : ''}
+    ${cu || lg || all ? H('神兵之魂 · 灵玉') + cu + lg + all : ''}</div>`;
 };
 // 塔里用的是不熟的职业时：先看一眼它靠什么打、塔里会出哪几套（只说路子，不给配装）
 const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS_MECH[cls];
