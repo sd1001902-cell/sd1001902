@@ -1039,7 +1039,9 @@ function refineStart(it, idx) {
 }
 function refinePick(it, c) { const P = it.rfPending; if (!P) return; withOwnerHp(it, () => { it.aff[P.idx] = P.opts[c]; }); delete it.rfPending; }
 // 洗炼：锁住想留的词条，其余全部换新；洗完新旧整套二选一
-function washCost(it, nLock) { const n = it.wsn || 0; return { gold: Math.round((60 + it.ilvl * 8) * (1 + n * 0.2) * (1 + nLock * 0.8)), mats: 4 + nLock * 3 + Math.floor(n / 2) }; }
+// 2026-11-26 用户定：价钱固定（不再越洗越贵），锁越多越贵，锁 5 条一次 500 魂晶。银两底价 70 阶约 1 万两，跟魂晶一样按锁数翻
+const WASH_MATS = [10, 20, 40, 80, 200, 500];
+function washCost(it, nLock) { const k = WASH_MATS[Math.min(nLock, WASH_MATS.length - 1)] / WASH_MATS[0]; return { gold: Math.round((200 + it.ilvl * 140) * k), mats: WASH_MATS[Math.min(nLock, WASH_MATS.length - 1)] }; }
 function washStart(it, locks) {
   if (busyRoll(it)) return { err: '上一次的结果还没选' };
   if (!it.aff.length) return { err: '这件装备没有词条' };
