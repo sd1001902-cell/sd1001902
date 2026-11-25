@@ -1520,7 +1520,7 @@ function rStep(ch, x, y, run) {
 // 逢 5 层拿神兵之魂（乾坤袋，最多三格），逢 10 层拿灵玉（最多三颗）。每层回满血，不带丹药；怒气在塔里一层层留着。
 // 每十层存一次档，倒下回到存档那层（带着存档时那身塔装）。每周换一座塔（楼层、妖物、三选一按周和职业定好，大家一样），从第一层重爬；
 // 每个职业的历史最高层、首通奖励永久保留。
-var TW = { bossK: [0.45, 0.6], ilvl: 70, plus: 10, gemT: 6, lgLv0: 20, lgLvK: 1.2, lgMax: 150, nStart: 2, n0: 24, nK: 1.5, top: 200, box: 200,
+var TW = { bossK: [0.45, 0.6], ilvl: 70, plus: 10, gemT: 6, lgLv0: 20, lgLvK: 1.2, lgMax: 150, nStart: 2, n0: 24, nK: 0.85, top: 200, box: 200,
   para: { pAtk: 25, pArmor: 25, pHp: 25, crit: 60, spd: 40, res: 80, dmgPct: 90, hpPct: 60, armorPct: 25 },
   cls: { berserker: { hpPct: 20, dmgPct: 30 }, mage: { hpPct: 80, dmgPct: 40 }, necro: { hpPct: 80, dmgPct: 80, minionPct: 60 }, assassin: { hpPct: 40, dmgPct: 40 }, paladin: {} },
   start: { necro: ['summon', 'shidu'], assassin: ['venom', 'bingpo'] } };   // 2026-11-25 塔里僵尸改成吃你的伤害、暴击（同幻境），赶尸人伤害补偿 150 → 80：打塔主步数 227 → 121，最高层中位约 30 → 33（60 局）   // 起手两招（没写的按等级取前两招）   // 塔里不带伙伴：各职业的底子按模拟补一点（和尚自己扛得住，不补）
@@ -1547,7 +1547,7 @@ const twSets = cls => BUILDS[cls].map(B => B.set);
 function twItem(cls, slot, rarity, extra) {   // 一件塔装：宝品照常；套装、神兵一律太古 +10、词条满值；孔开满、镶通灵玉
   const it = makeItem({ slot: slotType(slot), ilvl: TW.ilvl, rarity, cls, noSocket: true, ...(extra || {}) });
   it.plus = TW.plus; it.tw = 1;
-  if (it.rarity === 'set' || it.rarity === 'legend') { it.anc = 2; if (it.aff.length < 5) addAffixes(it, 5 - it.aff.length); it.aff = it.aff.map(([k]) => [k, affixValue(affDef(k), it.ilvl, affMult(it), true)]); }
+  // 2026-11-25 套装、神兵换上去时沿用这一格原来的词条和孔（twApply），只换特效；不再是太古满词条白送属性
   const st = slotType(it.slot), n = MAX_SOCKETS[st] || 0, g = ['weapon', 'ring', 'amulet', 'offhand'].includes(st) ? 'ruby' : 'emerald';
   it.sockets = n; it.gems = Array.from({ length: n }, () => gemKey(g, TW.gemT));
   return it;
@@ -1601,9 +1601,9 @@ function twPicks(cls, f, kit) {
   const T = twSave(), C = CLASSES[cls];
   return twWith(twHash(T.wk, cls, 'pick', f), () => {
     const out = [], B = BUILDS[cls];
-    const lgPool = () => { const own = new Set(kit.lg.map(g => g.t)); const want = [...new Set(B.flatMap(b => b.gems))].filter(t => LGEMS[t] && !own.has(t) && t !== 'greed');
+    const lgPool = () => { const own = new Set(kit.lg.map(g => g.t)); const want = [];   // 2026-11-25 不再优先出流派推荐的：懂搭配才挑得准
       const gen = Object.keys(LGEMS).filter(t => !own.has(t) && t !== 'greed' && !want.includes(t) && (!LGEMS[t].cls || LGEMS[t].cls === cls)); return RNG.shuffle(want).concat(RNG.shuffle(gen)); };
-    const cubePool = () => { const own = new Set(kit.cube); const want = [...new Set(B.flatMap(b => b.cube))].filter(id => !own.has(id) && LEGENDS.some(l => l.id === id));
+    const cubePool = () => { const own = new Set(kit.cube); const want = [];
       const gen = LEGENDS.filter(l => !l.w && (!l.cls || l.cls === cls) && !own.has(l.id) && !want.includes(l.id) && l.fx).map(l => l.id); return RNG.shuffle(want).slice(0, 2).concat(RNG.shuffle(gen)); };
     if (f % 10 === 0) {
       const lv = twLgLv(f);
@@ -1616,7 +1616,8 @@ function twPicks(cls, f, kit) {
         const legs = [...new Set(B.flatMap(b => b.leg))].map(id => LEGENDS.find(l => l.id === id)).filter(Boolean);
         const wpn = LEGENDS.filter(l => l.w && sets.includes(l.set));
         const gen = LEGENDS.filter(l => !l.cls && !l.w && !l.x && l.slot !== 'offhand');
-        const L = RNG.ch(0.45) ? RNG.pick(legs.concat(wpn)) : RNG.pick(gen); return { t: 'eq', it: twItem(cls, L.slot, 'legend', { legendId: L.id }) };
+        const clsL = LEGENDS.filter(l => l.cls === cls && !l.w && !l.x);   // 本职业的神兵（不只流派推荐那几件）+ 套装兵器，或者通用神兵，各一半
+        const L = RNG.pick(RNG.ch(0.5) ? clsL.concat(wpn) : gen); return { t: 'eq', it: twItem(cls, L.slot, 'legend', { legendId: L.id }) };
       };
       const skill = () => {
         const notIn = C.skills.filter(k => k.cd && !kit.sk.includes(k.id));
@@ -1633,7 +1634,17 @@ function twPicks(cls, f, kit) {
 }
 // 三选一都不要：换一点全属性，一层层叠（2026-11-25）
 const TW_ALL = 3;   // 每次：伤害、气血、护甲各 +3%
-function twBuffs(cls, kit) { const b = { ...(TW.cls[cls] || {}) }, a = TW_ALL * (kit.allN || 0); if (a) for (const k of ['dmgPct', 'hpPct', 'armorPct']) b[k] = (b[k] || 0) + a; return b; }
+// 套装共鸣（2026-11-25）：塔里同一套凑齐 4 件、6 件，另给伤害、气血——集中凑一套的才有，东拼西凑拿不到
+const TW_RES = [[4, 60, 40], [6, 120, 80]];
+function twSetMax(kit) { const c = {}; for (const q of POS_IDS) { const it = kit.eq[q]; if (it && it.set) c[it.set] = (c[it.set] || 0) + 1; } return Math.max(0, ...Object.values(c)); }
+function twBuffs(cls, kit) { const b = { ...(TW.cls[cls] || {}) }, a = TW_ALL * (kit.allN || 0); if (a) for (const k of ['dmgPct', 'hpPct', 'armorPct']) b[k] = (b[k] || 0) + a;
+  const n = twSetMax(kit); for (const [k, d, h] of TW_RES) if (n >= k) { b.dmgPct = (b.dmgPct || 0) + d; b.hpPct = (b.hpPct || 0) + h; }
+  return b; }
+// 底子属性（攻击、护甲、气血、速度这些部位本身带的）沿用旧的那件，再加上新神兵自己的特效属性
+function twImpOf(old, it) { const lo = old.legend && LEGENDS.find(l => l.id === old.legend), ln = it.legend && LEGENDS.find(l => l.id === it.legend), b = { ...(old.imp || {}) };
+  if (lo) for (const k in lo.imp) if (b[k] != null) { b[k] -= lo.imp[k]; if (Math.abs(b[k]) < 1e-9) delete b[k]; }
+  if (ln) for (const k in ln.imp) b[k] = (b[k] || 0) + ln.imp[k];
+  return b; }
 function twEqPos(kit, it) {   // 塔装换上去落在哪一格：扳指先顶掉空的、宝品的那只
   if (slotType(it.slot) !== 'ring') return it.slot;
   const rank = x => !x ? -1 : x.rarity === 'rare' ? 0 : 1; return rank(kit.eq.ring2) < rank(kit.eq.ring) ? 'ring2' : 'ring';
@@ -1641,7 +1652,9 @@ function twEqPos(kit, it) {   // 塔装换上去落在哪一格：扳指先顶�
 function twApply(cls, p) {   // 选中一样：放进塔装
   const S = twState(cls), kit = S.kit;
   if (p.t === 'eq') {
-    kit.eq[twEqPos(kit, p.it)] = p.it;
+    const pos = twEqPos(kit, p.it), old = kit.eq[pos], it = p.it;
+    if (old) { it.aff = twClone(old.aff); it.plus = old.plus; it.sockets = old.sockets; it.gems = (old.gems || []).slice(); it.imp = twImpOf(old, it); }
+    kit.eq[pos] = it;
   } else if (p.t === 'sk') { if (kit.sk.includes(p.id)) {} else if (p.out && kit.sk.includes(p.out)) { kit.sk[kit.sk.indexOf(p.out)] = p.id; delete kit.rn[p.out]; } else if (kit.sk.length < LOADOUT_MAX) kit.sk.push(p.id); }
   else if (p.t === 'rn') kit.rn[p.id] = p.r;
   else if (p.t === 'cube') { if (!kit.cube.includes(p.lid) && kit.cube.length < 3) kit.cube.push(p.lid); }
@@ -1662,6 +1675,7 @@ function twRun(cls) {
 }
 // 打完一层：赢了记层数、给三选一、发奖；输了回存档
 // 塔主奖励（2026-11-25 塔顶 200 层后重定）：每周魂晶 100 起、每个塔主多 5，爬到顶一周约 3000；九幽玄晶只在 100 层以上首通给
+const twPickFl = f => f % 3 === 0 || f % 5 === 0;   // 2026-11-25 不再每层都选：每 3 层一次，逢 5 层神兵之魂、逢 10 层灵玉照旧
 const TW_REW = { mats: 100, matsK: 5, goldX: 200, jyFrom: 110 };
 function twRewOf(f) { const k = f / 10, m = TW_REW.mats + TW_REW.matsK * (k - 1);
   return { m, g: m * TW_REW.goldX, tier: 2 + Math.ceil(f / 40), x: f >= TW_REW.jyFrom ? (f > 150 ? 3 : 2) : 0 }; }
@@ -1669,7 +1683,7 @@ function twEnd(cls, b) {
   const T = twSave(), S = twState(cls), f = S.fl, res = { win: !!b.win, f, rew: [] };
   if (b.win) {
     S.kit.rage = Math.round(b.P.rage || 0); S.best = Math.max(S.best, f); T.rec[cls] = Math.max(T.rec[cls] || 0, f); S.fl = f + 1;
-    S.pend = f >= TW.top ? null : twPicks(cls, f, S.kit); if (S.pend && !S.pend.length) S.pend = null;   // 塔顶打完就不用再选了
+    S.pend = f >= TW.top || !twPickFl(f) ? null : twPicks(cls, f, S.kit); if (S.pend && !S.pend.length) S.pend = null;   // 塔顶打完就不用再选了
     if (f >= TW.top) res.top = true;
     if (f % 10 === 0) {
       S.ck = f; if (S.pend) S.ckWait = true; else S.ckKit = twClone(S.kit);

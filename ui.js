@@ -720,7 +720,8 @@ const twNextRew = f => { const k = Math.ceil(f / 10) * 10; return k; };
 function twKitLine(cls, kit) {   // 身上塔装的一句话概括
   const sets = {}; let leg = 0, rare = 0; for (const p of POS_IDS) { const it = kit.eq[p]; if (!it) continue; if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; else if (it.legend) leg++; else rare++; }
   const st = Object.keys(sets).map(id => `${(SETS.find(x => x.id === id) || {}).n || id} ${sets[id]} 件`).join(' · ');
-  return [st, leg ? `神兵 ${leg} 件` : '', rare ? `宝品 ${rare} 件` : '', kit.allN ? `全属性 +${TW_ALL * kit.allN}%` : ''].filter(Boolean).join(' · ');
+  const rs = twSetMax(kit);
+  return [st, rs >= TW_RES[0][0] ? `${rs >= TW_RES[1][0] ? 6 : 4} 件共鸣` : '', leg ? `神兵 ${leg} 件` : '', rare ? `宝品 ${rare} 件` : '', kit.allN ? `全属性 +${TW_ALL * kit.allN}%` : ''].filter(Boolean).join(' · ');
 }
 function towerBody(cls) {
   const T = twSave(), S = twState(cls), f = S.fl, kit = S.kit, C = CLASSES[cls], rec = T.rec[cls] || 0, nx = Math.min(TW.top, twNextRew(f)), RW = twRewOf(nx), top = f > TW.top;
@@ -754,6 +755,7 @@ function twGo() {
 // 三选一：点一下展开看清楚（套装各档效果、换下什么、跟手上哪些东西有关），再按「就选它」（2026-11-25）
 let TWSEL = null;   // { f: 这是哪一层的三选一, i }
 const twSetCnt = kit => { const c = {}; for (const q of POS_IDS) { const it = kit.eq[q]; if (it && it.set) c[it.set] = (c[it.set] || 0) + 1; } return c; };
+const twResTxt = () => `塔里凑齐 ${TW_RES[0][0]} 件：伤害 +${TW_RES[0][1]}%、气血 +${TW_RES[0][2]}%；${TW_RES[1][0]} 件再 +${TW_RES[1][1]}%、+${TW_RES[1][2]}%`;
 const twSetTxt = S => [2, 4, 6].map(n => S['b' + n + 'd']).filter(Boolean).join('；');
 const twTheme = (cls, sid) => { const b = (BUILDS[cls] || []).find(x => x.set === sid); return b ? b.d : ''; };
 // 一段说明里点名了哪些招式、哪些套装：只说有没有关系，不评好坏
@@ -786,6 +788,7 @@ function twPickHTML(cls, p, i) {
       d = `${S.n}：换上后 ${now} 件${th ? ` · ${esc(th)}` : ''}`;
       det = [2, 4, 6].filter(n => S['b' + n + 'd']).map(n => { const was = (cnt[S.id] || 0) >= n, on = now >= n;
         return `<p class="twb ${on ? (was ? 'on' : 'new') : 'off'}"><i>${n} 件</i>${esc(S['b' + n + 'd'])}<em>${on ? (was ? '已开' : '这件开') : `还差 ${n - now} 件`}</em></p>`; });
+      det.push(`<p class="twb ${now >= TW_RES[0][0] ? (now >= TW_RES[1][0] ? ((cnt[S.id] || 0) >= TW_RES[1][0] ? 'on' : 'new') : ((cnt[S.id] || 0) >= TW_RES[0][0] ? 'on' : 'new')) : 'off'}"><i>共鸣</i>${twResTxt()}<em>${now >= TW_RES[1][0] ? '6 件共鸣' : now >= TW_RES[0][0] ? '4 件共鸣' : `还差 ${TW_RES[0][0] - now} 件`}</em></p>`);
       rel = twRelOut(cls, kit, twSetTxt(S), S.id);
     } else if (L) { d = esc(L.d); rel = twRelOut(cls, kit, L.d); }
     let ol = '这个位置现在空着';
@@ -825,7 +828,8 @@ function twResHTML() {
   const ck = R.f % 10 === 0 ? `<p class="twrw">存档：第 ${R.f} 层</p>` : '';
   if (R.top) return `<div class="res win tw"><h3>登顶</h3><p>第 ${TW.top} 层塔主打过了，这周的通天塔爬到顶了。</p>${rew}<div class="twbtns"><button class="btn big" data-act="twhome">回青石镇</button></div></div>`;
   if (S.pend) return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<p class="sub">选一样带上楼</p><div class="twpicks">${twPicksHTML(cls)}</div></div>`;
-  return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<div class="twbtns"><button class="btn big" data-act="twnext">上第 ${S.fl} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
+  let nf = R.f + 1; while (nf < TW.top && !twPickFl(nf)) nf++;
+  return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<p class="sub">下一次三选一：打过第 ${nf} 层</p><div class="twbtns"><button class="btn big" data-act="twnext">上第 ${S.fl} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
 }
 function twEndUI() {
   BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();
@@ -836,7 +840,7 @@ function twEndUI() {
 const twKitModal = () => () => {
   const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls], cnt = twSetCnt(kit), H = t => `<h4 class="twkh">${t}</h4>`;
   const sets = Object.keys(cnt).map(id => { const S = SETS.find(x => x.id === id); if (!S) return ''; const n = cnt[id], th = twTheme(cls, id);
-    return `<div class="twkset"><b class="r-set">${S.n}</b><small>身上 ${n} 件</small>${th ? `<span>${esc(th)}</span>` : ''}${[2, 4, 6].filter(k => S['b' + k + 'd']).map(k => `<p class="twb ${n >= k ? 'on' : 'off'}"><i>${k} 件</i>${esc(S['b' + k + 'd'])}<em>${n >= k ? '已开' : `还差 ${k - n} 件`}</em></p>`).join('')}</div>`; }).join('');
+    return `<div class="twkset"><b class="r-set">${S.n}</b><small>身上 ${n} 件</small>${th ? `<span>${esc(th)}</span>` : ''}${[2, 4, 6].filter(k => S['b' + k + 'd']).map(k => `<p class="twb ${n >= k ? 'on' : 'off'}"><i>${k} 件</i>${esc(S['b' + k + 'd'])}<em>${n >= k ? '已开' : `还差 ${k - n} 件`}</em></p>`).join('')}<p class="twb ${n >= TW_RES[0][0] ? 'on' : 'off'}"><i>共鸣</i>${twResTxt()}<em>${n >= TW_RES[1][0] ? '6 件共鸣' : n >= TW_RES[0][0] ? '4 件共鸣' : `还差 ${TW_RES[0][0] - n} 件`}</em></p></div>`; }).join('');
   const eq = POS_IDS.map(p => { const it = kit.eq[p]; if (!it) return ''; const L = it.legend && LEGENDS.find(l => l.id === it.legend);
     return `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}${L ? `<span>${esc(L.d)}</span>` : ''}</div>`; }).join('');
   const skRow = (k, own) => { const r = kit.rn[k.id], RR = RUNES[k.id] || [], R = r && RR[r === 'a' ? 0 : 1];
@@ -856,10 +860,11 @@ const twKitModal = () => () => {
 const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS_MECH[cls];
   const sets = twSets(cls).map(id => { const S = SETS.find(x => x.id === id); return S ? `<div class="twkrow"><small>套装</small><b class="r-set">${S.n}</b><span>${esc(twTheme(cls, id))}</span></div>` : ''; }).join('');
   return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">${esc(C.n)} · 怎么打</h2><div class="twkit2" data-scroll="twcls"><p class="help-p">${esc(C.d)}</p>${M ? `<p class="help-p"><b>${M[0]}</b>：${M[1]}</p>` : ''}
-    <p class="help-p sub">塔里会出这几套，每套各走一条路：</p>${sets}<p class="help-p sub">三选一时点一下卡片，能看到这件东西的全部效果、会换下什么、跟你手上哪些招式有关。</p></div>`; };
+    <p class="help-p sub">塔里会出这几套，每套各走一条路。同一套凑齐 4 件、6 件还有共鸣加成：</p>${sets}<p class="help-p sub">三选一时点一下卡片，能看到这件东西的全部效果、会换下什么、跟你手上哪些招式有关。</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">通天塔</h2><div class="help-scroll"><p class="help-p">一层一场仗，打完直接上楼，塔顶是第 ${TW.top} 层。普通层是一群妖物（第 3 层起带精英），逢 5 层是精英首领带两个护法，逢 10 层是塔主。妖物一层比一层强一点，慢慢往上涨。</p>
   <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，必杀的怒气一层层留着。</p>
-  <p class="help-p">每过一层三选一往上长：普通层拿一件塔装（套装、神兵，都是太古 +10、词条满值、孔里镶好玉）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
+  <p class="help-p">每 3 层三选一往上长（逢 5 层、逢 10 层也有）：普通的三选一拿一件塔装（套装、神兵。换上时沿用这一格原来的词条和孔，只换特效）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
+  <p class="help-p">套装共鸣：塔里同一套凑齐 ${TW_RES[0][0]} 件，伤害 +${TW_RES[0][1]}%、气血 +${TW_RES[0][2]}%；凑齐 ${TW_RES[1][0]} 件，再加伤害 +${TW_RES[1][1]}%、气血 +${TW_RES[1][2]}%。东拼西凑拿不到，想走一套就得一路集中选。</p>
   <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。想换个路子，可以「从第 1 层重来」，奖励只拿最高的。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
   <p class="help-p">奖励：每打过一个塔主，这周第一次领魂晶、银两和一颗玉，越高给得越多，爬到顶一周约 ${Math.round(Array.from({ length: TW.top / 10 }, (_, i) => twRewOf((i + 1) * 10).m).reduce((a, b) => a + b, 0) / 100) * 100} 魂晶；第 ${TW_REW.jyFrom} 层起，每个职业第一次打过某一层塔主，再给九幽玄晶。历史最高层永远记着。</p></div>`;
 const goHelpModal = () => () => {

@@ -721,7 +721,8 @@ const twNextRew = f => { const k = Math.ceil(f / 10) * 10; return k; };
 function twKitLine(cls, kit) {   // 身上塔装的一句话概括
   const sets = {}; let leg = 0, rare = 0; for (const p of POS_IDS) { const it = kit.eq[p]; if (!it) continue; if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; else if (it.legend) leg++; else rare++; }
   const st = Object.keys(sets).map(id => `${(SETS.find(x => x.id === id) || {}).n || id} ${sets[id]} món`).join(' · ');
-  return [st, leg ? `Thần binh ${leg} món` : '', rare ? `Bảo phẩm ${rare} món` : '', kit.allN ? `Toàn thuộc tính +${TW_ALL * kit.allN}%` : ''].filter(Boolean).join(' · ');
+  const rs = twSetMax(kit);
+  return [st, rs >= TW_RES[0][0] ? `Cộng hưởng ${rs >= TW_RES[1][0] ? 6 : 4} món` : '', leg ? `Thần binh ${leg} món` : '', rare ? `Bảo phẩm ${rare} món` : '', kit.allN ? `Toàn thuộc tính +${TW_ALL * kit.allN}%` : ''].filter(Boolean).join(' · ');
 }
 function towerBody(cls) {
   const T = twSave(), S = twState(cls), f = S.fl, kit = S.kit, C = CLASSES[cls], rec = T.rec[cls] || 0, nx = Math.min(TW.top, twNextRew(f)), RW = twRewOf(nx), top = f > TW.top;
@@ -755,6 +756,7 @@ function twGo() {
 // 三选一：点一下展开看清楚（套装各档效果、换下什么、跟手上哪些东西有关），再按「就选它」（2026-11-25）
 let TWSEL = null;   // { f: 这是哪一层的三选一, i }
 const twSetCnt = kit => { const c = {}; for (const q of POS_IDS) { const it = kit.eq[q]; if (it && it.set) c[it.set] = (c[it.set] || 0) + 1; } return c; };
+const twResTxt = () => `Trong tháp gom đủ ${TW_RES[0][0]} món: sát thương +${TW_RES[0][1]}%, khí huyết +${TW_RES[0][2]}%; ${TW_RES[1][0]} món thêm +${TW_RES[1][1]}%, +${TW_RES[1][2]}%`;
 const twSetTxt = S => [2, 4, 6].map(n => S['b' + n + 'd']).filter(Boolean).join("; ");
 const twTheme = (cls, sid) => { const b = (BUILDS[cls] || []).find(x => x.set === sid); return b ? b.d : ''; };
 // 一段说明里点名了哪些招式、哪些套装：只说有没有关系，不评好坏
@@ -787,6 +789,7 @@ function twPickHTML(cls, p, i) {
       d = `${S.n}: mặc vào thành ${now} món${th ? ` · ${esc(th)}` : ''}`;
       det = [2, 4, 6].filter(n => S['b' + n + 'd']).map(n => { const was = (cnt[S.id] || 0) >= n, on = now >= n;
         return `<p class="twb ${on ? (was ? 'on' : 'new') : 'off'}"><i>${n} món</i>${esc(S['b' + n + 'd'])}<em>${on ? (was ? "Đã mở" : "Món này mở") : `Thiếu ${n - now} món`}</em></p>`; });
+      det.push(`<p class="twb ${now >= TW_RES[0][0] ? (now >= TW_RES[1][0] ? ((cnt[S.id] || 0) >= TW_RES[1][0] ? 'on' : 'new') : ((cnt[S.id] || 0) >= TW_RES[0][0] ? 'on' : 'new')) : 'off'}"><i>Cộng hưởng</i>${twResTxt()}<em>${now >= TW_RES[1][0] ? "Cộng hưởng 6 món" : now >= TW_RES[0][0] ? "Cộng hưởng 4 món" : `Thiếu ${TW_RES[0][0] - now} món`}</em></p>`);
       rel = twRelOut(cls, kit, twSetTxt(S), S.id);
     } else if (L) { d = esc(L.d); rel = twRelOut(cls, kit, L.d); }
     let ol = "Ô này đang trống";
@@ -826,7 +829,8 @@ function twResHTML() {
   const ck = R.f % 10 === 0 ? `<p class="twrw">Đã lưu: tầng ${R.f}</p>` : '';
   if (R.top) return `<div class="res win tw"><h3>Lên đỉnh</h3><p>Đã hạ chủ tháp tầng ${TW.top}, Tháp Thông Thiên tuần này đã leo tới đỉnh.</p>${rew}<div class="twbtns"><button class="btn big" data-act="twhome">Về trấn</button></div></div>`;
   if (S.pend) return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<p class="sub">Chọn một thứ mang lên tầng</p><div class="twpicks">${twPicksHTML(cls)}</div></div>`;
-  return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<div class="twbtns"><button class="btn big" data-act="twnext">Lên tầng ${S.fl}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
+  let nf = R.f + 1; while (nf < TW.top && !twPickFl(nf)) nf++;
+  return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<p class="sub">Lần chọn một trong ba tiếp theo: sau khi qua tầng ${nf}</p><div class="twbtns"><button class="btn big" data-act="twnext">Lên tầng ${S.fl}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
 }
 function twEndUI() {
   BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();
@@ -837,7 +841,7 @@ function twEndUI() {
 const twKitModal = () => () => {
   const cls = SAVE.cls, kit = twState(cls).kit, C = CLASSES[cls], cnt = twSetCnt(kit), H = t => `<h4 class="twkh">${t}</h4>`;
   const sets = Object.keys(cnt).map(id => { const S = SETS.find(x => x.id === id); if (!S) return ''; const n = cnt[id], th = twTheme(cls, id);
-    return `<div class="twkset"><b class="r-set">${S.n}</b><small>trên người ${n} món</small>${th ? `<span>${esc(th)}</span>` : ''}${[2, 4, 6].filter(k => S['b' + k + 'd']).map(k => `<p class="twb ${n >= k ? 'on' : 'off'}"><i>${k} món</i>${esc(S['b' + k + 'd'])}<em>${n >= k ? "Đã mở" : `Thiếu ${k - n} món`}</em></p>`).join('')}</div>`; }).join('');
+    return `<div class="twkset"><b class="r-set">${S.n}</b><small>trên người ${n} món</small>${th ? `<span>${esc(th)}</span>` : ''}${[2, 4, 6].filter(k => S['b' + k + 'd']).map(k => `<p class="twb ${n >= k ? 'on' : 'off'}"><i>${k} món</i>${esc(S['b' + k + 'd'])}<em>${n >= k ? "Đã mở" : `Thiếu ${k - n} món`}</em></p>`).join('')}<p class="twb ${n >= TW_RES[0][0] ? 'on' : 'off'}"><i>Cộng hưởng</i>${twResTxt()}<em>${n >= TW_RES[1][0] ? "Cộng hưởng 6 món" : n >= TW_RES[0][0] ? "Cộng hưởng 4 món" : `Thiếu ${TW_RES[0][0] - n} món`}</em></p></div>`; }).join('');
   const eq = POS_IDS.map(p => { const it = kit.eq[p]; if (!it) return ''; const L = it.legend && LEGENDS.find(l => l.id === it.legend);
     return `<div class="twkrow"><small>${(SLOTS.find(x => x.id === p) || {}).n}</small><b class="r-${it.rarity}">${itemTitle(it)}</b>${it.set ? `<em>${(SETS.find(x => x.id === it.set) || {}).n}</em>` : ''}${L ? `<span>${esc(L.d)}</span>` : ''}</div>`; }).join('');
   const skRow = (k, own) => { const r = kit.rn[k.id], RR = RUNES[k.id] || [], R = r && RR[r === 'a' ? 0 : 1];
@@ -857,10 +861,11 @@ const twKitModal = () => () => {
 const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS_MECH[cls];
   const sets = twSets(cls).map(id => { const S = SETS.find(x => x.id === id); return S ? `<div class="twkrow"><small>Bộ</small><b class="r-set">${S.n}</b><span>${esc(twTheme(cls, id))}</span></div>` : ''; }).join('');
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">${esc(C.n)} · Cách đánh</h2><div class="twkit2" data-scroll="twcls"><p class="help-p">${esc(C.d)}</p>${M ? `<p class="help-p"><b>${M[0]}</b>: ${M[1]}</p>` : ''}
-    <p class="help-p sub">Trong tháp sẽ ra mấy bộ này, mỗi bộ một lối:</p>${sets}<p class="help-p sub">Khi chọn một trong ba, chạm vào thẻ để xem toàn bộ hiệu ứng, sẽ thay ra món gì, và liên quan tới chiêu nào ngươi đang có.</p></div>`; };
+    <p class="help-p sub">Trong tháp sẽ ra mấy bộ này, mỗi bộ một lối. Gom đủ 4 món, 6 món cùng bộ còn có cộng hưởng:</p>${sets}<p class="help-p sub">Khi chọn một trong ba, chạm vào thẻ để xem toàn bộ hiệu ứng, sẽ thay ra món gì, và liên quan tới chiêu nào ngươi đang có.</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên, đỉnh tháp là tầng ${TW.top}. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp. Yêu vật mỗi tầng mạnh hơn một chút, tăng dần từ từ.</p>
   <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí tuyệt kỹ giữ qua từng tầng.</p>
-  <p class="help-p">Qua mỗi tầng chọn một trong ba để mạnh lên: tầng thường lấy một món đồ tháp (bộ, thần binh, đều là Thái Cổ +10, dòng tối đa, khảm sẵn ngọc) hoặc một chiêu, một biến chiêu (tối đa năm chiêu, đủ rồi vẫn còn ra chiêu mới, chọn nó thì phải bỏ một chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp). Không muốn món nào thì chọn «Không lấy», đổi lấy sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL}%, cộng dồn mãi.</p>
+  <p class="help-p">Cứ 3 tầng chọn một trong ba để mạnh lên (tầng 5, tầng 10 cũng có): lựa chọn thường là một món đồ tháp (bộ, thần binh; mặc vào thì giữ nguyên dòng và lỗ của ô đó, chỉ đổi hiệu ứng) hoặc một chiêu, một biến chiêu (tối đa năm chiêu, đủ rồi vẫn còn ra chiêu mới, chọn nó thì phải bỏ một chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp). Không muốn món nào thì chọn «Không lấy», đổi lấy sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL}%, cộng dồn mãi.</p>
+  <p class="help-p">Cộng hưởng bộ: trong tháp gom đủ ${TW_RES[0][0]} món cùng một bộ thì sát thương +${TW_RES[0][1]}%, khí huyết +${TW_RES[0][2]}%; đủ ${TW_RES[1][0]} món thì thêm sát thương +${TW_RES[1][1]}%, khí huyết +${TW_RES[1][2]}%. Mặc lẫn lộn thì không có, muốn theo một bộ phải chọn tập trung suốt đường.</p>
   <p class="help-p">Mỗi lần hạ chủ tháp là lưu một lần. Ngã thì về tầng đã lưu, đồ tháp cũng về bộ lúc lưu. Muốn đổi lối thì có thể «Leo lại từ tầng 1», thưởng chỉ lấy mức cao nhất. Thứ Hai hằng tuần đổi tháp mới, leo lại từ tầng một; cùng tuần, cùng nghề thì yêu vật và lựa chọn ai cũng giống nhau.</p>
   <p class="help-p">Thưởng: mỗi chủ tháp hạ được, lần đầu trong tuần nhận hồn tinh, bạc và một viên ngọc, càng cao cho càng nhiều, leo tới đỉnh một tuần khoảng ${Math.round(Array.from({ length: TW.top / 10 }, (_, i) => twRewOf((i + 1) * 10).m).reduce((a, b) => a + b, 0) / 100) * 100} hồn tinh; từ tầng ${TW_REW.jyFrom}, mỗi nghề lần đầu hạ một chủ tháp còn được Cửu U Huyền Tinh. Kỷ lục cao nhất được giữ mãi.</p></div>`;
 const goHelpModal = () => () => {
