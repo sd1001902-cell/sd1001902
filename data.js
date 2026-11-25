@@ -343,7 +343,7 @@ const CLASSES = {
       { id: 'jihuo',     n: '摇铃·集火', lv: 3, cat: 'core', cd: 3, wx: 'jin', d: '所有僵尸立刻对目标各出手一次' },
       { id: 'shidu',     n: '尸毒蔓',   lv: 6, cat: 'core',  cd: 4, wx: 'mu',  k: 'aoe', m: 0.4, d: '尸毒蔓延，对所有敌人造成 40% 伤害' },
       { id: 'corpse',    n: '尸爆',     lv: 9, cat: 'core',  cd: 3, wx: 'huo', d: '引爆血最少的一具僵尸，按它剩余气血的 80% 打所有敌人' },
-      { id: 'yangshi',   n: '养尸符',   lv: 12, cat: 'buff', cd: 4, wx: 'shui', d: '所有僵尸恢复 30% 气血，3 回合内攻击 +30%' },
+      { id: 'yangshi',   n: '养尸符',   lv: 12, cat: 'buff', cd: 4, wx: 'shui', d: '所有僵尸恢复 30% 气血、多出手 2 次，3 回合内攻击 +30%' },
       { id: 'curse',     n: '摄魂咒',   lv: 16, cat: 'ctrl', cd: 6, wx: 'shui', d: '3 回合内所有敌人伤害 -30%' },
       { id: 'bonestorm', n: '百鬼夜行', lv: 20, cat: 'core', cd: 5, wx: 'shui', d: '每具僵尸各对所有敌人造成一次 45% 伤害（僵尸越多越疼）' },
       { id: 'tudun',     n: '土遁葬',   lv: 25, cat: 'core', cd: 4, wx: 'tu',  k: 'aoe', m: 1.0, heal: 'minion', d: '大地翻涌，对所有敌人造成 100% 伤害，并给你的僵尸回 30% 气血' },

@@ -2045,6 +2045,8 @@ function kingUp(b, P) {
   u.gemKing = true; u.maxHp = u.hp = Math.round(u.maxHp * LGV.kgH(lv) / 100); u.atk *= LGV.kgA(lv) / 100; u.aura = LGV.kgU(lv) / 100; return u;
 }
 const kingAura = (b, u) => { const k = b.units.find(x => x.gemKing && x.hp > 0 && x !== u); return k ? 1 + k.aura : 1; };
+// 僵尸寿命（2026-11-26 用户定）：自己出手几次就化土，得摇铃唤尸再补；不同僵尸不一样，开场随机 ±1 错开。尸王不算
+const ZOMBIE_LIFE = { tiaoshi: 5, tiejia: 8, dushi: 6, yinhuo: 4 }, ZOMBIE_LIFE_YANG = 2;
 const ZOMBIE_ATKK = 0.75;   // 2026-11-25 用户：僵尸攻击系数下调 25%（尸王的在 LGV.kgA 里一起乘了）
 const ZOMBIE_HPK = 0.58;   // 2026-11-25 用户：僵尸气血三次下调（0.8 × 0.85 × 0.85 ≈ 0.58）；尸王的在 LGV.kgH 里一起乘了
 function makeZombie(b, P, zt, slot, rune) {
@@ -2061,6 +2063,7 @@ function makeZombie(b, P, zt, slot, rune) {
     const J = P.jy || {}; if (J.tuntian || J.shentong || J.pojia) u.jy = { tuntian: J.tuntian || 0, shentong: J.shentong || 0, pojia: J.pojia || 0 };   // 九幽吞天、神通（集火那一口算招式）、洞穿
     if (P.lgv && P.lgv.shigu != null) u.sgK = LGV.sgK(P.lgv.shigu);    // 蚀骨玉：敌人身上每有一种状态加伤
   }   // 2026-11-25 通天塔也一样（原来塔里不吃，选伤害词条只加主角自己）   // 幻境里僵尸吃你的伤害加成和暴击（修为、灵玉、镇妖录才对赶尸人有用）
+  if (ZOMBIE_LIFE[zt]) { u.life = ZOMBIE_LIFE[zt] + RNG.i(-1, 1); u.life0 = u.life; }
   u.hp = u.maxHp; b.units.push(u); return u;
 }
 const zombiesOf = b => b.units.filter(u => u.kind === 'minion' && u.hp > 0);
@@ -2076,8 +2079,12 @@ function summonSkel(b, P, rune, n) {
   return made;
 }
 function minionAct(b, u, out) {
-  if (u.life != null && --u.life < 0) { u.hp = 0; out.lines.push(`${u.name} hóa thành một nắm đất, trở về lòng đất`); out.pops.push([u.id, "Về đất", 'miss']); return; }
+  if (u.life != null && u.life <= 0) { u.hp = 0; return; }
   const foes = aliveOf(b, 'e'); if (!foes.length) return;
+  try { minionAct2(b, u, out, foes); } finally {   // 寿命：自己出手一次扣一次，扣光就化土（穿阴兵 4 件照样炸）
+    if (u.life != null && u.hp > 0 && --u.life <= 0) { u.hp = 0; out.lines.push(`${u.name} hóa thành một nắm đất, trở về lòng đất`); out.pops.push([u.id, "Về đất", 'miss']); } }
+}
+function minionAct2(b, u, out, foes) {
   const Z = ZOMBIES[u.zt] || ZOMBIES.tiaoshi;
   const am = (u.st.yang ? 1.3 : 1) * kingAura(b, u), sk = Z.ap ? { ap: Z.ap, apc: Z.apc || 1 } : null;
   if (Z.aoe) { out.cast = { id: 'minion', elem: u.ae, target: foes[0].id, aoe: true }; foes.forEach(f => hit(b, u, f, Z.aoe * am, u.ae, out, { aoe: 1, sk })); return; }
@@ -2326,7 +2333,7 @@ function ultimate(b, P, foes, out, autoCut) {
     else if (u.cid === 'tie') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => { x.st.tieArm = 4; }); foes.forEach(f => stSet(u, f, 'burn', out)); out.pops.push([u.id, "Hỏa súng tề minh", 'buff']); }
   });
   switch (P.cls) {
-    case 'berserker': if (!P.fx.has('buSi4')) P.fury = Math.min(100, (P.fury || 0) + ULT.furyAdd); P.st.rumo = ULT.rmT;   // 不死套不灌怒意（满怒会改去放霸王卸甲） out.pops.push(['P', '入魔', 'crit']); break;
+    case 'berserker': if (!P.fx.has('buSi4')) P.fury = Math.min(100, (P.fury || 0) + ULT.furyAdd); P.st.rumo = ULT.rmT; out.pops.push(['P', "Nhập Ma", 'crit']); break;   // 不死套不灌怒意（满怒会改去放霸王卸甲）。2026-11-26 修：注释原来把 break 吞了，狂刀客的秘技会顺带放出道士的五行归一
     case 'mage': { out.pops.push(['P', "Quy nhất", 'crit']);   // 不再灌「连」：天师叠满就清零，灌满反而打断归元
       P.ultCrit = (P.ultCrit || 0) + ULT.crit2; P.st.guiyi = ULT.rmT; break; }
     case 'necro': {
@@ -2518,7 +2525,7 @@ function autoPick(b, P, foes) {
   }
   if (P.cls === 'berserker' && FX.has('buSi4') && !(P.fury >= 80 && pick('bawang') && foes.length < 2)) { const x = (foes.some(f => f.st.melt) ? pick('whirl') : null) || pick('liedi') || pick('whirl'); if (x) return x; }
   if (P.cls === 'assassin' && FX.has('qianJi4')) { const pz = foes.some(f => f.st.poison); const x = (!foes.every(f => f.st.poison) ? pick('venom') : null) || (pz ? pick('fan') || pick('bingpo') : null); if (x && !(P.ki >= P.kiMax && ready.some(k => k.fin))) return x; }
-  if (P.cls === 'necro' && pick('summon') && zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length <= Math.max(1, (P.minionCap || 3) - 2)) return pick('summon');   // 空了两个尸位就补（原来要少于 2 具才补；阴兵会自爆，空得快）
+  if (P.cls === 'necro' && pick('summon') && zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length <= Math.max(1, (P.minionCap || 3) - (globalThis.SUMGAP != null ? globalThis.SUMGAP : 2))) return pick('summon');   // 空了两个尸位就补（原来要少于 2 具才补；阴兵会自爆，空得快）
   if (P.cls === 'paladin' && P.hp / P.maxHp < 0.5 && (pick('prayer') || pick('aegis'))) return pick('prayer') || pick('aegis');
   if (P.cls === 'berserker' && P.fury >= 80 && pick('bawang')) return pick('bawang');
   if (P.cls === 'assassin' && P.ki >= P.kiMax - 1) { const f = ready.find(k => k.fin && k.pay && has(k.pay.s)) || ready.find(k => k.fin); if (f) return f; }
@@ -2583,7 +2590,7 @@ function castInner(b, P, sk, foes, out) {
       if (R === 'b' && zombiesOf(b).length) { P.st.guardZ = 1; out.pops.push(['P', "Hộ Chủ", 'buff']); }
       break; }
     case 'yangshi': if (R === 'a') summonSkel(b, P, P.runes.summon || null, 1);
-      zombiesOf(b).forEach(z => { heal(z, z.maxHp * 0.3, out); z.st.yang = 3; }); if (R === 'b') P.st.shijia = 3; out.pops.push(['P', "Dưỡng thi", 'buff']); break;
+      zombiesOf(b).forEach(z => { heal(z, z.maxHp * 0.3, out); z.st.yang = 3; if (z.life != null) z.life += ZOMBIE_LIFE_YANG; }); if (R === 'b') P.st.shijia = 3; out.pops.push(['P', "Dưỡng thi", 'buff']); break;   // 养尸符顺手续命
     case 'curse': foes.forEach(f => { f.st.curse = 4; if (R === 'a') f.st.curseW = true; if (R === 'b') f.st.curseB = true; out.pops.push([f.id, "Nguyền rủa", 'curse', 1]); }); break;
     case 'corpse': {   // 尸爆：炸掉血最少的一具僵尸
       for (let i = 0; i < (R === 'a' ? 2 : 1); i++) {

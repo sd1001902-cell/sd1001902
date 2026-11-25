@@ -343,7 +343,7 @@ const CLASSES = {
       { id: 'jihuo',     n: "Rung Chuông · Tập Hỏa", lv: 3, cat: 'core', cd: 3, wx: 'jin', d: "Mọi cương thi lập tức đánh mục tiêu mỗi con một lần" },
       { id: 'shidu',     n: "Thi Độc Lan",   lv: 6, cat: 'core',  cd: 4, wx: 'mu',  k: 'aoe', m: 0.4, d: "Thi độc lan tràn, gây 40% sát thương lên mọi kẻ địch" },
       { id: 'corpse',    n: "Thi Bạo",     lv: 9, cat: 'core',  cd: 3, wx: 'huo', d: "Kích nổ cương thi ít máu nhất, đánh mọi kẻ địch bằng 80% khí huyết còn lại của nó" },
-      { id: 'yangshi',   n: "Dưỡng Thi Phù",   lv: 12, cat: 'buff', cd: 4, wx: 'shui', d: "Mọi cương thi hồi 30% khí huyết, trong 3 lượt công +30%" },
+      { id: 'yangshi',   n: "Dưỡng Thi Phù",   lv: 12, cat: 'buff', cd: 4, wx: 'shui', d: "Mọi cương thi hồi 30% khí huyết, ra tay thêm 2 lần, trong 3 lượt công +30%" },
       { id: 'curse',     n: "Nhiếp Hồn Chú",   lv: 16, cat: 'ctrl', cd: 6, wx: 'shui', d: "Trong 3 lượt mọi kẻ địch giảm 30% sát thương" },
       { id: 'bonestorm', n: "Bách Quỷ Dạ Hành", lv: 20, cat: 'core', cd: 5, wx: 'shui', d: "Mỗi cương thi đánh mọi kẻ địch một lần 45% sát thương (càng nhiều cương thi càng đau)" },
       { id: 'tudun',     n: "Thổ Độn Táng",   lv: 25, cat: 'core', cd: 4, wx: 'tu',  k: 'aoe', m: 1.0, heal: 'minion', d: "Đất cuộn trào, gây 100% sát thương lên mọi kẻ địch và hồi 30% khí huyết cho cương thi của bạn" },

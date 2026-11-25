@@ -1008,11 +1008,11 @@ function sustText(cls, s) {
 }
 // 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
 const CLS_MECH_S = { berserker: "Ra đòn, chịu đòn đều tích Nộ ý, quá nửa thì sát thương +15%, càng ít máu càng đau", mage: "Đổi sang một hành khác để ra chiêu thì cộng một tầng “Liên”, mỗi tầng sát thương +8%, tối đa 5 tầng",
-  necro: "Vào trận cương thi đã xếp trận, ăn chỉ số và tăng sát thương của ngươi; Trấn Hồn Đinh chỉ đâu cắn đó", assassin: "Ám khí tích Sát ý, chiêu kết liễu tiêu sạch một lần; vào trận ra tay trước", paladin: "Chịu đòn chắc chắn phản chấn, đủ 10 tầng “Chấn” thì tung Kim Cương Chấn đánh cả sân" };
+  necro: "Vào trận cương thi đã xếp trận, ăn chỉ số và tăng sát thương của ngươi; cương thi ra tay vài lần là hóa đất, phải rung chuông gọi lại", assassin: "Ám khí tích Sát ý, chiêu kết liễu tiêu sạch một lần; vào trận ra tay trước", paladin: "Chịu đòn chắc chắn phản chấn, đủ 10 tầng “Chấn” thì tung Kim Cương Chấn đánh cả sân" };
 const CLS_MECH = {
   berserker: ["Nộ ý", "Ra đòn tích 5 điểm, trúng một đòn tích 8 điểm, tối đa 100 điểm. Nộ ý quá nửa: sát thương +15%. Khí huyết mỗi thiếu một phần mười: sát thương thêm +3%. Bá Vương Giải Giáp đổi hết Nộ ý thành sát thương (mỗi điểm +2%)."],
   mage: ["Ngũ hành lưu chuyển", "Mỗi lần đổi sang một hành khác để ra chiêu, chồng một tầng “Liên” (tối đa 5 tầng), mỗi tầng sát thương +8%, không cần theo thứ tự; cùng một hành ra liên tiếp thì không tăng cũng không mất. Mỗi chiêu thuộc hành nào được ghi cạnh tên chiêu; đòn thường Linh Phù là Mộc."],
-  necro: ["Thi trận", "Vào trận cương thi đã xếp sẵn theo Thi trận (thi vị cơ bản 3), công và khí huyết của chúng tính theo chỉ số của bạn; trong Ảo Cảnh và Tháp Thông Thiên, mọi chỉ số tăng sát thương chung trên người bạn chúng cũng hưởng (sát thương, tỉ lệ chí mạng, ST chí mạng, thủ lĩnh và tinh anh, trảm sát, phá thế, Cửu U, Thực Cốt Ngọc; ST thuật pháp chỉ cộng cho Độc Thi, Âm Hỏa Thi), còn những thứ chỉ có khi chính bạn ra tay thì không tính (liên trảm, hội tâm, sát thương một chiêu…). Kẻ địch bị Trấn Hồn Đinh đóng trúng sẽ bị cương thi ưu tiên cắn. Cương thi ngã thì dùng Rung Chuông Gọi Xác gọi lại."],
+  necro: ["Thi trận", "Vào trận cương thi đã xếp sẵn theo Thi trận (thi vị cơ bản 3), công và khí huyết của chúng tính theo chỉ số của bạn; trong Ảo Cảnh và Tháp Thông Thiên, mọi chỉ số tăng sát thương chung trên người bạn chúng cũng hưởng (sát thương, tỉ lệ chí mạng, ST chí mạng, thủ lĩnh và tinh anh, trảm sát, phá thế, Cửu U, Thực Cốt Ngọc; ST thuật pháp chỉ cộng cho Độc Thi, Âm Hỏa Thi), còn những thứ chỉ có khi chính bạn ra tay thì không tính (liên trảm, hội tâm, sát thương một chiêu…). Kẻ địch bị Trấn Hồn Đinh đóng trúng sẽ bị cương thi ưu tiên cắn. Mỗi cương thi chỉ ra tay được một số lần (Khiêu Thi 5, Thiết Giáp Thi 8, Độc Thi 6, Âm Hỏa Thi 4, lúc vào trận lệch nhau một hai lần), dùng hết thì hóa thành đất; ngã hay hóa đất đều dùng Rung Chuông Gọi Xác gọi lại, Dưỡng Thi Phù nối thêm 2 lần. Thi Vương không tính."],
   assassin: ["Sát ý", "Tiêu Tẩm Độc, Băng Phách Châm và các chiêu như vậy khi ra đòn sẽ tích Sát ý (tối đa 5 điểm), đòn kết liễu tiêu sạch một lần: Đoạt Mệnh Ấn mỗi điểm sát thương +25%, Ảnh Sát mỗi điểm đâm thêm một nhát. Vào trận bạn ra tay trước."],
   paladin: ["Phản chấn · Kim Cương Chấn", "Bị đánh chắc chắn phản chấn: sát thương Phật quang = công kích × bội số phản chấn (sẵn có 30%, đồ và bộ La Hán cộng thêm). Mỗi lần phản chấn tích một tầng «Chấn», đủ 10 tầng tự tung «Kim Cương Chấn», Phật quang đánh mọi kẻ địch. Bị đánh phản chấn còn hồi chút khí huyết."],
 };
@@ -1880,6 +1880,7 @@ let STPOP = null;
 function stDesc(u, k) {
   if (!u) return null;
   if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + " (đặc tính yêu vật)", c: '#e8c88a', d: TRAITS[u.trait].d };
+  if (k === 'life') return { n: `Còn ra tay được ${u.life} lần`, c: '#c8b08a', d: "Cương thi tự ra tay một lần thì trừ một lần, hết thì hóa thành đất (mặc Âm Binh Mượn Đường 4 món vẫn nổ). Dưỡng Thi Phù nối thêm 2 lần cho mọi cương thi. Ngã thì dùng Rung Chuông Gọi Xác gọi lại." };
   if (k === 'fonu') return { n: `Phật nộ ${u.fonu || 0} tầng`, c: '#ffb066', d: "Bộ La Hán Kim Thân 6 món: mỗi lần phản chấn có một nửa tỉ lệ chồng một tầng, mỗi tầng sát thương +20%, sát thương phải nhận -4%, có hiệu lực suốt trận này." };
   if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + " (thuộc tính tinh anh)", c: '#ffb066', d: A.d } : null; }
   if (k === 'all') { const L = [...(u.trait ? [TRAITS[u.trait].n] : []), ...(u.aff || []).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean), ...unitSts(u).map(x => x.n)];
@@ -2214,6 +2215,7 @@ function applyStep(o, anim) {
       const tx = u.escaped ? "chuồn rồi" : u.kind === 'ally' && u.dead ? "tạm lui" : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`; if (hb.tx !== tx) { hb.tx = tx; hb.sp.textContent = tx; } }
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">Giữ lấy ông ấy!</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
+    if (u.kind === 'minion' && u.life != null && u.hp > 0) st.push(`<span class="zl" data-act="stinfo" data-arg="${u.id}|life">${u.life}</span>`);   // 僵尸还能出手几次
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} lượt nữa chuồn</span>`);
     if (u.fleeDef && u.flee && u.hp > 0) st.push(`<span style="color:#f1c94a">${Math.max(0, (u.fleeDef.n || 3) - u.flee + 1)} lượt nữa bỏ chạy</span>`);
     { const L = unitSts(u).filter(x => x.k !== 'hufa' && x.k !== 'call' && x.k !== 'shield');   // 2026-11-24 战场上统一成小圆点，最多两个，多的折成 +N；护体看血条末端那截白；全名和回合数在下面状态栏里

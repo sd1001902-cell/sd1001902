@@ -1007,11 +1007,11 @@ function sustText(cls, s) {
 }
 // 本门功法：不占格子、一直生效的两样——门派机制和本职续航。以前只散在职业介绍和「人物」页的小字里
 const CLS_MECH_S = { berserker: '出手、挨打攒怒意，过半伤害 +15%，血越少越疼', mage: '换一种五行出招叠一层「连」，每层伤害 +8%，最多 5 层',
-  necro: '开战僵尸列好阵，吃你的属性和增伤；镇魂钉指哪咬哪', assassin: '暗器攒杀意，终结技一次花光；开战先手', paladin: '挨打必反震，攒满 10 层「震」放金刚震打全场' };
+  necro: '开战僵尸列好阵，吃你的属性和增伤；僵尸出手几次就化土，要摇铃补', assassin: '暗器攒杀意，终结技一次花光；开战先手', paladin: '挨打必反震，攒满 10 层「震」放金刚震打全场' };
 const CLS_MECH = {
   berserker: ['怒意', '出手攒 5 点，挨一下攒 8 点，最多 100 点。怒意过半：伤害 +15%。气血每少一成：伤害再 +3%。霸王卸甲把怒意一口气换成伤害（每点 +2%）。'],
   mage: ['五行流转', '每换一种五行出招，叠一层「连」（最多 5 层），每层伤害 +8%，不用管顺序；同一种五行连着放，不加也不掉。每招是哪一行，招式名旁边写着；普攻灵符是木。'],
-  necro: ['尸阵', '开战时僵尸已经按尸阵列好（基础尸位 3），它们的攻击和气血按你的属性算；幻境、通天塔里你身上通用的增伤也都吃（伤害、暴击、暴伤、首领精英、斩杀、破势、九幽、蚀骨玉；术法只加毒尸、阴火尸），只在你自己出手时才有的不算（连斩、会心、某一招伤害这类）。镇魂钉钉中的敌人，僵尸优先去咬。僵尸倒了，用摇铃唤尸补回来。'],
+  necro: ['尸阵', '开战时僵尸已经按尸阵列好（基础尸位 3），它们的攻击和气血按你的属性算；幻境、通天塔里你身上通用的增伤也都吃（伤害、暴击、暴伤、首领精英、斩杀、破势、九幽、蚀骨玉；术法只加毒尸、阴火尸），只在你自己出手时才有的不算（连斩、会心、某一招伤害这类）。镇魂钉钉中的敌人，僵尸优先去咬。每只僵尸能出手的次数有限（跳尸 5、铁甲尸 8、毒尸 6、阴火尸 4，开场各差一两次），用完就化成土；倒了、化土了，用摇铃唤尸补回来，养尸符能给它们续 2 次。尸王不算。'],
   assassin: ['杀意', '淬毒镖、冰魄针这些招式出手攒杀意（最多 5 点），终结技一次花光：夺命印每点伤害 +25%，影杀每点多刺一下。开战你先出手。'],
   paladin: ['反震 · 金刚震', '挨打必定反震：佛光伤害 = 攻击 × 反震倍率（自带 30%，堆装备、罗汉套往上加）。每反震一次攒一层「震」，攒满 10 层自动放「金刚震」，佛光打所有敌人。挨打反震还会回一点气血。'],
 };
@@ -1879,6 +1879,7 @@ let STPOP = null;
 function stDesc(u, k) {
   if (!u) return null;
   if (k === 'trait' && u.trait) return { n: TRAITS[u.trait].n + '（妖物特性）', c: '#e8c88a', d: TRAITS[u.trait].d };
+  if (k === 'life') return { n: `还能出手 ${u.life} 次`, c: '#c8b08a', d: '僵尸自己出手一次扣一次，扣光就化成土（穿阴兵借道 4 件照样炸）。养尸符给所有僵尸续 2 次。倒下的用摇铃唤尸补回来。' };
   if (k === 'fonu') return { n: `佛怒 ${u.fonu || 0} 层`, c: '#ffb066', d: '罗汉金身 6 件：每次反震有一半几率叠一层，每层伤害 +20%、受到的伤害 -4%，这场战斗内一直有效。' };
   if (k.startsWith('aff:')) { const A = ELITE_AFFIXES.find(x => x.id === k.slice(4)); return A ? { n: A.n + '（精英词缀）', c: '#ffb066', d: A.d } : null; }
   if (k === 'all') { const L = [...(u.trait ? [TRAITS[u.trait].n] : []), ...(u.aff || []).map(a => (ELITE_AFFIXES.find(x => x.id === a) || {}).n).filter(Boolean), ...unitSts(u).map(x => x.n)];
@@ -2213,6 +2214,7 @@ function applyStep(o, anim) {
       const tx = u.escaped ? '溜走了' : u.kind === 'ally' && u.dead ? '暂时退下' : `${fmtBig(Math.max(0, Math.round(u.hp)) * uK(u))} / ${fmtBig(u.maxHp * uK(u))}`; if (hb.tx !== tx) { hb.tx = tx; hb.sp.textContent = tx; } }
     const st = [];
     if (u.kind === 'ward' && B.ward) { st.push(`<span style="color:#ffe58a">守住他！</span>`); el.querySelector('.sp').style.opacity = (1 - 0.55 * Math.min(1, B.ward.n / B.ward.need)).toFixed(2); }
+    if (u.kind === 'minion' && u.life != null && u.hp > 0) st.push(`<span class="zl" data-act="stinfo" data-arg="${u.id}|life">${u.life}</span>`);   // 僵尸还能出手几次
     if (u.def && u.def.goblin && !u.dead) st.push(`<span style="color:#f1c94a">${GOBLIN_FLEE - (u.flee || 0)} 回合后溜走</span>`);
     if (u.fleeDef && u.flee && u.hp > 0) st.push(`<span style="color:#f1c94a">${Math.max(0, (u.fleeDef.n || 3) - u.flee + 1)} 回合后跑掉</span>`);
     { const L = unitSts(u).filter(x => x.k !== 'hufa' && x.k !== 'call' && x.k !== 'shield');   // 2026-11-24 战场上统一成小圆点，最多两个，多的折成 +N；护体看血条末端那截白；全名和回合数在下面状态栏里
