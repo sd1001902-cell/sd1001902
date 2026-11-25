@@ -839,7 +839,7 @@ function twResHTML() {
   return `<div class="res win tw"><h3>第 ${R.f} 层 · 过</h3>${rew}${ck}<p class="sub">下一次三选一：打过第 ${nf} 层</p><div class="twbtns"><button class="btn big" data-act="twnext">上第 ${S.fl} 层</button><button class="btn ghost" data-act="twhome">回青石镇</button></div></div>`;
 }
 function twEndUI() {
-  BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();
+  BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();   setTimeout(() => lbSync(), 800);   // 排行榜：有新纪录就传
   if (B.win) VFX.victory('P'); SFX.play(B.win ? (BRES.tw.rew.length ? 'legend' : 'win') : 'lose');
   flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
 }
@@ -1326,6 +1326,75 @@ function talentGrid(cls) {
       return `<div class="tal ${locked ? 'locked' : ''} ${r ? 'has' : ''} ${T.max === 1 ? 'cap' : ''}"><div class="tt"><b>${T.n}</b><span>${r}/${T.max}</span></div><p>${T.d}${T.max > 1 ? '（每点）' : ''}</p>
         ${locked ? `<small>需要本路投入 ${i * TALENT_TIER_REQ} 点</small>` : `<button class="btn sm" ${can ? '' : 'disabled'} data-act="learn" data-arg="${Bq.id}|${i}">修习</button>`}</div>`; }).join('')}</div>`; }).join('')}</div>`;
 }
+// ---------- 排行榜（2026-11-26）：成绩存在 Supabase 的 jiuyou 项目（新加坡）。只能经 lb_submit 写：每个玩家一个随机 pid + 本机密钥，别人改不了你的成绩
+// claude.ai 里的页面不让连外部网站，排行榜只在网页版（github）能用。起了名字才上传
+const LB_URL = 'https://ttmvtftgncavnocfvwrk.supabase.co/rest/v1/rpc/', LB_KEY = 'sb_publishable_Nbnc5vsX9YwHxRucF5Xo0A_sZxe7XvD', LB_SITE = 'https://sd1001902-cell.github.io/sd1001902/';
+const LB_CLS = { paladin: 'monk' }, LB_CLS_BACK = { monk: 'paladin' };   // 库里武僧叫 monk
+const LB_SHORT = { berserker: '狂刀', mage: '道士', necro: '赶尸', assassin: '刺客', paladin: '武僧' };
+let LBV = { kind: 'rift', cls: 'all', data: {}, busy: false, err: '', syncing: false };
+const lbBlocked = () => /claude/i.test(location.hostname);
+function lbRand(n) { const a = new Uint8Array(n); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < n; i++) a[i] = Math.random() * 256 | 0; } return a; }
+function lbMe() { const L = SAVE.lb || (SAVE.lb = { pid: '', sec: '', name: '', sent: {} });
+  if (!L.pid) { const b = lbRand(16); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128; const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+    L.pid = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; L.sec = [...lbRand(24)].map(x => 'abcdefghijkmnpqrstuvwxyz23456789'[x & 31]).join(''); }
+  L.sent = L.sent || {}; return L; }
+async function lbCall(fn, body) {
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { if (ctl) ctl.abort(); }, 12000);
+  try { const r = await fetch(LB_URL + fn, { method: 'POST', headers: { apikey: LB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined });
+    const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.message) || ('HTTP ' + r.status)); return j; }
+  finally { clearTimeout(to); }
+}
+const lbWeek = () => 'w' + twWeek();
+function lbRows() {   // 现在该上传的：每个职业的幻境纪录、本周通天塔最高层
+  const rows = [], wk = lbWeek(), T = SAVE.tower;
+  for (const c of CLASS_IDS) {
+    const R = SAVE.riftRec && SAVE.riftRec[c], tb = T && T.wk === twWeek() && T.c && T.c[c] ? T.c[c].best || 0 : 0;
+    if (!(R && R.lv > 0) && !tb) continue;
+    let pw = 0; try { pw = Math.max(0, Math.round(power(charStats(c)))); } catch (e) {}
+    const cc = LB_CLS[c] || c;
+    if (R && R.lv > 0) rows.push({ kind: 'rift', cls: cc, period: 'all', val: R.lv, sub: R.s != null ? R.s : 999999, power: pw });
+    if (tb) rows.push({ kind: 'tower', cls: cc, period: wk, val: tb, sub: 0, power: pw });
+  }
+  return rows;
+}
+async function lbSync(force) {   // 有新纪录就传上去；没起名字不传
+  if (!SAVE || !SAVE.lb || !SAVE.lb.name || lbBlocked() || LBV.syncing) return;
+  const L = lbMe(), key = r => r.kind + '|' + r.cls + '|' + r.period, rows = lbRows().filter(r => force || L.sent[key(r)] !== r.val + '|' + r.sub);
+  if (!rows.length) return;
+  LBV.syncing = true;
+  try { await lbCall('lb_submit', { p_pid: L.pid, p_sec: L.sec, p_name: L.name, p_rows: rows }); for (const r of rows) L.sent[key(r)] = r.val + '|' + r.sub; save(); }
+  catch (e) { LBV.err = String(e && e.message || e); }
+  finally { LBV.syncing = false; }
+}
+const lbKey = () => LBV.kind + '|' + LBV.cls + '|' + (LBV.kind === 'tower' ? lbWeek() : 'all');
+async function lbLoad(force) {
+  const k = lbKey(), D = LBV.data[k];
+  if (LBV.busy) { if (force) LBV.again = true; return; }   // 正在读：读完再读一遍
+  if (lbBlocked() || (!force && D && Date.now() - D.t < 30000)) return;
+  LBV.busy = true; LBV.err = '';
+  try { await lbSync();
+    const j = await lbCall('lb_board', { p_kind: LBV.kind, p_period: LBV.kind === 'tower' ? lbWeek() : 'all', p_cls: LBV.cls === 'all' ? 'all' : (LB_CLS[LBV.cls] || LBV.cls), p_pid: SAVE.lb && SAVE.lb.pid || null, p_limit: 50 });
+    LBV.data[k] = { t: Date.now(), j }; }
+  catch (e) { LBV.err = /fetch|network|abort|load/i.test(String(e && e.message || e)) ? '连不上排行榜，检查一下网络' : '排行榜出错了：' + (e && e.message || e); }
+  finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if (TT === 'col' && CTAB === 'lb') refresh(); }
+}
+function lbHTML() {
+  if (lbBlocked()) return `<section class="panel"><h3>排行榜</h3><p class="help-p">这里打不开排行榜（claude.ai 的页面不让连外部网站）。用网页版玩就能看：</p><p class="help-p"><a href="${LB_SITE}" target="_blank" rel="noopener">${LB_SITE}</a></p><p class="help-p">存档可以用「设置 → 存档」里的存档码搬过去。</p></section>`;
+  const L = SAVE.lb, named = !!(L && L.name), D = LBV.data[lbKey()], j = D && D.j;
+  if (!D && !LBV.busy) setTimeout(() => lbLoad(), 0);
+  const val = r => LBV.kind === 'rift' ? `<b>${r.val} 层</b><small>${r.sub < 999999 ? fmtClock(r.sub * 1000) : '—'}</small>` : `<b>${r.val} 层</b>`;
+  const row = r => `<div class="lbr ${r.me ? 'me' : ''}"><i>${r.rk}</i><span><b>${esc(r.n)}</b><small>${LB_SHORT[LB_CLS_BACK[r.cls] || r.cls] || ''} · 战力 ${fmtBig(r.pw)}</small></span><em>${val(r)}</em></div>`;
+  const mine = j && j.me && j.me.length ? j.me.filter(m => !(j.top || []).some(t => t.rk === m.rk)) : [];
+  const list = j ? ((j.top || []).length ? j.top.map(row).join('') + (mine.length ? `<div class="lbgap">⋯</div>${mine.map(m => row({ ...m, me: true })).join('')}` : '') : `<div class="empty-note">${LBV.kind === 'tower' ? '这周还没人上榜' : '还没人上榜'}</div>`) : `<div class="empty-note">${LBV.err ? esc(LBV.err) : '正在读取…'}</div>`;
+  return `<section class="panel lbp">
+    <div class="lbtop"><div class="seg">${[['rift', '幻境'], ['tower', '通天塔 · 本周']].map(([k, n]) => `<button class="${LBV.kind === k ? 'on' : ''}" data-act="lbkind" data-arg="${k}">${n}</button>`).join('')}</div><button class="qhelp sm" data-act="lbhelp" aria-label="说明">?</button></div>
+    <div class="lbcls">${[['all', '全部'], ...CLASS_IDS.map(c => [c, LB_SHORT[c]])].map(([k, n]) => `<button class="${LBV.cls === k ? 'on' : ''}" data-act="lbcls" data-arg="${k}">${n}</button>`).join('')}</div>
+    <div class="lblist">${list}</div>
+    ${LBV.err && j ? `<p class="sub warn">${esc(LBV.err)}</p>` : ''}
+    ${named ? `<div class="lbme"><span>我上榜的名字：<b>${esc(L.name)}</b></span><button class="btn sm ghost" data-act="lbrename">改名</button><button class="btn sm ghost" data-act="lbreload" ${LBV.busy ? 'disabled' : ''}>刷新</button></div>`
+      : `<div class="lbme"><input id="lbName" maxlength="12" placeholder="起个名字就能上榜" autocomplete="off"><button class="btn sm" data-act="lbjoin">上榜</button></div>`}
+  </section>`;
+}
 let CTAB = null;
 // 江湖录（2026-11 一屏）：分成几个小页签，每个只在框里滚
 function colTab() {
@@ -1340,7 +1409,7 @@ function colTab() {
     return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">开场</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">结尾</button>` : ''}</div>`; }).join('') + (SAVE.story.ended && !wHas(10) ? '<div class="rp"><b>终章</b><button class="btn sm" data-act="replay" data-arg="10|ending">结局</button></div>' : '');
   const rec = [...CHAPTERS.map((C, i) => { const b = SAVE.best['normal-' + (i + 1)]; return [chTitle(i + 1), b ? fmtTime(b.t) : '—']; }),
     ['幻境最高层', SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ['幻境·' + CLASSES[c].n, riftRecTxt(SAVE.riftRec[c])]), ['累计斩妖', SAVE.stats.kills], ['招财金蟾', SAVE.stats.goblins], ['完成悬赏', SAVE.stats.bounties]];
-  const tabs = [...(featureOn('bounty') ? [['bty', '悬赏']] : []), ...(featureOn('rift') ? [['zy', '镇妖录']] : []), ['ach', `成就 ${nGot}/${ACHIEVEMENTS.length}`], ['dex', '图鉴'], ['rec', '纪录']];
+  const tabs = [...(featureOn('bounty') ? [['bty', '悬赏']] : []), ...(featureOn('rift') ? [['zy', '镇妖录'], ['lb', '排行']] : []), ['ach', featureOn('rift') ? '成就' : `成就 ${nGot}/${ACHIEVEMENTS.length}`], ['dex', '图鉴'], ['rec', '纪录']];
   if (!tabs.some(t => t[0] === CTAB)) CTAB = tabs[0][0];
   const sec = {
     ach: `<section class="panel"><h3>成就 <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>`,
@@ -1349,7 +1418,7 @@ function colTab() {
       <section class="panel"><h3>百妖谱 <small>每种妖物斩 ${BESTIARY_TIERS.join(' / ')} 只点亮一颗星</small></h3><div class="mons">${mons}</div></section>`,
     rec: `<section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
       <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${seen('snowfox') || cl >= 1 ? '<div class="rp"><b>序 · 雪夜</b><button class="btn sm ghost" data-act="snowreplay">重看</button></div>' : ''}${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>` };
-  const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : sec[CTAB];
+  const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : CTAB === 'lb' ? lbHTML() : sec[CTAB];
   return tpane(tabs, CTAB, 'ctab', body);
 }
 // 一屏页面的通用壳：上面一排小页签，下面的内容只在框里滚
@@ -2327,6 +2396,7 @@ function applyStep(o, anim) {
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
 }
 function finishRunView(run, outcome) {
+  if (run && run.mode === 'rift') setTimeout(() => lbSync(), 800);   // 排行榜：幻境破纪录就传
   endRun(run, outcome); LASTRUN = run; VIEW = 'end'; B = null; save(); render(); achToast(run.ach); formNotify();   // 阵法跟着进度学会
 }
 function battleContinue() {
@@ -4000,6 +4070,15 @@ const ACT = {
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },
+  lbkind: k => { LBV.kind = k; refresh(); },
+  lbcls: k => { LBV.cls = k; refresh(); },
+  lbreload: () => { lbLoad(true); refresh(); },
+  lbjoin: () => { const v = String(($('#lbName') || {}).value || '').replace(/[\u0000-\u001f<>&"]/g, '').trim(); if (!v) return toast('先起个名字'); if (v.length > 12) return toast('名字最多 12 个字');
+    lbMe().name = v; lbMe().sent = {}; save(); toast('上榜了：' + v); LBV.data = {}; lbLoad(true); refresh(); },
+  lbrename: () => { const L = lbMe(); openModal(() => `<h2 class="mh">改名</h2><div class="row rdm-row"><input id="lbName2" maxlength="12" value="${esc(L.name || '')}" autocomplete="off"><button class="btn sm" data-act="lbrename2">好</button></div><p class="help-p">所有职业、幻境和通天塔的成绩一起改名。</p>`); },
+  lbrename2: () => { const v = String(($('#lbName2') || {}).value || '').replace(/[\u0000-\u001f<>&"]/g, '').trim(); if (!v) return toast('先起个名字'); if (v.length > 12) return toast('名字最多 12 个字');
+    const L = lbMe(); L.name = v; L.sent = {}; save(); closeModal(); LBV.data = {}; lbLoad(true); refresh(); },
+  lbhelp: () => openModal(() => `<h2 class="mh">排行榜</h2><p class="help-p">起了名字以后，你每个职业的成绩会自动传上去：幻境比最高层，层数一样比用时；通天塔比这一周爬到的最高层，每周一清零（大家同一周、同一个职业的塔是一样的）。战力只是附带看看，不算名次。</p><p class="help-p">只在网页版能用：${LB_SITE}</p><p class="help-p">存档在各自手机上，成绩以自己报上来的为准，图个乐。</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">知道了</button></div>`),
   zyhelp: () => openModal(zyHelpModal()),
   stab: k => { STAB = k; refresh(); },
   zyopen: () => { TT = 'col'; CTAB = 'zy'; ZYOPEN = true; VIEW = 'town'; refresh(); setTimeout(() => { const e = document.getElementById('zylu'); if (e) e.scrollIntoView({ block: 'start' }); }, 50); },
@@ -4424,6 +4503,7 @@ function render() {
 }
 VIEW = 'title';
 render();
+setTimeout(() => { try { lbSync(); } catch (e) {} }, 5000);   // 排行榜：开游戏时把没传过的纪录补上
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次

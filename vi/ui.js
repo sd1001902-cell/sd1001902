@@ -840,7 +840,7 @@ function twResHTML() {
   return `<div class="res win tw"><h3>Qua tầng ${R.f}</h3>${rew}${ck}<p class="sub">Lần chọn một trong ba tiếp theo: sau khi qua tầng ${nf}</p><div class="twbtns"><button class="btn big" data-act="twnext">Lên tầng ${S.fl}</button><button class="btn ghost" data-act="twhome">Về Trấn Thanh Thạch</button></div></div>`;
 }
 function twEndUI() {
-  BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();
+  BRES = { tw: twEnd(SAVE.run.cls, B), win: !!B.win, items: [], gems: [], zy: [] }; save();   setTimeout(() => lbSync(), 800);   // 排行榜：有新纪录就传
   if (B.win) VFX.victory('P'); SFX.play(B.win ? (BRES.tw.rew.length ? 'legend' : 'win') : 'lose');
   flushBattleToasts(); const el = $('#bres'); if (!el) return; $('#bctl').hidden = true; el.innerHTML = twResHTML();
 }
@@ -1327,6 +1327,75 @@ function talentGrid(cls) {
       return `<div class="tal ${locked ? 'locked' : ''} ${r ? 'has' : ''} ${T.max === 1 ? 'cap' : ''}"><div class="tt"><b>${T.n}</b><span>${r}/${T.max}</span></div><p>${T.d}${T.max > 1 ? " (mỗi điểm)" : ''}</p>
         ${locked ? `<small>Cần đầu tư ${i * TALENT_TIER_REQ} điểm vào nhánh này</small>` : `<button class="btn sm" ${can ? '' : 'disabled'} data-act="learn" data-arg="${Bq.id}|${i}">Tu tập</button>`}</div>`; }).join('')}</div>`; }).join('')}</div>`;
 }
+// ---------- 排行榜（2026-11-26）：成绩存在 Supabase 的 jiuyou 项目（新加坡）。只能经 lb_submit 写：每个玩家一个随机 pid + 本机密钥，别人改不了你的成绩
+// claude.ai 里的页面不让连外部网站，排行榜只在网页版（github）能用。起了名字才上传
+const LB_URL = 'https://ttmvtftgncavnocfvwrk.supabase.co/rest/v1/rpc/', LB_KEY = 'sb_publishable_Nbnc5vsX9YwHxRucF5Xo0A_sZxe7XvD', LB_SITE = 'https://sd1001902-cell.github.io/sd1001902/';
+const LB_CLS = { paladin: 'monk' }, LB_CLS_BACK = { monk: 'paladin' };   // 库里武僧叫 monk
+const LB_SHORT = { berserker: "Cuồng Đao", mage: "Đạo Sĩ", necro: "Cản Thi", assassin: "Thích Khách", paladin: "Võ Tăng" };
+let LBV = { kind: 'rift', cls: 'all', data: {}, busy: false, err: '', syncing: false };
+const lbBlocked = () => /claude/i.test(location.hostname);
+function lbRand(n) { const a = new Uint8Array(n); try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < n; i++) a[i] = Math.random() * 256 | 0; } return a; }
+function lbMe() { const L = SAVE.lb || (SAVE.lb = { pid: '', sec: '', name: '', sent: {} });
+  if (!L.pid) { const b = lbRand(16); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128; const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+    L.pid = `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; L.sec = [...lbRand(24)].map(x => 'abcdefghijkmnpqrstuvwxyz23456789'[x & 31]).join(''); }
+  L.sent = L.sent || {}; return L; }
+async function lbCall(fn, body) {
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, to = setTimeout(() => { if (ctl) ctl.abort(); }, 12000);
+  try { const r = await fetch(LB_URL + fn, { method: 'POST', headers: { apikey: LB_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl ? ctl.signal : undefined });
+    const j = await r.json().catch(() => null); if (!r.ok) throw new Error((j && j.message) || ('HTTP ' + r.status)); return j; }
+  finally { clearTimeout(to); }
+}
+const lbWeek = () => 'w' + twWeek();
+function lbRows() {   // 现在该上传的：每个职业的幻境纪录、本周通天塔最高层
+  const rows = [], wk = lbWeek(), T = SAVE.tower;
+  for (const c of CLASS_IDS) {
+    const R = SAVE.riftRec && SAVE.riftRec[c], tb = T && T.wk === twWeek() && T.c && T.c[c] ? T.c[c].best || 0 : 0;
+    if (!(R && R.lv > 0) && !tb) continue;
+    let pw = 0; try { pw = Math.max(0, Math.round(power(charStats(c)))); } catch (e) {}
+    const cc = LB_CLS[c] || c;
+    if (R && R.lv > 0) rows.push({ kind: 'rift', cls: cc, period: 'all', val: R.lv, sub: R.s != null ? R.s : 999999, power: pw });
+    if (tb) rows.push({ kind: 'tower', cls: cc, period: wk, val: tb, sub: 0, power: pw });
+  }
+  return rows;
+}
+async function lbSync(force) {   // 有新纪录就传上去；没起名字不传
+  if (!SAVE || !SAVE.lb || !SAVE.lb.name || lbBlocked() || LBV.syncing) return;
+  const L = lbMe(), key = r => r.kind + '|' + r.cls + '|' + r.period, rows = lbRows().filter(r => force || L.sent[key(r)] !== r.val + '|' + r.sub);
+  if (!rows.length) return;
+  LBV.syncing = true;
+  try { await lbCall('lb_submit', { p_pid: L.pid, p_sec: L.sec, p_name: L.name, p_rows: rows }); for (const r of rows) L.sent[key(r)] = r.val + '|' + r.sub; save(); }
+  catch (e) { LBV.err = String(e && e.message || e); }
+  finally { LBV.syncing = false; }
+}
+const lbKey = () => LBV.kind + '|' + LBV.cls + '|' + (LBV.kind === 'tower' ? lbWeek() : 'all');
+async function lbLoad(force) {
+  const k = lbKey(), D = LBV.data[k];
+  if (LBV.busy) { if (force) LBV.again = true; return; }   // 正在读：读完再读一遍
+  if (lbBlocked() || (!force && D && Date.now() - D.t < 30000)) return;
+  LBV.busy = true; LBV.err = '';
+  try { await lbSync();
+    const j = await lbCall('lb_board', { p_kind: LBV.kind, p_period: LBV.kind === 'tower' ? lbWeek() : 'all', p_cls: LBV.cls === 'all' ? 'all' : (LB_CLS[LBV.cls] || LBV.cls), p_pid: SAVE.lb && SAVE.lb.pid || null, p_limit: 50 });
+    LBV.data[k] = { t: Date.now(), j }; }
+  catch (e) { LBV.err = /fetch|network|abort|load/i.test(String(e && e.message || e)) ? "Không kết nối được bảng xếp hạng, kiểm tra mạng nhé" : "Bảng xếp hạng bị lỗi: " + (e && e.message || e); }
+  finally { LBV.busy = false; if (LBV.again) { LBV.again = false; setTimeout(() => lbLoad(true), 0); } if (TT === 'col' && CTAB === 'lb') refresh(); }
+}
+function lbHTML() {
+  if (lbBlocked()) return `<section class="panel"><h3>Bảng xếp hạng</h3><p class="help-p">Ở đây không mở được bảng xếp hạng (trang trên claude.ai không cho kết nối ra ngoài). Chơi bản web là xem được:</p><p class="help-p"><a href="${LB_SITE}" target="_blank" rel="noopener">${LB_SITE}</a></p><p class="help-p">Dữ liệu có thể chuyển sang bằng mã lưu trong "Cài đặt → Lưu trữ".</p></section>`;
+  const L = SAVE.lb, named = !!(L && L.name), D = LBV.data[lbKey()], j = D && D.j;
+  if (!D && !LBV.busy) setTimeout(() => lbLoad(), 0);
+  const val = r => LBV.kind === 'rift' ? `<b>Tầng ${r.val}</b><small>${r.sub < 999999 ? fmtClock(r.sub * 1000) : '—'}</small>` : `<b>Tầng ${r.val}</b>`;
+  const row = r => `<div class="lbr ${r.me ? 'me' : ''}"><i>${r.rk}</i><span><b>${esc(r.n)}</b><small>${LB_SHORT[LB_CLS_BACK[r.cls] || r.cls] || ''} · Lực chiến ${fmtBig(r.pw)}</small></span><em>${val(r)}</em></div>`;
+  const mine = j && j.me && j.me.length ? j.me.filter(m => !(j.top || []).some(t => t.rk === m.rk)) : [];
+  const list = j ? ((j.top || []).length ? j.top.map(row).join('') + (mine.length ? `<div class="lbgap">⋯</div>${mine.map(m => row({ ...m, me: true })).join('')}` : '') : `<div class="empty-note">${LBV.kind === 'tower' ? "Tuần này chưa ai lên bảng" : "Chưa ai lên bảng"}</div>`) : `<div class="empty-note">${LBV.err ? esc(LBV.err) : "Đang tải…"}</div>`;
+  return `<section class="panel lbp">
+    <div class="lbtop"><div class="seg">${[['rift', "Ảo Cảnh"], ['tower', "Tháp Thông Thiên · Tuần này"]].map(([k, n]) => `<button class="${LBV.kind === k ? 'on' : ''}" data-act="lbkind" data-arg="${k}">${n}</button>`).join('')}</div><button class="qhelp sm" data-act="lbhelp" aria-label="Giải thích">?</button></div>
+    <div class="lbcls">${[['all', "Tất cả"], ...CLASS_IDS.map(c => [c, LB_SHORT[c]])].map(([k, n]) => `<button class="${LBV.cls === k ? 'on' : ''}" data-act="lbcls" data-arg="${k}">${n}</button>`).join('')}</div>
+    <div class="lblist">${list}</div>
+    ${LBV.err && j ? `<p class="sub warn">${esc(LBV.err)}</p>` : ''}
+    ${named ? `<div class="lbme"><span>Tên trên bảng: <b>${esc(L.name)}</b></span><button class="btn sm ghost" data-act="lbrename">Đổi tên</button><button class="btn sm ghost" data-act="lbreload" ${LBV.busy ? 'disabled' : ''}>Làm mới</button></div>`
+      : `<div class="lbme"><input id="lbName" maxlength="12" placeholder="Đặt tên là lên bảng" autocomplete="off"><button class="btn sm" data-act="lbjoin">Lên bảng</button></div>`}
+  </section>`;
+}
 let CTAB = null;
 // 江湖录（2026-11 一屏）：分成几个小页签，每个只在框里滚
 function colTab() {
@@ -1341,7 +1410,7 @@ function colTab() {
     return `<div class="rp"><b>${chTitle(k)}</b><button class="btn sm ghost" data-act="replay" data-arg="${k}|intro">Mở đầu</button>${C.story ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|story">${C.story.t}</button>` : ''}${C.outro.length ? `<button class="btn sm ghost" data-act="replay" data-arg="${k}|outro">Kết chương</button>` : ''}</div>`; }).join('') + (SAVE.story.ended && !wHas(10) ? "<div class=\"rp\"><b>Chương cuối</b><button class=\"btn sm\" data-act=\"replay\" data-arg=\"10|ending\">Kết cục</button></div>" : '');
   const rec = [...CHAPTERS.map((C, i) => { const b = SAVE.best['normal-' + (i + 1)]; return [chTitle(i + 1), b ? fmtTime(b.t) : '—']; }),
     ["Tầng Ảo Cảnh cao nhất", SAVE.riftMax || '—'], ...CLASS_IDS.filter(c => SAVE.riftRec[c]).map(c => ["Ảo Cảnh ·" + CLASSES[c].n, riftRecTxt(SAVE.riftRec[c])]), ["Tổng yêu đã diệt", SAVE.stats.kills], ["Kim Thiềm Chiêu Tài", SAVE.stats.goblins], ["Truy nã đã xong", SAVE.stats.bounties]];
-  const tabs = [...(featureOn('bounty') ? [['bty', "Truy nã"]] : []), ...(featureOn('rift') ? [['zy', "Trấn Yêu Lục"]] : []), ['ach', `Thành tựu ${nGot}/${ACHIEVEMENTS.length}`], ['dex', "Đồ giám"], ['rec', "Kỷ lục"]];
+  const tabs = [...(featureOn('bounty') ? [['bty', "Truy nã"]] : []), ...(featureOn('rift') ? [['zy', "Trấn Yêu Lục"], ['lb', "Xếp hạng"]] : []), ['ach', featureOn('rift') ? "Thành tựu" : `Thành tựu ${nGot}/${ACHIEVEMENTS.length}`], ['dex', "Đồ giám"], ['rec', "Kỷ lục"]];
   if (!tabs.some(t => t[0] === CTAB)) CTAB = tabs[0][0];
   const sec = {
     ach: `<section class="panel"><h3>Thành tựu <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>`,
@@ -1350,7 +1419,7 @@ function colTab() {
       <section class="panel"><h3>Bách Yêu Phổ <small>Mỗi loại yêu vật diệt ${BESTIARY_TIERS.join(' / ')} con thì sáng một sao</small></h3><div class="mons">${mons}</div></section>`,
     rec: `<section class="panel"><h3>Kỷ lục cá nhân <small>Thời gian nhanh nhất mỗi chương ở độ khó Phàm Trần</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
       <section class="panel"><h3>Xem lại cốt truyện <small>Đoạn đã xem có thể xem lại bất cứ lúc nào</small></h3>${seen('snowfox') || cl >= 1 ? "<div class=\"rp\"><b>Mở đầu · Đêm tuyết</b><button class=\"btn sm ghost\" data-act=\"snowreplay\">Xem lại</button></div>" : ''}${replay || "<div class=\"empty-note\">Qua chương 1 rồi mới xem lại được cốt truyện.</div>"}</section>` };
-  const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : sec[CTAB];
+  const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : CTAB === 'lb' ? lbHTML() : sec[CTAB];
   return tpane(tabs, CTAB, 'ctab', body);
 }
 // 一屏页面的通用壳：上面一排小页签，下面的内容只在框里滚
@@ -2328,6 +2397,7 @@ function applyStep(o, anim) {
   const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
 }
 function finishRunView(run, outcome) {
+  if (run && run.mode === 'rift') setTimeout(() => lbSync(), 800);   // 排行榜：幻境破纪录就传
   endRun(run, outcome); LASTRUN = run; VIEW = 'end'; B = null; save(); render(); achToast(run.ach); formNotify();   // 阵法跟着进度学会
 }
 function battleContinue() {
@@ -4001,6 +4071,15 @@ const ACT = {
   rlvto: n => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), +n || 1)); refresh(); },   // 一下跳到 1 层、本门纪录、最高层
   rlv: d => { SAVE.riftLv = Math.max(1, Math.min(Math.max(1, SAVE.riftCap || 3), SAVE.riftLv + +d)); refresh(); },
   ctab: k => { CTAB = k; refresh(); },
+  lbkind: k => { LBV.kind = k; refresh(); },
+  lbcls: k => { LBV.cls = k; refresh(); },
+  lbreload: () => { lbLoad(true); refresh(); },
+  lbjoin: () => { const v = String(($('#lbName') || {}).value || '').replace(/[\u0000-\u001f<>&"]/g, '').trim(); if (!v) return toast("Đặt tên trước đã"); if (v.length > 12) return toast("Tên tối đa 12 ký tự");
+    lbMe().name = v; lbMe().sent = {}; save(); toast("Đã lên bảng: " + v); LBV.data = {}; lbLoad(true); refresh(); },
+  lbrename: () => { const L = lbMe(); openModal(() => `<h2 class="mh">Đổi tên</h2><div class="row rdm-row"><input id="lbName2" maxlength="12" value="${esc(L.name || '')}" autocomplete="off"><button class="btn sm" data-act="lbrename2">OK</button></div><p class="help-p">Thành tích của mọi nghề, Ảo Cảnh và Tháp Thông Thiên đều đổi tên theo.</p>`); },
+  lbrename2: () => { const v = String(($('#lbName2') || {}).value || '').replace(/[\u0000-\u001f<>&"]/g, '').trim(); if (!v) return toast("Đặt tên trước đã"); if (v.length > 12) return toast("Tên tối đa 12 ký tự");
+    const L = lbMe(); L.name = v; L.sent = {}; save(); closeModal(); LBV.data = {}; lbLoad(true); refresh(); },
+  lbhelp: () => openModal(() => `<h2 class="mh">Bảng xếp hạng</h2><p class="help-p">Đặt tên xong, thành tích của từng nghề sẽ tự tải lên: Ảo Cảnh so tầng cao nhất, cùng tầng thì so thời gian; Tháp Thông Thiên so tầng cao nhất trong tuần, thứ Hai hằng tuần làm mới (cùng tuần, cùng nghề thì tháp của mọi người giống nhau). Lực chiến chỉ để xem, không tính hạng.</p><p class="help-p">Chỉ dùng được ở bản web: ${LB_SITE}</p><p class="help-p">Dữ liệu lưu trên máy mỗi người, thành tích là tự báo lên, chơi cho vui thôi.</p><div class="row" style="justify-content:center"><button class="btn" data-act="close">Hiểu rồi</button></div>`),
   zyhelp: () => openModal(zyHelpModal()),
   stab: k => { STAB = k; refresh(); },
   zyopen: () => { TT = 'col'; CTAB = 'zy'; ZYOPEN = true; VIEW = 'town'; refresh(); setTimeout(() => { const e = document.getElementById('zylu'); if (e) e.scrollIntoView({ block: 'start' }); }, 50); },
@@ -4425,6 +4504,7 @@ function render() {
 }
 VIEW = 'title';
 render();
+setTimeout(() => { try { lbSync(); } catch (e) {} }, 5000);   // 排行榜：开游戏时把没传过的纪录补上
 initCloud();
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}   // 请浏览器别在空间紧张时自动清掉存档
 if (SAVE.lgems && SAVE.lgems.some(g => g.t === 'reforge')) setTimeout(() => { if (!MODALFN && VIEW !== 'battle' && !DLG) openModal(lgReModal); }, 2200);   // 老灵玉待重铸：进游戏先弹一次
