@@ -17,6 +17,12 @@ const RNG = {
 let _uid = 0;
 const uid = () => (++_uid).toString(36) + Math.random().toString(36).slice(2, 7);
 
+// ---------------- 减法改版（2026-11-26 用户定）----------------
+// 封存的功能：代码和存档数据都留着，把这里的开关改成 false 就回来（以后当新版本放出）。
+// form 阵法（妖物也不摆阵）；zy 镇妖录（小妖精魄、每页属性、后记；首领精魄照掉，役使要用）；jy 九幽品质和玄晶（太古到顶）；mods 加难度
+const SHELF = { form: true, zy: true, jy: true, mods: true };
+const shelved = k => !!SHELF[k];
+const PRESLIM_KEY = 'jy_backup_preslim';   // 改版前的存档原样留一份在本机
 // ---------------- 存档 ----------------
 const SAVE_KEY = 'jiuyou-save-v1';
 let SAVE = null;
@@ -30,13 +36,13 @@ function newSave() {
               mode: 'story', riftLv: 1, mods: [], speed: 1, sound: true, music: true, run: null,
               stats: { runs: 0, wins: 0, kills: 0, goblins: 0, bounties: 0, rifts: 0 }, best: {},
               para: { lv: 0, xp: 0, pts: {} }, cube: {}, lgems: [], flags: {}, kills: {}, ach: {}, bld: {}, disp: {}, bounty: null,
-              riftMax: 0, rift: {}, riftCap: 3, jyx: 0, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true, thv: 2,
+              riftMax: 0, rift: {}, riftCap: 3, jyx: 0, riftRec: {}, zy: {}, chapter: 1, ngocJoin: true, ultAuto: true, thv: 2, sv: 1,
               story: { cleared: { normal: 0, nightmare: 0, hell: 0 }, pages: {}, ended: false, seen: {} } };
   for (const c of CLASS_IDS) s.chars[c] = newChar();
   return s;
 }
 function migrate(s) {
-  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0, pv0 = s.pv || 0, thv0 = s.thv || 0;
+  const d = newSave(), gv0 = s.gv || 0, bx0 = s.boxv || 0, pv0 = s.pv || 0, thv0 = s.thv || 0, sv0 = s.sv || 0;
   for (const k in d) if (s[k] === undefined) s[k] = d[k];
   for (const k in d.stats) if (s.stats[k] === undefined) s.stats[k] = 0;
   for (const c of CLASS_IDS) {
@@ -101,7 +107,36 @@ function migrate(s) {
   // 词条重做（gv 2）：旧装备的百分比词条按新规矩换算，出错部位的词条换成同档的实数词条
   if (gv0 < 2) { let n = 0; walkItems(s, it => { if (regearItem(it)) n++; }); if (n && s.t) s.gearNote = n; s.gv = 2; }
   s.v = 4;
+  if (sv0 < 1) slimMigrate(s);
+  s.sv = 1;
   return s;
+}
+// 减法改版（sv 1）：老存档搬一次
+function slimMigrate(s) {
+  const note = { jy: 0 }, old = !!(s.t || 0);
+  { const ended = !!(s.story && s.story.ended), rp = s.path === 'rift', top = s.riftMax || 0, cl = (s.story && s.story.cleared && s.story.cleared.normal) || 0; s.unl = s.unl || {};
+    for (const k of ['enhance', 'sockets', 'gems', 'bounty', 'reroll', 'cube', 'anc', 'lgem', 'para', 'runes'])
+      if ((rp && RIFT_UNLOCK_OLD[k] != null && top >= RIFT_UNLOCK_OLD[k]) || (POSTGAME.has(k) ? ended : (FEATURE_CH[k] != null && cl >= FEATURE_CH[k]))) s.unl[k] = 1; }
+  // 「幻境之路」的提示：老存档已经开着的功能，不再来人说一遍
+  { const m = { 3: 'enhance', 7: 'runes', 8: 'sockets', 10: 'bounty', 15: 'reroll', 20: 'cube', 25: 'anc', 30: 'lgem', 40: 'para' }; s.flags = s.flags || {};
+    for (const lv in m) if (s.unl[m[lv]] || (s.riftMax || 0) >= +lv) s.flags['rp' + lv] = 1; }
+  // 九幽封存：九幽装备先当太古用（词条留着），九幽词条存在 jy0 里，重开时原样回来；玄晶数量不动，只是不显示
+  if (shelved('jy')) walkItems(s, it => { if (it.anc === 3) { it.anc = 2; it.j9 = 1; if (it.jy) { it.jy0 = it.jy; delete it.jy; } note.jy++; } });
+  if (shelved('mods')) { s.mods = []; if (s.run && Array.isArray(s.run.mods)) s.run.mods = []; }
+  // 幻境纪录重新记（排行榜清零）：老纪录留在 riftRecOld 里看
+  if (s.riftRec && Object.keys(s.riftRec).length) { s.riftRecOld = s.riftRec; s.riftRec = {}; }
+  if (s.lb) s.lb.sent = {};
+  // 强化、孔、玉改成跟着部位走：身上的不动；储物箱里的装备清零，强化和孔按当初的价退银两、魂晶，玉放回玉石包
+  note.mats = 0; note.gold = 0; note.gems = 0;
+  for (const it of s.stash || []) { if (!it || it.tw) continue;
+    const p = it.plus || 0, k = it.sockets || 0;
+    for (let i = 0; i < p; i++) { note.gold += Math.round((20 + it.ilvl * 4) * (i + 1)); note.mats += i + 1; }
+    if (it.gems && it.gems.length) { for (let i = 0; i < k; i++) { note.gold += Math.round((60 + it.ilvl * 8) * (i + 1)); note.mats += 4 * (i + 1); } }   // 只退镶过玉的孔（掉落自带的空孔不算）
+    for (const g of it.gems || []) if (!g.startsWith('L:')) { s.gems[g] = (s.gems[g] || 0) + 1; note.gems++; }
+    it.plus = 0; it.sockets = 0; it.gems = [];
+  }
+  s.gold = (s.gold || 0) + note.gold; s.mats = (s.mats || 0) + note.mats;
+  if (old) s.slimNote = note;
 }
 function walkItems(o, fn, depth = 0) {
   if (!o || typeof o !== 'object' || depth > 12) return;
@@ -139,7 +174,9 @@ function regearItem(it) {
   return changed;
 }
 function loadSave() {
-  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { SAVE = migrate(JSON.parse(raw)); clampRunHp(); return SAVE; } }
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) { const o = JSON.parse(raw);
+    if (!(o.sv >= 1) && !localStorage.getItem(PRESLIM_KEY)) { try { localStorage.setItem(PRESLIM_KEY, raw); } catch (e) {} }   // 减法改版前的存档，原样留一份
+    SAVE = migrate(o); clampRunHp(); return SAVE; } }
   catch (e) { storageOK = false; }
   SAVE = newSave(); return SAVE;
 }
@@ -250,15 +287,26 @@ function saveBrief(S) {
 
 // ---------------- 剧情进度与解锁 ----------------
 const storyCleared = diff => (SAVE && SAVE.story && SAVE.story.cleared[diff || 'normal']) || 0;
-const POSTGAME = new Set(['rift', 'para', 'lgem', 'bounty', 'mods', 'nightmare', 'enhance', 'sockets', 'gems', 'reroll']);   // 装备养成（强化、打孔镶玉、淬炼洗炼、传承升阶）通关后才开：剧情里装备每章都换，专心看故事
+const POSTGAME = new Set(['rift', 'para', 'lgem', 'bounty', 'mods', 'nightmare', 'enhance', 'sockets', 'gems', 'reroll', 'anc']);   // 装备养成（强化、打孔镶玉、淬炼洗炼、传承升阶）通关后才开：剧情里装备每章都换，专心看故事
 // 两条路：主线（看剧情，一章一章开）/ 幻境（开头选「幻境挑战」：跳过剧情直接刷，按幻境打到的最高层一样样开）。两条路共用一个存档，主线随时能回去打
 const riftPath = () => !!(typeof SAVE !== 'undefined' && SAVE && SAVE.path === 'rift');
 const rTop = () => (SAVE && SAVE.riftMax) || 0;
-const RIFT_UNLOCK = { rift: 0, enhance: 3, reroll: 5, sockets: 5, gems: 5, runes: 7, cube: 8, bounty: 10, lgem: 12, para: 15, mods: 15 };
+// 解锁节奏（2026-11-26 减法改版）：两条路都跟着「幻境打通的最高层」慢慢开，不再通关一次全开。
+// 主线通关以后同样按这张表开（通关即开幻境）；剧情里教过的乾坤袋（第六章）、变招（第七章）照旧，不会因为走主线反而更晚。老存档已经开了的记在 SAVE.unl 里，不回锁
+const RIFT_UNLOCK = { rift: 0, enhance: 3, runes: 7, sockets: 8, gems: 8, bounty: 10, reroll: 15, cube: 20, anc: 25, lgem: 30, para: 40, mods: 15 };
+const RIFT_UNLOCK_OLD = { rift: 0, enhance: 3, reroll: 5, sockets: 5, gems: 5, runes: 7, cube: 8, bounty: 10, lgem: 12, para: 15, mods: 15, anc: 3 };
 const RIFT_COMP = { ngoc: 0, zhen: 3, long: 7, kang: 10 };   // 幻境路线：伙伴陆续来
 const pgOr = lv => !!(SAVE && SAVE.story && SAVE.story.ended) || (riftPath() && rTop() >= lv);   // 通关了，或者幻境路线打到了 lv 层
-const featureOn = key => (riftPath() && RIFT_UNLOCK[key] != null && rTop() >= RIFT_UNLOCK[key]) || featureOn0(key);
-const featureOn0 = key => POSTGAME.has(key) ? !!(SAVE && SAVE.story && SAVE.story.ended) : storyCleared('normal') >= (FEATURE_CH[key] || 0) || (key === 'runes' && typeof wPast === 'function' && wPast(7, 'runes7'));   // 变招：第七章龙道长教过就开
+const featureOn = key => !(key === 'mods' && shelved('mods')) && featureOnRaw(key);
+const storyEnded = () => !!(SAVE && SAVE.story && SAVE.story.ended);
+const featureOnRaw = key => {
+  if (SAVE && SAVE.unl && SAVE.unl[key]) return true;
+  if (key === 'rift') return riftPath() || storyEnded();
+  if (key === 'nightmare') return storyEnded();
+  if ((riftPath() || storyEnded()) && RIFT_UNLOCK[key] != null && rTop() >= RIFT_UNLOCK[key]) return true;
+  if (POSTGAME.has(key)) return false;
+  return storyCleared('normal') >= (FEATURE_CH[key] || 0) || (key === 'runes' && typeof wPast === 'function' && wPast(7, 'runes7'));   // 变招：第七章龙道长教过就开
+};
 const pgCh = () => Math.max(storyCleared('normal'), riftPath() ? Math.min(10, Math.floor(rTop() / 2)) : 0);   // 营地建筑按「相当于打到第几章」：幻境路线两层算一章
 const bldOpen = B => pgCh() >= (B.ch || 0);
 
@@ -290,7 +338,7 @@ function chIlvl(ch, lv) { const B = CH_BAND[Math.min(10, Math.max(1, ch))]; retu
 // 通关后的新位置：腰带、副手、第二枚扳指，按幻境最高纪录逐个开；灵玉匣通关即得
 const slotOpen = pos => { const S = SLOTS.find(x => x.id === pos); return !!S && (!S.rift || !!(pgOr(0) && (SAVE.riftMax || 0) >= S.rift)); };
 const eqSlots = () => POS_IDS.filter(slotOpen);
-const boxOpen = () => pgOr(RIFT_UNLOCK.lgem);
+const boxOpen = () => featureOn('lgem');
 // 同一件神兵、同一套的扳指，只能戴一枚
 const sameRing = (a, b) => !!a && !!b && a !== b && ((a.legend && a.legend === b.legend) || (a.set && a.set === b.set));
 // 这件装备穿到哪个位置：扳指有两个位置（空的优先；都满了换掉更值得换的那枚），别的装备只有自己那个位置
@@ -393,14 +441,14 @@ const affMult = it => ({ rare: 1.1, set: 1.2, legend: 1.2 }[it.rarity] || 1);
 const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%：神兵掉得多了，这两档收一收才显得珍贵）
 // 上古、太古跟着幻境层数走：30 层以内 5% / 0.3%，往上每层 +0.25% / +0.03%（69 层约 14.8% / 1.5%），封顶 20% / 2%。幻境以外（主线、赌装备、铸兵）按底数
 const ANC_STEP = [0.0025, 0.0005], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 500, PRIMAL_COST = 1000, PRIMAL_FROM = 90, PRIMAL_P0 = 0.005;   // 太古：幻境 90 层起才出，90 层 0.5%，每层 +0.05%，120 层到 2% 封顶
-const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= JY_FROM ? 2 * jyRate(N) : (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };   // 400 层起太古 = 九幽的两倍（400 层 2%，500 层 6%）
+const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= JY_FROM && !shelved('jy') ? 2 * jyRate(N) : (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };   // 400 层起太古 = 九幽的两倍（400 层 2%，500 层 6%）
 const ancNow = () => ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0);
 // 九幽（2026-11-24 用户定）：太古之上第四档。全属性再 +30%（合计普通的 1.69 倍），5–6 条满值词条，外加 1 条九幽词条。
 // 只在幻境 400 层起掉：400 层 1%，每层 +0.02%，500 层 3% 封顶；保底：太古点化成九幽（2000 魂晶 + 10 颗九幽玄晶，要到过 400 层）；九幽词条可以花 2 颗玄晶重洗
 const JY_FROM = 400, JY_P0 = 0.01, JY_STEP = 0.0002, JY_CAP = 0.03, JY_COST = 2000, JY_XJ = 10, JY_WASH = 2;
 const jyRate = N => (N || 0) >= JY_FROM ? Math.min(JY_CAP, JY_P0 + ((N || 0) - JY_FROM) * JY_STEP) : 0;
-const jyOK = () => !!(SAVE && SAVE.run && SAVE.run.mode === 'rift' && SAVE.run.riftLv >= JY_FROM);
-const jyGate = () => (SAVE.riftMax || 0) >= JY_FROM;
+const jyOK = () => !shelved('jy') && !!(SAVE && SAVE.run && SAVE.run.mode === 'rift' && SAVE.run.riftLv >= JY_FROM);
+const jyGate = () => !shelved('jy') && (SAVE.riftMax || 0) >= JY_FROM;
 const ancK = it => (it.anc || 0) >= 3 ? 1.69 : it.anc ? 1.3 : 1;   // 上古、太古 ×1.3，九幽 ×1.69
 const maxAnc = it => (it.anc || 0) >= 2;   // 太古、九幽：词条全满值
 const jySlot = it => { const t = slotType(it.slot) || it.slot; return t === 'ring2' ? 'ring' : t; };
@@ -416,18 +464,20 @@ function jyUp(it) {   // 太古 → 九幽：多长一条满值词条（凑到 5
   it.aff = it.aff.map(([k]) => [k, affixValue(affDef(k), it.ilvl, affMult(it), true)]);
   it.jy = rollJy(it); }
 // 点化：花魂晶逐级点——普通 → 上古（500，一半几率多长一条词条）→ 太古（1000，再多长一条，全部词条变满值）。太古要幻境到过 90 层
-const ancOK = it => !!it && (it.rarity === 'legend' || it.rarity === 'set') && (it.anc || 0) < 3;
+const ancOK = it => !!it && (it.rarity === 'legend' || it.rarity === 'set') && (it.anc || 0) < (shelved('jy') ? 2 : 3);
 const ancCost = it => (it.anc || 0) === 0 ? ANC_COST : (it.anc || 0) === 1 ? PRIMAL_COST : JY_COST;
 const primalGate = () => (SAVE.riftMax || 0) >= PRIMAL_FROM;
 function ancientize(it) {
   if (!it || !(it.rarity === 'legend' || it.rarity === 'set')) return { err: '只有神兵和套装能点化' };
   if ((it.anc || 0) >= 3) return { err: '这件已经是九幽了' };
+  if (it.anc === 2 && shelved('jy')) return { err: '太古已经到顶了' };
   if (busyRoll(it)) return { err: '这件还有一次洗炼／淬炼的结果没选' };
   if (it.anc === 1 && !primalGate()) return { err: `幻境打到 ${PRIMAL_FROM} 层才能点化太古` };
   if (it.anc === 2 && !jyGate()) return { err: `幻境打到 ${JY_FROM} 层才能点化九幽` };
   if (it.anc === 2 && (SAVE.jyx || 0) < JY_XJ) return { err: `九幽玄晶不够（要 ${JY_XJ} 颗）` };
   const c = ancCost(it); if (SAVE.mats < c) return { err: '魂晶不够' };
   SAVE.mats -= c; let add = 0;
+  try { if (!it.tw) upTierDo(it, upTierTarget(ownerOf(it) || SAVE.cls)); } catch (e) {}   // 顺带升到满阶
   if (it.anc === 2) { SAVE.jyx -= JY_XJ; const n0 = it.aff.length; jyUp(it); return { ok: true, add: it.aff.length - n0, jy: true }; }
   if (!it.anc) { it.anc = 1; SAVE.flags.ancient = true; if (RNG.ch(0.5)) add = addAffixes(it, 1); }
   else { it.anc = 2; SAVE.flags.primal = true; add = addAffixes(it, 1); it.aff = it.aff.map(([k]) => [k, affixValue(affDef(k), it.ilvl, affMult(it), true)]); }
@@ -445,7 +495,7 @@ function addAffixes(it, n) { const L = it.legend && LEGENDS.find(l => l.id === i
   it.aff.push(...more); return more.length; }
 function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
-  it.plus = 0; it.gems = []; it.sockets = noSocket ? 0 : rollSockets(it.slot, it.rarity);
+  it.plus = 0; it.gems = []; it.sockets = 0;   // 2026-11-26 孔记在部位上，掉落的装备不再自带孔
   if (it.rarity === 'legend' || it.rarity === 'set') {
     const ap = ancNow(), ak = mfAnc(DROP_MF); it.anc = jyOK() && RNG.ch(jyRate(SAVE.run.riftLv) * ak) ? 3 : primalOK() && RNG.ch(ap[1] * ak) ? 2 : RNG.ch(ap[0] * ak) ? 1 : 0;
     if (it.anc === 3) jyUp(it);
@@ -553,6 +603,33 @@ function paraFree() { let n = 0; for (const k in SAVE.para.pts) n += SAVE.para.p
 function paraCanAdd(k) { const P = PARAGON_STATS.find(x => x.k === k); const cur = SAVE.para.pts[k] || 0; return paraFree() > 0 && (!P.cap || (cur + 1) * P.v <= P.cap); }
 function addPara(k, n = 1) { let done = 0; while (done < n && paraCanAdd(k)) { SAVE.para.pts[k] = (SAVE.para.pts[k] || 0) + 1; done++; } return done; }
 function resetPara() { SAVE.para.pts = {}; }
+// ---------------- 自动加点（2026-11-26 减法改版）----------------
+// 心法、修为默认自动加：只分配还没用掉的点，已经点的不动；在修炼页随时能关掉自己点。
+// 心法：先把本门那一路点满，再杀伐、内功哪边少点哪边。修为：先根基（攻击、气血、护甲轮着来，各 50 点封顶），再按 伤害 3：气血 2：暴击、暴伤、速度、全抗、护甲各 1 轮着加，到顶的跳过
+const autoTalOn = () => !!SAVE && SAVE.autoTal !== false, autoParaOn = () => !!SAVE && SAVE.autoPara !== false;
+function autoTalent(cls) {
+  if (!autoTalOn()) return 0; let n = 0;
+  const first = br => { const Bq = talentBranches(cls).find(b => b.id === br); if (!Bq) return -1; for (let i = 0; i < Bq.t.length; i++) if (canLearn(cls, br, i)) return i; return -1; };
+  for (let g = 0; g < 200 && talentInfo(cls).free > 0; g++) {
+    let br = 'class', i = first(br);
+    if (i < 0) { const rest = talentBranches(cls).map(b => b.id).filter(b => b !== 'class' && first(b) >= 0).sort((a, b) => branchSpent(cls, a) - branchSpent(cls, b) || (a === 'slay' ? -1 : 1)); if (!rest.length) break; br = rest[0]; i = first(br); }
+    if (!learnTalent(cls, br, i)) break; n++;
+  }
+  return n;
+}
+const PARA_AUTO = ['dmgPct', 'hpPct', 'crit', 'dmgPct', 'spd', 'res', 'dmgPct', 'hpPct', 'critDmg', 'armorPct'];
+function autoPara() {
+  if (!autoParaOn() || !featureOn('para')) return 0; let n = 0, k = 0;
+  const roots = ['pAtk', 'pHp', 'pArmor'];
+  for (let g = 0; g < 100000 && paraFree() > 0; g++) {
+    const r = roots.filter(paraCanAdd).sort((a, b) => (SAVE.para.pts[a] || 0) - (SAVE.para.pts[b] || 0))[0];
+    if (r) { addPara(r, 1); n++; continue; }
+    let done = false; for (let t = 0; t < PARA_AUTO.length && !done; t++) { const key = PARA_AUTO[(k + t) % PARA_AUTO.length]; if (paraCanAdd(key)) { addPara(key, 1); n++; k = (k + t + 1) % PARA_AUTO.length; done = true; } }
+    if (!done) break;
+  }
+  return n;
+}
+function autoAllot() { let n = 0; try { for (const c of CLASS_IDS) n += autoTalent(c); n += autoPara(); } catch (e) {} return n; }
 
 // ---------------- 镇妖录与役使 ----------------
 function zyEntries(i) { const C = CHAPTERS[i], out = [], seen = new Set();
@@ -567,6 +644,7 @@ const zyOf = n => (SAVE.zy || {})[MK(n)] || 0;
 function zyPagePts(i) { return zyEntries(i).reduce((a, e) => a + zyOf(e.n), 0); }
 function zyPageDone(i) { const E = zyEntries(i); return E.some(e => e.boss && zyOf(e.n)) && E.filter(e => !e.boss && zyOf(e.n)).length >= ZY_NEED; }
 function yiGrade(id) { const Y = YISHI[id]; if (!Y) return 0; return Math.max(...zyEntries(Y.pg).filter(e => e.boss).map(e => zyOf(e.n))); }
+const yiCount = () => Object.keys(YISHI).filter(id => yiGrade(id)).length;   // 收服了几只首领
 function yiOf(ch) { const o = {}; if (!ch || !ch.yi || !SAVE || !featureOn('rift')) return o; for (const id of ch.yi) { const g = yiGrade(id); if (g) o[id] = g; } return o; }
 function setYi(cls, id) {
   const ch = SAVE.chars[cls], yi = ch.yi || (ch.yi = []), before = runMaxHpIf(cls);
@@ -604,7 +682,7 @@ function globalStats() {
   const s = {};
   const add = (k, v) => { s[k] = (s[k] || 0) + v; };
   if (featureOn('para')) for (const P of PARAGON_STATS) { const n = SAVE.para.pts[P.k] || 0; if (n) add(P.k, n * P.v); }
-  if (featureOn('rift')) ZY_PAGES.forEach((Pg, i) => { const n = zyPagePts(i); if (n) for (const k in Pg.st) add(k, +(n * Pg.st[k]).toFixed(2)); });
+  if (featureOn('rift') && !shelved('zy')) ZY_PAGES.forEach((Pg, i) => { const n = zyPagePts(i); if (n) for (const k in Pg.st) add(k, +(n * Pg.st[k]).toFixed(2)); });
   return s;
 }
 
@@ -705,24 +783,28 @@ function power(s) {
   return Math.round(Math.sqrt(off * ehp) * (1 + 0.015 * san) * (1 + s.leech / (s.cls === 'berserker' || !s.cls ? 40 : 160)) * (1 + s.fx.size * 0.08 + s.minion * 0.1 + s.freeze / 200 + s.poison / 200 + skb / 600) * (1 + rs * 0.3));
 }
 const RSET_FX = new Set([...SETS.filter(S => S.rift).flatMap(S => [S.b4, S.b6]), ...LEGENDS.filter(l => l.w).map(l => l.fx)]);   // 专属兵器也按这个份量算，一键换装不会把它换下来
-function powerWith(cls, item, pos) { const ch = SAVE.chars[cls]; return power(calcStats(cls, { ...ch.eq, [posFor(cls, item, pos)]: item }, ch.level, null, ch)); }
-// 传承后的样子（不动原件）：把 src 的强化（降一级）、孔和玉搬到 dst 上。新捡的 +0 装备要这样才能和身上强化过的比
-function inheritSim(dst, src) {
-  if (typeof canInherit !== 'function' || !canInherit(dst, src)) return dst;
-  const c = { ...dst, gems: [...(dst.gems || [])] };
-  c.plus = Math.min(ENHANCE_MAX, Math.max(dst.plus || 0, Math.max(0, (src.plus || 0) - 1)));
-  c.sockets = Math.max(dst.sockets || 0, Math.min(MAX_SOCKETS[dst.slot], src.sockets || 0));
-  for (const g of src.gems || []) if (c.gems.length < c.sockets) c.gems.push(g);
-  return c;
+// ---- 部位强化（2026-11-26 用户定：强化的是位置，不是某件装备）----
+// 强化等级、孔、镶的玉都跟着「部位」走：穿在身上的那件带着它们；换装备时原样交给新的那件，换下来的那件清零（储物箱里的装备一律 +0、没孔没玉）。
+// 部位空着的时候记在 ch.slk[pos] = { p 强化, s 孔, g 玉 } 里。传承整个取消。通天塔的塔装自成一套，不走这里
+const slotState = (ch, pos) => { const it = ch.eq[pos]; return it ? { p: it.plus || 0, s: it.sockets || 0, g: it.gems || [] } : (ch.slk && ch.slk[pos]) || { p: 0, s: 0, g: [] }; };
+function slotClear(it) { it.plus = 0; it.sockets = 0; it.gems = []; }
+function slotTake(ch, pos) {   // 把 pos 上的装备脱下来：强化、孔、玉留在部位上；返回脱下的那件
+  const it = ch.eq[pos]; if (!it) return null;
+  (ch.slk = ch.slk || {})[pos] = { p: it.plus || 0, s: it.sockets || 0, g: it.gems || [] };
+  slotClear(it); delete ch.eq[pos]; return it;
 }
-// 换上这件能到的战力：直接换、传承后换，取高的。inh：要传承才到得了这个数
-function powerBest(cls, item, pos0) {
-  const pos = posFor(cls, item, pos0), raw = powerWith(cls, item, pos), sim = inheritSim(item, SAVE.chars[cls].eq[pos]);
-  if (sim === item) return { p: raw, raw, inh: false };
-  const ch = SAVE.chars[cls], pi = power(calcStats(cls, { ...ch.eq, [pos]: sim }, ch.level, null, ch));
-  return pi > raw ? { p: pi, raw, inh: true } : { p: raw, raw, inh: false };
+function slotPut(ch, pos, it) {   // 把 it 穿到 pos 上（pos 要先空出来）：接过部位上的强化、孔、玉
+  const k = (ch.slk && ch.slk[pos]) || { p: 0, s: 0, g: [] }; if (ch.slk) delete ch.slk[pos];
+  it.plus = k.p; it.sockets = Math.min(k.s, MAX_SOCKETS[it.slot] || 0); it.gems = [];
+  for (const g of k.g || []) { if (it.gems.length < it.sockets) it.gems.push(g); else if (!g.startsWith('L:')) addGem(g); }
+  ch.eq[pos] = it;
 }
-// 「一键换上最强」的打算：每个位置挑传承后最强的那件。不动存档，只出清单
+// 这件穿到 pos 上会是什么样（不动原件）：比战力用
+function slotSim(ch, pos, it) { if (!it || it.tw || ch.tower) return it; const k = slotState(ch, pos), sk = Math.min(k.s, MAX_SOCKETS[it.slot] || 0); return { ...it, plus: k.p, sockets: sk, gems: (k.g || []).slice(0, sk) }; }
+function powerWith(cls, item, pos) { const ch = SAVE.chars[cls], ps = posFor(cls, item, pos); return power(calcStats(cls, { ...ch.eq, [ps]: slotSim(ch, ps, item) }, ch.level, null, ch)); }
+// 换上这件能到的战力（强化、孔、玉跟着部位，直接比）
+function powerBest(cls, item, pos0) { const raw = powerWith(cls, item, pos0); return { p: raw, raw, inh: false }; }
+// 「一键换上最强」的打算：每个位置挑最强的那件。不动存档，只出清单
 function bestPlan(cls) {
   const ch = SAVE.chars[cls], eq = { ...ch.eq }, plan = {};
   const P = e => power(calcStats(cls, e, ch.level, null, ch));
@@ -732,27 +814,15 @@ function bestPlan(cls) {
     for (const it of SAVE.stash) {
       if (it.slot !== slotType(sl) || !canEquip(it, cls) || (taken(it) && !(plan[sl] && plan[sl].it === it))) continue;
       if (it.slot === 'ring' && sameRing(it, eq[sl === 'ring' ? 'ring2' : 'ring'])) continue;
-      const sim = inheritSim(it, ch.eq[sl]), pr = P({ ...eq, [sl]: gemSim(it, ch.eq[sl]) }), ps = sim === it ? pr : P({ ...eq, [sl]: sim });   // 不传承也会把玉搬过来（免费）
-      const inh = ps > pr, p = Math.max(pr, ps);
-      if (p > bestP) { bestP = p; best = { it, sl, inh, sim: inh ? sim : it, cost: inh ? inheritCost(it, ch.eq[sl]) : null }; }
+      const sim = slotSim(ch, sl, it), p = P({ ...eq, [sl]: sim });
+      if (p > bestP) { bestP = p; best = { it, sl, inh: false, sim, cost: null }; }
     }
     if (best) { eq[sl] = best.sim; plan[sl] = best; }
   }
   return Object.values(plan);
 }
-// 照清单办：useInh 为假就只换不用传承也更强的；银两魂晶不够的那件，不传承也更强就照换，否则跳过
-function bestApply(cls, useInh) {
-  if (!useInh) return { n: bestGear(cls), inh: 0, skip: 0 };
-  const ch = SAVE.chars[cls]; let n = 0, ni = 0, skip = 0;
-  for (const e of bestPlan(cls)) {
-    if (!SAVE.stash.includes(e.it)) continue;
-    let did = false;
-    if (e.inh) { const r = inheritFrom(e.it, ch.eq[e.sl]); if (r.err) { if (power(calcStats(cls, { ...ch.eq, [e.sl]: gemSim(e.it, ch.eq[e.sl]) }, ch.level, null, ch)) <= power(calcStats(cls, ch.eq, ch.level, null, ch))) { skip++; continue; } } else { ni++; did = true; } }
-    const old = ch.eq[e.sl];
-    if (equipItem(cls, e.it.id, e.sl)) { n++; if (!did && old) bestGear.gm = (bestGear.gm || 0) + moveGems(old, e.it); }
-  }
-  return { n, inh: ni, skip };
-}
+// 照清单办
+function bestApply(cls) { let n = 0; for (const e of bestPlan(cls)) { if (!SAVE.stash.includes(e.it)) continue; if (equipItem(cls, e.it.id, e.sl)) n++; } return { n, inh: 0, skip: 0 }; }
 
 // ---------------- 等级 ----------------
 const MAX_LV = MAX_LEVEL;
@@ -779,6 +849,7 @@ function gainXp(cls, x) {
     SAVE.para.xp += x;
     while (SAVE.para.xp >= paraNeed(SAVE.para.lv)) { SAVE.para.xp -= paraNeed(SAVE.para.lv); SAVE.para.lv++; pups++; }
   }
+  if (ups) autoTalent(cls); if (pups) autoPara();
   return ups + pups;
 }
 
@@ -796,14 +867,14 @@ function equipItem(cls, id, pos0) {
   const it = SAVE.stash[i]; if (!canEquip(it, cls)) return false;
   const before = runMaxHpIf(cls), pos = posFor(cls, it, pos0);
   SAVE.stash.splice(i, 1);
-  if (ch.eq[pos]) SAVE.stash.push(ch.eq[pos]);
-  ch.eq[pos] = it;
+  const old = slotTake(ch, pos); if (old) SAVE.stash.push(old);
+  slotPut(ch, pos, it);
   fixRunHp(cls, before); checkSet4(cls); return true;
 }
 function unequip(cls, slot) {
   const ch = SAVE.chars[cls]; if (!ch.eq[slot]) return;
   const before = runMaxHpIf(cls);
-  SAVE.stash.push(ch.eq[slot]); delete ch.eq[slot];
+  SAVE.stash.push(slotTake(ch, slot));
   fixRunHp(cls, before);
 }
 function returnGems(it) { for (const g of it.gems || []) if (!g.startsWith('L:')) SAVE.gems[g] = (SAVE.gems[g] || 0) + 1; it.gems = []; }
@@ -865,17 +936,7 @@ function kitGemsFill(cls, k) {
   return miss;
 }
 // 一键换装时玉跟着走（免费）：换下来那件上的玉搬到新装备上，孔不够的退回玉石包
-function gemSim(it, old) {
-  const og = plainGems(old); if (!og.length || !it) return it;
-  const free = Math.max(0, (it.sockets || 0) - (it.gems || []).length); if (!free) return it;
-  return { ...it, gems: [...(it.gems || []), ...og.slice(0, free)] };
-}
-function moveGems(old, it) {
-  const og = plainGems(old); if (!og.length || !it) return 0; let n = 0;
-  old.gems = (old.gems || []).filter(g => g.startsWith('L:')); it.gems = it.gems || [];
-  for (const g of og) { if (it.gems.length < (it.sockets || 0)) { it.gems.push(g); n++; } else addGem(g); }
-  return n;
-}
+const gemSim = it => it, moveGems = () => 0;   // 2026-11-26 玉跟着部位走（slotTake／slotPut），这两个不用了
 // 现在身上这身和第 i 套是不是一样（只比装备、乾坤袋、招式）
 function kitSame(cls, i) { const ch = SAVE.chars[cls], k = kitsOf(cls)[i]; if (!k) return false;
   const gs = L => [...(L || [])].sort().join(',');   // 玉也要一样（同一身装备、两套玉的情况）
@@ -900,8 +961,8 @@ function kitUse(cls, i) {
     if (want && !slotOpen(p) && p !== 'weapon') continue;
     plan.push([p, want]);
   }
-  for (const [p] of plan) if (ch.eq[p]) { SAVE.stash.push(ch.eq[p]); delete ch.eq[p]; }
-  for (const [p, want] of plan) if (want) { const j = SAVE.stash.findIndex(x => x.id === want); if (j >= 0 && canEquip(SAVE.stash[j], cls)) { ch.eq[p] = SAVE.stash[j]; SAVE.stash.splice(j, 1); } }
+  for (const [p] of plan) if (ch.eq[p]) SAVE.stash.push(slotTake(ch, p));
+  for (const [p, want] of plan) if (want) { const j = SAVE.stash.findIndex(x => x.id === want); if (j >= 0 && canEquip(SAVE.stash[j], cls)) { const x = SAVE.stash[j]; SAVE.stash.splice(j, 1); slotPut(ch, p, x); } }
   // 2. 乾坤袋、灵玉、役使：还在的才放回去
   if (featureOn('cube')) ch.cube = [0, 1, 2].map(j => { const l = (k.cube || [])[j]; return l && SAVE.cube[l] ? l : null; });
   if (k.lgs) ch.lgs = k.lgs.map(g => g && SAVE.lgems.some(x => x.id === g) ? g : null);
@@ -927,12 +988,10 @@ function bestGear(cls) {
     let bestP = power(calcStats(cls, ch.eq, ch.level, null, ch)), best = null;
     for (const it of SAVE.stash) {
       if (it.slot !== slotType(sl) || !canEquip(it, cls) || (it.slot === 'ring' && sameRing(it, ch.eq[sl === 'ring' ? 'ring2' : 'ring']))) continue;
-      const p = power(calcStats(cls, { ...ch.eq, [sl]: gemSim(it, ch.eq[sl]) }, ch.level, null, ch));   // 换下来那件的玉会跟过来
+      const p = power(calcStats(cls, { ...ch.eq, [sl]: slotSim(ch, sl, it) }, ch.level, null, ch));   // 强化、孔、玉跟着部位
       if (p > bestP) { bestP = p; best = it; }
     }
-    if (best) { SAVE.stash.splice(SAVE.stash.indexOf(best), 1); const old = ch.eq[sl];
-      if (old) { SAVE.stash.push(old); bestGear.gm = (bestGear.gm || 0) + moveGems(old, best); if ((old.plus || 0) > 0) bestGear.left = (bestGear.left || []).concat([old]); }
-      ch.eq[sl] = best; changed++; }
+    if (best) { SAVE.stash.splice(SAVE.stash.indexOf(best), 1); const old = slotTake(ch, sl); if (old) SAVE.stash.push(old); slotPut(ch, sl, best); changed++; }
   }
   fixRunHp(cls, before); checkSet4(cls); return changed;
 }
@@ -971,7 +1030,9 @@ function findOwned(id) {
 function ownerOf(it) { for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] === it) return c; return null; }
 function withOwnerHp(it, fn) { const o = ownerOf(it), b = o ? runMaxHpIf(o) : 0; const r = fn(); if (o) fixRunHp(o, b); return r; }
 function enhanceCost(it) { const p = it.plus || 0; return { gold: Math.round((20 + it.ilvl * 4) * (p + 1)), mats: p + 1, rate: Math.min(1, ENHANCE_RATE[p] + bLv('smith') * 0.03) }; }
+const onBody = it => !!it && (!!it.tw || !!ownerOf(it));   // 穿在身上（或塔装）
 function enhance(it) {
+  if (!onBody(it)) return { err: '强化的是部位：先把它穿上' };
   if ((it.plus || 0) >= smithMax()) return { err: (it.plus || 0) >= ENHANCE_MAX ? '已经强化到最高了' : `铁匠铺等级不够，现在最多强化到 +${smithMax()}` };
   const c = enhanceCost(it);
   if (SAVE.gold < c.gold) return { err: '金币不够' };
@@ -984,6 +1045,7 @@ function enhance(it) {
 }
 function socketCost(it) { const n = it.sockets || 0; return { gold: Math.round((60 + it.ilvl * 8) * (n + 1)), mats: 4 * (n + 1) }; }
 function addSocket(it) {
+  if (!onBody(it)) return { err: '孔打在部位上：先把它穿上' };
   if ((it.sockets || 0) >= MAX_SOCKETS[it.slot]) return { err: '这个部位已经打满孔了' };
   const c = socketCost(it);
   if (SAVE.gold < c.gold) return { err: '金币不够' };
@@ -1010,7 +1072,7 @@ function bulkPick(cls, f) {
     if (f.keepJy && it.anc === 3) return false;   // 九幽默认留下；用户取消勾选才会处理
     if (f.keepCube && it.legend && !SAVE.cube[it.legend]) return false;
     if (f.keepQ && it.aff.length && itemQ(it) >= 0.8) return false;
-    if (f.keepUp && canEquip(it, cls) && powerBest(cls, it).p > cur) return false;   // 传承后更强的也算：新捡的没强化，直接比会输给身上强化过的
+    if (f.keepUp && canEquip(it, cls) && powerBest(cls, it).p > cur) return false;   // 按穿到部位上以后的样子比（强化、玉跟着部位）
     return true;
   });
 }
@@ -1080,23 +1142,7 @@ function washOdds(it, locks) {
           ...rare.map(a => { const r = rng(a); return { k: a.k, p: pr / rare.length, lo: r[0], hi: r[1], rare: true }; })];
 }
 // 传承：把旧装备的强化（降一级）、孔和宝石转到同部位的新装备上
-function inheritCost(dst, src) { const p = Math.max(1, src.plus || 0); return { gold: Math.round((40 + dst.ilvl * 6) * p), mats: p }; }
-const canInherit = (dst, src) => src && dst && src !== dst && src.slot === dst.slot && ((src.plus || 0) > 0 || (src.gems && src.gems.length));
-function inheritFrom(dst, src) {
-  if (!canInherit(dst, src)) return { err: '传承不了' };
-  const c = inheritCost(dst, src); if (SAVE.gold < c.gold) return { err: '银两不够' }; if (SAVE.mats < c.mats) return { err: '魂晶不够' };
-  SAVE.gold -= c.gold; SAVE.mats -= c.mats;
-  const plus = Math.max(0, (src.plus || 0) - 1), gems = [...(src.gems || [])], socks = src.sockets || 0;
-  withOwnerHp(src, () => { src.plus = 0; src.gems = []; });
-  const over = [];
-  withOwnerHp(dst, () => {
-    dst.plus = Math.min(ENHANCE_MAX, Math.max(dst.plus || 0, plus));
-    dst.gems = dst.gems || []; dst.sockets = Math.max(dst.sockets || 0, Math.min(MAX_SOCKETS[dst.slot], socks));
-    for (const g of gems) { if (dst.gems.length < dst.sockets) dst.gems.push(g); else over.push(g); }
-  });
-  if (over.length) returnGems({ gems: over });
-  return { ok: true, plus: dst.plus, gems: gems.length - over.length };
-}
+const canInherit = () => false;   // 2026-11-26 传承取消：强化、孔、玉跟着部位走
 // 升阶：稀有、套装、神兵可以升到当前章节的阶数，词条按比例一起涨
 const upTierOK = it => ['rare', 'set', 'legend'].includes(it.rarity);
 function upTierTarget(cls) { return chIlvl(curChapter(), SAVE.chars[cls || SAVE.cls].level); }
@@ -1105,6 +1151,10 @@ function upTier(it, L) {
   if (!upTierOK(it) || L <= it.ilvl) return { err: '升不了阶' };
   const c = upTierCost(it, L); if (SAVE.gold < c.gold) return { err: '银两不够' }; if (SAVE.mats < c.mats) return { err: '魂晶不够' };
   SAVE.gold -= c.gold; SAVE.mats -= c.mats;
+  upTierDo(it, L); return { ok: true };
+}
+function upTierDo(it, L) {   // 2026-11-26 升阶并进点化：点化时顺带升到满阶，不另收钱
+  if (!upTierOK(it) || L <= it.ilvl) return { ok: false };
   const old = it.ilvl, b0 = implicitFor(it.slot, old), b1 = implicitFor(it.slot, L);
   withOwnerHp(it, () => {
     const imp = {};
@@ -1167,7 +1217,7 @@ const wpnIlvl = () => Math.max(30, Math.min(70, riftD(Math.max(WPN_LV, SAVE.rift
 function forgeWeapon(cls, lid) {
   const L = LEGENDS.find(l => l.id === lid && l.w && l.cls === cls); if (!L) return { err: '打不了这把' };
   if ((SAVE.bp || 0) < WPN_COST) return { err: '兵魄不够' };
-  if (SAVE.stash.length >= stashMax()) return { err: '储物箱满了，先清一清' };
+  if (SAVE.stash.length >= stashMax()) return { err: '背包满了，先清一清' };
   SAVE.bp -= WPN_COST; SAVE.flags.wpnForged = 1; const it = storeItem(null, makeItem({ ilvl: wpnIlvl(), rarity: 'legend', cls, legendId: lid })); return { ok: true, it };
 }
 // 专属兵器每强化 +1，特效再涨 WPN_UP
@@ -1199,6 +1249,7 @@ function addGem(key, n = 1) { SAVE.gems[key] = (SAVE.gems[key] || 0) + n; }
 function dropGem(res, key) { if (featureOn('gems')) res.gems.push(key); else addGem(key); }
 function socketGem(it, key) {
   if (!SAVE.gems[key]) return { err: '没有这颗宝石' };
+  if (!onBody(it)) return { err: '玉镶在部位上：先把它穿上' };
   if ((it.gems || []).length >= (it.sockets || 0)) return { err: '没有空的孔' };
   withOwnerHp(it, () => { it.gems.push(key); });
   if (--SAVE.gems[key] <= 0) delete SAVE.gems[key];
@@ -1238,6 +1289,31 @@ function combineGem(key) {
   const nk = gemKey(t, +tier + 1); addGem(nk); return { ok: true, key: nk };
 }
 // 一键合成（2026-11-24 用户要的）：每种玉从低档往高档，能合的全合上去；银两、魂晶不够就停在那一步
+// 2026-11-26 玉石自动合成：不花魂晶的那几档（碎 → 极品），捡到就自己往上合，银两照扣（钱不够就先不合）；要花魂晶的高档留给「一键合成」
+function gemAutoCombine() {
+  if (!featureOn('gems')) return 0; let n = 0;
+  for (let tier = 0; tier < Math.min(4, gemCap()); tier++) for (const k of Object.keys(SAVE.gems)) {
+    const [t, tr] = k.split('_'); if (+tr !== tier || combineMats(k)) continue;
+    while ((SAVE.gems[k] || 0) >= 3 && SAVE.gold >= combineCost(k)) { SAVE.gold -= combineCost(k); SAVE.gems[k] -= 3; if (!SAVE.gems[k]) delete SAVE.gems[k]; addGem(gemKey(t, tier + 1)); n++; }
+  }
+  return n;
+}
+// 一键镶最好的：身上每个孔，换上玉石包里让战力涨得最多的那颗（空孔先填；已经镶着的，有更好的就换下来放回玉石包）。免费
+function gemAutoFit(cls) {
+  const ch = SAVE.chars[cls]; if (!featureOn('gems')) return { n: 0 };
+  const before = runMaxHpIf(cls), P = () => power(calcStats(cls, ch.eq, ch.level, null, ch)); let n = 0;
+  for (let pass = 0; pass < 6; pass++) { let moved = 0;
+    for (const pos of POS_IDS) { const it = ch.eq[pos]; if (!it || !(it.sockets > 0)) continue; it.gems = it.gems || [];
+      for (let i = 0; i < it.sockets; i++) {
+        const cur = it.gems[i] || null; if (cur && cur.startsWith('L:')) continue;
+        const best = {}; for (const k in SAVE.gems) if (SAVE.gems[k] > 0) { const [t, tr] = k.split('_'); if (!best[t] || +tr > +best[t].split('_')[1]) best[t] = k; }
+        let top = P(), pick = null;
+        for (const t in best) { const k = best[t]; if (k === cur) continue; const sv = it.gems.slice(); if (i < it.gems.length) it.gems[i] = k; else it.gems.push(k); const p = P(); it.gems = sv; if (p > top) { top = p; pick = k; } }
+        if (pick) { if (--SAVE.gems[pick] <= 0) delete SAVE.gems[pick]; if (i < it.gems.length) { addGem(it.gems[i]); it.gems[i] = pick; } else it.gems.push(pick); moved++; n++; }
+      } }
+    if (!moved) break; }
+  fixRunHp(cls, before); return { n };
+}
 function combineAllPlan(apply) {
   const G0 = SAVE.gems, G = { ...G0 }; let gold = SAVE.gold, mats = SAVE.mats, n = 0, cost = 0, mcost = 0;
   const types = [...new Set(Object.keys(G).map(k => k.split('_')[0]))];
@@ -1893,9 +1969,10 @@ const teamSlots = () => 1 + ((SAVE.riftMax || 0) >= 120 ? 1 : 0) + ((SAVE.riftMa
 // ---------------- 阵法（2026-11-23）：四个号位，谁站哪自己摆；号位决定前后排（妖物七成先打前排）；阵花魂晶升级；幻境 20 层起妖物也摆阵，五阵循环相克 ----------------
 const formSave = () => { if (!SAVE.form) SAVE.form = { cur: 'san', lv: {}, pos: {} }; return SAVE.form; };
 const formLv = id => formSave().lv[id] || 0;
-const formOpen = id => id === 'san' || formLv(id) > 0;
-const formCur = () => { const F = formSave(); return F.cur && F.cur !== 'san' && F.lv[F.cur] ? F.cur : null; };
+const formOpen = id => !shelved('form') && (id === 'san' || formLv(id) > 0);
+const formCur = () => { if (shelved('form')) return null; const F = formSave(); return F.cur && F.cur !== 'san' && F.lv[F.cur] ? F.cur : null; };
 function formCheckUnlock() {   // 跟着进度学会：主线通关第几章，或幻境到过多少层，哪个先到算哪个
+  if (shelved('form')) return [];
   const F = formSave(), ch = (SAVE.story && SAVE.story.cleared && SAVE.story.cleared.normal) || 0, r = SAVE.riftMax || 0, got = [];
   for (const id of FORM_IDS) if (!F.lv[id] && (ch >= FORMS[id].ch || r >= FORMS[id].at)) { F.lv[id] = 1; got.push(id); }
   return got;
@@ -1928,7 +2005,7 @@ function formUp(id) {
 const formK = (my, en) => !en ? 0 : (!my || my === 'san') ? -1 : FORM_BEAT[my] === en ? 1 : FORM_BEAT[en] === my ? -1 : 0;   // 1 你克它，-1 它克你
 const rFloorIdx = () => { try { const R = rFloorOf(RCH); return (R && R.fi) || 0; } catch (e) { return 0; } };
 function enemyForm(run, kind) {   // 幻境 20 层起：每层妖物摆一个阵（这一局开始时定好），守关妖王另摆一个
-  if (!run || run.mode !== 'rift' || (run.riftLv || 0) < EFM_FROM) return null;
+  if (shelved('form') || !run || run.mode !== 'rift' || (run.riftLv || 0) < EFM_FROM) return null;
   if (!run.efm) run.efm = { f: [0, 1, 2, 3].map(() => RNG.pick(FORM_IDS)), b: RNG.pick(FORM_IDS) };
   return kind === 'boss' ? run.efm.b : run.efm.f[rFloorIdx()] || run.efm.f[0];
 }
@@ -1957,7 +2034,7 @@ const isFrontU = a => a.frow != null ? a.frow === 0 : a.kind === 'hero' ? FRONT_
 const zyPagesDone = () => ZY_PAGES.reduce((a, _, i) => a + (zyPageDone(i) ? 1 : 0), 0);
 const COMP_LOCK = {   // 通关后才认识的伙伴：[现在多少, 要多少]
   lei: () => [(SAVE.stats && SAVE.stats.bounties) || 0, 10],
-  liu: () => [zyPagesDone(), 3],
+  liu: () => [shelved('zy') ? yiCount() : zyPagesDone(), 3],
   tie: () => [SAVE.flags && SAVE.flags.wpnForged ? 1 : 0, 1] };
 const compOpen = c => { if (!COMPANIONS[c]) return false; const ended = !!(SAVE.story && SAVE.story.ended);
   if (riftPath() && RIFT_COMP[c] != null && rTop() >= RIFT_COMP[c]) return true;   // 幻境路线：打到那一层就来
@@ -3315,7 +3392,9 @@ function finishBattle(b) {
     if (u.rare) res.items.push(dropItem(run, 'boss', u.lv + 1, s.mf));
     if (run.mode === 'rift') {
       const g = zyGrade(run.riftLv), nm = u.def.n;
-      if (q === 'boss' || (q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6))) zyTake(res, nm, g);
+      if (q === 'boss') zyTake(res, nm, g);
+      else if (shelved('zy')) { if ((q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6)) || (u.kind === 'normal' && RNG.ch(0.01 * (rw ? 0.4 : 1)))) res.mats += 2; }
+      else if (q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6)) zyTake(res, nm, g);
       else if (u.kind === 'normal' && RNG.ch((zyOf(nm) < g ? 0.05 : 0.01) * (rw ? 0.4 : 1))) zyTake(res, nm, g);
       if (q === 'boss' && run.riftLv >= RSET2_LV && RNG.ch(WPN_DROP)) { const W = wpnList(run.cls); if (W.length) res.items.push(makeItem({ ilvl: u.lv + 1, rarity: 'legend', cls: run.cls, legendId: RNG.pick(W).id })); }
       const two = run.riftLv >= RSET2_LV;   // 30 层起多一套：两套各半，掉率跟着提，免得凑头一套变慢
@@ -3327,7 +3406,7 @@ function finishBattle(b) {
     }
     if (RNG.ch(q === 'boss' ? 1 : q === 'elite' ? 0.35 : rw ? 0.02 : 0.05)) dropGem(res, rollGem(run));
     res.mats += q === 'boss' ? RNG.i(4, 7) : q === 'elite' ? RNG.i(1, 3) + (u.rare ? 3 : 0) : (RNG.ch(rw ? 0.05 : 0.12) ? 1 : 0);
-    if (run.mode === 'rift' && run.riftLv >= JY_FROM) res.jyx = (res.jyx || 0) + (u.kind === 'boss' ? RNG.i(1, 2) : q === 'elite' && RNG.ch(u.rare ? 0.5 : 0.1) ? 1 : 0);   // 九幽玄晶：400 层起，守关妖王 1–2 颗，精英一成几率
+    if (run.mode === 'rift' && run.riftLv >= JY_FROM && !shelved('jy')) res.jyx = (res.jyx || 0) + (u.kind === 'boss' ? RNG.i(1, 2) : q === 'elite' && RNG.ch(u.rare ? 0.5 : 0.1) ? 1 : 0);   // 九幽玄晶：400 层起，守关妖王 1–2 颗，精英一成几率
   }
   if (s.fx.has('gFast') && (b.pr || 0) <= 8) b.extraLoot++;                                                                   // 铁算盘
   if (b.midas) res.gold += Math.round(b.midas * (2 + lv * 1.2) * 10 * (1 + s.gf / 100));                                         // 点金手
@@ -3339,7 +3418,7 @@ function finishBattle(b) {
   SAVE.gold += res.gold; run.goldGot += res.gold;
   SAVE.mats += res.mats; run.matsGot += res.mats;
   if (res.jyx) { SAVE.jyx = (SAVE.jyx || 0) + res.jyx; run.jyxGot = (run.jyxGot || 0) + res.jyx; }
-  res.gems.forEach(k => addGem(k)); run.gemsGot += res.gems.length;
+  res.gems.forEach(k => addGem(k)); run.gemsGot += res.gems.length; gemAutoCombine();
   const cu = catchUpMul(run.cls); if (cu > 1) { res.xp = Math.round(res.xp * cu); res.cu = cu; }
   res.levels = gainXp(run.cls, res.xp); run.xpGot += res.xp;
   res.items.forEach(it => storeItem(run, it));
