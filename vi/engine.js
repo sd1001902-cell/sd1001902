@@ -2116,10 +2116,10 @@ function battleStep(b) {
   const out = { lines: [], pops: [], actor: null, cast: null };
   if (b.over) return out;
   BNOW = b;
-  // 必杀（2026-11-24）：不占出手，按下去下一步立刻放；自动出招时攒满两格才替你打断蓄力（只打断，留一格给你）
+  // 秘技（2026-11-24）：不占出手，按下去下一步立刻放；自动出招时攒满两格才替你打断蓄力（只打断，留一格给你）
   if (b.P && b.P.hp > 0 && b.P.rage >= 100) { const foes = aliveOf(b, 'e');
     if (foes.length && (b.ultReq || (b.ultAuto && b.P.rage >= ULT.maxR && foes.some(f => f.charging)))) { out.actor = 'P'; out.dt = 0; ultimate(b, b.P, foes, out, !b.ultReq);   // 自动打断只用第二格
-      if (b.P.lgv && b.P.lgv.tiangang != null) { b.P.st.tg = 3; out.pops.push(['P', "Thiên Cương", 'buff']); }   // 天罡玉：必杀后两招加伤
+      if (b.P.lgv && b.P.lgv.tiangang != null) { b.P.st.tg = 3; out.pops.push(['P', "Thiên Cương", 'buff']); }   // 天罡玉：秘技后两招加伤
       resolveDeaths(b, out); return out; } }
   b.ultReq = false;
   const live = b.units.filter(u => u.hp > 0);
@@ -2268,9 +2268,9 @@ function ngocAct(b, u, out) {
   } else { const t = foes[0]; out.cast = { id: 'potionThrow', elem: 'poison', target: t.id }; hit(b, u, t, 0.8, 'magic', out, { sk: { ap: 'burn', apc: 0.5 } }); }
 }
 
-// ---------------- 必杀技 ----------------
-// 2026-11-24 改成主动按钮（用户定）：怒气满了点「必杀」才有职业增益（加上打断妖王蓄力、伙伴合击）；
-//   自动出招时程序只在妖物蓄力时替你放，只有打断效果。怒气同一趟里跨场保留。增益收着做：必杀带来的伤害占比压在一成以内
+// ---------------- 秘技技 ----------------
+// 2026-11-24 改成主动按钮（用户定）：怒气满了点「秘技」才有职业增益（加上打断妖王蓄力、伙伴合击）；
+//   自动出招时程序只在妖物蓄力时替你放，只有打断效果。怒气同一趟里跨场保留。增益收着做：秘技带来的伤害占比压在一成以内
 const ULTS = {
   berserker: { n: "Nhập Ma", g: "MA", s: "Sát thương +60%", elem: 'phys', wx: 'jin', d: "Trong ba lượt sát thương +60%; Nộ ý +30, 20% sát thương gây ra hồi thành khí huyết (mặc bộ Bất Tử thì không cộng Nộ ý, không hút máu, để khỏi hút máu lên lại)" },
   mage:      { n: "Ngũ Hành Quy Nhất", g: "QUY", s: "Sát thương ×2", elem: 'light', wx: 'mu', d: "Trong ba lượt sát thương gấp đôi; hai chiêu tiếp theo chắc chắn chí mạng" },
@@ -2298,7 +2298,7 @@ function ultimate(b, P, foes, out, autoCut) {
   J.forEach(u => { u.rage = 0; });
   out.ult = { cls: P.cls, n: combo ? (J.length > 1 ? `${J.length + 1} người hợp kích · ` : "Song nhân hợp kích · ") + U.n : U.n, g: U.g, combo, comp: NG && NG.comp, sprs: J.map(u => u.spr) };
   out.cast = { id: 'ult', elem: U.elem, aoe: true, cls: P.cls, combo };
-  out.lines.push(combo ? `Bạn và ${J.map(u => u.name).join(", ")} cùng ra tay — “${U.n}”!` : `Tuyệt kỹ “${U.n}”!`);
+  out.lines.push(combo ? `Bạn và ${J.map(u => u.name).join(", ")} cùng ra tay — “${U.n}”!` : `Bí kỹ “${U.n}”!`);
   if (b.run && b.run.team) J.forEach(u => {   // 合击里各带一段
     if (u.cid === 'zhen') { foes.forEach(f => freezeU(f, out, "Choáng")); out.pops.push([u.id, "Xích sắt", 'buff']); }
     else if (u.cid === 'ngoc') { b.units.filter(x => x.side === 'p' && x.hp > 0 && x.kind !== 'ward').forEach(x => heal(x, x.maxHp * 0.15, out, true)); out.pops.push([u.id, "Hồ quang", 'buff']); }
@@ -2823,11 +2823,11 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   let d = opt.flat != null ? opt.flat : src.atk * mult * (1 + (src.dmgPct || 0) / 100 + (elem !== 'phys' ? (src.elem || 0) / 100 : 0));
   if (src.st.warcry) d *= 1.4;
   if (src.st.zhenyue) d *= 1 + ZHENYUE_DMG;   // 镇岳符
-  if (src.st.rumo) d *= 1 + ULT.rmDmg;   // 狂刀客必杀「入魔」
-  if (src.st.qianren) d *= 1 + ULT.qrDmg;   // 刺客必杀「无影千刃」
-  if (src.st.guiyi) d *= 1 + ULT.gyDmg;   // 道士必杀「五行归一」
-  if (src.st.baigui || (src.kind === 'minion' && b.P && b.P.st.baigui)) d *= 1 + ULT.bgDmg;   // 赶尸人必杀「百鬼还魂」：自己和僵尸
-  if (src.st.jsh && elem === 'holy') d *= 1 + ULT.jsHoly;   // 和尚必杀「金身」：佛光（含反震）加伤
+  if (src.st.rumo) d *= 1 + ULT.rmDmg;   // 狂刀客秘技「入魔」
+  if (src.st.qianren) d *= 1 + ULT.qrDmg;   // 刺客秘技「无影千刃」
+  if (src.st.guiyi) d *= 1 + ULT.gyDmg;   // 道士秘技「五行归一」
+  if (src.st.baigui || (src.kind === 'minion' && b.P && b.P.st.baigui)) d *= 1 + ULT.bgDmg;   // 赶尸人秘技「百鬼还魂」：自己和僵尸
+  if (src.st.jsh && elem === 'holy') d *= 1 + ULT.jsHoly;   // 和尚秘技「金身」：佛光（含反震）加伤
   if (src.kind === 'hero') {   // 职业的看家本事
     if (src.cls === 'berserker') { d *= (src.fury >= 50 ? 1.15 * (src.lgv && src.lgv.zhanhun != null ? 1 + LGV.zhHalf(src.lgv.zhanhun) / 100 : 1) : 1) * (1 + (0.03 + (src.lowHpK || 0) / 100) * Math.floor((1 - src.hp / src.maxHp) * 10)); }   // 战魂玉：怒意过半加伤、残血加伤
     if (src.cls === 'mage' && src.lian) d *= 1 + src.lian * (0.08 + (src.lianPct || 0) / 100);
@@ -3028,7 +3028,7 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (crit && src === b.P && src.jy && src.jy.shihun && src.hp > 0 && d > 0) heal(src, d * src.jy.shihun / 100, out, true);   // 九幽·噬魂
   if (tgt.side === 'e') stAdd(b, src, 'dmg', d + Math.min(0, tgt.hp)); else stAdd(b, tgt, 'taken', d);
   if (hsT) hsT.hp += d;
-  else if (src === b.P && tgt.side === 'e') { hsDmg(b, opt.tag || (opt.ult ? "Tất sát" : !opt.proc && b.castSk ? b.castSk.n : "Hiệu ứng"), d + Math.min(0, tgt.hp)); if (!opt.proc && !opt.tag && !opt.ult) { const h = hsOf(b); h.n++; if (crit) h.cr++; } }
+  else if (src === b.P && tgt.side === 'e') { hsDmg(b, opt.tag || (opt.ult ? "Bí kỹ" : !opt.proc && b.castSk ? b.castSk.n : "Hiệu ứng"), d + Math.min(0, tgt.hp)); if (!opt.proc && !opt.tag && !opt.ult) { const h = hsOf(b); h.n++; if (crit) h.cr++; } }
   out.pops.push([tgt.id, popN(tgt, d), crit ? 'crit' : elem, 0, src === b.P ? 'P' : src.kind === 'minion' ? 'Z' : '', opt.tag || '']);   // 僵尸打的也标出来：只看主角时一起跳
   if (tgt.side === 'e' && b.P && b.P.fx) {   // 职业神兵：打中之后
     const PF = b.P.fx;
@@ -3164,7 +3164,7 @@ function thornHit(b, tgt, src, out, opt) {
   const tfx = tgt.fx || new Set(), chan = !!tgt.st.chan, monk = tgt.cls === 'paladin', lh4 = chan && tfx.has('luoHan4');
   let K = (tgt.thornK || 0) + (chan && monk ? THORN_TAUNT : 0); if (K <= 0) return;
   if (lh4) K *= 2;
-  if (tgt.st.jsh) K *= 1 + ULT.jsThk;   // 和尚必杀「金身」
+  if (tgt.st.jsh) K *= 1 + ULT.jsThk;   // 和尚秘技「金身」
   K *= 1 + (tgt.thornDmg || 0) / 100;
   const d = hit(b, tgt, src, K * f / 100, 'holy', out, { proc: 1, refl: 1, tag: "Phản chấn" });
   if (!monk) return;

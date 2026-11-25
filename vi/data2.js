@@ -84,7 +84,7 @@ const LGV = {
   sgK: lv => 4 + lv * 0.12,                                     // 蚀骨：敌人身上每种状态 +x%
   xjK: lv => 15 + lv * 0.35, xjBoom: lv => 100 + lv * 1.5,      // 玄甲：有护体时伤害；护体打碎炸开
   ssK: lv => 15 + lv * 0.3, ssHeal: lv => 1 + lv * 0.02,       // 嗜杀：每层下一招伤害；杀一个回血
-  tgK: lv => 30 + lv * 0.6,                                     // 天罡：放完必杀后的伤害
+  tgK: lv => 30 + lv * 0.6,                                     // 天罡：放完秘技后的伤害
 };
 const LGEMS = {
   // ---- 留下的六颗特色玉 ----
@@ -105,7 +105,7 @@ const LGEMS = {
   shigu:    { n: "Thực Cốt Ngọc", c: '#9ad86a', d: lv => `Trên người kẻ địch mỗi có một loại trạng thái, sát thương nó nhận từ bạn +${LGV.sgK(lv).toFixed(1)}%; trạng thái bạn gắn kéo dài thêm 1 hiệp. Hợp với Vạn Phù, Ngũ Độc, Thiên Cơ, Quy Nguyên, Âm Binh (cương thi cũng hưởng)`, st: () => ({}) },
   xuanjia:  { n: "Huyền Giáp Ngọc", c: '#8ab0d8', d: lv => `Khi có hộ thể, sát thương +${LGV.xjK(lv).toFixed(0)}%; hộ thể bị đánh vỡ thì nổ tung, gây ${LGV.xjBoom(lv).toFixed(0)}% sát thương lên mọi kẻ địch (hai hiệp tối đa một lần). Hợp với Đại Nhật, La Hán, Đạo Sĩ Ngũ Hành`, st: () => ({}) },
   shisha:   { n: "Thị Sát Ngọc", c: '#e05a5a', d: lv => `Mỗi khi có một kẻ địch ngã xuống: hồi ${LGV.ssHeal(lv).toFixed(1)}% khí huyết, chiêu kế tiếp sát thương +${LGV.ssK(lv).toFixed(0)}% (cộng dồn tối đa 3 tầng, ra chiêu xong thì xóa). Hợp với Thất Sát, Tu La Bất Tử`, st: () => ({}) },
-  tiangang: { n: "Thiên Cương Ngọc", c: '#ffe08a', d: lv => `Tuyệt kỹ tích nhanh hơn ${Math.round(30 + lv * 0.5)}%; tung tuyệt kỹ xong, hai chiêu sau sát thương +${LGV.tgK(lv).toFixed(0)}%. Hợp với Huyết Hải, Đại Nhật và các lối đánh dựa vào tuyệt kỹ`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
+  tiangang: { n: "Thiên Cương Ngọc", c: '#ffe08a', d: lv => `Bí kỹ tích nhanh hơn ${Math.round(30 + lv * 0.5)}%; tung bí kỹ xong, hai chiêu sau sát thương +${LGV.tgK(lv).toFixed(0)}%. Hợp với Huyết Hải, Đại Nhật và các lối đánh dựa vào bí kỹ`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
   // 老存档里被删的灵玉：先放在这里，等玩家挑一颗新的换（等级保留）
   reforge:  { n: "Linh ngọc chờ tái luyện", c: '#8a8070', d: () => "Hiệu quả của viên linh ngọc này đã bị xóa: vào “Linh ngọc · Tái luyện” chọn một viên mới, cấp giữ nguyên", st: () => ({}), hide: true },
 };
@@ -331,7 +331,7 @@ STAT_NAMES.lianPct = STAT_NAMES.lianPct || "Sát thương mỗi tầng “Liên�
 const JY_AFF = {
   liepo:    { slot: 'weapon',  n: "Liệt Phách", r: [30, 50],  st: 'xBoss',    d: v => `Sát thương lên thủ lĩnh, tinh anh +${v}%` },
   tuntian:  { slot: 'weapon',  n: "Thôn Thiên", r: [2, 3],                    d: v => `Trong trận này, mỗi yêu vật ngã xuống, sát thương +${v}% (tối đa +${v * 10}%)` },
-  lingtai:  { slot: 'helm',    n: "Linh Đài", r: [40, 60],  st: 'xRage',    d: v => `Nộ khí tất sát tích nhanh hơn ${v}%` },
+  lingtai:  { slot: 'helm',    n: "Linh Đài", r: [40, 60],  st: 'xRage',    d: v => `Nộ khí bí kỹ tích nhanh hơn ${v}%` },
   dingshen: { slot: 'helm',    n: "Định Thần", r: [30, 50],  st: 'xTen',     d: v => `Mỗi trận lần đầu bị choáng, đóng băng thì miễn luôn; sau đó bị khống chế có ${v}% tỉ lệ miễn` },
   xuanming: { slot: 'chest',   n: "Huyền Minh", r: [25, 40],                  d: v => `Khi vào trận nhận hộ thể bằng ${v}% khí huyết tối đa` },
   bumie:    { slot: 'chest',   n: "Hồi hồn", r: [20, 30],                  d: v => `Mỗi trận một lần: trúng đòn chí tử không ngã, hồi ${v}% khí huyết (tính riêng với các hiệu ứng miễn tử khác)` },

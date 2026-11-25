@@ -38,7 +38,7 @@ const STAT_NAMES = {
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",
   // 稀有词条（只能洗炼出）和灵玉用到的
-  xDouble: "Liên trảm (tỉ lệ bồi thêm một đòn sau khi ra tay)", xRage: "Nộ khí tất sát nhận được", xTen: "Thanh thần (kháng choáng, bất động)", xDr: "Giảm sát thương phải nhận", xLast: "Bất khuất (giảm sát thương khi khí huyết dưới 30%)",
+  xDouble: "Liên trảm (tỉ lệ bồi thêm một đòn sau khi ra tay)", xRage: "Nộ khí bí kỹ nhận được", xTen: "Thanh thần (kháng choáng, bất động)", xDr: "Giảm sát thương phải nhận", xLast: "Bất khuất (giảm sát thương khi khí huyết dưới 30%)",
   xHaste: "Tật hành (tốc độ hai lượt đầu trận)", xKill: "Tham lang (hồi khí huyết mỗi lần giết địch)", cdSkip: "Tỉ lệ chiêu không vào hồi chiêu", xLuck: "Tỉ lệ rơi thần binh", xShield: "Bàn thạch (vào trận có sẵn hộ thể, theo khí huyết tối đa)",
   regenPct: "Hồi khí huyết mỗi lượt", xCritNext: "Hội tâm (sát thương chiêu kế sau khi chí mạng)", allyPct: "Sát thương và khí huyết của đồng hành, cương thi",
 };

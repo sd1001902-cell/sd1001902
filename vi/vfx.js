@@ -108,7 +108,7 @@ const VFX = (() => {
   const pillar = (p, c, dur) => p && spawn('pillar', p.x, p.y + p.h / 2, dur, { c, h: (p.y + p.h / 2) + 'px' });
   // 书法大字：落笔如印，墨散而去
   let LOUD = false;   // 大招、首领死亡时为 true：4 倍速也照样出字
-  // 2026-11-24 大字只留必杀：普通招式、伙伴、小怪出招都不盖大字；必杀、首领大招、打死首领、克制道具传 force
+  // 2026-11-24 大字只留秘技：普通招式、伙伴、小怪出招都不盖大字；秘技、首领大招、打死首领、克制道具传 force
   const glyph = (p, ch, c, size, dur, dy, force) => p && force && spawn('glyph', p.x, p.y + (dy || 0), dur, { c, s: size + 'px' }, ch);
   const glyphF = (p, ch, c, size, dur, dy) => glyph(p, ch, c, size, dur, dy, true);
   // 朱红印章
@@ -137,10 +137,10 @@ const VFX = (() => {
     el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${d}" stroke="${c}" stroke-width="9" fill="none" opacity=".35" stroke-linejoin="round"/><path d="${d}" stroke="#fff" stroke-width="2.5" fill="none" stroke-linejoin="round"/></svg>`;
     layer.appendChild(el); setTimeout(() => el.remove(), dur + 80);
   }
-  // 2026-11-25 用户：打斗画面老抖，看得眼睛累。整屏只为大事震：首领的大招、必杀、首领倒下、落地这类（力度 ≥ 7）；
+  // 2026-11-25 用户：打斗画面老抖，看得眼睛累。整屏只为大事震：首领的大招、秘技、首领倒下、落地这类（力度 ≥ 7）；
   // 两倍速以上只留 ≥ 9；1.5 秒里最多震一次；幅度压到原来六成、最多 6 像素。普通出手、暴击、连招、破盾都不再震屏
   const SHAKE_MIN = 7; let shLast = 0;
-  function shake(power, force) {   // force：必杀、首领倒下——不看倍速和间隔
+  function shake(power, force) {   // force：秘技、首领倒下——不看倍速和间隔
     if (!arena) return;
     power = power || 4;
     if (!force && (power < SHAKE_MIN || (speed >= 2 && power < 9))) return;
@@ -648,12 +648,12 @@ const VFX = (() => {
       dl(() => ts2.forEach((p, i) => later(() => fx(p), i * 40)));
       return mv;
     }
-    // ---- 必杀 ----
+    // ---- 秘技 ----
     if (c.id === 'ult') {
       const W = arena.clientWidth, H = arena.clientHeight, mid = { x: W * 0.62, y: H * 0.45 }, foes = fps.length ? fps : [mid];
       if (c.cut) { inkWash(INK); glyphF(mid, ULTS.cutG || "ĐOẠN", '#ffd86a', 150, G * 1.2); shake(7, 1); return Math.round(T * 0.5); }   // 自动出招：只打断蓄力
       inkWash(c.combo ? '#2a0a1a' : INK);
-      const UG = (ULTS[c.cls] || {}).g;   // 2026-11-24 必杀改成职业增益：大字跟着新招名
+      const UG = (ULTS[c.cls] || {}).g;   // 2026-11-24 秘技改成职业增益：大字跟着新招名
       switch (c.cls) {
         case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, UG, '#ff3a2a', 170, G * 1.4); shake(12, 1); break;
         case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, UG, '#e6e0ff', 170, G * 1.4); shake(10, 1); break;

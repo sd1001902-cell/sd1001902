@@ -876,7 +876,7 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
   return `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">${esc(C.n)} · Cách đánh</h2><div class="twkit2" data-scroll="twcls"><p class="help-p">${esc(C.d)}</p>${M ? `<p class="help-p"><b>${M[0]}</b>: ${M[1]}</p>` : ''}
     <p class="help-p sub">Trong tháp sẽ ra mấy bộ này, mỗi bộ một lối. Gom đủ 4 món, 6 món cùng bộ còn có cộng hưởng:</p>${sets}<p class="help-p sub">Khi chọn một trong ba, chạm vào thẻ để xem toàn bộ hiệu ứng, sẽ thay ra món gì, và liên quan tới chiêu nào ngươi đang có.</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">Tháp Thông Thiên</h2><div class="help-scroll"><p class="help-p">Mỗi tầng một trận, đánh xong lên thẳng tầng trên, đỉnh tháp là tầng ${TW.top}. Tầng thường là một đàn yêu vật (từ tầng 3 có tinh anh), cứ 5 tầng là thủ lĩnh tinh anh kèm hai hộ pháp, cứ 10 tầng là chủ tháp. Yêu vật mỗi tầng mạnh hơn một chút, tăng dần từ từ.</p>
-  <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí tuyệt kỹ giữ qua từng tầng.</p>
+  <p class="help-p">Vào tháp ai cũng như nhau: cấp 50, một bộ đồ tháp bảo phẩm, hai chiêu, nền tu vi thống nhất; không mang trang bị, tu vi, ngọc, đồng hành, trận pháp, dịch sử của mình. Mỗi tầng hồi đầy máu, không mang đan dược, nộ khí bí kỹ giữ qua từng tầng.</p>
   <p class="help-p">Cứ 3 tầng chọn một trong ba để mạnh lên (tầng 5, tầng 10 cũng có): lựa chọn thường là một món đồ tháp (bộ, thần binh; mặc vào thì giữ nguyên dòng và lỗ của ô đó, chỉ đổi hiệu ứng) hoặc một chiêu, một biến chiêu (tối đa năm chiêu, đủ rồi vẫn còn ra chiêu mới, chọn nó thì phải bỏ một chiêu); cứ 5 tầng lấy một hồn thần binh (tối đa ba, đủ rồi vẫn còn ra cái mới, chọn nó thì phải bỏ một cái); cứ 10 tầng lấy một linh ngọc (tối đa ba, đủ rồi thì chọn một viên để lên cấp, hoặc lấy một viên mới thay cho một viên trên người, viên mới giữ cấp của viên cũ). Không muốn món nào thì chọn «Không lấy», đổi lấy sát thương, khí huyết, hộ giáp mỗi thứ +${TW_ALL}%, cộng dồn mãi.</p>
   <p class="help-p">Cộng hưởng bộ: trong tháp gom đủ ${TW_RES[0][0]} món cùng một bộ thì sát thương +${TW_RES[0][1]}%, khí huyết +${TW_RES[0][2]}%; đủ ${TW_RES[1][0]} món thì thêm sát thương +${TW_RES[1][1]}%, khí huyết +${TW_RES[1][2]}%. Mặc lẫn lộn thì không có, muốn theo một bộ phải chọn tập trung suốt đường.</p>
   <p class="help-p">Mỗi lần hạ chủ tháp là lưu một lần. Ngã thì về tầng đã lưu, đồ tháp cũng về bộ lúc lưu. Muốn đổi lối thì có thể «Leo lại từ tầng 1»; lên đỉnh rồi cũng leo lại ngay được. Thưởng chủ tháp mỗi tuần chỉ nhận một lần, chỉ lấy mức cao nhất. Thứ Hai hằng tuần đổi tháp mới, leo lại từ tầng một; cùng tuần, cùng nghề thì yêu vật và lựa chọn ai cũng giống nhau.</p>
@@ -1180,7 +1180,7 @@ const teamModal = () => () => {
     <div class="teaml">${L.map(c => row(c)).join('')}${LK.map(c => row(c, true)).join('')}</div>
     <div class="sheet-act"><span class="sub">Bạn có ${fmtBig(SAVE.gold)} lượng</span><button class="btn ghost" data-act="close">Xong</button></div>`;
 };
-const teamHelpModal = () => () => `<h2 class="mh">Đồng hành</h2><p class="help-p">Bảy phần đòn của yêu vật đánh vào tiền tuyến, tiền tuyến ngã hết mới đánh hậu tuyến. Đồng hành ăn theo mức tăng sát thương và chí mạng của bạn; bạn mang chiêu kết thúc ăn trạng thái nào, đồng hành sẽ ưu tiên giúp bạn treo trạng thái đó. Khi tất sát, đồng hành đầy nộ khí cùng hợp kích, mỗi người kèm một hiệu ứng.</p>
+const teamHelpModal = () => () => `<h2 class="mh">Đồng hành</h2><p class="help-p">Bảy phần đòn của yêu vật đánh vào tiền tuyến, tiền tuyến ngã hết mới đánh hậu tuyến. Đồng hành ăn theo mức tăng sát thương và chí mạng của bạn; bạn mang chiêu kết thúc ăn trạng thái nào, đồng hành sẽ ưu tiên giúp bạn treo trạng thái đó. Khi bí kỹ, đồng hành đầy nộ khí cùng hợp kích, mỗi người kèm một hiệu ứng.</p>
   <p class="help-p">Khi dẫn đồng hành, yêu vật cũng mạnh lên: tiểu yêu nhiều máu hơn, thủ lĩnh mang theo hộ pháp.</p><button class="btn ghost" data-act="close">Quay lại</button>`;
 // ---- 阵法（2026-11-23）：选阵、摆号位、升级；妖阵和克制 ----
 let FMSEL = null, FMPICK = null;   // 弹窗里正在看的阵；点了哪个号位（再点一个就互换）
@@ -1286,7 +1286,7 @@ function skillPanel(cls, inBag) {
   if (typeof SKSEL === 'number' && (SKSEL < 0 || SKSEL > 4)) SKSEL = 0;
   const sel = SKSEL === 'basic' ? basic : SKSEL === 'ult' ? null : (S[SKSEL] && CLASSES[cls].skills.find(x => x.id === S[SKSEL]));
   let det;
-  if (SKSEL === 'ult') det = `<div class="skd"><div class="skh"><b>Tuyệt kỹ · ${U.n}</b><small>tích đầy thanh tuyệt kỹ rồi tự bấm</small></div><p>${U.d}</p></div>`;
+  if (SKSEL === 'ult') det = `<div class="skd"><div class="skh"><b>Bí kỹ · ${U.n}</b><small>tích đầy thanh bí kỹ rồi tự bấm</small></div><p>${U.d}</p></div>`;
   else if (!sel) det = `<div class="skd empty"><p>Ô ${SKSEL + 1} (${slotName(SKSEL)}) đang trống.</p><button class="btn" data-act="skpick" data-arg="${SKSEL}">Chọn một chiêu</button></div>`;
   else { const k = sel, r = ch.runes[k.id], i = L.indexOf(k.id);
     det = `<div class="skd"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>${k.cd ? "Hồi chiêu " + k.cd : "Chiêu cơ bản, dùng khi các võ học khác đang hồi chiêu"}</small></div>
@@ -1301,7 +1301,7 @@ function skillPanel(cls, inBag) {
   return `${mechCard(cls)}
     <h4 class="sub-h">Võ học xuất chiến <small>chạm ô để đổi chiêu · số là thứ tự ra chiêu</small></h4>
     ${slotGrid(cls, L, null, 'sksel', SKSEL)}
-    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">Cơ bản · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">Tuyệt kỹ · ${U.n}</button></div>
+    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">Cơ bản · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">Bí kỹ · ${U.n}</button></div>
     ${det}
     <details class="wxinfo skfold skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
     ${inBag ? '' : buildCard(cls)}${fold("Thi trận", formHTML(cls), 'form')}${fold("Phối hợp trạng thái · cách đánh liên hoàn", combo, 'combo')}`;
@@ -1514,7 +1514,7 @@ const setBasic = () => `<section class="panel"><h3>Ngôn ngữ</h3>${langRow()}<
       <button class="btn ghost" data-act="guide">Chỉ dẫn nhiệm vụ: ${SAVE.guide === 'full' ? "Chi tiết" : "Manh mối"}</button></div>
       <p class="help-p">Chỉ dẫn “Manh mối”: chỉ cho biết đại khái ở vùng nào, đồ phải tự tìm; “Chi tiết”: đánh dấu thẳng vị trí.</p>
       </section><section class="panel"><h3>Hình ảnh</h3><div class="row"><button class="btn ghost" data-act="gfxq">Hiệu ứng: ${["Thấp (tiết kiệm pin)", "Vừa", "Cao"][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
-      <button class="btn ghost" data-act="cine">Hoạt cảnh tất sát: ${SAVE.cineOff ? "tắt" : "gọn"}</button>
+      <button class="btn ghost" data-act="cine">Hoạt cảnh bí kỹ: ${SAVE.cineOff ? "tắt" : "gọn"}</button>
       <button class="btn ghost" data-act="allnums">Số sát thương: ${SAVE.allNums ? "Hiện tất cả" : "Chỉ nhân vật chính"}</button>
       <button class="btn ghost" data-act="hdpx">Điểm ảnh: ${SAVE.hdOff ? "Cổ điển" : "Sắc nét"}</button></div>
       <p class="help-p">Điện thoại nóng, tốn pin thì chỉnh xuống “Thấp”: chế độ tiết kiệm pin — ít hạt hơn, bỏ khựng hình và quay chậm, các động tác chờ của nhân vật và cảnh dừng lại, bản đồ đứng yên thì vẽ ít khung hình hơn.</p></section>`;
@@ -1732,7 +1732,7 @@ const CAST_NAMES = { ngocHeal: "ném tới một bình thuốc", foxHeal: "dùng
   blade2: "vung đao chém xuống", chain2: "quăng xích sắt", zhengjue: "niệm một câu chính khí quyết", zhengqi: "cao giọng ngâm «Chính Khí Ca»", gen: '', bossHeal: "hút độc khí hồi máu", roar: "ngửa mặt hú dài", enrage: "nổi cuồng bạo", web: "nhả tơ quấn lấy bạn", summon: "gọi đồng bọn tới", phase: "hiện nguyên hình", phoenix: "Lông phượng hoàng bùng cháy" };
 function narrate(o) {
   if (!o.actor || !o.cast || !B) return '';
-  if (o.ult) return o.ult.auto ? "Bạn quát lớn một tiếng, cắt đứt yêu vật đang tụ lực!" : `Bạn thi triển tuyệt kỹ “${o.ult.n}”!`;
+  if (o.ult) return o.ult.auto ? "Bạn quát lớn một tiếng, cắt đứt yêu vật đang tụ lực!" : `Bạn thi triển bí kỹ “${o.ult.n}”!`;
   if (o.cast.id === 'charge') return '';
   const u = B.units.find(x => x.id === o.actor); if (!u) return '';
   const dmg = o.pops.filter(p => /^\d+$/.test(p[1])).reduce((a, p) => a + +p[1], 0);
@@ -1756,7 +1756,7 @@ function schedule(o) {
   timer = setTimeout(tick, ms);
 }
 const CUT_MS = () => SAVE.speed >= 3 ? 700 : SAVE.speed === 2 ? 900 : 1150;
-const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed >= 3 ? 320 : 500;   // 必杀：顶上一条细横幅，不压暗、不挡人
+const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed >= 3 ? 320 : 500;   // 秘技：顶上一条细横幅，不压暗、不挡人
 function tick() {
   if (!B || VIEW !== 'battle') return;
   // 手动出招：轮到你时停下来等你点
@@ -1829,7 +1829,7 @@ function battleHTML() {
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><button class="statb" id="statc" data-act="statfull" aria-label="Thống kê trận này">TK</button><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
     <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div></div><div class="hud-sk" id="hudsk"></div>
-      <button class="ultb" id="ultb" data-act="ult" title="Tuyệt kỹ · ${U.n}: ${U.d}"><i id="ultfill"></i><span><b>Tuyệt kỹ</b><small id="ultpct"></small></span></button>
+      <button class="ultb" id="ultb" data-act="ult" title="Bí kỹ · ${U.n}: ${U.d}"><i id="ultfill"></i><span><b>Bí kỹ</b><small id="ultpct"></small></span></button>
 </div>`;
 }
 // ---- 状态栏和状态说明 ----
@@ -1852,7 +1852,7 @@ const ST_INFO = {
   chan: ["Thiền", '#fff2b0', 1, "Sát thương phải chịu -45%, bội số phản chấn +50%."],
   renew: ["Hồi xuân", '#5df07a', 1, "Mỗi lượt hồi 6% khí huyết."],
   shield: ["Hộ Thể", '#ffe58a', 1, "Chân khí hộ thể: chặn sát thương trước, chặn hết mới mất máu."],
-  charging: ["Tụ lực", '#ff5a3a', 0, "Thủ lĩnh đang tụ lực, chiêu sau rất nặng. Làm nó choáng là cắt được, tuyệt kỹ cũng cắt được (bật tự động ra chiêu thì sẽ tung giúp bạn)."],
+  charging: ["Tụ lực", '#ff5a3a', 0, "Thủ lĩnh đang tụ lực, chiêu sau rất nặng. Làm nó choáng là cắt được, bí kỹ cũng cắt được (bật tự động ra chiêu thì sẽ tung giúp bạn)."],
   enraged: ["Cuồng Bạo", '#ff5a3a', 0, "Sát thương và tốc độ tăng mạnh."],
   ghost: ["Quỷ thân", '#c39cff', 0, "Hóa thành quỷ ảnh, rất khó đánh trúng. Dùng choáng để nó hiện hình."],
   cocoon: ["Kén tơ", '#e8e0d0', 0, "Nhả tơ bọc lấy mình, chặn sát thương. Dùng thiêu đốt có thể đốt thủng kén tơ."],
@@ -1894,9 +1894,9 @@ function drawStPop() {
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
   if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">Thống kê trận này</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
   el.classList.remove('full'); el._h = '';
-  if (STPOP && STPOP.ult && B) {   // 点右下角的必杀：看说明（攒满了就顺手放出去）
+  if (STPOP && STPOP.ult && B) {   // 点右下角的秘技：看说明（攒满了就顺手放出去）
     const U = ULTS[B.P.cls], r = Math.round(B.P.rage || 0);
-    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">Tuyệt kỹ · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? "Đã tung ra" : `Đã đầy ${Math.floor(r / 100)} ô`) : `Còn thiếu ${100 - r}%`} · tối đa tích hai ô, không chiếm lượt</p>`; return; }
+    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">Bí kỹ · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? "Đã tung ra" : `Đã đầy ${Math.floor(r / 100)} ô`) : `Còn thiếu ${100 - r}%`} · tối đa tích hai ô, không chiếm lượt</p>`; return; }
   if (STPOP && STPOP.sk && B) {   // 战斗里点招式：看说明（2026-11-25）
     const k = B.P.skills.find(x => x.id === STPOP.sk); if (!k) { STPOP = null; el.hidden = true; return; }
     const r = B.P.runes && B.P.runes[k.id], R = r && RUNES[k.id] ? RUNES[k.id][r === 'a' ? 0 : 1] : null;
@@ -1977,16 +1977,16 @@ function sayBubble(id, text) {
   const b = document.createElement('div'); b.className = 'bubble'; b.textContent = text; el.appendChild(b);
   setTimeout(() => b.remove(), 2200);
 }
-// 主角团那半边的上沿（中线下面一点），连招、金刚震、必杀的字都放这里（2026-11-24：上半区只留妖物和伤害数字）
+// 主角团那半边的上沿（中线下面一点），连招、金刚震、秘技的字都放这里（2026-11-24：上半区只留妖物和伤害数字）
 const partyTop = () => { const ar = $('#arena'), ln = $('#bline'); if (!ar) return 0; const b = ln ? parseFloat(ln.style.bottom) : NaN; return isNaN(b) ? ar.clientHeight * 0.55 : ar.clientHeight - b + 10; };
 function showCutin(kind, data) {
   const el = $('#cutin'); if (!el) return;
   let h;
-  if (kind === 'ult') {   // 必杀：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
+  if (kind === 'ult') {   // 秘技：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
     const run = SAVE.run, sm = SAVE.speed >= 3, ms = ULT_MS();
     const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
     el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
-    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');   // 必杀横幅放在战场最下面（主角团这半边，见 .cutin.ultlite）
+    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');   // 秘技横幅放在战场最下面（主角团这半边，见 .cutin.ultlite）
     SFX.play('gong');
     clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, ms); return;
   } else {
@@ -2317,7 +2317,7 @@ function applyStep(o, anim) {
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100, n = Math.floor(r / 100), U = ULTS[P.cls];   // 2026-11-24 第二版：能存两格
     $('#ultfill').style.width = (full ? 100 : r) + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq); ub.classList.toggle('two', n >= 2);
     $('#ultpct').textContent = B.ultReq ? "Ngay" : n >= 2 ? "Đầy hai ô" : full ? `Một ô · ${r - 100}%` : `${r}%`; ub.disabled = B.over;
-    if (full && !B.over && !SAVE.flags.ult3) { SAVE.flags.ult3 = 1; setTimeout(() => toast(`Tuyệt kỹ đã đổi: tích chậm, giữ được hai ô, để dành đánh yêu vương. Chạm «${U.n}» — ${U.d}. Không tốn lượt, còn cắt được yêu vương đang tụ lực; nộ khí giữ sang trận sau. Khi bật tự động ra chiêu, chỉ dùng ô thứ hai để cắt tụ lực giúp bạn, luôn chừa lại một ô`, 7000), 300); } }
+    if (full && !B.over && !SAVE.flags.ult3) { SAVE.flags.ult3 = 1; setTimeout(() => toast(`Bí kỹ đã đổi: tích chậm, giữ được hai ô, để dành đánh yêu vương. Chạm «${U.n}» — ${U.d}. Không tốn lượt, còn cắt được yêu vương đang tụ lực; nộ khí giữ sang trận sau. Khi bật tự động ra chiêu, chỉ dùng ô thứ hai để cắt tụ lực giúp bạn, luôn chừa lại một ô`, 7000), 300); } }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = "Đan dược " + SAVE.run.potions;
   drawSbar(); drawStPop();
@@ -4195,7 +4195,7 @@ const ACT = {
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; STPOP = { ult: 1 }; drawStPop(); if ((B.P.rage || 0) < 100) return; B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? "Tự động<br>ra chiêu" : "Thủ công<br>ra chiêu"; }
-    toast(SAVE.ultAuto ? "Tự động ra chiêu: kỹ năng tự tung; tuyệt kỹ đầy hai ô thì chỉ dùng ô thứ hai để cắt yêu vật tụ lực, muốn hiệu ứng tăng cường thì tự chạm «Tuyệt kỹ»" : "Thủ công ra chiêu: chạm kỹ năng phía trên, chiêu sau nhân vật sẽ tung nó; không chạm thì dùng chiêu cơ bản. Nộ khí đầy thì chạm «Tuyệt kỹ» (không tốn lượt)"); if (B) applyStep(null); },
+    toast(SAVE.ultAuto ? "Tự động ra chiêu: kỹ năng tự tung; bí kỹ đầy hai ô thì chỉ dùng ô thứ hai để cắt yêu vật tụ lực, muốn hiệu ứng tăng cường thì tự chạm «Bí kỹ»" : "Thủ công ra chiêu: chạm kỹ năng phía trên, chiêu sau nhân vật sẽ tung nó; không chạm thì dùng chiêu cơ bản. Nộ khí đầy thì chạm «Bí kỹ» (không tốn lượt)"); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;
     STPOP = B.castAuto && STPOP && STPOP.sk === id ? null : { sk: id }; drawStPop(); if (B.castAuto || k.left > 0) return; B.castReq = B.castReq === id ? null : id; SFX.play('click'); applyStep(null); if (B.waiting && B.castReq) { B.waiting = false; clearTimeout(timer); tick(); } },
   btarget: id => { if (!B || B.over) return; B.target = B.target === id ? null : id; SFX.play('click'); applyStep(null); },

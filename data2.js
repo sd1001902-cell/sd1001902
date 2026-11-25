@@ -84,7 +84,7 @@ const LGV = {
   sgK: lv => 4 + lv * 0.12,                                     // 蚀骨：敌人身上每种状态 +x%
   xjK: lv => 15 + lv * 0.35, xjBoom: lv => 100 + lv * 1.5,      // 玄甲：有护体时伤害；护体打碎炸开
   ssK: lv => 15 + lv * 0.3, ssHeal: lv => 1 + lv * 0.02,       // 嗜杀：每层下一招伤害；杀一个回血
-  tgK: lv => 30 + lv * 0.6,                                     // 天罡：放完必杀后的伤害
+  tgK: lv => 30 + lv * 0.6,                                     // 天罡：放完秘技后的伤害
 };
 const LGEMS = {
   // ---- 留下的六颗特色玉 ----
@@ -105,7 +105,7 @@ const LGEMS = {
   shigu:    { n: '蚀骨玉', c: '#9ad86a', d: lv => `敌人身上每有一种状态，受到你的伤害 +${LGV.sgK(lv).toFixed(1)}%；你挂的状态多持续 1 回合。配万符、五毒、千机、归元、阴兵（僵尸也吃）`, st: () => ({}) },
   xuanjia:  { n: '玄甲玉', c: '#8ab0d8', d: lv => `身上有护体时伤害 +${LGV.xjK(lv).toFixed(0)}%；护体被打碎时炸开，对所有敌人造成 ${LGV.xjBoom(lv).toFixed(0)}% 伤害（两回合最多一次）。配大日、罗汉、五行道士`, st: () => ({}) },
   shisha:   { n: '嗜杀玉', c: '#e05a5a', d: lv => `每有一个敌人倒下：回复 ${LGV.ssHeal(lv).toFixed(1)}% 气血，下一招伤害 +${LGV.ssK(lv).toFixed(0)}%（最多叠 3 层，出招后清空）。配七杀、修罗不死`, st: () => ({}) },
-  tiangang: { n: '天罡玉', c: '#ffe08a', d: lv => `必杀蓄得快 ${Math.round(30 + lv * 0.5)}%；放完必杀后两招伤害 +${LGV.tgK(lv).toFixed(0)}%。配血海、大日这些靠必杀的打法`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
+  tiangang: { n: '天罡玉', c: '#ffe08a', d: lv => `秘技蓄得快 ${Math.round(30 + lv * 0.5)}%；放完秘技后两招伤害 +${LGV.tgK(lv).toFixed(0)}%。配血海、大日这些靠秘技的打法`, st: lv => ({ xRage: 30 + lv * 0.5 }) },
   // 老存档里被删的灵玉：先放在这里，等玩家挑一颗新的换（等级保留）
   reforge:  { n: '待重铸的灵玉', c: '#8a8070', d: () => '这颗灵玉的效果删掉了：去「灵玉 · 重铸」挑一颗新的，等级原样保留', st: () => ({}), hide: true },
 };
@@ -331,7 +331,7 @@ STAT_NAMES.lianPct = STAT_NAMES.lianPct || '每层「连」伤害';
 const JY_AFF = {
   liepo:    { slot: 'weapon',  n: '裂魄', r: [30, 50],  st: 'xBoss',    d: v => `打首领、精英伤害 +${v}%` },
   tuntian:  { slot: 'weapon',  n: '吞天', r: [2, 3],                    d: v => `这场每倒下一只妖物，伤害 +${v}%（最多 +${v * 10}%）` },
-  lingtai:  { slot: 'helm',    n: '灵台', r: [40, 60],  st: 'xRage',    d: v => `必杀怒气攒得快 ${v}%` },
+  lingtai:  { slot: 'helm',    n: '灵台', r: [40, 60],  st: 'xRage',    d: v => `秘技怒气攒得快 ${v}%` },
   dingshen: { slot: 'helm',    n: '定神', r: [30, 50],  st: 'xTen',     d: v => `每场第一次被眩晕、冰冻直接免掉；之后再被控制，有 ${v}% 几率免掉` },
   xuanming: { slot: 'chest',   n: '玄冥', r: [25, 40],                  d: v => `开战获得最大气血 ${v}% 的护体` },
   bumie:    { slot: 'chest',   n: '回魂', r: [20, 30],                  d: v => `每场一次：挨了致命伤不倒，回复 ${v}% 气血（和其他免死各算各的）` },

@@ -875,7 +875,7 @@ const twClsModal = () => () => { const cls = SAVE.cls, C = CLASSES[cls], M = CLS
   return `<button class="btn sm ghost x" data-act="close">关闭</button><h2 class="mh">${esc(C.n)} · 怎么打</h2><div class="twkit2" data-scroll="twcls"><p class="help-p">${esc(C.d)}</p>${M ? `<p class="help-p"><b>${M[0]}</b>：${M[1]}</p>` : ''}
     <p class="help-p sub">塔里会出这几套，每套各走一条路。同一套凑齐 4 件、6 件还有共鸣加成：</p>${sets}<p class="help-p sub">三选一时点一下卡片，能看到这件东西的全部效果、会换下什么、跟你手上哪些招式有关。</p></div>`; };
 const twHelpModal = () => () => `<h2 class="mh">通天塔</h2><div class="help-scroll"><p class="help-p">一层一场仗，打完直接上楼，塔顶是第 ${TW.top} 层。普通层是一群妖物（第 3 层起带精英），逢 5 层是精英首领带两个护法，逢 10 层是塔主。妖物一层比一层强一点，慢慢往上涨。</p>
-  <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，必杀的怒气一层层留着。</p>
+  <p class="help-p">进塔时人人一样：50 级、一身宝品塔装、两招，有统一的修为底子；自己号上的装备、修为、玉、伙伴、阵法、役使都不带。每层回满血，不带丹药，秘技的怒气一层层留着。</p>
   <p class="help-p">每 3 层三选一往上长（逢 5 层、逢 10 层也有）：普通的三选一拿一件塔装（套装、神兵。换上时沿用这一格原来的词条和孔，只换特效）或者一个招式、变招（最多五招，满了还会出新招，选它要换掉一招）；逢 5 层拿一个神兵之魂（最多三个，满了还会出新的，选它要换掉一个）；逢 10 层拿一颗灵玉（最多三颗，满了就选一颗升级，或者拿一颗新的换掉身上一颗，新的接过它的等级）。三样都不想要，可以选「都不要」，换伤害、气血、护甲各 +${TW_ALL}%，一直叠。</p>
   <p class="help-p">套装共鸣：塔里同一套凑齐 ${TW_RES[0][0]} 件，伤害 +${TW_RES[0][1]}%、气血 +${TW_RES[0][2]}%；凑齐 ${TW_RES[1][0]} 件，再加伤害 +${TW_RES[1][1]}%、气血 +${TW_RES[1][2]}%。东拼西凑拿不到，想走一套就得一路集中选。</p>
   <p class="help-p">每打过一个塔主存一次档。倒下了回到存档那层，塔装也回到存档时那身。想换个路子，可以「从第 1 层重来」；登顶以后也能马上再爬。塔主奖励每周只领一次，只拿最高的。每周一换一座新塔，从第一层重爬；同一周、同一个职业，大家碰到的妖物和三选一都一样。</p>
@@ -1179,7 +1179,7 @@ const teamModal = () => () => {
     <div class="teaml">${L.map(c => row(c)).join('')}${LK.map(c => row(c, true)).join('')}</div>
     <div class="sheet-act"><span class="sub">你有 ${fmtBig(SAVE.gold)} 两</span><button class="btn ghost" data-act="close">好了</button></div>`;
 };
-const teamHelpModal = () => () => `<h2 class="mh">伙伴</h2><p class="help-p">妖物七成的攻击打前排，前排倒光了才打后排。伙伴吃你的伤害加成和暴击；你带了收某种状态的招式，伙伴会优先帮你把这种状态挂上。必杀时怒气满的伙伴一起合击，各带一段效果。</p>
+const teamHelpModal = () => () => `<h2 class="mh">伙伴</h2><p class="help-p">妖物七成的攻击打前排，前排倒光了才打后排。伙伴吃你的伤害加成和暴击；你带了收某种状态的招式，伙伴会优先帮你把这种状态挂上。秘技时怒气满的伙伴一起合击，各带一段效果。</p>
   <p class="help-p">带伙伴组队时妖物也会变强：小怪血量变多，首领会带护法。</p><button class="btn ghost" data-act="close">返回</button>`;
 // ---- 阵法（2026-11-23）：选阵、摆号位、升级；妖阵和克制 ----
 let FMSEL = null, FMPICK = null;   // 弹窗里正在看的阵；点了哪个号位（再点一个就互换）
@@ -1285,7 +1285,7 @@ function skillPanel(cls, inBag) {
   if (typeof SKSEL === 'number' && (SKSEL < 0 || SKSEL > 4)) SKSEL = 0;
   const sel = SKSEL === 'basic' ? basic : SKSEL === 'ult' ? null : (S[SKSEL] && CLASSES[cls].skills.find(x => x.id === S[SKSEL]));
   let det;
-  if (SKSEL === 'ult') det = `<div class="skd"><div class="skh"><b>必杀 · ${U.n}</b><small>攒满必杀条手动放</small></div><p>${U.d}</p></div>`;
+  if (SKSEL === 'ult') det = `<div class="skd"><div class="skh"><b>秘技 · ${U.n}</b><small>攒满秘技条手动放</small></div><p>${U.d}</p></div>`;
   else if (!sel) det = `<div class="skd empty"><p>第 ${SKSEL + 1} 格（${slotName(SKSEL)}）空着。</p><button class="btn" data-act="skpick" data-arg="${SKSEL}">选一个招式</button></div>`;
   else { const k = sel, r = ch.runes[k.id], i = L.indexOf(k.id);
     det = `<div class="skd"><div class="skh"><b>${wxBadge(k, cls)}${k.n}</b>${skcTag(cls, k)}<small>${k.cd ? '冷却 ' + k.cd : '基本招式，其他武学都在冷却时使用'}</small></div>
@@ -1300,7 +1300,7 @@ function skillPanel(cls, inBag) {
   return `${mechCard(cls)}
     <h4 class="sub-h">出战武学 <small>点格子换招 · 数字是出招顺序</small></h4>
     ${slotGrid(cls, L, null, 'sksel', SKSEL)}
-    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">基础 · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">必杀 · ${U.n}</button></div>
+    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">基础 · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">秘技 · ${U.n}</button></div>
     ${det}
     <details class="wxinfo skfold skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
     ${inBag ? '' : buildCard(cls)}${fold('尸阵', formHTML(cls), 'form')}${fold('状态配合 · 怎么打连招', combo, 'combo')}`;
@@ -1513,7 +1513,7 @@ const setBasic = () => `<section class="panel"><h3>语言 · Ngôn ngữ</h3>${l
       <button class="btn ghost" data-act="guide">任务指引：${SAVE.guide === 'full' ? '详细' : '线索'}</button></div>
       <p class="help-p">任务指引「线索」：只告诉你大概在哪一带，东西要自己找；「详细」：直接标出位置。</p>
       </section><section class="panel"><h3>画面</h3><div class="row"><button class="btn ghost" data-act="gfxq">特效：${['低（省电）', '中', '高'][SAVE.gfx != null ? SAVE.gfx : 2]}</button>
-      <button class="btn ghost" data-act="cine">必杀动画：${SAVE.cineOff ? '关闭' : '简洁'}</button>
+      <button class="btn ghost" data-act="cine">秘技动画：${SAVE.cineOff ? '关闭' : '简洁'}</button>
       <button class="btn ghost" data-act="allnums">伤害数字：${SAVE.allNums ? '全部显示' : '只看主角'}</button>
       <button class="btn ghost" data-act="hdpx">像素：${SAVE.hdOff ? '经典' : '高清'}</button></div>
       <p class="help-p">手机发烫、耗电快就调到「低」：省电模式——粒子少、不顿帧不慢镜，人物和场景的待机小动画停下，地图静止时少画几帧。</p></section>`;
@@ -1731,7 +1731,7 @@ const CAST_NAMES = { ngocHeal: '扔来一瓶药', foxHeal: '用狐火为你疗�
   blade2: '挥刀劈下', chain2: '甩出锁链', zhengjue: '念了一句正气诀', zhengqi: '高声诵读《正气歌》', gen: '', bossHeal: '吸取毒气回血', roar: '仰天长啸', enrage: '狂暴了', web: '吐丝缠住了你', summon: '召来帮手', phase: '现出真身', phoenix: '凤凰之羽爆燃' };
 function narrate(o) {
   if (!o.actor || !o.cast || !B) return '';
-  if (o.ult) return o.ult.auto ? '你一声断喝，打断了妖物蓄力！' : `你施展必杀「${o.ult.n}」！`;
+  if (o.ult) return o.ult.auto ? '你一声断喝，打断了妖物蓄力！' : `你施展秘技「${o.ult.n}」！`;
   if (o.cast.id === 'charge') return '';
   const u = B.units.find(x => x.id === o.actor); if (!u) return '';
   const dmg = o.pops.filter(p => /^\d+$/.test(p[1])).reduce((a, p) => a + +p[1], 0);
@@ -1755,7 +1755,7 @@ function schedule(o) {
   timer = setTimeout(tick, ms);
 }
 const CUT_MS = () => SAVE.speed >= 3 ? 700 : SAVE.speed === 2 ? 900 : 1150;
-const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed >= 3 ? 320 : 500;   // 必杀：顶上一条细横幅，不压暗、不挡人
+const ULT_MS = () => SAVE.cineOff ? 0 : SAVE.speed >= 3 ? 320 : 500;   // 秘技：顶上一条细横幅，不压暗、不挡人
 function tick() {
   if (!B || VIEW !== 'battle') return;
   // 手动出招：轮到你时停下来等你点
@@ -1828,7 +1828,7 @@ function battleHTML() {
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><button class="statb" id="statc" data-act="statfull" aria-label="本场统计">统</button><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
     <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? '<button data-act="skip">跳过</button>' : ''}</div></div><div class="hud-sk" id="hudsk"></div>
-      <button class="ultb" id="ultb" data-act="ult" title="必杀·${U.n}：${U.d}"><i id="ultfill"></i><span><b>必杀</b><small id="ultpct"></small></span></button>
+      <button class="ultb" id="ultb" data-act="ult" title="秘技·${U.n}：${U.d}"><i id="ultfill"></i><span><b>秘技</b><small id="ultpct"></small></span></button>
 </div>`;
 }
 // ---- 状态栏和状态说明 ----
@@ -1851,7 +1851,7 @@ const ST_INFO = {
   chan: ['禅', '#fff2b0', 1, '受到的伤害 -45%，反震倍率 +50%。'],
   renew: ['回春', '#5df07a', 1, '每回合回 6% 气血。'],
   shield: ['护体', '#ffe58a', 1, '护体真气：先挡伤害，挡完才掉血。'],
-  charging: ['蓄力', '#ff5a3a', 0, '首领在憋大招，下一招很重。打晕它能打断，必杀也能打断（开着自动出招时会替你放）。'],
+  charging: ['蓄力', '#ff5a3a', 0, '首领在憋大招，下一招很重。打晕它能打断，秘技也能打断（开着自动出招时会替你放）。'],
   enraged: ['狂暴', '#ff5a3a', 0, '伤害和速度大增。'],
   ghost: ['鬼身', '#c39cff', 0, '化成鬼影，很难打中。用眩晕让它现形。'],
   cocoon: ['丝茧', '#e8e0d0', 0, '吐丝裹住自己，挡伤害。用灼烧能把丝茧烧穿。'],
@@ -1893,9 +1893,9 @@ function drawStPop() {
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
   if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">本场统计</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
   el.classList.remove('full'); el._h = '';
-  if (STPOP && STPOP.ult && B) {   // 点右下角的必杀：看说明（攒满了就顺手放出去）
+  if (STPOP && STPOP.ult && B) {   // 点右下角的秘技：看说明（攒满了就顺手放出去）
     const U = ULTS[B.P.cls], r = Math.round(B.P.rage || 0);
-    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">必杀 · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? '放出去了' : `攒满 ${Math.floor(r / 100)} 格`) : `还差 ${100 - r}%`} · 最多存两格，不占出手</p>`; return; }
+    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">秘技 · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? '放出去了' : `攒满 ${Math.floor(r / 100)} 格`) : `还差 ${100 - r}%`} · 最多存两格，不占出手</p>`; return; }
   if (STPOP && STPOP.sk && B) {   // 战斗里点招式：看说明（2026-11-25）
     const k = B.P.skills.find(x => x.id === STPOP.sk); if (!k) { STPOP = null; el.hidden = true; return; }
     const r = B.P.runes && B.P.runes[k.id], R = r && RUNES[k.id] ? RUNES[k.id][r === 'a' ? 0 : 1] : null;
@@ -1976,16 +1976,16 @@ function sayBubble(id, text) {
   const b = document.createElement('div'); b.className = 'bubble'; b.textContent = text; el.appendChild(b);
   setTimeout(() => b.remove(), 2200);
 }
-// 主角团那半边的上沿（中线下面一点），连招、金刚震、必杀的字都放这里（2026-11-24：上半区只留妖物和伤害数字）
+// 主角团那半边的上沿（中线下面一点），连招、金刚震、秘技的字都放这里（2026-11-24：上半区只留妖物和伤害数字）
 const partyTop = () => { const ar = $('#arena'), ln = $('#bline'); if (!ar) return 0; const b = ln ? parseFloat(ln.style.bottom) : NaN; return isNaN(b) ? ar.clientHeight * 0.55 : ar.clientHeight - b + 10; };
 function showCutin(kind, data) {
   const el = $('#cutin'); if (!el) return;
   let h;
-  if (kind === 'ult') {   // 必杀：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
+  if (kind === 'ult') {   // 秘技：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
     const run = SAVE.run, sm = SAVE.speed >= 3, ms = ULT_MS();
     const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
     el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
-    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');   // 必杀横幅放在战场最下面（主角团这半边，见 .cutin.ultlite）
+    el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');   // 秘技横幅放在战场最下面（主角团这半边，见 .cutin.ultlite）
     SFX.play('gong');
     clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, ms); return;
   } else {
@@ -2316,7 +2316,7 @@ function applyStep(o, anim) {
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100, n = Math.floor(r / 100), U = ULTS[P.cls];   // 2026-11-24 第二版：能存两格
     $('#ultfill').style.width = (full ? 100 : r) + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq); ub.classList.toggle('two', n >= 2);
     $('#ultpct').textContent = B.ultReq ? '马上' : n >= 2 ? '满两格' : full ? `一格 · ${r - 100}%` : `${r}%`; ub.disabled = B.over;
-    if (full && !B.over && !SAVE.flags.ult3) { SAVE.flags.ult3 = 1; setTimeout(() => toast(`必杀改了：攒得慢，能存两格，留着打妖王。点「${U.n}」——${U.d}。不占出手，还能打断妖王蓄力；怒气留到下一场。开着自动出招时，只用第二格替你打断蓄力，永远给你留一格`, 7000), 300); } }
+    if (full && !B.over && !SAVE.flags.ult3) { SAVE.flags.ult3 = 1; setTimeout(() => toast(`秘技改了：攒得慢，能存两格，留着打妖王。点「${U.n}」——${U.d}。不占出手，还能打断妖王蓄力；怒气留到下一场。开着自动出招时，只用第二格替你打断蓄力，永远给你留一格`, 7000), 300); } }
   if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
   const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
   drawSbar(); drawStPop();
@@ -4194,7 +4194,7 @@ const ACT = {
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; STPOP = { ult: 1 }; drawStPop(); if ((B.P.rage || 0) < 100) return; B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
   ultsw: () => { SAVE.ultAuto = SAVE.ultAuto === false; if (B) { B.ultAuto = SAVE.ultAuto; B.castAuto = SAVE.ultAuto; B.castReq = null; if (B.waiting && B.castAuto) { B.waiting = false; setTimeout(tick, 50); } else if (!B.castAuto) applyStep(null); } save(); const b = document.querySelector('.ultsw'); if (b) { b.classList.toggle('on', SAVE.ultAuto); b.innerHTML = SAVE.ultAuto ? '自动<br>出招' : '手动<br>出招'; }
-    toast(SAVE.ultAuto ? '自动出招：技能自动放；必杀攒满两格时，只用第二格替你打断妖物蓄力，想要增益就自己点「必杀」' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「必杀」（不占出手）'); if (B) applyStep(null); },
+    toast(SAVE.ultAuto ? '自动出招：技能自动放；秘技攒满两格时，只用第二格替你打断妖物蓄力，想要增益就自己点「秘技」' : '手动出招：点上面的技能，主角下一招就放它；不点就用基本招式。怒气满了点「秘技」（不占出手）'); if (B) applyStep(null); },
   castq: id => { if (!B || B.over) return; const k = B.P.skills.find(x => x.id === id); if (!k) return;
     STPOP = B.castAuto && STPOP && STPOP.sk === id ? null : { sk: id }; drawStPop(); if (B.castAuto || k.left > 0) return; B.castReq = B.castReq === id ? null : id; SFX.play('click'); applyStep(null); if (B.waiting && B.castReq) { B.waiting = false; clearTimeout(timer); tick(); } },
   btarget: id => { if (!B || B.over) return; B.target = B.target === id ? null : id; SFX.play('click'); applyStep(null); },
