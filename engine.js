@@ -2037,7 +2037,7 @@ function kingUp(b, P) {
   u.gemKing = true; u.maxHp = u.hp = Math.round(u.maxHp * LGV.kgH(lv) / 100); u.atk *= LGV.kgA(lv) / 100; u.aura = LGV.kgU(lv) / 100; return u;
 }
 const kingAura = (b, u) => { const k = b.units.find(x => x.gemKing && x.hp > 0 && x !== u); return k ? 1 + k.aura : 1; };
-const ZOMBIE_HPK = 0.8;   // 2026-11-25 用户：僵尸气血整体下调 20%（尸王的在 LGV.kgH 里一起乘了）
+const ZOMBIE_HPK = 0.68;   // 2026-11-25 用户：僵尸气血整体下调 20%，再下调 15%（0.8 × 0.85）；尸王的在 LGV.kgH 里一起乘了
 function makeZombie(b, P, zt, slot, rune) {
   const Z = ZOMBIES[zt] || ZOMBIES.tiaoshi, m = (P.fx && P.fx.has('boneLord') ? 2 : 1) * (1 + ((P.minionPct || 0) + (P.allyPct || 0)) / 100);   // 2026-11-25 僵尸强度和同伴加成改成相加（原来相乘，配齐后每只僵尸十几倍攻击）
   const hq = P.fx && P.fx.has('huangquan') ? 1.25 : 1;
