@@ -14,13 +14,24 @@ const VFX = (() => {
 
   function setup(a, spd) { arena = a; layer = a && a.querySelector('.fxl'); speed = spd || 1; if (typeof GFX !== 'undefined') GFX.setup(a); clearInterval(idleH); if (a && !RM) idleH = setInterval(idleTick, 120); }
   // 待机呼吸：每个人自己的节奏，在站姿和「沉一下」两张图之间换
-  let idleH = 0;
+  let idleH = 0, idleZh = 0;
   function idleTick() {
     if (!arena || !document.body.contains(arena)) { clearInterval(idleH); return; }
     if (typeof SAVE !== 'undefined' && SAVE && SAVE.gfx === 0) return;   // 特效「低」（省电）：待机呼吸不换图
-    const t = performance.now();
+    const t = performance.now(), gf = GF();
+    if (gf && t > idleZh) {   // 国风样板：隔几秒，随便哪具僵尸原地蹦一下（跳尸嘛）
+      idleZh = t + 2200 + Math.random() * 2600;
+      const zs = [...arena.querySelectorAll('.unit.k-minion:not(.dead)')].filter(el => !el.closest('#foes') && !(el._busy > t)), z = zs[Math.floor(Math.random() * zs.length)], za = z && z.querySelector('.act');
+      if (za && za.animate) A(za, [tf('none'), tf('translateY(1px) scale(1.06,.93)', 0.2), tf('translateY(-7px) scale(.96,1.05)', 0.52), tf('translateY(0) scale(1.07,.92)', 0.82), tf('none')], 380, 'ease-out');
+    }
     arena.querySelectorAll('.unit:not(.dead) .act').forEach(act => {
       if (isRig(act)) { const el = act.closest('.unit'); if (!el || el._busy > t) return; const p = act.dataset.pose; if (p !== 'idle' && p !== 'idle2') return;
+        if (gf && act.dataset.rig === 'necro') {   // 国风样板：赶尸人站久了，提铃看一眼 / 扶一下斗笠
+          if (!el._fz) el._fz = t + 1800 + Math.random() * 2400;
+          if (t > el._fz) { el._fz = t + 4200 + Math.random() * 3800; const r = { el, act, rig: true, face: el.closest('#foes') ? -1 : 1 };
+            if ((el._fzn = (el._fzn || 0) + 1) % 2) frames(r, [['ib', 0]], 900, 1);
+            else { frames(r, [['ib', 0], ['ic', 0.2], ['id', 0.4], ['ic', 0.6], ['ib', 0.8]], 860, 1); setTimeout(() => { if (/^i[bcd]$/.test(act.dataset.pose)) chime(r, 26, 420, 1); }, 380); }
+            return; } }
         const ph = el._ph || (el._ph = Math.random() * 1200), want = Math.floor((t + ph) / 560) % 2 ? 'idle2' : 'idle'; if (p !== want) setPose(act, want); return; }
       const img = act.querySelector(':scope > img'), el = act.closest('.unit'); if (!img || !el || el._busy > t) return;
       if (!img.dataset.base) img.dataset.base = img.src;
@@ -304,6 +315,38 @@ const VFX = (() => {
       `<svg viewBox="-50 -50 100 100"><defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="${c}" stop-opacity="0"/><stop offset=".6" stop-color="${c}"/><stop offset="1" stop-color="#fff"/></linearGradient></defs><path d="M-42,-4 A44,44 0 0 1 42,-4 A58,58 0 0 0 -42,-4 Z" fill="url(#${id})"/></svg>`);
   }
   const impact = (p, c, size) => p && spawn('impact', p.x, p.y, Math.round(320 * fac()), { c: c || '#fff', s: (size || 120) + 'px' });
+  // ---------- 国风样板（志怪·阴间）：只在 body.gf 时走 ----------
+  const GF = () => typeof document !== 'undefined' && document.body.classList.contains('gf');
+  const MING = '#59e0c4', FUY = '#e8c13a', rim = (c, k) => ({ filter: `drop-shadow(0 0 ${k || 6}px ${c})` });
+  // 兵器尖（铃口）在战场里的位置：姿势图自己带着
+  function tipP(r) { const im = r && r.act && r.act.querySelector(':scope > img'); if (!im || !arena) return null; const b = im.getBoundingClientRect(), A0 = arena.getBoundingClientRect(), tx = +r.act.dataset.tx || 0.5, ty = +r.act.dataset.ty || 0.5;
+    return { x: b.left - A0.left + (r.face > 0 ? tx : 1 - tx) * b.width, y: b.top - A0.top + ty * b.height }; }
+  // 铃音：从铃口荡开的细圈，一粗一细
+  const chime = (r, size, dur, quiet) => { const p = tipP(r); if (!p) return; spawn('yin', p.x, p.y, dur, { c: MING, s: size + 'px' }); if (quiet) return; spawn('yin thin', p.x, p.y, dur * 1.25, { c: '#d8fff4', s: size * 1.5 + 'px' }); if (typeof SFX !== 'undefined') SFX.play('ding'); };
+  // 黄符：从脚边飘起来几张
+  const fus = (p, n, dur) => { if (!p) return; for (let i = 0; i < n; i++) spawn('fu', p.x + (Math.random() - 0.5) * 34, p.y + p.h * 0.3, dur * (0.8 + Math.random() * 0.5), { dx: ((Math.random() - 0.5) * 46).toFixed(0) + 'px', dy: (-46 - Math.random() * 34).toFixed(0) + 'px', r0: ((Math.random() - 0.5) * 40).toFixed(0) + 'deg', r1: ((Math.random() - 0.5) * 150).toFixed(0) + 'deg', dl: (i * 50) + 'ms' }); };
+  // 僵尸听铃：我方还站着的僵尸齐齐一跳，额头的符亮一下
+  function zombieHop(d, hgt) { if (!arena) return;
+    arena.querySelectorAll('.unit.k-minion:not(.dead)').forEach((el, i) => { if (el.closest('#foes')) return; const act = el.querySelector('.act'); if (!act || !act.animate) return;
+      const h = hgt || 11; A(act, [tf('none'), tf('translateY(2px) scale(1.08,.9)', 0.16), tf(`translateY(-${h}px) scale(.94,1.08)`, 0.48), tf('translateY(0) scale(1.1,.88)', 0.78), tf('none')], d, 'ease-out');
+      const sp = el.querySelector('.sp') || el, b = sp.getBoundingClientRect(), A0 = arena.getBoundingClientRect(), x = b.left - A0.left + b.width / 2, y = b.top - A0.top;
+      setTimeout(() => spawn('fuflash', x, y + b.height * 0.22 - h * 0.5, d * 0.7, { c: FUY }), d * 0.3);
+      setTimeout(() => spawn('hopdust', x, y + b.height * 0.96, d * 0.6, { c: '#9fb0a8' }), d * 0.78); }); }
+  // 普通摇铃（普攻、摄魂、镇魂钉、养尸符）：提铃一荡一落，一声
+  function gfBell(r, a, t, f, c) { const d = 440 * f, F = r.face;
+    frames(r, [['cs', 0.04], ['ya', 0.16], ['yb', 0.34], ['yc', 0.56]], d, 0.84);
+    body2(r, [[`translateY(-3px)`, 0.2], [`translateY(-4px)`, 0.4], [`translateX(${5 * F}px) translateY(1px)`, 0.62, rim(MING, 5)]], d);
+    setTimeout(() => chime(r, 44, 340 * f), d * 0.36);
+    setTimeout(() => { if (a) spawn('yinwave', a.x, a.y + a.h * 0.44, 420 * f, { c: MING, s: '120px' }); }, d * 0.58);
+    return { hit: 0, pre: Math.round(d * 0.62) }; }
+  // 大摇铃（摇铃唤尸、集火、百鬼夜行）：举过头顶来回三荡，铃音一圈圈荡开，黄符飘起，僵尸齐跳
+  function gfBell2(r, a, t, f) { const d = 660 * f, F = r.face;
+    frames(r, [['rd', 0], ['ya', 0.1], ['yb', 0.24], ['ya', 0.38], ['yb', 0.52], ['yc', 0.66]], d, 0.9);
+    body2(r, [[`translateY(2px) scale(1.04,.95)`, 0.06], [`translateY(-7px) scale(1.03)`, 0.2, rim(MING, 5)], [`translateY(-8px) scale(1.04)`, 0.52, rim(MING, 7)], [`translateX(${6 * F}px) translateY(1px)`, 0.7, rim(MING, 5)]], d);
+    [0.14, 0.28, 0.42, 0.56].forEach((k, i) => setTimeout(() => chime(r, 46 + i * 10, 360 * f), d * k));
+    setTimeout(() => fus(a, 4, 700 * f), d * 0.12);
+    setTimeout(() => { if (a) { spawn('yinwave', a.x, a.y + a.h * 0.44, 560 * f, { c: MING, s: '300px' }); spawn('yinwave', a.x, a.y + a.h * 0.44, 700 * f, { c: '#d8fff4', s: '420px' }); } zombieHop(380 * f); }, d * 0.66);
+    return { hit: 0, pre: Math.round(d * 0.7) }; }
   const mcircle = (p, c, size) => p && spawn('mcircle', p.x, p.y + p.h * 0.42, Math.round(760 * fac()), { c, s: (size || 92) + 'px' });
   const glow = (c, k) => ({ filter: `drop-shadow(0 0 ${k || 10}px ${c}) brightness(1.35)` });
   const MELEE_CLS = ['berserker', 'assassin', 'paladin'];
@@ -440,12 +483,12 @@ const VFX = (() => {
       wpn(r, [[-45, 0.3], [100, 0.45], [95, 0.6]], d);
       setTimeout(() => { dust(a, 10); shake(3); }, d * 0.45);
       return { hit: 0, pre: Math.round(d * 0.45) }; },
-    bell(r, a, t, f, c) { const d = 400 * f, F = r.face; frames(r, [['cs', 0.08], ['rd', 0.2], ['cs', 0.32], ['rd', 0.44], ['st', 0.6]], d, 0.8);
+    bell(r, a, t, f, c) { if (GF() && r.rig) return gfBell(r, a, t, f, c); const d = 400 * f, F = r.face; frames(r, [['cs', 0.08], ['rd', 0.2], ['cs', 0.32], ['rd', 0.44], ['st', 0.6]], d, 0.8);
       body2(r, [[`translateY(-4px)`, 0.24], [`translateY(0)`, 0.48], [`translateX(${6 * F}px) rotate(${5 * F}deg)`, 0.68, glow('#5df0c0', 8)]], d);
       wpn(r, [[-55, 0.12], [-5, 0.24], [-60, 0.36], [-5, 0.48], [35, 0.68, 4], [30, 0.8]], d);
       setTimeout(() => ring(a && { x: a.x + 22 * F, y: a.y - 6 }, '#ffd75a', 50, 300 * f, 2), d * 0.3);
       return { hit: 0, pre: Math.round(d * 0.66) }; },
-    bell2(r, a, t, f) { const d = 560 * f, F = r.face; frames(r, [['c2', 0.1], ['cs', 0.28], ['c2', 0.46], ['cs', 0.62]], d, 0.78);
+    bell2(r, a, t, f) { if (GF() && r.rig) return gfBell2(r, a, t, f); const d = 560 * f, F = r.face; frames(r, [['c2', 0.1], ['cs', 0.28], ['c2', 0.46], ['cs', 0.62]], d, 0.78);
       mcircle(a, '#5df0c0', 110);
       body2(r, [[`translateY(-8px) scale(1.04)`, 0.25, glow('#5df0c0', 12)], [`translateY(-10px) scale(1.06)`, 0.6, glow('#5df0c0', 14)]], d);
       wpn(r, [[-65, 0.15], [-25, 0.25], [-70, 0.35], [-25, 0.45], [-70, 0.55], [-45, 0.7]], d);
@@ -544,7 +587,7 @@ const VFX = (() => {
     const M = MOVES[motionOf(u, c, spr, !!t)] || MOVES.swing;
     const res = M(r, a, t, f, c, u) || { hit: 0, pre: 0 };
     if (u.kind === 'hero' && r.rig) { const mvN = motionOf(u, c, spr, !!t), seq = SKILL_FR[o.ult ? 'ult:' + u.cls : c.id];
-      if (seq) frames(r, seq, (MOVE_D[mvN] || 480) * f, 0.82); }
+      if (seq && !(GF() && !o.ult && (mvN === 'bell' || mvN === 'bell2'))) frames(r, seq, (MOVE_D[mvN] || 480) * f, 0.82); }   // 国风样板：摇铃的姿势由摇铃自己排
     if (r.act.dataset.mon) { const h0 = res.hit || res.pre || 300 * f, tot = h0 + 280 * f, hk = h0 / tot;   // 首领、稀有精英：蓄力 → 出招 → 收势
       frames(r, [['rd', 0], ['st', Math.max(0.06, hk - 0.14)], ['ft', Math.min(0.92, hk + 0.2)]], tot, 1); }
     else if (r.act.dataset.atk) frames(r, [['atk', 0]], (res.hit || res.pre || 300 * f) + 220 * f, 1);   // 妖物出招图
@@ -657,7 +700,10 @@ const VFX = (() => {
       switch (c.cls) {
         case 'berserker': spawn('bigslash', mid.x, mid.y, G, { c: '#ff3a2a' }); foes.forEach((p, i) => later(() => { slash(p, '#fff', -30, 130, D); ink(p, 10, 70, D, BLOOD); }, i * 50)); glyphF(mid, UG, '#ff3a2a', 170, G * 1.4); shake(12, 1); break;
         case 'mage': foes.forEach((p, i) => later(() => { bolt([{ x: p.x + (Math.random() - 0.5) * 60, y: 0 }, p], '#b8a8ff', D); boom(p, '#e6e0ff', 90, D); }, i * 90)); glyphF(mid, UG, '#e6e0ff', 170, G * 1.4); shake(10, 1); break;
-        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); }); glyphF(mid, UG, GHOST, 170, G * 1.4); shake(8, 1); break;
+        case 'necro': foes.forEach((p, i) => { for (let k = 0; k < 2; k++) sprite({ x: -30, y: p.y + (k ? 18 : -18) }, SPR.img('ghost', 44, { W: '#cfe8e0', B: GHOST }), G, 'sweep', { dx: (W + 60) + 'px', dl: (i * 50 + k * 100) + 'ms' }); flames(p, 8, GHOST, 50, G); });
+          if (GF()) { const hp = pos('P'); fus(hp, 6, G); if (hp) { spawn('yinwave', hp.x, hp.y + hp.h * 0.44, G * 0.8, { c: MING, s: '460px' }); spawn('yinwave', hp.x, hp.y + hp.h * 0.44, G, { c: '#d8fff4', s: '620px' }); } later(() => zombieHop(Math.round(420 * fac()), 14), 120); }   // 国风样板：大字已经在特写里出过，这里换成铃音荡开、黄符飘起、群尸齐跳
+          else glyphF(mid, UG, GHOST, 170, G * 1.4);
+          shake(8, 1); break;
         case 'assassin': { const p = foes[0]; for (let k = 0; k < 7; k++) later(() => { slash(p, k % 2 ? '#fff' : BLOOD, Math.random() * 180, 90, D * 0.6); ink(p, 3, 40, D, BLOOD); }, k * 70); seal(p, "SÁT", G * 1.6); glyphF(mid, UG, '#ff3a3a', 150, G * 1.2); shake(8, 1); break; }
         case 'paladin': spawn('palm', mid.x, mid.y, G, { c: GOLD, s: '200px' }); foes.forEach(p => { pillar(p, GOLD, G); boom(p, GOLD, 120, D); }); glyphF(mid, UG, GOLD, 170, G * 1.4); spawn('swastika', mid.x, mid.y, G * 1.4, { c: GOLD }); shake(10, 1); break;
       }
