@@ -2113,6 +2113,31 @@ html body .fmc{position:relative;min-height:0;padding:3px 6px 4px;gap:1px;border
 html body .fmtip{margin:4px 0 2px;font-size:10.5px}html body .fmbench{margin:4px 0 0}html body .fmbl{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:3px}
 html body .fmbc{padding:2px 1px 3px}html body .fmbc b{font-size:10.5px}html body .fmbc small{font-size:9px;line-height:1.1}html body .fmact{margin-top:5px}
 html[lang=vi] body .fmlist,html[lang=vi] body .fmbl{grid-template-columns:repeat(3,minmax(0,1fr))}html[lang=vi] body .fmh{white-space:normal}html[lang=vi] body .fmo b{font-size:11px;white-space:normal;line-height:1.1}
+/* 出发按钮：两扇朱门（门钉、门环），中间一块黑底金边的匾 */
+body.gf .gostart .btn.big{height:58px;border:2px solid #d9b866;border-radius:3px;color:#f6e9cf;font:400 21px/1 "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:2px;text-shadow:0 0 10px rgba(89,224,196,.4),0 1px 0 #000;
+  background:linear-gradient(180deg,#1e1611,#0f0b09) center/74% 68% no-repeat,linear-gradient(#d9b866,#d9b866) center/calc(74% + 4px) calc(68% + 4px) no-repeat,linear-gradient(#3a0f0a,#3a0f0a) center/calc(74% + 10px) calc(68% + 10px) no-repeat,
+    radial-gradient(circle at 6.5% 50%,transparent 0 5px,#e8c97a 5.3px 7.3px,transparent 7.6px),radial-gradient(circle at 93.5% 50%,transparent 0 5px,#e8c97a 5.3px 7.3px,transparent 7.6px),
+    radial-gradient(circle,#ffe9a8 0 1.4px,#b98f24 1.5px 2.8px,rgba(0,0,0,.3) 2.9px 3.8px,transparent 3.9px) 3px 2px/15px 18px,linear-gradient(180deg,#b02c1b,#6e160e);
+  box-shadow:inset 0 0 0 2px #4a120c,0 3px 0 #000,0 0 16px rgba(185,50,31,.3)}
+html[lang=vi] body.gf .gostart .btn.big{font:700 14.5px/1.1 "Noto Serif",serif;letter-spacing:0;padding:0 14%}
+/* 通天塔页：塔的夜景 */
+.twsc .rg-moon{right:auto;left:11%;top:8%}
+.tw-pag{position:absolute;left:50%;bottom:24%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center}
+.tw-sp{display:block;width:2px;height:11px;background:#d9b866;box-shadow:0 -2px 0 2px #d9b866}
+.tw-t{position:relative;display:block;width:var(--w);height:17px;background:linear-gradient(180deg,#263a40 0 7px,#5e170e 7px 17px);clip-path:polygon(0 7px,9% 0,91% 0,100% 7px,93% 7px,93% 100%,7% 100%,7% 7px)}
+.tw-t::after{content:"";position:absolute;left:50%;top:9px;width:5px;height:7px;margin-left:-2.5px;background:#140d0b;border-radius:2px 2px 0 0}
+.tw-t.lit{background:linear-gradient(180deg,#2e464c 0 7px,#a82a1a 7px 17px)}.tw-t.lit::after{background:#ffb04a;box-shadow:0 0 6px 2px rgba(255,170,70,.7)}
+.tw-t.cur::after{background:#fff2c0;box-shadow:0 0 8px 3px rgba(89,224,196,.8)}
+.tw-base{display:block;width:96px;height:5px;background:#3a2a1e;border-top:1px solid #d9b866}
+.tw-mark{position:absolute;left:calc(50% + 48px);display:flex;align-items:baseline;gap:2px;padding:0 7px 1px;background:linear-gradient(180deg,#241811,#120c09);border:1px solid #d9b866;box-shadow:inset 0 0 0 1px #000,0 3px 8px rgba(0,0,0,.6)}
+.tw-mark::before{content:"";position:absolute;left:-7px;top:50%;border:4px solid transparent;border-right-color:#d9b866;transform:translateY(-50%)}
+.tw-mark b{font:400 22px/1.1 "Ma Shan Zheng","Noto Serif SC",serif;color:#f6e9cf;text-shadow:0 0 10px rgba(89,224,196,.5)}.tw-mark small{font:400 12px "Ma Shan Zheng","Noto Serif SC",serif;color:#d9b866}
+.tw-me{position:absolute;left:8%;bottom:20px;display:flex;align-items:flex-end;gap:2px}.tw-me .tq{margin-bottom:4px}
+.tw-boss{position:absolute;right:5%;top:8%;display:flex;flex-direction:column;align-items:center;gap:1px}.tw-boss img{image-rendering:pixelated;filter:drop-shadow(0 0 8px rgba(255,60,40,.55)) brightness(.9)}
+.tw-boss small{font-size:9.5px;line-height:1.25;text-align:center;color:#cfc3a8;background:rgba(8,12,12,.6);border-radius:6px;padding:1px 6px}.tw-boss small b{color:#ff9a8a;font-weight:700}
+.rtiles.c3{grid-template-columns:repeat(3,minmax(0,1fr))}.rtiles.c1{grid-template-columns:1fr;margin-top:0}.rtiles.c3 .rtile{padding:4px 6px;gap:5px}
+.twkitb{position:relative;width:100%;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;margin-top:0}.twkitb>em{position:absolute;right:6px;bottom:3px;font-style:normal;font-size:10.5px;color:var(--gold2)}
+html[lang=vi] .tw-mark b{font:700 18px "Playfair Display","Noto Serif",serif}html[lang=vi] .tw-mark small{font:700 10px "Noto Serif",serif}
 /* 出征页：幻境关隘图 */
 .rgate{position:relative;height:clamp(150px,24dvh,192px);border:1px solid #4a3524;border-radius:2px;overflow:hidden;margin-bottom:8px;background:linear-gradient(180deg,#0a1216 0,#10222a 44%,#1a2c2e 62%,#151d1a 62%,#0c100e 100%);box-shadow:inset 0 0 0 1px #000,inset 0 0 30px rgba(0,0,0,.6)}
 .rg-moon{position:absolute;right:15%;top:9%;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#fff6d8,#e8d9a0 60%,#bfae78);box-shadow:0 0 22px 6px rgba(240,220,150,.22)}

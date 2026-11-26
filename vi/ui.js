@@ -776,13 +776,21 @@ function towerBody(cls) {
   const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id]; return k ? `${k.n}${r ? `<small>·${RUNES[id][r === 'a' ? 0 : 1].n}</small>` : ''}` : ''; }).join(", ");
   const cube = kit.cube.map(id => (LEGENDS.find(l => l.id === id) || {}).n).filter(Boolean).join(", ") || "Chưa có";
   const lg = kit.lg.map(g => `${LGEMS[g.t].n} ${g.lv}`).join(", ") || "Chưa có";
+  // 2026-11-26 通天塔页照出征页的路子重排：上面一幅塔的夜景（打到哪一截亮到哪一截、旁边挂着层数牌、下一个塔主在塔顶等着），底下是带图标的小牌
+  const TN = 7, cf = Math.min(f, TW.top), lit = Math.max(1, Math.min(TN, Math.ceil(cf / TW.top * TN))), BS = CHAPTERS[(nx - 1 + T.wk) % 10].boss;
+  const pag = Array.from({ length: TN }, (_, i) => { const k = TN - 1 - i; return `<i class="tw-t ${k < lit ? 'lit' : ''} ${k === lit - 1 ? 'cur' : ''}" style="--w:${80 - k * 7}px"></i>`; }).join('');
+  const tl = (ic, k, v, cl) => `<div class="rtile ${cl || ''}">${SPR.img(ic, 24)}<span><small>${k}</small><b>${v}</b></span></div>`;
   return `<div class="gobody tw" data-scroll="gobody">
-      <div class="twhead"><b>${esc(C.n)}<button class="qhelp tq" data-act="twcls" aria-label="Lối chơi môn phái">?</button></b><span>Tuần này tầng <em>${f}</em></span></div>
-      <div class="twstat"><div><small>Điểm lưu</small><b>tầng ${S.ck}</b></div><div><small>Cao nhất tuần</small><b>tầng ${S.best}</b></div><div><small>Kỷ lục</small><b>tầng ${rec}</b></div></div>
-      <div class="twnext"><small>${top ? "Đỉnh tháp" : `Tầng ${f}`}</small><b>${top ? `Đã qua hết ${TW.top} tầng` : `${twKindTxt(cls, f)}${f === TW.top ? " · Đỉnh tháp" : ''}`}</b></div>
-      <div class="twkit" data-act="twkit"><div><small>Đồ tháp</small><span>${twKitLine(cls, kit)}</span></div><div><small>Chiêu</small><span>${sk}</span></div><div><small>Hồn thần binh</small><span>${cube}</span></div><div><small>Linh ngọc</small><span>${lg}</span></div><em>Xem đồ tháp ›</em></div>
+      <div class="rgate twsc"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+        <div class="tw-pag"><i class="tw-sp"></i>${pag}<i class="tw-base"></i></div>
+        <span class="tw-mark" style="bottom:calc(24% + ${(lit - 1) * 17 + 6}px)"><small>Tầng</small><b>${top ? TW.top : f}</b></span>
+        <div class="tw-me">${heroFig(cls, 60)}<button class="qhelp tq" data-act="twcls" aria-label="Lối chơi môn phái">?</button></div>
+        ${top ? '' : `<div class="tw-boss">${SPR.img(BS.spr, 46, BS.pal)}<small>Chủ tháp tầng ${nx}<br><b>${BS.n}</b></small></div>`}
+        <span class="rg-sh">${esc(C.n)} · vào tháp ai cũng như nhau, mỗi tuần đổi tháp</span></div>
+      <div class="rtiles c3">${tl('tent', "Lưu trữ", `Tầng ${S.ck}`)}${tl('lantern', "Cao nhất tuần", `Tầng ${S.best}`)}${tl('scroll', "Kỷ lục", `Tầng ${rec}`)}</div>
+      <div class="rtiles c1">${tl('stairs', top ? "Đỉnh tháp" : `Tầng ${f}`, top ? `Đã qua hết ${TW.top} tầng` : `${twKindTxt(cls, f)}${f === TW.top ? " · Đỉnh tháp" : ''}`)}</div>
+      <button class="rtiles twkitb" data-act="twkit">${tl('i_chest', "Đồ tháp", twKitLine(cls, kit))}${tl('rune', "Chiêu", sk)}${tl('i_weapon', "hồn thần binh", cube)}${tl('gem', "Linh ngọc", lg)}<em>Xem đồ tháp ›</em></button>
       ${top ? `<p class="twrew twtop">Đã lên đỉnh tầng ${TW.top} · có thể leo lại ngay từ tầng 1, thưởng chủ tháp mỗi tuần chỉ nhận một lần</p>` : `<p class="twrew"><small>Chủ tháp tầng ${nx}</small>${(T.wr[cls] || 0) >= nx ? "Thưởng tuần này đã nhận" : `Hồn tinh ${RW.m} · Bạc ${fmtBig(RW.g)} · một viên ngọc`}${(T.ms[cls] || 0) >= nx || !RW.x ? '' : shelved('jy') ? ` · lần đầu qua thêm hồn tinh ${RW.x * 100}` : ` · <b class="jyc">Lần đầu: Huyền Tinh ${RW.x}</b>`}</p>`}
-      <p class="sub twnote">Vào tháp ai cũng như nhau, không mang đồ luyện của mình · thứ Hai đổi tháp</p>
     </div>
     <div class="gostart">${f > 1 && !top ? `<button class="btn sm ghost twrs" data-act="twreset">Leo lại từ tầng 1</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">Chọn thưởng tầng ${f - 1} trước</button>` : top ? `<button class="btn big" data-act="twagain">Leo lại từ tầng 1</button>` : `<button class="btn big" data-act="twgo">Khiêu chiến tầng ${f}</button>`}</div>`;
 }

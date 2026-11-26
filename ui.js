@@ -775,13 +775,21 @@ function towerBody(cls) {
   const sk = kit.sk.map(id => { const k = C.skills.find(x => x.id === id), r = kit.rn[id]; return k ? `${k.n}${r ? `<small>·${RUNES[id][r === 'a' ? 0 : 1].n}</small>` : ''}` : ''; }).join('、');
   const cube = kit.cube.map(id => (LEGENDS.find(l => l.id === id) || {}).n).filter(Boolean).join('、') || '还没有';
   const lg = kit.lg.map(g => `${LGEMS[g.t].n} ${g.lv}`).join('、') || '还没有';
+  // 2026-11-26 通天塔页照出征页的路子重排：上面一幅塔的夜景（打到哪一截亮到哪一截、旁边挂着层数牌、下一个塔主在塔顶等着），底下是带图标的小牌
+  const TN = 7, cf = Math.min(f, TW.top), lit = Math.max(1, Math.min(TN, Math.ceil(cf / TW.top * TN))), BS = CHAPTERS[(nx - 1 + T.wk) % 10].boss;
+  const pag = Array.from({ length: TN }, (_, i) => { const k = TN - 1 - i; return `<i class="tw-t ${k < lit ? 'lit' : ''} ${k === lit - 1 ? 'cur' : ''}" style="--w:${80 - k * 7}px"></i>`; }).join('');
+  const tl = (ic, k, v, cl) => `<div class="rtile ${cl || ''}">${SPR.img(ic, 24)}<span><small>${k}</small><b>${v}</b></span></div>`;
   return `<div class="gobody tw" data-scroll="gobody">
-      <div class="twhead"><b>${esc(C.n)}<button class="qhelp tq" data-act="twcls" aria-label="职业玩法">?</button></b><span>本周第 <em>${f}</em> 层</span></div>
-      <div class="twstat"><div><small>存档</small><b>${S.ck} 层</b></div><div><small>本周最高</small><b>${S.best} 层</b></div><div><small>历史最高</small><b>${rec} 层</b></div></div>
-      <div class="twnext"><small>${top ? '塔顶' : `第 ${f} 层`}</small><b>${top ? `${TW.top} 层都打过了` : `${twKindTxt(cls, f)}${f === TW.top ? ' · 塔顶' : ''}`}</b></div>
-      <div class="twkit" data-act="twkit"><div><small>塔装</small><span>${twKitLine(cls, kit)}</span></div><div><small>招式</small><span>${sk}</span></div><div><small>神兵之魂</small><span>${cube}</span></div><div><small>灵玉</small><span>${lg}</span></div><em>看塔装 ›</em></div>
+      <div class="rgate twsc"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+        <div class="tw-pag"><i class="tw-sp"></i>${pag}<i class="tw-base"></i></div>
+        <span class="tw-mark" style="bottom:calc(24% + ${(lit - 1) * 17 + 6}px)"><b>${top ? TW.top : f}</b><small>层</small></span>
+        <div class="tw-me">${heroFig(cls, 60)}<button class="qhelp tq" data-act="twcls" aria-label="职业玩法">?</button></div>
+        ${top ? '' : `<div class="tw-boss">${SPR.img(BS.spr, 46, BS.pal)}<small>第 ${nx} 层塔主<br><b>${BS.n}</b></small></div>`}
+        <span class="rg-sh">${esc(C.n)} · 进塔人人一样，每周一换塔</span></div>
+      <div class="rtiles c3">${tl('tent', '存档', `${S.ck} 层`)}${tl('lantern', '本周最高', `${S.best} 层`)}${tl('scroll', '历史最高', `${rec} 层`)}</div>
+      <div class="rtiles c1">${tl('stairs', top ? '塔顶' : `第 ${f} 层`, top ? `${TW.top} 层都打过了` : `${twKindTxt(cls, f)}${f === TW.top ? ' · 塔顶' : ''}`)}</div>
+      <button class="rtiles twkitb" data-act="twkit">${tl('i_chest', '塔装', twKitLine(cls, kit))}${tl('rune', '招式', sk)}${tl('i_weapon', '神兵之魂', cube)}${tl('gem', '灵玉', lg)}<em>看塔装 ›</em></button>
       ${top ? `<p class="twrew twtop">已登顶第 ${TW.top} 层 · 可以马上从第 1 层再爬，塔主奖励每周只领一次</p>` : `<p class="twrew"><small>第 ${nx} 层塔主</small>${(T.wr[cls] || 0) >= nx ? '本周奖励已领' : `魂晶 ${RW.m} · 银两 ${fmtBig(RW.g)} · 玉一颗`}${(T.ms[cls] || 0) >= nx || !RW.x ? '' : shelved('jy') ? ` · 首通再给魂晶 ${RW.x * 100}` : ` · <b class="jyc">首通玄晶 ${RW.x}</b>`}</p>`}
-      <p class="sub twnote">进塔人人一样，不带自己的养成 · 每周一换塔</p>
     </div>
     <div class="gostart">${f > 1 && !top ? `<button class="btn sm ghost twrs" data-act="twreset">从第 1 层重来</button>` : ''}${S.pend ? `<button class="btn big" data-act="twpend">先选第 ${f - 1} 层的奖励</button>` : top ? `<button class="btn big" data-act="twagain">从第 1 层再爬一次</button>` : `<button class="btn big" data-act="twgo">挑战第 ${f} 层</button>`}</div>`;
 }
