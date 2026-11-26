@@ -254,6 +254,15 @@ function lootChips(items) {
   const up = it => SAVE.stash.includes(it) && canEquip(it, cls) && powerBest(cls, it).p > cur;   // 传承后更强的也标出来
   return `<div class="loot">${items.map(it => { const u = up(it); return `<button class="lchip ${ancCls(it)} ${u ? 'isup' : ''}" data-act="item" data-arg="${it.id}">${SPR.item(it, 24)}<span class="r-${it.rarity}">${itemTitle(it)}</span>${u ? '<em class="upm">↑</em>' : ''}</button>`; }).join('')}</div>`;
 }
+// 掉落摆成多宝格（2026-11-26 设计语言）：战斗结算、结局页共用。一格一件，能提升的右上角亮一个绿箭头；玉石、精魄也各占一格
+function lootGrid(items, gems, zy) {
+  const cls = ctxCls(), cur = power(charStats(cls));
+  const up = it => SAVE.stash.includes(it) && canEquip(it, cls) && powerBest(cls, it).p > cur;
+  const a = (items || []).map(it => { const u = up(it); return `<div class="bgc b-${it.rarity} ${ancCls(it)} ${u ? 'isup' : ''}"><button class="bgm" data-act="item" data-arg="${it.id}">${SPR.item(it, 28)}<b class="r-${it.rarity}">${esc(it.name)}</b></button>${u ? '<em class="bgup">▲</em>' : ''}</div>`; });
+  const b = (gems || []).map(k => `<div class="bgc gm"><span class="bgm">${gemImg(k, 28)}<b>${gemName(k)}</b></span></div>`);
+  const c = (zy || []).map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n); return `<div class="bgc zy"><span class="bgm">${d ? SPR.img(d.spr, 28, d.pal) : ''}<b>精魄·${n}</b><small class="up">${ZY_CN[g]} · ${old ? '升品' : '新收服'}</small></span></div>`; });
+  const all = [...a, ...b, ...c]; return all.length ? `<div class="bggrid lootg">${all.join('')}</div>` : '';
+}
 const zyChips = zy => zy && zy.length ? `<div class="loot">${zy.map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n);
   return `<span class="lchip zy">${d ? SPR.img(d.spr, 24, d.pal) : ''}<span>精魄·${n}<b>${ZY_CN[g]}</b>${old ? '<small>升品</small>' : '<small>新收服</small>'}</span></span>`; }).join('')}</div>` : '';
 const gemChips = keys => keys && keys.length ? `<div class="loot">${keys.map(k => `<span class="lchip">${gemImg(k, 22)}${gemName(k)}</span>`).join('')}</div>` : '';
@@ -314,10 +323,18 @@ function stashBody(cls, D) {
       ${cur ? itemCard(cur, cls, '') : '<p class="sub" style="margin:6px 0 0">空着</p>'}</div>
       <h4 class="sub-h gcur-t">背包里能换的${SLOT_NAME[slotType(GSLOT)]}</h4>` : '';
   const chips = [['all', '全部'], ['up', '只看能提升的'], ...(featureOn('cube') ? [['leg', '乾坤袋未收']] : []), ...(SAVE.stash.some(it => it.anc === 3) ? [['jy', '九幽']] : [])];
-  return `${curRow}<div class="chips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
-      ${VIEW === 'town' ? `<button class="chip bulkc" data-act="bulkopen">筛选分解 / 出售</button>${svcFns('kang').some(f => f[0] === 'gamble') ? '<button class="chip bulkc" data-act="npcgo" data-arg="kang|gamble">赌石</button>' : ''}` : ''}</div>
-    <div class="ilist2">${list.length ? list.map(it => itemRow(it, D)).join('') : `<div class="empty-note">${GSLOT ? `背包里没有可以换的${SLOT_NAME[slotType(GSLOT)]}。` : '这里没有符合条件的装备。'}</div>`}</div>
-    <p class="sub" style="margin:8px 0 0">右边数字是换上后的战力变化（强化和玉跟着部位，已经算进去）。背包 ${SAVE.stash.length}/${stashMax()}，五个门派共用。</p>`;
+  // 2026-11-26 设计语言：清单改成多宝格——一格一件（图标、名字、换上后的战力变化），点格子看详情；能提升的右上角有个「穿」，点一下直接换上
+  const sg = d => d == null ? '用不了' : d > 0 ? '+' + fmtBig(d) : d < 0 ? '-' + fmtBig(-d) : '±0';
+  const cellOf = it => { const d = D.get(it.id);
+    return `<div class="bgc b-${it.rarity} ${ancCls(it)} ${d > 0 ? 'isup' : ''}"><button class="bgm" data-act="item" data-arg="${it.id}">${SPR.item(it, 32)}<b class="r-${it.rarity}">${esc(it.name)}</b><small class="${d > 0 ? 'up' : d < 0 ? 'dn' : 'no'}">${sg(d)}</small>${socketDots(it)}</button>${d > 0 ? `<button class="bgq" data-act="qeq" data-arg="${it.id}" aria-label="穿上">穿</button>` : ''}</div>`; };
+  const sc = compact && !GSLOT ? `<div class="bgsc"><i class="bg-shelf"></i><span class="bg-deco">${['jar', 'scroll', 'bag', 'gold', 'key', 'jar'].map(n => SPR.img(n, 16)).join('')}</span><i class="tg-lan"></i><span class="bg-keeper">${npcList().some(x => x[0] === 'kang') ? unitIcon('merchant', 50, null, '', 'full') : SPR.img('chest', 40)}</span>
+      <div class="bg-plq"><b>库房</b><small>${SAVE.stash.length}/${stashMax()}</small></div>
+      <span class="bg-objs"><button class="bg-obj" data-act="bulkopen">${SPR.img('furnace', 32)}<small>分解 · 出售</small></button>${svcFns('kang').some(f => f[0] === 'gamble') ? `<button class="bg-obj" data-act="npcgo" data-arg="kang|gamble">${SPR.img('crystal', 32)}<small>赌石</small></button>` : ''}</span>
+      <button class="qhelp sm" data-act="baghelp" aria-label="说明">?</button></div>` : '';
+  return `${curRow}${sc}<div class="chips bgchips">${chips.map(([k, n]) => `<button class="chip ${FILTER === k ? 'on' : ''}" data-act="filter" data-arg="${k}">${n}</button>`).join('')}
+      ${VIEW === 'town' && !sc ? `<button class="chip bulkc" data-act="bulkopen">筛选分解 / 出售</button>${svcFns('kang').some(f => f[0] === 'gamble') ? '<button class="chip bulkc" data-act="npcgo" data-arg="kang|gamble">赌石</button>' : ''}` : ''}</div>
+    <div class="bggrid">${list.length ? list.map(cellOf).join('') : `<div class="empty-note">${GSLOT ? `背包里没有可以换的${SLOT_NAME[slotType(GSLOT)]}。` : '这里没有符合条件的装备。'}</div>`}</div>
+    ${sc ? '' : `<p class="sub" style="margin:8px 0 0">格子底下的数字是换上后的战力变化。背包 ${SAVE.stash.length}/${stashMax()}，五个门派共用。</p>`}`;
 }
 // 灵玉一行：名字、等级、说明；本命玉标上是哪个门派的
 function lgemRow(g, btn) { const G = LGEMS[g.t] || LGEMS.reforge;
@@ -345,11 +362,11 @@ function boxBody(cls) {
     <div class="gems">${rest.length ? rest.map(g => { const G = LGEMS[g.t]; return gemRow(g, G.cls && G.cls !== cls ? `<button class="btn sm ghost" disabled>${CLASSES[G.cls].n}专用</button>` : g.t === 'reforge' ? '<button class="btn sm" data-act="lgreopen">重铸</button>' : `<button class="btn sm" data-act="boxput" data-arg="${g.id}">放进匣里</button>`); }).join('') : `<div class="empty-note">${SAVE.lgems.length ? '手上的灵玉都在匣里了。' : '还没有灵玉。去九幽幻境打败守关妖王吧。'}</div>`}</div>`;
 }
 function gemsBody() {
-  const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b));
-  return `<p class="help-p">三块相同的玉石可以合成高一阶，现在最高合成到「${GEM_TIERS[gemCap()]}」。玉器坊管到「极品」；后四档「无瑕、通灵、天成、九幽」要幻境最高层打到 ${GEM_RIFT.join('、')} 层。镶在装备上的玉石也能直接升级（玉掌柜那里点它）。</p>
-    ${(() => { const P = combineAllPlan(false); return P.n ? `<button class="btn gemall" data-act="combineall">一键合成：合 ${P.n} 次（${fmtBig(P.cost)} 两${P.mcost ? ` + ${P.mcost} 魂晶` : ''}）</button>` : ''; })()}
-    <div class="gems">${gemKeys.length ? gemKeys.map(k => `<div class="gemrow">${gemImg(k, 26)}<span class="nm">${gemName(k)} <small>${gemDesc(k)}</small></span><b>×${SAVE.gems[k]}</b>
-      <button class="btn sm ghost" ${SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap() ? '' : 'disabled'} data-act="combine" data-arg="${k}">合成（${combineCost(k)} 两${combineMats(k) ? ` + ${combineMats(k)} 魂晶` : ''}）</button></div>`).join('')
+  const gemKeys = Object.keys(SAVE.gems).sort((a, b) => a.localeCompare(b)), P = combineAllPlan(false), fit = gemKeys.length && featureOn('sockets') && VIEW === 'town' && TT === 'bag';
+  // 2026-11-26 设计语言：玉石摆成一盘一盘的格子；整段说明收进「?」；两个一键并排
+  return `<div class="gemtop">${fit ? '<button class="btn sm" data-act="gemfit">一键镶最好的</button>' : ''}${P.n ? `<button class="btn sm ghost" data-act="combineall">一键合成 ${P.n} 次<small>${fmtBig(P.cost)} 两${P.mcost ? ` + ${P.mcost} 魂晶` : ''}</small></button>` : ''}<button class="qhelp sm" data-act="gemhelp" aria-label="说明">?</button></div>
+    <div class="gemgrid">${gemKeys.length ? gemKeys.map(k => { const can = SAVE.gems[k] >= 3 && +k.split('_')[1] < gemCap();
+      return `<div class="gmc ${can ? 'can' : ''}">${gemImg(k, 30)}<u>×${SAVE.gems[k]}</u><b>${gemName(k)}</b><small>${gemDesc(k)}</small><button class="gmb" ${can ? '' : 'disabled'} data-act="combine" data-arg="${k}">合成<i>${combineCost(k)} 两${combineMats(k) ? ` + ${combineMats(k)} 晶` : ''}</i></button></div>`; }).join('')
       : '<div class="empty-note">还没有玉石。精英、首领和宝箱会掉落玉石。</div>'}</div>
     ${SAVE.lgems.length || featureOn('rift') ? `<h4 class="sub-h">灵玉 <small>幻境守关妖王掉落，镶在灵玉匣里（点装备栏的「灵玉匣」）</small></h4>
     <div class="gems">${SAVE.lgems.length ? SAVE.lgems.map(g => { const users = CLASS_IDS.filter(c => (SAVE.chars[c].lgs || []).includes(g.id)).map(c => CLASSES[c].n), G = LGEMS[g.t];
@@ -427,9 +444,9 @@ const lockNote = (txt) => `<div class="locknote">${SPR.img('lock', 22)}<span>${t
 // 山海异兽坐骑：图鉴页最上面一排；没见过的只有剪影
 const mountPanel = () => { const M = SAVE.mounts || {}; return `<section class="panel mtp"><h3>山海异兽 <small>${Object.keys(MOUNTS).filter(k => M[k]).length}/${Object.keys(MOUNTS).length} · 打赢了就能骑，只是好看</small></h3><div class="mts">${Object.keys(MOUNTS).map(id => { const m = MOUNTS[id], got = M[id], on = got && SAVE.mount === id; return `<button class="mt ${got ? '' : 'no'} ${on ? 'on' : ''}" data-act="mount" data-arg="${id}">${SPR.img(m.spr, 44)}<b>${got ? m.n : '？？'}</b><small>${on ? '骑着' : got ? '点了骑上' : '没见过'}</small></button>`; }).join('')}</div></section>`; };
 // 出征页关隘图里的主角：有坐骑就骑着，没有就站着（三层姿势图叠起来，和地图上是同一套）
-function heroFig(cls, S) {
+function heroFig(cls, S, foot) {   // foot：不骑坐骑（练功场里）
   if (typeof HERO === 'undefined' || !HERO.has(cls)) return heroSpr(cls, S);
-  const mt = SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount], cell = S / 32, u = cell * 0.655 * 30 / 30, F = HERO.url(cls, mt ? 'ride' : 'idle', null); if (!F) return heroSpr(cls, S);
+  const mt = !foot && SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount], cell = S / 32, u = cell * 0.655 * 30 / 30, F = HERO.url(cls, mt ? 'ride' : 'idle', null); if (!F) return heroSpr(cls, S);
   const w = 56 * u * 1.5, h = 46 * u * 1.5, k = u * 1.5, lay = (x, y) => ['back', 'body', 'front'].map(l => `<img src="${F[l]}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;image-rendering:pixelated" alt="" draggable="false">`).join('');
   if (!mt) return `<div class="hfig" style="width:${(S * 0.7).toFixed(0)}px;height:${S}px">${lay(S * 0.35 - 28 * k, S - 44 * k)}</div>`;
   return `<div class="hfig" style="width:${S}px;height:${S}px"><img src="${SPR.url(mt.spr)}" style="position:absolute;left:0;top:0;width:${S}px;height:${S}px;image-rendering:pixelated" alt="" draggable="false">${lay(mt.seat[0] * cell - 28 * k, mt.seat[1] * cell - 33 * k)}</div>`;
@@ -659,18 +676,17 @@ function goTab() {
     const rec = Math.min(MAX_LV, (k === 1 ? 1 : 2) + Math.round((k - 1) * 2.3) + DIFFS[diff].base);
     const lv = SAVE.chars[cls].level;
     const diffs = DIFF_IDS.filter(d => SAVE.unlocked[d]);
+    // 2026-11-26 设计语言：这一章的首领站在场景中间等着，头顶挂这一章的牌子；主角（Ngoc 同行就一起）站在左下；底下两块小牌写首领和建议等级
+    const tile = (ic, k2, v, c2) => `<div class="rtile ${c2 || ''}">${SPR.img(ic, 22)}<span><small>${k2}</small><b>${v}</b></span></div>`;
     body = `${diffs.length > 1 ? `<div class="dsw">${diffs.map(d => `<button class="${diff === d ? 'on' : ''}" data-act="diff" data-arg="${d}">${DIFFS[d].n}</button>`).join('')}</div>` : ''}
-      <div class="chcard" style="--cbg:${C.bg}">
-        <button class="charr" data-act="chnav" data-arg="-1" ${k > 1 ? '' : 'disabled'} aria-label="上一章">‹</button>
-        <div class="chc-mid">
-          <div class="chc-art ${known ? '' : 'sil'}">${SPR.img(C.boss.spr, 64, C.boss.pal, 'idle')}</div>
-          <small class="chc-no">第${CN[k]}章${done ? ' · <em>已通关</em>' : ''}</small>
-          <h3>${C.n}</h3><p>${C.sub}</p>
-          <div class="chc-meta"><span>首领：${known ? C.boss.n : '？？？'}</span><span class="${lv >= rec ? '' : 'warn'}">建议 ${rec} 级（你 ${lv} 级）</span>${C.ngoc ? '<span class="pink">Ngoc 同行</span>' : ''}</div>
-        </div>
-        <button class="charr" data-act="chnav" data-arg="1" ${k < maxCh ? '' : 'disabled'} aria-label="下一章">›</button>
-      </div>
-      <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div>
+      <div class="rgate stsc" style="--ac:${(typeof CH_ACCENT !== 'undefined' && CH_ACCENT[k]) || '#b9321f'}"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i><i class="rg-path"></i>
+        <span class="st-boss ${known ? '' : 'sil'}">${SPR.img(C.boss.spr, 104, C.boss.pal)}</span>
+        <div class="st-plq"><small>第${CN[k]}章</small><b>${C.n}</b>${done ? '<i class="jb-seal">通</i>' : ''}</div>
+        <button class="rg-arr l" data-act="chnav" data-arg="-1" ${k > 1 ? '' : 'disabled'} aria-label="上一章">‹</button><button class="rg-arr r" data-act="chnav" data-arg="1" ${k < maxCh ? '' : 'disabled'} aria-label="下一章">›</button>
+        <span class="st-me">${heroFig(cls, 60)}${C.ngoc ? unitIcon('ngoc', 36, null, '', 'full') : ''}</span>
+        <div class="chdots">${CHAPTERS.map((_, i) => `<i class="${i + 1 === k ? 'on' : ''} ${i + 1 <= cl ? 'done' : ''} ${i + 1 > maxCh ? 'lock' : ''}"></i>`).join('')}</div></div>
+      <p class="st-sub">${C.sub}</p>
+      <div class="rtiles st-t">${tile('st_kill', '首领', known ? C.boss.n : '？？？')}${tile('st_para', '建议等级', `${rec} 级 · 你 ${lv} 级`, lv >= rec ? '' : 'warn')}</div>
       ${!SAVE.story.ended && !riftPath() ? '<button class="linkbtn topath" data-act="topath">不想看剧情？改走「幻境挑战」 ›</button>' : ''}${formRow()}${yiRow(cls)}`;
   } else {
     const maxR = Math.max(1, SAVE.riftCap || 3); if (SAVE.riftLv > maxR) SAVE.riftLv = maxR;
@@ -951,13 +967,16 @@ const goHelpModal = () => () => {
 function bountyHTML() {
   if (!featureOn('bounty')) return '';
   ensureBounties();
-  const Bn = SAVE.bounty, allDone = Bn.list.every(b => b.claimed);
-  return `<section class="panel"><h3>江湖悬赏 <small>每天刷新 · 完成后领宝箱（必出宝品以上）</small></h3>
-    <div class="bounties">${Bn.list.map((b, i) => `<div class="bounty ${b.claimed ? 'done' : ''}"><div><b>${b.t}</b><div class="bar"><i style="width:${b.prog / b.need * 100}%"></i></div><small>${b.prog} / ${b.need}</small></div>
-      ${b.claimed ? '<span class="sub">已领取</span>' : `<button class="btn sm" ${b.prog >= b.need ? '' : 'disabled'} data-act="bclaim" data-arg="${i}">领取</button>`}</div>`).join('')}</div>
-    <div class="row" style="margin-top:10px;justify-content:space-between"><span class="sub">三个全部完成，再领一个<b style="color:var(--gold2)">赏金大箱</b>（必出套装或神兵）</span>
-      ${Bn.bonus ? '<span class="sub">已领取</span>' : `<button class="btn sm" ${allDone ? '' : 'disabled'} data-act="bbonus">领取大箱</button>`}</div>
-    <div class="row" style="margin-top:10px;justify-content:space-between"><span class="sub">攒下的赏银，去柜上换东西</span><button class="btn sm ghost" data-act="btyshop">赏银柜</button></div></section>`;
+  const Bn = SAVE.bounty, allDone = Bn.list.every(b => b.claimed), nDone = Bn.list.filter(b => b.claimed).length, Lei = (typeof SPEAKERS !== 'undefined' && SPEAKERS.lei) || { spr: 'blade' };
+  // 2026-11-26 设计语言：一面告示墙——三张悬赏贴在墙上，写着做什么、做到哪儿，做完了盖印领赏；雷老虎守在墙根，旁边摆着赏金大箱和赏银柜
+  return `<section class="panel btyp"><div class="bwall"><i class="bw-roof"></i><div class="bw-plq"><b>江湖悬赏</b><small>每天刷新</small></div>
+      <div class="bw-notes">${Bn.list.map((b, i) => { const ok = b.prog >= b.need;
+        return `<div class="bwn ${b.claimed ? 'done' : ok ? 'ok' : ''}"><b>${b.t}</b><span class="bw-bar"><i style="width:${Math.min(100, b.prog / b.need * 100)}%"></i></span><small>${b.prog} / ${b.need}</small>
+          ${b.claimed ? '<em class="bw-got">已领</em>' : `<button class="bw-claim" ${ok ? '' : 'disabled'} data-act="bclaim" data-arg="${i}">领赏</button>`}</div>`; }).join('')}</div>
+      <div class="bw-floor"><span class="bw-lei">${unitIcon(Lei.spr, 62, Lei.pal, '', 'full')}</span>
+        <button class="bw-obj ${allDone && !Bn.bonus ? 'ok' : ''}" ${allDone && !Bn.bonus ? '' : 'disabled'} data-act="bbonus">${SPR.img('chest', 40)}<small>赏金大箱 · ${Bn.bonus ? '已领' : `${nDone}/3`}</small></button>
+        <button class="bw-obj" data-act="btyshop">${SPR.img('silverbox', 40)}<small>赏银柜 ›</small></button></div></div>
+    <p class="sub bw-tip">做完一张领一只宝箱（必出宝品以上）；三张都做完，再开赏金大箱（必出套装或神兵）。赏银去柜上换东西。</p></section>`;
 }
 // 配装：三套，一键切换
 const gemMissTxt = L => { const c = {}; for (const g of L) c[g] = (c[g] || 0) + 1; return Object.keys(c).map(g => gemName(g) + (c[g] > 1 ? ' ×' + c[g] : '')).join('、'); };
@@ -1039,18 +1058,30 @@ function statFull(cls) {
 }
 // 人物页（2026-11-26 减法改版）：一屏——6 项要紧的属性（其余点「全部属性」）、装备格、灵玉和乾坤袋两格、一键换装、配装。背包搬到单独的页签
 function gearTab() {
-  const cls = SAVE.cls, eq = SAVE.chars[cls].eq, D = deltaMap(cls), up = {};
+  // 2026-11-26 设计语言：上面一幅夜景——主角站在亭子里（有坐骑就骑着），两边两座兵器架挂着十件装备，亭前摆着灵玉匣和乾坤袋；底下八块带图标的属性牌
+  const cls = SAVE.cls, ch = SAVE.chars[cls], eq = ch.eq, D = deltaMap(cls), up = {}, s = charStats(cls);
   for (const it of SAVE.stash) { const d = D.get(it.id); if (!(d > 0)) continue; const ps = posFor(cls, it, gpos(it)); if (d > (up[ps] || 0)) up[ps] = d; }
   const nUp = Object.keys(up).length;
-  let doll = SLOTS.filter(sl => slotOpen(sl.id)).map(sl => { const it = eq[sl.id];
-    return `<button class="gsb ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${sl.id}"><span class="gi">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}</span><span class="gn">${sl.n}${it && it.plus ? ` +${it.plus}` : ''}</span>${up[sl.id] ? `<em>+${up[sl.id]}</em>` : ''}</button>`; }).join('');
-  if (featureOn('rift')) doll += SLOTS.filter(sl => sl.rift && !slotOpen(sl.id)).map(sl => `<div class="gsb locked"><span class="gi"><i>锁</i></span><span class="gn">${sl.n}</span><small>幻境 ${sl.rift} 层</small></div>`).join('');
-  if (boxOpen()) { const nb = boxOf(cls).filter(Boolean).length;
-    doll += `<button class="gsb box ${nb ? 'b-legend' : 'empty'}" data-act="boxopen"><span class="gi">${SPR.img('gem', 30, { G: '#ffb02a' }, nb ? 'glow' : '')}</span><span class="gn">灵玉 ${nb}/${BOX_SLOTS}</span></button>`; }
-  if (featureOn('cube')) { const nc = (SAVE.chars[cls].cube || []).filter(Boolean).length;
-    doll += `<button class="gsb box ${nc ? 'b-legend' : 'empty'}" data-act="cubeopen"><span class="gi">${SPR.img('bag', 30)}</span><span class="gn">乾坤袋 ${nc}/3</span></button>`; }
-  return `<section class="panel gearp2"><div class="gfit">${keyStats(cls)}<div class="gdoll">${doll}</div>
-      <div class="gbar"><span class="sub">${nUp ? `<b class="upn">${nUp}</b> 个位置有更好的` : '已经是目前最好的搭配'}</span><span class="gbar-b"><button class="btn sm ghost" data-act="kits">配装</button><button class="btn sm ${nUp ? '' : 'ghost'}" ${nUp ? '' : 'disabled'} data-act="best">一键换上最强</button></span></div></div></section>`;
+  const cell = id => { const sl = SLOTS.find(x => x.id === id), it = eq[id];
+    if (!slotOpen(id)) return featureOn('rift') && sl.rift ? `<div class="rk locked"><i>锁</i><span class="rkn">${sl.n}</span><small>${sl.rift} 层开</small></div>` : '';
+    return `<button class="rk ${it ? 'b-' + it.rarity + ' ' + ancCls(it) : 'empty'}" data-act="gsl" data-arg="${id}">${it ? SPR.item(it, 34) : `<i>${sl.s}</i>`}<span class="rkn">${sl.n}</span>${it && it.plus ? `<u>+${it.plus}</u>` : ''}${up[id] ? '<em>▲</em>' : ''}</button>`; };
+  const rack = (side, ids) => { const h = ids.map(cell).join(''); return h ? `<div class="hs-rack ${side}">${h}</div>` : ''; };
+  let feet = '';
+  if (boxOpen()) { const nb = boxOf(cls).filter(Boolean).length; feet += `<button class="hs-ft ${nb ? 'on' : ''}" data-act="boxopen">${SPR.img('gem', 24, { G: '#ffb02a' })}<span><small>灵玉</small><b>${nb}/${BOX_SLOTS}</b></span></button>`; }
+  if (featureOn('cube')) { const nc = (ch.cube || []).filter(Boolean).length; feet += `<button class="hs-ft ${nc ? 'on' : ''}" data-act="cubeopen">${SPR.img('bag', 24)}<span><small>乾坤袋</small><b>${nc}/3</b></span></button>`; }
+  const dg = Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10;
+  const T = [['st_hp', '气血', hpTxt(s.maxHp, ch.level)], ['i_weapon', '攻击', fmtBig(s.atk)], ['st_arm', '护甲', fmtBig(s.armorT)], ['st_res', '全抗', s.res + '%'], ['st_crit', '暴击', s.crit + '%'], ['st_cd', '暴伤', s.critDmg + '%'], ['st_spd', '速度', s.speed], ['fire', '伤害', '+' + s.dmgPct + '%']];
+  const sets = SETS.filter(S => S.cls === cls && (s.setCount[S.id] || 0) >= 2).map(S => `<i class="r-set">${esc(S.n)} ${s.setCount[S.id]}/${S.pieces.length}</i>`);
+  const fx = [...s.fx].map(f => { const Lg = LEGENDS.find(l => l.fx === f); return Lg ? `<i class="r-legend">${esc(Lg.n)}</i>` : ''; }).filter(Boolean);
+  const xs = [s.leech ? `吸血 ${s.leech}%` : '', dg ? `闪避 ${dg}%` : '', s.xDr ? `减伤 ${s.xDr}%` : '', s.thornDmg ? `反震 +${s.thornDmg}%` : '', s.mf ? `福缘 +${s.mf}%` : ''].filter(Boolean).map(t => `<i>${t}</i>`);
+  return `<section class="panel gearp2 herosc"><div class="hsc"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+      ${rack('l', ['weapon', 'offhand', 'gloves', 'ring', 'ring2'])}
+      <div class="hs-mid"><button class="hs-ting" data-act="statall" aria-label="全部属性"><i class="tg-roof"></i><i class="tg-beam"><em>${CLASSES[cls].n}</em></i><i class="tg-pl"></i><i class="tg-pr"></i><i class="tg-lan l"></i><i class="tg-lan r"></i><span class="tg-me">${heroFig(cls, SAVE.mount && (SAVE.mounts || {})[SAVE.mount] ? 104 : 118)}</span><i class="tg-base"></i></button>
+        ${feet ? `<div class="hs-feet">${feet}</div>` : ''}</div>
+      ${rack('r', ['helm', 'chest', 'belt', 'boots', 'amulet'])}</div>
+    <button class="rtiles c4 hstats" data-act="statall">${T.map(([ic, k, v]) => `<div class="rtile">${SPR.img(ic, 18)}<span><small>${k}</small><b>${v}</b></span></div>`).join('')}</button>
+    <button class="hchips" data-act="statall"><span class="ksfx">${[...sets, ...fx, ...xs].join('')}</span><em>全部属性 ›</em></button>
+    <div class="gbar"><span class="sub">${nUp ? `<b class="upn">${nUp}</b> 个位置有更好的` : '已经是目前最好的搭配'}</span><span class="gbar-b"><button class="btn sm ghost" data-act="kits">配装</button><button class="btn sm ${nUp ? '' : 'ghost'}" ${nUp ? '' : 'disabled'} data-act="best">一键换上最强</button></span></div></section>`;
 }
 const boxModal = () => `${boxBody(SAVE.cls)}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">好了</button></div>`;
 const cubeBagModal = () => `<h2 class="mh">乾坤袋</h2>${cubeBody(SAVE.cls)}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">好了</button></div>`;
@@ -1061,7 +1092,7 @@ function bagTab() {
   const cls = SAVE.cls, subs = [['eq', `装备 ${SAVE.stash.length}`], ...(featureOn('gems') ? [['gems', '玉石']] : [])];
   if (!subs.some(x => x[0] === BAGV)) BAGV = 'eq';
   const bar = subs.length > 1 ? `<div class="gsubs gtop" style="--n:${subs.length}">${subs.map(([k, n]) => `<button class="${BAGV === k ? 'on' : ''}" data-act="bagv" data-arg="${k}">${n}</button>`).join('')}</div>` : '';
-  const body = BAGV === 'gems' ? `${Object.keys(SAVE.gems).length && featureOn('sockets') ? '<button class="btn gemfit" data-act="gemfit">一键镶最好的<small>身上每个孔换上玉石包里最合适的那颗 · 免费</small></button>' : ''}${gemsBody()}` : stashBody(cls, deltaMap(cls));
+  const body = BAGV === 'gems' ? gemsBody() : stashBody(cls, deltaMap(cls));
   const back = BAGV === 'eq' && GSLOT ? `<button class="chip gback" data-act="bagall">‹ 全部装备</button>` : '';
   return `<section class="panel gearp2 bagp">${bar}<div class="gscroll gbody" data-scroll="bag-${BAGV}">${back}${body}</div></section>`;
 }
@@ -1233,6 +1264,13 @@ function statPage(cls) {
         return `<li class="${S.rift ? 'rset' : ''}"><details><summary><b>${S.n}</b> <small>已穿 ${n}/${S.pieces.length}${S.rift ? ` · 幻境 ${S.rlv || RSET_LV} 层起` : ''}</small></summary><div class="${n >= 2 ? 'on' : 'off'}">2 件：${S.b2d}</div><div class="${n >= 4 ? 'on' : 'off'}">4 件：${S.b4d}</div>${S.b6 ? `<div class="${n >= 6 ? 'on' : 'off'}">6 件：${S.b6d}</div>` : ''}${setTip(S, n)}</details></li>`; }).join('')}</ul>
       ${fxList ? `<h4 class="sub-h">生效中的特效</h4><ul class="setlist fxlist">${fxList}</ul>` : ''}`;
 }
+// 修炼页的场景（2026-11-26 设计语言）：一根横梁，上面挂东西——武学挂五块招式牌，心法挂三卷经，修为挂三枚根基印；梁上写这一页最要紧的那句；底下练功场里站着主角和木人桩
+const PARA_IC = { pAtk: 'i_weapon', pArmor: 'st_arm', pHp: 'st_hp', dmgPct: 'fire', hpPct: 'st_hp', armorPct: 'st_arm', critDmg: 'st_cd', crit: 'st_crit', spd: 'st_spd', res: 'st_res', mf: 'st_mf', gf: 'ingot' };
+function xlScene(cls, beam, hang, signs) {
+  return `<div class="xlsc"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+    <div class="xl-beam">${beam}</div><div class="xl-hang">${hang}</div>
+    <span class="xl-me">${heroFig(cls, 68, true)}</span><span class="xl-dummy">${SPR.img('dummy', 50)}</span>${signs || ''}</div>`;
+}
 function heroTab() {
   const cls = SAVE.cls, ch = SAVE.chars[cls], s = charStats(cls), ti = talentInfo(cls), pf = paraFree(), rOn = featureOn('runes');
   const tabs = [['skill', '武学'], ['tal', `心法${talTodo(cls) ? ` <b class="upn">${ti.free}</b>` : ''}`], ...(featureOn('para') ? [['para', `修为${pf && !autoParaOn() ? ` <b class="upn">${pf}</b>` : ''}`]] : [])];
@@ -1242,22 +1280,28 @@ function heroTab() {
   // 2026-11-26 减法：心法、修为默认自动加点；想自己点，关掉自动再展开
   const autoRow = (on, act, txt) => `<div class="autorow ${on ? 'on' : ''}"><span><b>自动加点：${on ? '开' : '关'}</b><small>${txt}</small></span><button class="btn sm ghost" data-act="${act}">${on ? '改成自己点' : '改回自动'}</button></div>`;
   if (HTAB === 'tal') {
-    const on = autoTalOn(), sum = talentBranches(cls).map(Bq => `${Bq.n} ${branchSpent(cls, Bq.id)}`).join(' · ');
-    const manual = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="sub">每升一级得 1 点 · 可用 <b style="color:var(--gold2)">${ti.free}</b> 点</span>
+    const on = autoTalOn(), brs = talentBranches(cls), tot = brs.reduce((n, Bq) => n + Bq.t.reduce((m, T) => m + T.max, 0), 0);
+    const scrolls = brs.map((Bq, i) => { const sp = branchSpent(cls, Bq.id), mx = Bq.t.reduce((m, T) => m + T.max, 0);
+      return `<button class="xl-juan ${!on && TBR === i ? 'on' : ''}" data-act="${on ? 'talpeek' : 'tbr'}" data-arg="${i}"><b>${Bq.n}</b><em>${sp}</em><small>共 ${mx} 点</small></button>`; }).join('');
+    const sc = xlScene(cls, `<em>心法</em><small>每升一级得 1 点${ti.free ? ` · 可用 <b>${ti.free}</b>` : ''}</small>`, `<div class="xl-juans">${scrolls}</div>`);
+    const manual = `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="sub">可用 <b style="color:var(--gold2)">${ti.free}</b> 点</span>
       <button class="btn sm ghost" ${SAVE.gold >= respecCost(cls) && ti.spent ? '' : 'disabled'} data-act="respec">散功重修${respecCost(cls) ? `（${respecCost(cls)} 两）` : '（免费）'}</button></div>${talentGrid(cls)}`;
-    body = on ? `${autoRow(true, 'autotal', '每升一级得 1 点心法，自动加好：先点满本门那一路，再杀伐、内功。')}<p class="autosum">已经点了：${sum}</p><details class="autofold"><summary>看看都点了什么</summary>${talentGrid(cls)}</details>`
-      : `${autoRow(false, 'autotal', '现在由你自己点。')}${manual}`;
+    body = sc + (on ? `${autoRow(true, 'autotal', '先点满本门那一路，再杀伐、内功。')}<details class="autofold" ${window.TALOPEN ? 'open' : ''} ontoggle="window.TALOPEN=this.open"><summary>看看都点了什么</summary>${talentGrid(cls)}</details>`
+      : `${autoRow(false, 'autotal', '现在由你自己点。')}${manual}`);
   } else if (HTAB === 'skill') {
     body = skillPanel(cls);
   } else {
-    const on = autoParaOn(), rows = `${[1, 0].map(rt => `<h4 class="sub-h">${rt ? '根基 <small>最终乘算 · 每项最多 50 点</small>' : '其他 <small>跟装备加成相加</small>'}</h4>
-      <div class="para">${PARAGON_STATS.filter(P => !!P.root === !!rt).map(P => { const n = SAVE.para.pts[P.k] || 0, pc = P.root || PCT_STATS.has(P.k), full = P.cap && (n + 1) * P.v > P.cap;
-        return `<div class="prow ${P.root ? 'root' : ''}"><span>${P.n}<small>每点 +${P.v}${pc ? '%' : ''}${P.cap ? ' · 上限 ' + P.cap + '%' : ''}</small></span><b>${full ? '<i>满</i> ' : ''}+${num(n * P.v)}${pc ? '%' : ''}</b>
+    const on = autoParaOn(), pc = P => P.root || PCT_STATS.has(P.k), val = P => `+${num((SAVE.para.pts[P.k] || 0) * P.v)}${pc(P) ? '%' : ''}`;
+    const rows = `${[1, 0].map(rt => `<h4 class="sub-h">${rt ? '根基 <small>最终乘算 · 每项最多 50 点</small>' : '其他 <small>跟装备加成相加</small>'}</h4>
+      <div class="para">${PARAGON_STATS.filter(P => !!P.root === !!rt).map(P => { const n = SAVE.para.pts[P.k] || 0, full = P.cap && (n + 1) * P.v > P.cap;
+        return `<div class="prow ${P.root ? 'root' : ''}"><span>${P.n}<small>每点 +${P.v}${pc(P) ? '%' : ''}${P.cap ? ' · 上限 ' + P.cap + '%' : ''}</small></span><b>${full ? '<i>满</i> ' : ''}${val(P)}</b>
         ${on ? '' : [1, 10, 50].map(k => `<button class="mini" ${paraCanAdd(P.k) ? '' : 'disabled'} data-act="para" data-arg="${P.k}|${k}">+${k}</button>`).join('')}</div>`; }).join('')}</div>`).join('')}`;
-    const head = `<p class="help-p">五个门派共用 · ${SAVE.para.lv ? `${realmName(SAVE.para.lv)} · ` : ''}一共 <b style="color:var(--gold2)">${SAVE.para.lv}</b> 点${pf ? ` · 还有 <b style="color:var(--gold2)">${pf}</b> 点没用` : ''}</p>`;
-    const sum = PARAGON_STATS.filter(P => SAVE.para.pts[P.k]).map(P => `${P.n} +${num(SAVE.para.pts[P.k] * P.v)}${P.root || PCT_STATS.has(P.k) ? '%' : ''}`).join(' · ');
-    body = on ? `${autoRow(true, 'autopara', '满级以后经验变成修为点，自动加好：先根基（攻击、气血、护甲），再以伤害、气血为主。')}${head}<p class="autosum">${sum || '还没有修为点'}</p><details class="autofold"><summary>看每一项</summary>${rows}</details>`
-      : `${autoRow(false, 'autopara', '现在由你自己点。')}${head}${rows}${SAVE.para.lv ? '<button class="btn sm ghost" style="margin-top:8px" data-act="parareset">重新分配修为（免费）</button>' : ''}`;
+    const seals = PARAGON_STATS.filter(P => P.root).map(P => { const n = SAVE.para.pts[P.k] || 0, full = P.cap && (n + 1) * P.v > P.cap;
+      return `<div class="xl-yin ${full ? 'full' : ''}">${SPR.img(PARA_IC[P.k], 22)}<b>${val(P)}</b><small>${P.n}根基</small></div>`; }).join('');
+    const sc = xlScene(cls, `<em class="pl">${SAVE.para.lv ? realmName(SAVE.para.lv) : '修为'}</em><small>五门共用 · 共 <b>${SAVE.para.lv}</b> 点${pf ? ` · 剩 <b>${pf}</b>` : ''}</small>`, `<div class="xl-yins">${seals}</div>`);
+    const tiles = `<div class="rtiles c3 xl-pt">${PARAGON_STATS.filter(P => !P.root).map(P => `<div class="rtile ${SAVE.para.pts[P.k] ? '' : 'zero'}">${SPR.img(PARA_IC[P.k] || 'rune', 20)}<span><small>${P.n}</small><b>${val(P)}</b></span></div>`).join('')}</div>`;
+    body = sc + (on ? `${autoRow(true, 'autopara', '满级以后经验变成修为点：先根基，再以伤害、气血为主。')}${tiles}<details class="autofold"><summary>看每一项</summary>${rows}</details>`
+      : `${autoRow(false, 'autopara', '现在由你自己点。')}${rows}${SAVE.para.lv ? '<button class="btn sm ghost" style="margin-top:8px" data-act="parareset">重新分配修为（免费）</button>' : ''}`);
   }
   return `<section class="panel herop">${bar}<div class="hbody" data-scroll="hbody-${HTAB}">${body}</div></section>`;
 }
@@ -1402,10 +1446,17 @@ function skillPanel(cls, inBag) {
   const combo = `<p class="help-p">起手技能给敌人「挂状态」，收招技能打带这个状态的敌人，会有额外效果（伤害翻倍、必定暴击、打碎、传染……）。</p>
       <div class="rlist">${Object.entries(STATES).map(([k, S2]) => `<div>${stTag(k)}<span>${S2.d}</span></div>`).join('')}</div>${comboHints(act, SAVE.comp)}
       <p class="help-p">同伴也会挂状态：Ngoc 灼烧，珍姑娘破甲，龙道长冰冻。带对了同伴，你的收招就有得打。</p>`;
-  return `${mechCard(cls)}
+  // 2026-11-26 设计语言：五块招式牌挂在梁上（数字是出招顺序），梁上写本门功法；基础招式是左边的木牌，秘技是右边的旗
+  const M = CLS_MECH[cls];
+  let wxrow = '';
+  if (cls === 'mage') { const have = new Set([...act, basic].map(k => effWx(cls, k))); wxrow = `<p class="help-p wxrow">你现在带的五行：${WX_IDS.map(w => `<i class="wxb ${have.has(w) ? '' : 'off'}" style="--c:${WX[w].c}">${WX[w].n}</i>`).join(' ')}</p>`; }
+  const top = inBag ? `${mechCard(cls)}
     <h4 class="sub-h">出战武学 <small>点格子换招 · 数字是出招顺序</small></h4>
     ${slotGrid(cls, L, null, 'sksel', SKSEL)}
-    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">基础 · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">秘技 · ${U.n}</button></div>
+    <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">基础 · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">秘技 · ${U.n}</button></div>`
+    : `${xlScene(cls, `<em>${M[0]}</em><small>本门功法</small><button class="qhelp sm" data-act="mechhelp" aria-label="说明">?</button>`, slotGrid(cls, L, null, 'sksel', SKSEL),
+      `<button class="xl-sign l ${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic"><small>基础</small><b>${basic.n}</b></button><button class="xl-sign r ${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult"><small>秘技</small><b>${U.n}</b></button>`)}${wxrow}`;
+  return `${top}
     ${det}
     <details class="wxinfo skfold skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
     ${inBag ? '' : buildCard(cls)}${fold('尸阵', formHTML(cls), 'form')}${fold('状态配合 · 怎么打连招', combo, 'combo')}`;
@@ -1569,10 +1620,11 @@ function lbHTML() {
   const L = SAVE.lb, named = !!(L && L.name), D = LBV.data[lbKey()], j = D && D.j;
   if (!D && !LBV.busy) setTimeout(() => lbLoad(), 0);
   const val = r => LBV.kind === 'rift' ? `<b>${r.val} 层</b><small>${r.sub < 999999 ? fmtClock(r.sub * 1000) : '—'}</small>` : `<b>${r.val} 层</b>`;
-  const row = r => `<div class="lbr ${r.me ? 'me' : ''}"><i>${r.rk}</i><span><b>${esc(r.n)}</b><small>${LB_SHORT[LB_CLS_BACK[r.cls] || r.cls] || ''} · 战力 ${fmtBig(r.pw)}</small></span><em>${val(r)}</em></div>`;
+  const row = r => `<div class="lbr ${r.me ? 'me' : ''}"><i class="${r.rk <= 3 ? 'top r' + r.rk : ''}">${r.rk}</i><span><b>${esc(r.n)}</b><small>${LB_SHORT[LB_CLS_BACK[r.cls] || r.cls] || ''} · 战力 ${fmtBig(r.pw)}</small></span><em>${val(r)}</em></div>`;
   const mine = j && j.me && j.me.length ? j.me.filter(m => !(j.top || []).some(t => t.rk === m.rk)) : [];
   const list = j ? ((j.top || []).length ? j.top.map(row).join('') + (mine.length ? `<div class="lbgap">⋯</div>${mine.map(m => row({ ...m, me: true })).join('')}` : '') : `<div class="empty-note">${LBV.kind === 'tower' ? '这周还没人上榜' : '还没人上榜'}</div>`) : `<div class="empty-note">${LBV.err ? esc(LBV.err) : '正在读取…'}</div>`;
   return `<section class="panel lbp">
+    <div class="lb-head"><i class="bw-roof"></i><b>${LBV.kind === 'tower' ? '通天榜' : '幻境榜'}</b></div>
     <div class="lbtop"><div class="seg">${[['rift', '幻境'], ['tower', '通天塔 · 本周']].map(([k, n]) => `<button class="${LBV.kind === k ? 'on' : ''}" data-act="lbkind" data-arg="${k}">${n}</button>`).join('')}</div><button class="qhelp sm" data-act="lbhelp" aria-label="说明">?</button></div>
     <div class="lbcls">${[['all', '全部'], ...CLASS_IDS.map(c => [c, LB_SHORT[c]])].map(([k, n]) => `<button class="${LBV.cls === k ? 'on' : ''}" data-act="lbcls" data-arg="${k}">${n}</button>`).join('')}</div>
     <div class="lblist">${list}</div>
@@ -1585,7 +1637,7 @@ let CTAB = null;
 // 江湖录（2026-11 一屏）：分成几个小页签，每个只在框里滚
 function colTab() {
   const ach = ACHIEVEMENTS.map(A => { const got = !!SAVE.ach[A.id];
-    return `<div class="ach ${got ? 'got' : ''}"><b>${A.n}</b><span>${A.d}</span></div>`; }).join('');
+    return `<div class="ach ${got ? 'got' : ''}"><i class="ach-s">${esc(String(A.n).slice(0, 1))}</i><span><b>${A.n}</b><small>${A.d}</small></span></div>`; }).join('');
   const nGot = ACHIEVEMENTS.filter(A => SAVE.ach[A.id]).length;
   const mons = allMonsterDefs().map(d => { const k = SAVE.kills[MK(d.n)] || 0, t = bestiaryTier(d.n), nx = BESTIARY_TIERS[t];
     return `<div class="mon ${k ? '' : 'unk'}">${SPR.img(d.spr, 40, d.pal)}<b>${k ? d.n : '？？？'}</b><small>斩 ${k}${nx ? ' / ' + nx : ''}</small><span class="tier">${'★'.repeat(t)}${'☆'.repeat(3 - t)}</span></div>`; }).join('');
@@ -1598,11 +1650,11 @@ function colTab() {
   const tabs = [...(featureOn('bounty') ? [['bty', '悬赏']] : []), ...(featureOn('rift') ? [...(shelved('zy') ? [] : [['zy', '镇妖录']]), ['lb', '排行']] : []), ['ach', featureOn('rift') ? '成就' : `成就 ${nGot}/${ACHIEVEMENTS.length}`], ['dex', '图鉴'], ['rec', '纪录']];
   if (!tabs.some(t => t[0] === CTAB)) CTAB = tabs[0][0];
   const sec = {
-    ach: `<section class="panel"><h3>成就 <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>`,
+    ach: `<section class="panel achp"><div class="ach-head"><b>成就</b><span class="bw-bar"><i style="width:${nGot / ACHIEVEMENTS.length * 100}%"></i></span><em>${nGot}/${ACHIEVEMENTS.length}</em></div><div class="achs">${ach}</div></section>`,
     dex: `${mountPanel()}<section class="panel"><h3>传奇图鉴 <small>${Object.keys(SAVE.codex || {}).filter(k => LEGENDS.some(l => l.id === k)).length}/${LEGENDS.length} · 本职业的专属传奇标了职业名</small></h3><div class="codex">${LEGENDS.map(L => { const got = SAVE.codex && SAVE.codex[L.id];
-      return `<div class="${got ? 'got' : 'no'}"><b>${got ? L.n : '？？？'}</b><i>${(SLOTS.find(x => x.id === L.slot) || {}).n || ''}${L.cls ? ' · ' + CLASSES[L.cls].n : ' · 通用'}${L.ch ? ' · 多见于第' + L.ch + '章' : ''}</i><br>${got ? L.d : '尚未得到'}</div>`; }).join('')}</div></section>
+      return `<div class="${got ? 'got' : 'no'}">${SPR.img('i_' + (SPR.T['i_' + L.slot] ? L.slot : 'weapon'), 22, { M: SPR.RAR_COL.legend }, 'cdx')}<b>${got ? L.n : '？？？'}</b><i>${(SLOTS.find(x => x.id === L.slot) || {}).n || ''}${L.cls ? ' · ' + CLASSES[L.cls].n : ' · 通用'}${L.ch ? ' · 多见于第' + L.ch + '章' : ''}</i><br>${got ? L.d : '尚未得到'}</div>`; }).join('')}</div></section>
       <section class="panel"><h3>百妖谱 <small>每种妖物斩 ${BESTIARY_TIERS.join(' / ')} 只点亮一颗星</small></h3><div class="mons">${mons}</div></section>`,
-    rec: `<section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
+    rec: `<section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="rtiles c2 rec-t">${rec.map(([n, v], i) => `<div class="rtile ${v === '—' ? 'zero' : ''}">${SPR.img(i < CHAPTERS.length ? 'st_time' : /斩妖/.test(n) ? 'st_kill' : /金蟾/.test(n) ? 'toad' : /悬赏/.test(n) ? 'scroll' : 'portal', 20)}<span><small>${n}</small><b>${v}</b></span></div>`).join('')}</div></section>
       <section class="panel"><h3>剧情回顾 <small>已经看过的剧情可以随时重看</small></h3>${seen('snowfox') || cl >= 1 ? '<div class="rp"><b>序 · 雪夜</b><button class="btn sm ghost" data-act="snowreplay">重看</button></div>' : ''}${replay || '<div class="empty-note">打通第一章后可以回看剧情。</div>'}</section>` };
   const body = CTAB === 'bty' ? bountyHTML() : CTAB === 'zy' ? zyHTML() : CTAB === 'lb' ? lbHTML() : sec[CTAB];
   return tpane(tabs, CTAB, 'ctab', body);
@@ -1660,7 +1712,8 @@ function titleHTML() {
   const emb = Array.from({ length: 18 }, (_, i) => `<i class="tl-emb" style="--x:${(i * 53) % 100}%;--d:${6 + (i * 7) % 9}s;--dl:${-(i * 1.3) % 9}s;--s:${2 + i % 3}px"></i>`).join('');
   return `<div class="title">
     <div class="tl-sky"><i class="tl-moon"></i><i class="tl-mtn a"></i><i class="tl-mtn b"></i><i class="tl-town"></i><i class="tl-fog a"></i><i class="tl-fog b"></i>${emb}</div>
-    <div class="tl-head"><h1>九幽回廊</h1><p>三百年前，五人为钉，天狐为锁。</p></div>
+    <div class="tl-head"><h1>九幽回廊</h1><p>三百年前，五人为钉，天狐为锁。</p>
+      <div class="tl-gate ${prog ? '' : 'new'}"><div class="rg-arch"><i class="rg-portal"></i><i class="rg-pl"></i><i class="rg-pr"></i><i class="rg-roof"></i><i class="rg-beam"></i><i class="rg-lan l"></i><i class="rg-lan r"></i></div>${prog ? `<span class="tl-me">${heroFig(cls, 46)}</span>` : ''}</div></div>
     <div class="tl-menu">
       ${prog ? `<button class="btn big" data-act="tcont">继续游戏<small>${esc(CLASSES[cls].n)} ${lv} 级 · ${riftPath() && !SAVE.run && !storyCleared('normal') ? `九幽幻境 · 最高 ${rTop()} 层` : esc(chTitle(ch))}${SAVE.test ? ' · 试玩角色' : ''}</small></button>
         <button class="btn big tl-lb" data-act="tlb">排行榜<small>${lbTitleLine()}</small></button>` : `<button class="btn big" data-act="tpath" data-arg="story">主线剧情<small>跟着故事走，一章一章解锁 · 第一次玩推荐</small></button>
@@ -2067,22 +2120,25 @@ function showRes() {
   flushBattleToasts();
   $('#bctl').hidden = true;
   const run = SAVE.run, ch = SAVE.chars[run.cls];
-  const extra = [BRES.mats ? `魂晶 +${BRES.mats}` : '', BRES.jyx ? `<b class="jyx">九幽玄晶 +${BRES.jyx}</b>` : '', BRES.key ? '<b style="color:var(--gold2)">得到钥匙！</b>' : '',
-    BRES.goblin === 'killed' ? '<b style="color:var(--gold2)">金蟾被你拿下了！</b>' : BRES.goblin === 'fled' ? '金蟾溜走了……' : ''].filter(Boolean).join('　·　');
-  const lvText = BRES.levels ? `　<b style="color:var(--gold2)">${ch.level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}！` : `升级！现在 ${ch.level} 级，获得心法点`}</b>` : '';
   const cont = run.world ? '继续' : B.kind === 'boss' ? (run.mode === 'rift' ? '完成幻境' : run.floor < 3 ? '前往下一层' : '本章完结') : '继续探索';
   if (BRES.mount) { BTOAST.push(`打赢了山海异兽，得到坐骑「<b>${MOUNTS[BRES.mount].n}</b>」${BRES.mountOn ? '，已经骑上了' : ''}。坐骑只是走路好看，不加属性；在江湖录的图鉴里换。`); flushBattleToasts(); }
   if (BRES.yiNew) { const Y = YISHI[BRES.yiNew]; BTOAST.push(`收服了首领的精魄，解锁役使「<b>${Y.n}</b>」${BRES.yiOn ? '，已经带上了' : '（役使已满两只，在出征页点役使那一行换）'}：${Y.d(yiGrade(BRES.yiNew))}。下一场起它会跟在你身边。`); flushBattleToasts(); }
   const autoEq = BRES.items.filter(i => i.auto);
   if (autoEq.length) { toast('空着的位置自动穿上了：' + autoEq.map(i => `<b>${esc(i.name)}</b>`).join('、')); autoEq.forEach(i => delete i.auto); }
+  // 2026-11-26 设计语言：胜是一卷捷报——卷首盖一枚「胜」印，得的东西是带图标的小牌，掉落摆成多宝格
+  const tile = (ic, k, v) => `<div class="rtile">${SPR.img(ic, 20)}<span><small>${k}</small><b>${v}</b></span></div>`;
+  const rw = [tile('st_para', `经验${BRES.cu ? ` ×${cuTxt(BRES.cu)}` : ''}`, '+' + fmtBig(BRES.xp)), tile('ingot', '银两', '+' + fmtBig(BRES.gold)), BRES.mats ? tile('shard', '魂晶', '+' + BRES.mats) : '', BRES.jyx ? tile('gem', '九幽玄晶', '+' + BRES.jyx) : ''].filter(Boolean);
+  const notes = [BRES.levels ? (ch.level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}！` : `升级！现在 ${ch.level} 级，获得心法点`) : '', BRES.key ? '得到钥匙！' : '', BRES.goblin === 'killed' ? '金蟾被你拿下了！' : ''].filter(Boolean).map(t => `<b>${t}</b>`).join('') + (BRES.goblin === 'fled' ? '<i>金蟾溜走了……</i>' : '');
+  const drop = lootGrid(BRES.items, BRES.gems, BRES.zy);
   el.innerHTML = BRES.win
-    ? `<div class="res win"><h3>胜</h3><p>经验 +${BRES.xp}${BRES.cu ? `<small class="cu">（追赶 ×${cuTxt(BRES.cu)}）</small>` : ''}${lvText}　·　银两 +${BRES.gold}${extra ? '　·　' + extra : ''}</p>
-       ${lootChips(BRES.items)}${gemChips(BRES.gems)}${zyChips(BRES.zy)}${BRES.items.length || BRES.gems.length || (BRES.zy && BRES.zy.length) ? '' : '<p class="sub">这次没有掉装备</p>'}
+    ? `<div class="res win jb"><div class="jb-top"><i class="jb-seal">胜</i><b>捷报</b></div>
+       <div class="rtiles c${Math.min(4, Math.max(2, rw.length))} jb-rw">${rw.join('')}</div>${notes ? `<p class="jb-note">${notes}</p>` : ''}
+       ${drop || '<p class="sub jb-none">这次没有掉装备</p>'}
        ${BRES.stat ? `<details class="bstat-d"><summary>本场统计</summary>${statHero(BRES.stat, BRES.hs)}</details>` : ''}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
-    : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose"><h3>撑不住了</h3><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
-      : run.mode === 'rift' ? `<div class="res lose"><h3>倒下了</h3><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
-      : `<div class="res lose"><h3>败</h3><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
+    : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose jb"><div class="jb-top"><b>撑不住了</b></div><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
+      : run.mode === 'rift' ? `<div class="res lose jb"><div class="jb-top"><b>倒下了</b></div><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
+      : `<div class="res lose jb"><div class="jb-top"><b>败</b></div><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
 }
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
@@ -3967,8 +4023,7 @@ function endHTML() {
     ${sd.chapter < 10 && r.diff === 'normal' ? `<p class="sub">下一章「${CHAPTERS[sd.chapter].n}」已开启</p>` : ''}</div>`;
   if (rift && r.riftDone) {
     const tl = r.timeLeft || 0, used = Math.round((r.clock || 0) / 100);
-    extra += `<div class="riftres g-${tl >= 0.5 ? 'a' : tl >= 0.25 ? 'b' : tl > 0 ? 'c' : 'd'}"><div class="rr-g">${r.grade}</div>
-      <div><p>${r.world ? `用时 <b>${fmtClock(r.clock || 0)}</b> · 香还剩 <b>${fmtClock(tl * riftLimit(r.riftLv))}</b>` : `用时 <b>${used}</b> 回合 · 香还剩 <b>${Math.round(tl * 100)}%</b>`}${r.deaths ? ` · 倒下 ${r.deaths} 次` : ''}</p>
+    extra += `<div class="riftres jb-lines"><div>
       <p>${tl > 0 ? `${boxOpen() ? r.upgPara ? '灵玉都满级了 · ' : `灵玉可以升级 <b>${r.upg}</b> 次 · ` : ''}现在最多能挑战 <b>${SAVE.riftCap}</b> 层${SAVE.riftCap > (r.capBefore || 0) ? '（往上开了）' : ''}` : `香烧完了：这一层不算过${boxOpen() ? '，灵玉只能升 1 次' : ''}`}</p>
       ${r.bp ? `<p class="newslot">兵魄 <b>+${r.bp}</b>（现在 ${SAVE.bp || 0}/${WPN_COST}${(SAVE.bp || 0) >= WPN_COST ? '，够打一把专属兵器了：去找张大锤' : ''}）</p>` : ''}
       ${(r.newSlots || []).length ? `<p class="newslot">新的装备位开了：<b>${r.newSlots.map(p => SLOT_NAME[p]).join('、')}</b>。去「人物」页看看；这一类装备从现在起会在幻境里掉。</p>` : ''}
@@ -3980,17 +4035,22 @@ function endHTML() {
       <div class="gems">${lgUpOrder(r.cls).map(g => `<div class="gemrow lg${g.on ? ' on' : ''}">${SPR.img('gem', 26, { G: LGEMS[g.t].c }, 'glow')}<span class="nm">${g.on ? '<em class="lgon">带着</em>' : ''}<b style="color:${LGEMS[g.t].c}">${LGEMS[g.t].n}</b> ${g.lv} 级<small>${LGEMS[g.t].d(g.lv)}</small></span>
         ${g.lv >= LGEM_CAP ? '<button class="btn sm" disabled>满级</button>' : `<button class="btn sm" ${r.upg ? '' : 'disabled'} data-act="lgup" data-arg="${g.id}">升级（${Math.round(lgemChance(g, r.riftLv) * 100)}%）</button>`}</div>`).join('')}</div>` : ''}</div>`;
   }
-  // 2026-11 一屏：上面标题，中间在框里滚，按钮固定在底部
-  return `<div class="scene endv"><div class="panel endp"><div class="endtop"><div class="art">${r.ended === 'win' ? heroSpr(r.cls, 56, 'float') + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 50, null, 'float', 'stand') : '') : SPR.img('skeleton', 56)}</div><div><h2>${title}</h2>
-    <p class="d">${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}</p></div></div>
+  // 2026-11-26 设计语言：上面一幅夜景——主角（倒下了就是一副骨架）站在左边，右边挂一卷捷报，写着这一趟的结果，幻境的评级盖成一枚印；数字做成带图标的小牌，装备摆成多宝格
+  const win = r.ended === 'win', tl2 = r.timeLeft || 0, tile = (ic, k, v) => `<div class="rtile">${ic[0] === '<' ? ic : SPR.img(ic, 20)}<span><small>${k}</small><b>${v}</b></span></div>`;
+  const seal = rift && r.riftDone ? `<i class="jb-seal g-${tl2 >= 0.5 ? 'a' : tl2 >= 0.25 ? 'b' : tl2 > 0 ? 'c' : 'd'} n${String(r.grade).length}">${r.grade}</i>` : win ? '<i class="jb-seal">胜</i>' : '';
+  const sub = rift && r.riftDone ? (r.world ? `用时 ${fmtClock(r.clock || 0)} · 香还剩 ${fmtClock(tl2 * riftLimit(r.riftLv))}` : `用时 ${Math.round((r.clock || 0) / 100)} 回合 · 香还剩 ${Math.round(tl2 * 100)}%`) + (r.deaths ? ` · 倒下 ${r.deaths} 次` : '')
+    : `${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}`;
+  const head = `<div class="jbsc ${win ? 'win' : 'lose'}"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+      <span class="jb-me">${win ? heroFig(r.cls, 78) + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 40, null, '', 'full') : '') : SPR.img('skeleton', 56)}</span>
+      <div class="jb-juan"><h2>${title}</h2><p>${sub}</p>${seal}</div></div>`;
+  const stats = [tile('st_time', rift && r.world ? '香烧了' : '用时', rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)), tile('st_kill', '斩妖', r.kills), tile('st_para', '等级', `${r.lvStart} → ${SAVE.chars[r.cls].level}`),
+    tile('ingot', '银两', '+' + fmtBig(r.goldGot)), tile(SPR.img('gem', 20, { G: '#59c9b5' }), '玉石', '+' + r.gemsGot), tile('shard', '魂晶', '+' + fmtBig(r.matsGot)), r.jyxGot ? tile('rune', '九幽玄晶', '+' + r.jyxGot) : '', SAVE.para.lv > r.paraStart ? tile('st_para', '修为', realmName(SAVE.para.lv)) : ''].join('');
+  return `<div class="scene endv"><div class="panel endp">${head}
     <div class="endscroll" data-scroll="end">
     ${r.record && !rift ? '<p class="evres">刷新了本章最快纪录！</p>' : ''}
+    <div class="rtiles c3 jb-st">${stats}</div>
     ${extra}
-    <div class="endstats"><div><small>${rift && r.world ? '香烧了' : '用时'}</small><b>${rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)}</b></div><div><small>斩妖</small><b>${r.kills}</b></div>
-      <div><small>等级</small><b>${r.lvStart} → ${SAVE.chars[r.cls].level}</b></div><div><small>银两</small><b>+${r.goldGot}</b></div>
-      <div><small>玉石</small><b>+${r.gemsGot}</b></div><div><small>魂晶</small><b>+${r.matsGot}</b></div>${r.jyxGot ? `<div><small>九幽玄晶</small><b>+${r.jyxGot}</b></div>` : ''}
-      ${SAVE.para.lv > r.paraStart ? `<div><small>修为</small><b>${realmName(SAVE.para.lv)}</b></div>` : ''}</div>
-    <p style="margin:0;color:var(--dim)">这次得到 ${loot.length} 件装备（已放进背包）</p>${lootChips(loot)}
+    <p class="jb-cnt">这次得到 <b>${loot.length}</b> 件装备（已放进背包）</p>${lootGrid(loot)}
     ${!rift && r.ended === 'win' && bkDue() ? `<div class="bk-nudge"><p>又打完一章。进度只存在这台设备上，备份一下更保险。</p><button class="btn sm" data-act="export">复制存档码</button><button class="btn sm ghost" data-act="bknudge">更多备份方式</button></div>` : ''}
     </div>${rift && riftUnlocked() ? ragainRow() : ''}<div class="endbtns">${r.loot && r.loot.length ? '<button class="btn ghost" data-act="bulkopen">清点战利品</button>' : ''}<button class="btn ${rift && riftUnlocked() ? 'ghost' : 'big'}" data-act="town">回青石镇</button>${rift && riftUnlocked() ? '<button class="btn big" data-act="ragain">再次挑战</button>' : ''}</div></div></div>`;
 }
@@ -4301,6 +4361,9 @@ const ACT = {
   cubeopen: () => { BACK = null; openModal(cubeBagModal); },
   kits: () => { BACK = null; openModal(kitsModal); },
   bagv: k => { BAGV = k; GSLOT = null; FILTER = 'all'; refresh(); },
+  talpeek: i => { TBR = +i; window.TALOPEN = true; refresh(); },
+  baghelp: () => toast('格子底下的数字是换上后的战力变化（强化和玉跟着部位，已经算进去）。右上角有「穿」的是能提升的，点一下直接换上。背包五个门派共用。', 6000),
+  gemhelp: () => toast(`三块相同的玉石可以合成高一阶，现在最高合成到「${GEM_TIERS[gemCap()]}」。玉器坊管到「极品」；后四档「无瑕、通灵、天成、九幽」要幻境最高层打到 ${GEM_RIFT.join('、')} 层。「一键镶最好的」把身上每个孔换上玉石包里最合适的那颗，免费。`, 8000),
   bagall: () => { GSLOT = null; FILTER = 'all'; refresh(); },
   tobag: sl => { closeModal(); MODALFN = null; modal.hidden = true; BACK = null; GSLOT = sl || null; TT = 'bag'; BAGV = 'eq'; FILTER = 'all'; VIEW = 'town'; refresh(); },
   gemfit: () => { const r = gemAutoFit(ctxCls()); save(); if (r.n) SFX.play('forge'); toast(r.n ? `换上了 ${r.n} 颗更合适的玉` : '身上的玉已经是最合适的了（或者玉石包里没有更好的）'); refresh(); },
