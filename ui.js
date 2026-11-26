@@ -2206,6 +2206,14 @@ function showCutin(kind, data) {
   let h;
   if (kind === 'ult') {   // 秘技：屏幕顶上一条细横幅，不压暗；4 倍速只闪名字
     const run = SAVE.run, sm = SAVE.speed >= 3, ms = ULT_MS();
+    if (document.body.classList.contains('gf')) {   // 国风样板：半秒水墨定格——战场褪成墨色，一笔墨带扫过，毛笔大字 + 朱砂竖印
+      const UC = { berserker: '#ff5a3a', mage: '#b8a8ff', necro: '#59e0c4', assassin: '#ff4a6a', paladin: '#ffd75a' }[run.cls] || '#ffd75a', ar = $('#arena');
+      el.innerHTML = `<div class="uk-wash"></div><div class="uk-row">${sm ? '' : `<div class="uk-art">${heroSpr(run.cls, 100)}</div>`}<b class="uk-g">${data.g}</b><span class="uk-seal">${esc(data.n)}</span></div>`;
+      el.className = 'cutin on ultink'; el.style.setProperty('--cd', ms + 'ms'); el.style.setProperty('--uc', UC);
+      if (ar && !sm) { ar.classList.add('gfink'); setTimeout(() => ar.classList.remove('gfink'), ms * 0.86); }
+      SFX.play('gong');
+      clearTimeout(el._h); el._h = setTimeout(() => { el.className = 'cutin'; el.innerHTML = ''; }, ms); return;
+    }
     const art = sm ? '' : `<div class="ci-art">${heroSpr(run.cls, 52)}${data.combo ? (data.sprs && data.sprs.length ? data.sprs : [run.ngoc === 'fox' ? 'ngocfox' : 'ngoc']).map(sp => unitIcon(sp, 46, null, '', 'full')).join('') : ''}</div>`;
     el.innerHTML = `<div class="ci-band">${art}<div class="ci-txt"><b class="ci-g">${data.g}</b><span>${esc(data.n)}</span></div></div>`;
     el.className = 'cutin on ultlite' + (data.combo ? ' combo' : ''); el.style.setProperty('--cd', ms + 'ms');   // 秘技横幅放在战场最下面（主角团这半边，见 .cutin.ultlite）

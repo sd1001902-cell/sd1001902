@@ -3207,7 +3207,7 @@ Object.assign(CHAPTERS[5], {
     { n: "Băng phách", hp: 0.7, atk: 1.25, spd: 1.2, elem: 'cold', spr: 'iceshard' },
     { n: "Người tuyết", hp: 2.0, atk: 1.1, spd: 0.7, spr: 'yeti' },
     { n: "Dơi băng", hp: 0.5, atk: 0.8, spd: 1.5, pack: true, elem: 'cold', spr: 'bat', pal: { B: '#6a9ac4' } },
-    { n: "Hồn bị đóng băng", hp: 1.0, atk: 1.2, spd: 1.1, elem: 'cold', spr: 'ghost', pal: { C: '#c8e8ff' } },
+    { n: "Hồn bị đóng băng", hp: 1.0, atk: 1.2, spd: 1.1, elem: 'cold', spr: 'ghost', pal: { W: '#c8e8ff' } },
     { n: "Tằm băng", hp: 0.9, atk: 1.05, spd: 0.9, pack: true, elem: 'cold', spr: 'icesilkworm' },
     { n: "Vượn tuyết", hp: 1.5, atk: 1.2, spd: 1.1, spr: 'snowape' },
     { n: "Khôi lỗi băng tinh", hp: 1.9, atk: 1.0, spd: 0.7, elem: 'cold', spr: 'crystalgolem', trait: 'shield' } ],
@@ -3937,7 +3937,7 @@ Object.assign(SPEAKERS, {
   qianzhuang: { n: "Chưởng quỹ tiền trang ma", spr: 'merchant', pal: { B: '#2a2a3a', S: '#c8c8e8' } },
   guitiejiang: { n: "Thợ rèn âm phủ", spr: 'smith', pal: { B: '#3a3a4a' } },
   qizhen:   { n: "Chủ Kỳ Trân Các", spr: 'femghost', pal: { W: '#e8d0f0', R: '#8a3aaa' } },
-  guichu:   { n: "Đầu bếp ma", spr: 'ghost', pal: { C: '#e8c8a0' } },
+  guichu:   { n: "Đầu bếp ma", spr: 'ghost', pal: { W: '#e8c8a0' } },
   zhizha:   { n: "Thợ làm hàng mã", spr: 'paper' },
   xiaotou:  { n: "Tiểu quỷ trộm túi tiền", spr: 'imp', pal: { R: '#6a6a8a' } },
 });
