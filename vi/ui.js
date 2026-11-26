@@ -560,7 +560,7 @@ function bulkBody() {
     <div class="bk2-keep">${keeps.map(([k]) => `<button class="${f[k] ? 'on' : ''}${['keepAnc', 'keepPri', 'keepJy'].includes(k) ? ' w2' : ''}" data-act="bulkk" data-arg="${k}"><i></i>${keepsTxt[k]}</button>`).join('')}</div>
     <div class="bk2-list" data-scroll="bulk">${groups.length ? groups.map(([r, L]) => { const a1 = L.filter(it => it.anc === 1).length, a2 = L.filter(it => it.anc === 2).length, a3 = L.filter(it => it.anc === 3).length; return `<div class="bk2-g r-${r}">${RARITY[r].n} · ${L.length}${a1 ? `<em class="ga1">Thượng Cổ ${a1}</em>` : ''}${a2 ? `<em class="ga2">Thái Cổ ${a2}</em>` : ''}${a3 ? `<em class="ga3">Cửu U ${a3}</em>` : ''}</div>${L.map(tile).join('')}`; }).join('') : "<p class=\"bk2-empty\">Không có trang bị nào hợp điều kiện</p>"}${all.length > shown.length ? `<p class="bk2-empty">……còn ${all.length - shown.length} món chưa liệt kê</p>` : ''}</div>
     <div class="bk2-foot"><p>${list.length ? `${sell ? "Bán" : "Phân giải"} <b>${list.length}</b> món → <b>${tot}</b> ${sell ? "lượng bạc" : "hồn tinh"}` : "Không có trang bị cần xử lý"}${all.length ? "<small>Chạm vào trang bị để giữ riêng món đó</small>" : ''}</p>
-    <button class="btn big" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? (jyN ? `Trong đó có ${jyN} món Cửu U, chạm lần nữa để xác nhận` : `Trong đó có ${risky} món Bộ hoặc Thần binh, chạm lần nữa để xác nhận`) : `${sell ? "Bán" : "Phân giải"} ${list.length} món này`}</button></div></div>`;
+    <div class="bk2-btns"><button class="btn ghost bk2-back" data-act="close">Quay lại</button><button class="btn big ${BULKARM && risky ? 'arm' : ''}" ${list.length ? '' : 'disabled'} data-act="bulkgo">${BULKARM && risky ? (jyN ? `Trong đó có ${jyN} món Cửu U, chạm lần nữa để xác nhận` : `Trong đó có ${risky} món Bộ hoặc Thần binh, chạm lần nữa để xác nhận`) : `${sell ? "Bán" : "Phân giải"} ${list.length} món này`}</button></div></div></div>`;
 }
 const bulkModal = () => `<button class="btn sm ghost x" data-act="close">Đóng</button><h2 class="mh">Kiểm kê nhà kho</h2>${bulkBody()}`;
 function gambleBody() {
@@ -2177,7 +2177,7 @@ function battleHTML() {
       <div class="flash" id="flash"></div><div class="fxl"></div><div class="combo" id="combo"></div><div class="cutin" id="cutin"></div>
       <div class="stpop" id="stpop" data-act="stclose" hidden></div><button class="statb" id="statc" data-act="statfull" aria-label="Thống kê trận này">TK</button><div id="bres"></div></div>
     <div class="bctl sbar" id="bctl"><div class="sb-me" id="sbme"></div><div class="sb-foe" id="sbfoe"></div></div>
-    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}${SAVE.showSkip ? "<button data-act=\"skip\">Bỏ qua</button>" : ''}</div></div><div class="hud-sk" id="hudsk"></div>
+    <div class="hud" id="hud"><div class="hud-ctl"><div class="spdc" id="spdc">${[1, 2, 3].map(s => `<button class="${SAVE.speed === s ? 'on' : ''}" data-act="speed" data-arg="${s}">×${s}</button>`).join('')}</div>${SAVE.showSkip ? "<button class=\"skipb\" data-act=\"skip\">Bỏ qua</button>" : ''}</div><div class="hud-sk" id="hudsk"></div>
       <button class="ultb" id="ultb" data-act="ult" title="Bí kỹ · ${U.n}: ${U.d}"><i id="ultfill"></i><span><b>Bí kỹ</b><small id="ultpct"></small></span></button>
 </div>`;
 }
