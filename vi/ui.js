@@ -2108,11 +2108,11 @@ function tick() {
   const o = battleStep(B); const nl = narrate(o); if (nl && !(o.lines.length && !o.pops.some(p => /^\d+$/.test(p[1])))) B.logs.push(nl); B.logs.push(...o.lines); updBattle(o, true);
   if (B.over) setTimeout(endBattle, o.ult ? ULT_MS() + 300 : 250); else schedule(o);
 }
-// 跳过要等几秒（2026-11-26 用户：跳过战斗设一个限制）：这一场开打满 SKIP_WAIT 秒才能跳；没到的时候按钮是暗的，右上角一个小圆点倒数
-const SKIP_WAIT = 5; let SKIPT = { b: null, t: 0, h: 0 };
+// 跳过要等几秒（2026-11-26 用户：跳过战斗设一个限制 → 定 3 秒，不要倒计时）：这一场开打满 SKIP_WAIT 秒才能跳；没到的时候按钮是暗的，能点了就变亮
+const SKIP_WAIT = 3; let SKIPT = { b: null, t: 0, h: 0 };
 function skipLeft() { if (!B) return 0; if (SKIPT.b !== B) { SKIPT.b = B; SKIPT.t = performance.now(); } return Math.max(0, SKIP_WAIT - (performance.now() - SKIPT.t) / 1000); }
-function skipTick() { clearTimeout(SKIPT.h); const b = typeof document !== 'undefined' && document.querySelector('.skipb'); if (!b || !B) return; const L = B.over ? 0 : Math.ceil(skipLeft()), w = L > 0 ? String(L) : '';
-  if ((b.dataset.w || '') !== w) { b.dataset.w = w; b.classList.toggle('wait', L > 0); } if (L > 0) SKIPT.h = setTimeout(skipTick, 200); }
+function skipTick() { clearTimeout(SKIPT.h); const b = typeof document !== 'undefined' && document.querySelector('.skipb'); if (!b || !B) return; const L = B.over ? 0 : skipLeft();
+  if (b.classList.contains('wait') !== (L > 0)) b.classList.toggle('wait', L > 0); if (L > 0) SKIPT.h = setTimeout(skipTick, Math.min(200, L * 1000 + 20)); }
 function skipBattle() {
   clearTimeout(timer); let n = 0; B.ultAuto = true; B.castAuto = true;
   while (!B.over && n++ < 8000) { const o = battleStep(B); B.logs.push(...o.lines); }
