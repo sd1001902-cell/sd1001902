@@ -488,7 +488,7 @@ function townHTML() {
   return `<div class="thead"><div class="th1"><button class="homeb" data-act="home" aria-label="主页">‹</button><h1>九幽回廊</h1>
       <div class="rescur"><span class="pill gold">${SPR.img('ingot', 16)}${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 16)}${fmtBig(SAVE.mats)}</span><button class="setb ${TT === 'set' ? 'on' : ''}" data-act="tt" data-arg="set" aria-label="设置">⚙</button></div></div>
     <div class="th2"><div class="ctabs">${tabs}</div>${!seen('clstip') && storyCleared('normal') < 2 && !SAVE.story.ended ? '<button class="clstip" data-act="clstip"><b>↖ 这五个头像是五个门派</b>点一下就换人，各有各的打法 <i>知道了</i></button>' : ''}
-      <div class="cinfo"><div class="ci1"><b>${C.n}</b><span><i>战力</i> <b>${power(s)}</b></span></div>
+      <div class="cinfo"><div class="ci1 ${String(power(s)).length >= 8 ? 'lg' : ''}"><b>${C.n}</b><span><i>战力</i> <b>${power(s)}</b></span></div>
         <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}修为 ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `${ch.level} 级${featureOn('para') && SAVE.para.lv ? ` · 修为 ${realmName(SAVE.para.lv)}` : ` · 经验 ${ch.xp}/${need}`}`}</small></div></div></div>
   ${storageOK ? '' : '<p class="warn">当前浏览器不允许保存进度，关闭页面后进度会丢失。</p>'}
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>

@@ -489,7 +489,7 @@ function townHTML() {
   return `<div class="thead"><div class="th1"><button class="homeb" data-act="home" aria-label="Trang chủ">‹</button><h1>Cửu U Hồi Lang</h1>
       <div class="rescur"><span class="pill gold">${SPR.img('ingot', 16)}${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 16)}${fmtBig(SAVE.mats)}</span><button class="setb ${TT === 'set' ? 'on' : ''}" data-act="tt" data-arg="set" aria-label="Cài đặt">⚙</button></div></div>
     <div class="th2"><div class="ctabs">${tabs}</div>${!seen('clstip') && storyCleared('normal') < 2 && !SAVE.story.ended ? "<button class=\"clstip\" data-act=\"clstip\"><b>↖ Năm hình đầu này là năm môn phái</b>Chạm một cái là đổi người, mỗi phái một lối đánh <i>Đã hiểu</i></button>" : ''}
-      <div class="cinfo"><div class="ci1"><b>${C.n}</b><span><i>Lực chiến</i> <b>${power(s)}</b></span></div>
+      <div class="cinfo"><div class="ci1 ${String(power(s)).length >= 8 ? 'lg' : ''}"><b>${C.n}</b><span><i>Lực chiến</i> <b>${power(s)}</b></span></div>
         <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}Tu vi ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `Cấp ${ch.level}${featureOn('para') && SAVE.para.lv ? ` · Tu vi ${realmName(SAVE.para.lv)}` : ` · Kinh nghiệm ${ch.xp}/${need}`}`}</small></div></div></div>
   ${storageOK ? '' : "<p class=\"warn\">Trình duyệt này không cho lưu tiến độ, đóng trang là mất hết.</p>"}
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>

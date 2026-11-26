@@ -1630,7 +1630,7 @@ body[data-view=title] .wrap{max-width:none;padding:0}
 .gc3n{flex:1;min-width:0;display:flex;align-items:center;gap:4px;border:0;background:none;cursor:pointer;font-size:calc(13px * var(--fs,1));padding:0;text-align:left}.gc3n span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .gcur3 .btn.sm{flex:none;padding:0 8px;min-height:28px}
 @media(max-width:380px){.ctabs{gap:3px}.ct{width:36px}.ci1>b{font-size:calc(13px * var(--fs,1))}.ci1 span b{font-size:calc(15px * var(--fs,1))}}
-.ci1>b{min-width:0;overflow:hidden;text-overflow:ellipsis}.ci1 span i{font-style:normal}
+.ci1>b{min-width:0;overflow:hidden;text-overflow:ellipsis}.ci1 span i{font-style:normal}.ci1.lg span b{font-size:calc(14px * var(--fs,1));letter-spacing:-.3px}.ci1.lg span{font-size:calc(10px * var(--fs,1))}.ci1.lg{gap:3px}.ci1 span{flex:none}
 .npc2 b,.npc2 small{max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .kstats span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}.kstats div{gap:4px;min-width:0}
 html[lang=vi] .th1 h1{font-size:calc(16px * var(--fs,1));letter-spacing:0;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -2170,9 +2170,10 @@ html[lang=vi] .hstats .rtile small{font-size:9px}html[lang=vi] .hstats .rtile b{
 .bgc.isup{background:radial-gradient(circle at 50% 30%,#1a2a18,#0b0807 78%);border-color:#3f7a45}
 .bgc.ancient::after,.bgc.primal::after,.bgc.jiuyou::after{position:absolute;left:2px;top:2px;width:13px;height:13px;font:400 11px/13px "Ma Shan Zheng","Noto Serif SC",serif;text-align:center;color:#ffe9c9;border-radius:2px 3px 2px 4px;pointer-events:none}
 .bgc.ancient::after{content:"古";background:#3d6a5c}.bgc.primal::after{content:"太";background:#b9321f}.bgc.jiuyou::after{content:"幽";background:#6a3dc8}
-.bgq{position:absolute;right:-3px;top:-3px;width:22px;height:22px;padding:0;border:1px solid #0b1a0c;border-radius:50%;background:#6fe27c;color:#0b1a0c;font:400 13px/20px "Ma Shan Zheng","Noto Serif SC",serif;cursor:pointer;box-shadow:0 0 8px rgba(111,226,124,.6)}
+.bgq{position:absolute;right:1px;top:1px;width:22px;height:22px;padding:0;border:1px solid #0b1a0c;border-radius:50%;background:#6fe27c;color:#0b1a0c;font:400 13px/20px "Ma Shan Zheng","Noto Serif SC",serif;cursor:pointer;box-shadow:0 0 8px rgba(111,226,124,.6)}
 html[lang=vi] .bgq{font:700 0/20px sans-serif}html[lang=vi] .bgq::before{content:"▲";font-size:10px}
 html[lang=vi] .bg-plq b{font:700 12px/1.2 "Noto Serif",serif;letter-spacing:0;margin:0}html[lang=vi] .bg-obj small{font-size:9.5px}html[lang=vi] .bgm b{font:700 10px/1.3 "Noto Serif",serif}
+.gscroll.gbody,.endscroll,.tscroll,.hbody,.arena #bres .lootg{overflow-x:hidden;touch-action:pan-y}.gbody .chips{touch-action:pan-x}
 /* 玉石：一盘一盘的格子 */
 .gemtop{display:flex;align-items:stretch;gap:6px;margin:0 0 7px}.gemtop .btn{flex:1 1 0;min-width:0;flex-direction:column;gap:0;line-height:1.15;padding:4px 6px;white-space:nowrap}.gemtop .btn small{font-size:10px;font-weight:400;opacity:.8}.gemtop .qhelp{flex:none;align-self:center}
 .gemgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:5px}.gemgrid .empty-note{grid-column:1/-1}
@@ -2226,7 +2227,7 @@ html[lang=vi] .xl-juan b{font:700 12px/1.2 "Noto Serif",serif;white-space:normal
 .jb-note{display:flex;flex-wrap:wrap;gap:4px 10px;justify-content:center;margin:2px 0 6px!important;font-size:13px}.jb-note b{color:#f1c94a}.jb-note i{font-style:normal;color:var(--dim)}
 .lootg{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 8px;text-align:center}.lootg .bgm{padding:4px 2px 3px}.lootg .bgm img{width:28px;height:28px}.lootg .bgm b{font-size:11px}
 .lootg span.bgm{cursor:default}.lootg .bgc.gm b{color:#cfc3a8}.lootg .bgc.zy{border-color:#5a3a8a}.lootg .bgc.zy b{color:#c8a8ff}
-.bgup{position:absolute;right:-3px;top:-3px;width:15px;height:15px;font:700 9px/15px sans-serif;font-style:normal;text-align:center;color:#0b1a0c;background:#6fe27c;border-radius:50%;box-shadow:0 0 8px rgba(111,226,124,.7);pointer-events:none}
+.bgup{position:absolute;right:1px;top:1px;width:15px;height:15px;font:700 9px/15px sans-serif;font-style:normal;text-align:center;color:#0b1a0c;background:#6fe27c;border-radius:50%;box-shadow:0 0 8px rgba(111,226,124,.7);pointer-events:none}
 .arena #bres .res.jb{max-height:100%;display:flex;flex-direction:column}.arena #bres .res.jb .lootg{overflow-y:auto;overscroll-behavior:contain;max-height:150px;flex:0 1 auto;padding:3px 3px 0}
 /* 结局页：夜景里挂一卷捷报 */
 .jbsc{position:relative;height:124px;flex:none;border:1px solid #4a3524;border-radius:2px;overflow:hidden;background:linear-gradient(180deg,#0a1216 0,#10222a 44%,#1a2c2e 66%,#151d1a 66%,#0c100e 100%);box-shadow:inset 0 0 0 1px #000,inset 0 0 30px rgba(0,0,0,.6)}
