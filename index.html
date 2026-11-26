@@ -2397,6 +2397,8 @@ html body .sbar .potb::after{content:"";position:absolute;inset:-10px -8px -9px}
 .skipb{position:relative;flex:none;height:30px;min-width:58px;padding:0 12px;box-sizing:border-box;border:1px solid #8a6a3a;border-radius:2px;background:linear-gradient(180deg,#2a1c12,#150e0a);color:#f0d9a8;font:700 14px/1 "Noto Serif SC",serif;letter-spacing:2px;text-indent:2px;box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(201,164,92,.16);cursor:pointer;white-space:nowrap}
 .skipb::after{content:"";position:absolute;inset:-11px -5px -6px -2px}
 html[lang=vi] .skipb{letter-spacing:0;text-indent:0;font-size:13px;padding:0 9px}
+/* 战斗状态栏右上角的小字（精英 100% +2）不许被挤扁：原来名字长的时候它和名字一起缩，字就顶出框外，越南语版战斗页会被撑宽几像素（2026-11-26 顺手修） */
+html body .sbar .sbh small{flex:none}html body .sbar .sbh b{min-width:0}
 /* 清点库房：最下面一排「返回 + 分解/卖掉」（2026-11-26 用户：单手够不着顶上的关闭） */
 .bk2-btns{display:flex;gap:8px;align-items:stretch}
 .bk2-btns .btn.big{flex:1;min-width:0;width:auto;margin:0}
