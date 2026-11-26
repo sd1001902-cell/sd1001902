@@ -2148,7 +2148,11 @@ function stDesc(u, k) {
   const t = u.st[k], left = typeof t === 'number' ? t : t && t.t;
   return { n: I[0] + (left > 0 && left < 99 ? ` · còn ${left} lượt` : ''), c: I[1], d: I[3] };
 }
-document.addEventListener('click', e => { if (STPOP && e.target.closest && e.target.closest('#arena') && !e.target.closest('[data-act=stinfo],[data-act=castq],[data-act=ult],#stpop,#statc')) { STPOP = null; drawStPop(); } });   // 点战场空白处收起说明
+// 招式、秘技、状态的说明：点别的任何地方就收起（2026-11-26：原来只认战场里的点击，而且用的是 click——苹果手机上点空白处不出 click，说明就一直挂着）。
+// 开着「本场统计」时点统计框里面不收（要看、要滑）；点招式、秘技、状态这些会换说明的按钮也不收，交给它们自己
+document.addEventListener(typeof PointerEvent !== 'undefined' ? 'pointerdown' : 'click', e => { if (!STPOP || !e.target.closest) return;
+  if (e.target.closest('[data-act=stinfo],[data-act=castq],[data-act=ult],#statc')) return; if (STPOP.full && e.target.closest('#stpop')) return;
+  STPOP = null; drawStPop(); }, true);
 function drawStPop() {
   const el = document.getElementById('stpop'); if (!el) return;
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
