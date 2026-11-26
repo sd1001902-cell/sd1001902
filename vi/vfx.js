@@ -51,7 +51,10 @@ const VFX = (() => {
   const PC = new Map(); let PCt = 0;
   function pos(id) {
     if (!arena) return null;
-    const now = performance.now(); if (now - PCt > 150) { PC.clear(); PCt = now; }
+    const now = performance.now();
+    if (now - PCt > 150) { PC.clear(); PCt = now;   // 2026-11-26：到点重量时一口气把场上的人全量了（只逼浏览器排一次版）；原来是用到谁量谁，中间夹着往画面里加东西，一招里要排好几次
+      const A = arena.getBoundingClientRect(); for (const el of arena.querySelectorAll('.unit')) { if (!el.id) continue; const r = (el.querySelector('.sp') || el).getBoundingClientRect();
+        PC.set(el.id.slice(2), { el, p: { x: r.left - A.left + r.width / 2, y: r.top - A.top + r.height / 2, w: r.width, h: r.height } }); } }
     const hit = PC.get(id); if (hit && hit.el.isConnected) return hit.p;
     const el = document.getElementById('u-' + id); if (!el) return null;
     const s = el.querySelector('.sp') || el, r = s.getBoundingClientRect(), A = arena.getBoundingClientRect();
