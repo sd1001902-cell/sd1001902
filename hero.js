@@ -336,6 +336,7 @@ const HERO = (() => {
     ride:  { lean: 3, nh: 82, nk: 78, fh: 74, fk: 70, ns: 26, ne: 46, fs: 34, fe: 40 },                                                    // 骑在坐骑上：两腿往前跨着
     lk:    { lean: -3, hx: -1 },                                                                                                            // 回头看一眼（手上照站姿）
     b0: { view: 'back', walk: 0 }, b1: { view: 'back', walk: 1, y: -1 }, b2: { view: 'back', walk: 2 }, b3: { view: 'back', walk: 3, y: -1 },
+    rb: { view: 'back', walk: 0, ride: 1 },                                                                                                // 骑着坐骑的背影：两腿往两边跨开
   };
   // 各职业的修正：武器握法不一样
   const TWEAK = {
@@ -507,10 +508,12 @@ const HERO = (() => {
   }
 
   // ---------- 拼一帧 ----------
-  function build(cls, pose) {
+  function build(cls, pose0) {
+    const rd = /@r$/.test(pose0), pose = rd ? pose0.slice(0, -2) : pose0;   // 「招式名@r」＝骑在坐骑上使这一招：上半身照这一招，两条腿照骑姿，人不离鞍（2026-11-26 战斗里骑坐骑）
     const L = LOOK[cls] || LOOK.berserker, TW = TWEAK[cls] || {}, TI = TW.idle || {}, inh = {};
     if (/^(idle2|w\d|lk|ride)$/.test(pose) && !TW[pose]) for (const k of ['w', 'wl', 'ne', 'lean', 'y']) if (TI[k] !== undefined && (k !== 'y' || pose === 'idle2')) inh[k] = TI[k] + (k === 'y' && pose === 'idle2' ? 0 : 0);
     const P = Object.assign({}, BASE, POSES[pose] || POSES.idle, inh, TW[pose] || {});
+    if (rd && P.view !== 'back') { const R = POSES.ride; P.nh = R.nh; P.nk = R.nk; P.fh = R.fh; P.fk = R.fk; P.x = 0; P.y = 0; P.lean = Math.max(-10, Math.min(14, P.lean || 0)); }
     const back = newBuf(), body = newBuf(), front = newBuf();
     const hip = [28 + P.x, 33 + P.y], tv = [Math.sin(rad(P.lean)), -Math.cos(rad(P.lean))], neck = add(hip, tv, 7);
     const nSh = add(neck, [0.9, 1.4]), fSh = add(neck, [-1.4, 1.6]);
@@ -545,7 +548,7 @@ const HERO = (() => {
       const lh = add(hip, [-1.6, 0]), rh = add(hip, [1.6, 0]);
       const lg = (hp, lift) => ({ kn: add(hp, [0, 5.4 - lift]), an: add(hp, [0, 11 - lift * 1.6]) });
       const ph = P.walk || 0, l1 = ph === 1 ? 1.4 : 0, l2 = ph === 3 ? 1.4 : 0;
-      for (const [hp, lift] of [[lh, l1], [rh, l2]]) { const g = gid++, Lg = lg(hp, lift); put(body, capPix(hp, Lg.kn, 1.8, 1.6), 'D', g, true); put(body, capPix(Lg.kn, Lg.an, 1.6, 1.3), 'D', g); put(body, capPix(add(Lg.an, [0, -0.3]), add(Lg.an, [0, 0.4]), 1.3, 1.3), 'F', g); }
+      for (const [hp, lift, sx] of [[lh, l1, -1], [rh, l2, 1]]) { const g = gid++, Lg = P.ride ? { kn: add(hp, [sx * 2.4, 3.2]), an: add(hp, [sx * 3.1, 7.2]) } : lg(hp, lift); put(body, capPix(hp, Lg.kn, 1.8, 1.6), 'D', g, true); put(body, capPix(Lg.kn, Lg.an, 1.6, 1.3), 'D', g); put(body, capPix(add(Lg.an, [0, -0.3]), add(Lg.an, [0, 0.4]), 1.3, 1.3), 'F', g); }
       const g = gid++; put(body, capPix(hip, neck, 3.2, 3.6), 'B', g, true);
       if (L.robe) put(body, polyPix([add(hip, [-3.4, -0.5]), add(hip, [3.4, -0.5]), add(hip, [4.6, 4 + L.robe * 2.4]), add(hip, [-4.6, 4 + L.robe * 2.4])]), 'B', g);
       put(body, capPix(add(hip, [-3, -0.3]), add(hip, [3, -0.3]), 0.8, 0.8), 'R', g);

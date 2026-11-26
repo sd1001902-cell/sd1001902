@@ -417,8 +417,8 @@ const SH_BEASTS = {
           { t: 'shell', every: 4, pct: 0.05, nm: "Co tròn lại", note: "Đế Giang co tròn lại — “Đóng băng” làm nó duỗi ra", say: "(Nó co tròn lại)" }], half: { say: "(Nó lăn thành một quả cầu lửa, không rõ đâu là đằng trước)", enrage: true }, die: "(Nó xẹp xuống, như cái túi da xì hơi.)" },
 };
 // 坐骑：seat = 骑的人屁股落在图上的哪一格；hop = 独脚的，一蹦一蹦地走
-const MOUNTS = { dijiang: { n: "Đế Giang", spr: 'mt_dijiang', seat: [14, 12] }, kui: { n: "Quỳ", spr: 'mt_kui', seat: [13, 13], hop: 1 }, taotie: { n: "Thao Thiết", spr: 'mt_taotie', seat: [12, 13] },
-  xingtian: { n: "Hình Thiên", spr: 'mt_xingtian', seat: [15.5, 5] }, xiangliu: { n: "Tương Liễu", spr: 'mt_xiangliu', seat: [12, 16] } };
+const MOUNTS = { dijiang: { n: "Đế Giang", spr: 'mt_dijiang', seat: [14, 12], seatB: [15.5, 13] }, kui: { n: "Quỳ", spr: 'mt_kui', seat: [13, 13], seatB: [15.5, 12], hop: 1 }, taotie: { n: "Thao Thiết", spr: 'mt_taotie', seat: [12, 13], seatB: [15.5, 10] },
+  xingtian: { n: "Hình Thiên", spr: 'mt_xingtian', seat: [15.5, 5], seatB: [15.5, 5] }, xiangliu: { n: "Tương Liễu", spr: 'mt_xiangliu', seat: [12, 16], seatB: [15.5, 20] } };
 const shOn = run => !!(run && run.mode === 'rift' && run.rw && run.rw.sh && SH_BEASTS[run.rw.sh]);
 function shPick() { const ids = Object.keys(SH_BEASTS), got = (typeof SAVE !== 'undefined' && SAVE && SAVE.mounts) || {}, need = ids.filter(id => !got[id]); return RNG.pick(need.length ? need : ids); }
 // 装备图标按种类各画各的（2026-11-26 美化第三批）：神兵按编号、套装按「套装|部位」、普通装备按底材第几档，查它画成什么样。这张表是照中文名字自动生成的（规则见项目文档），里面只有编号，越南文版也能用
