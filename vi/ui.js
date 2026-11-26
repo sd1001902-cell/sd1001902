@@ -427,6 +427,34 @@ const lockNote = (txt) => `<div class="locknote">${SPR.img('lock', 22)}<span>${t
 // 2026-11-26 减法改版：背包独立成页（五门共用）；设置缩成右上角齿轮
 // 山海异兽坐骑：图鉴页最上面一排；没见过的只有剪影
 const mountPanel = () => { const M = SAVE.mounts || {}; return `<section class="panel mtp"><h3>Dị thú Sơn Hải <small>${Object.keys(MOUNTS).filter(k => M[k]).length}/${Object.keys(MOUNTS).length} · thắng là cưỡi được, chỉ để đẹp</small></h3><div class="mts">${Object.keys(MOUNTS).map(id => { const m = MOUNTS[id], got = M[id], on = got && SAVE.mount === id; return `<button class="mt ${got ? '' : 'no'} ${on ? 'on' : ''}" data-act="mount" data-arg="${id}">${SPR.img(m.spr, 44)}<b>${got ? m.n : "? ? "}</b><small>${on ? "Đang cưỡi" : got ? "Chạm để cưỡi" : "Chưa gặp"}</small></button>`; }).join('')}</div></section>`; };
+// 出征页关隘图里的主角：有坐骑就骑着，没有就站着（三层姿势图叠起来，和地图上是同一套）
+function heroFig(cls, S) {
+  if (typeof HERO === 'undefined' || !HERO.has(cls)) return heroSpr(cls, S);
+  const mt = SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount], cell = S / 32, u = cell * 0.655 * 30 / 30, F = HERO.url(cls, mt ? 'ride' : 'idle', null); if (!F) return heroSpr(cls, S);
+  const w = 56 * u * 1.5, h = 46 * u * 1.5, k = u * 1.5, lay = (x, y) => ['back', 'body', 'front'].map(l => `<img src="${F[l]}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;image-rendering:pixelated" alt="" draggable="false">`).join('');
+  if (!mt) return `<div class="hfig" style="width:${(S * 0.7).toFixed(0)}px;height:${S}px">${lay(S * 0.35 - 28 * k, S - 44 * k)}</div>`;
+  return `<div class="hfig" style="width:${S}px;height:${S}px"><img src="${SPR.url(mt.spr)}" style="position:absolute;left:0;top:0;width:${S}px;height:${S}px;image-rendering:pixelated" alt="" draggable="false">${lay(mt.seat[0] * cell - 28 * k, mt.seat[1] * cell - 33 * k)}</div>`;
+}
+// 布阵那一行（出征页）：阵法和伙伴合在一起
+function zhenRow() {
+  const T = teamOf(), N = teamSlots(), c = formCur(), any = FORM_IDS.some(formOpen);
+  return `<button class="teamrow zhrow" data-act="${any ? 'fmopen' : 'teamopen'}"><span class="sub">${any ? "Trận pháp" : "Đồng hành"}</span>${any ? `<b>${c ? `${FORMS[c].n} Lv ${formLv(c)}` : "Tán Trận"}</b>` : ''}<small>Đồng hành ${T.length}/${N}</small><em>${any ? "Bày trận" : "Điều chỉnh"} ›</em></button>`;
+}
+// 关隘图里门前的队伍：摆了阵按号位分前后排，没摆按各人本来的前后排；点了去布阵
+function gateTeam(cls) {
+  const keys = fmMembers(), cur = formCur(), sl = cur ? formSlots(cur, keys, cls) : null;
+  const rowOf = k => sl ? (sl.indexOf(k) < 2 ? 0 : 1) : natRow(k, cls), num = k => sl ? `<i>${sl.indexOf(k) + 1}</i>` : '';
+  const fig = k => `<span class="rg-m ${k === 'hero' ? 'me' : ''}">${k === 'hero' ? heroFig(cls, 62) : unitIcon(k === 'ngoc' ? 'ngocfox' : COMPANIONS[k].spr, 38, null, '', 'full')}${num(k)}</span>`;
+  const grp = (r, lab) => { const L = keys.filter(k => rowOf(k) === r); return `<button class="rg-row r${r}" data-act="${FORM_IDS.some(formOpen) ? 'fmopen' : 'teamopen'}"><span class="rg-figs">${L.map(fig).join('')}</span><small>${lab}</small></button>`; };
+  return grp(1, "Hậu tuyến") + grp(0, "Tiền tuyến");
+}
+// 布阵弹窗底下的一排伙伴：亮着的是带上的，写着站几号
+function fmBench(sel) {
+  const T = teamOf(), N = teamSlots(), all = Object.keys(COMPANIONS).filter(compOpen), sl = sel !== 'san' ? formSlots(sel, fmMembers(), SAVE.cls) : null;
+  if (!all.length) return '';
+  return `<div class="fmbench"><span class="sub">Đồng hành ${T.length}/${N}<button class="linkbtn" data-act="teamopen">Tài của từng người ›</button></span><div class="fmbl">${all.map(c => { const on = T.includes(c), i = sl ? sl.indexOf(c) : -1;
+    return `<button class="fmbc ${on ? 'on' : ''}" data-act="fmbench" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 30, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b><small>${on ? (i >= 0 ? `Vị trí ${i + 1}` : natRow(c, SAVE.cls) ? "Hậu tuyến" : "Tiền tuyến") : "Chưa mang"}</small></button>`; }).join('')}</div></div>`;
+}
 const TOWN_TABS = [['go', "Xuất chinh"], ['gear', "Nhân vật"], ['bag', "Túi đồ"], ['hero', "Tu luyện"], ['col', "Giang Hồ Lục"]];
 function dots() {
   const d = {}, cls = SAVE.cls;
@@ -650,14 +678,20 @@ function goTab() {
     const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], ar = ancRate(SAVE.riftLv);
     const info = [["Thượng Cổ", `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · Thái Cổ ${(ar[1] * 100).toFixed(2)}%` : ''}${jyRate(SAVE.riftLv) && !shelved('jy') ? ` · <b class="jyc">Cửu U ${(jyRate(SAVE.riftLv) * 100).toFixed(2)}%</b>` : ''}`], ["Một nén hương", `${Math.round(riftLimit(SAVE.riftLv) / 60000)} phút`],
       ["Kỷ lục", rec ? riftRecTxt(rec) : "Chưa có"], ["Bộ", SAVE.riftLv >= RSET2_LV ? "Rơi cả hai bộ" : SAVE.riftLv >= RSET_LV ? "Rơi một bộ" : `Từ tầng ${RSET_LV}`], ["Tinh phách", ZY_CN[zyGrade(SAVE.riftLv)]], ["Cao nhất", `Tầng ${maxR}`]];
-    body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
-        <div class="rl"><b>${SAVE.riftLv}</b><small>tầng · yêu vật khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}</small></div>
-        <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
-      <div class="rquick"><button data-act="rlvto" data-arg="1" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>Tầng 1</button><button data-act="rlv" data-arg="-50" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-50</button><button data-act="rlv" data-arg="-10" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-10</button><button data-act="rlv" data-arg="10" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+10</button><button data-act="rlv" data-arg="50" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+50</button>${rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? `<button data-act="rlvto" data-arg="${rec.lv}" class="rq-rec">Kỷ lục ${rec.lv}</button>` : ''}<button data-act="rlvto" data-arg="${maxR}" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>Cao nhất ${maxR}</button></div>
-      <div class="rinfo">${[0, 2, 1, 5, 3, 4].map(i => info[i]).map(([k, v], i) => `<div class="${i < 2 ? 'full' : ''}"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+    // 2026-11-26 出征页重排：上面一幅「幻境关隘」图（牌楼、匾额上写层数、主角和伙伴站在门前），底下是木牌快捷键和四块带图标的信息
+    const dq = (arg, txt, dis) => `<button data-act="rlv" data-arg="${arg}" ${dis ? 'disabled' : ''}>${txt}</button>`, atMin = SAVE.riftLv <= 1, atMax = SAVE.riftLv >= maxR;
+    const tile = (ic, k, v, act) => `<${act ? `button data-act="rlvto" data-arg="${act}"` : 'div'} class="rtile">${SPR.img(ic, 26)}<span><small>${k}</small><b>${v}</b></span></${act ? 'button' : 'div'}>`;
+    body = `<div class="rgate"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i><i class="rg-path"></i>
+        <div class="rg-arch"><i class="rg-portal"></i><i class="rg-pl"></i><i class="rg-pr"></i><i class="rg-roof"></i><i class="rg-beam"><em>Ảo Cảnh Cửu U</em></i><i class="rg-lan l"></i><i class="rg-lan r"></i>
+          <div class="rg-plaque"><small>Tầng</small><b>${SAVE.riftLv}</b></div></div>
+        <button class="rg-arr l" data-act="rlv" data-arg="-1" ${atMin ? 'disabled' : ''} aria-label="Thấp hơn một tầng">‹</button><button class="rg-arr r" data-act="rlv" data-arg="1" ${atMax ? 'disabled' : ''} aria-label="Cao hơn một tầng">›</button>
+        ${gateTeam(cls)}
+        <span class="rg-sh">${SPR.img('mt_dijiang', 16)}Có thể gặp <b>dị thú Sơn Hải</b> · thú cưỡi ${Object.keys(MOUNTS).filter(k => (SAVE.mounts || {})[k]).length}/${Object.keys(MOUNTS).length}</span></div>
+      <div class="rquick"><button data-act="rlvto" data-arg="1" ${atMin ? 'disabled' : ''}>T.1</button>${dq(-50, '-50', atMin)}${dq(-10, '-10', atMin)}${dq(-5, '-5', atMin)}${dq(5, '+5', atMax)}${dq(10, '+10', atMax)}${dq(50, '+50', atMax)}<button data-act="rlvto" data-arg="${maxR}" ${atMax ? 'disabled' : ''}>Max</button></div>
+      <div class="rtiles">${tile('fire', "Một nén hương · yêu vật", `${info[1][1]} · khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}`)}${tile('i_weapon', ar[1] ? "Thượng Cổ · Thái Cổ" : "Thượng Cổ", `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · ${(ar[1] * 100).toFixed(2)}%` : ''}`)}${tile('chest', "Bộ · Tinh phách", `${info[3][1]} · ${info[4][1]}`)}${tile('scroll', "Kỷ lục · Cao nhất", `${info[2][1]} · tầng ${maxR}`, rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? rec.lv : 0)}</div>
       ${rpOn() ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">Đang đuổi theo: kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (thấp hơn nhân vật cao nhất ${topLevel() - SAVE.chars[cls].level} cấp)</p>` : ''}
-      ${teamRow()}${formRow()}${yiRow(cls)}`;
+      ${zhenRow()}${yiRow(cls)}`;
   }
   const mods = featureOn('mods') ? `<button class="chip modchip ${SAVE.mods.length ? 'on' : ''}" data-act="modsopen">Tăng độ khó${SAVE.mods.length ? ' ' + SAVE.mods.length : ''}</button>` : '';
   const comps = Object.keys(COMPANIONS).filter(c => (SAVE.comps || {})[c]);
@@ -1278,7 +1312,7 @@ const formModal = () => () => {
     return `<button class="fmo ${id === sel ? 'sel' : ''} ${id === cur ? 'cur' : ''} ${op ? '' : 'lock'}" data-act="fmsel" data-arg="${id}"><b>${FORMS[id].n}</b><small>${op ? (id === 'san' ? "Không bày" : 'Lv ' + formLv(id)) : '🔒'}</small>${id === cur ? "<em>Đang dùng</em>" : k != null && E ? `<i class="fk k${k}">${fmKTxt(k)}</i>` : ''}</button>`; }).join('');
   const Fd = FORMS[sel], op = formOpen(sel);
   let body;
-  if (sel === 'san') body = `<p class="help-p">${Fd.d}</p><div class="fmact">${cur !== 'san' ? "<button class=\"btn sm\" data-act=\"fmuse\" data-arg=\"san\">Không bày trận</button>" : "<button class=\"btn sm\" disabled>Đang dùng</button>"}</div>`;
+  if (sel === 'san') body = `<p class="help-p">${Fd.d}</p>${fmBench(sel)}<div class="fmact">${cur !== 'san' ? "<button class=\"btn sm\" data-act=\"fmuse\" data-arg=\"san\">Không bày trận</button>" : "<button class=\"btn sm\" disabled>Đang dùng</button>"}</div>`;
   else if (!op) body = `<p class="help-p"><b>${Fd.n}</b> (${Fd.tag}) chưa học: qua chương ${Fd.ch} chính tuyến, hoặc từng tới tầng ${Fd.at} Ảo Cảnh là học được.</p>`;
   else {
     const lv = formLv(sel), keys = fmMembers(), sl = formSlots(sel, keys, cls);
@@ -1288,12 +1322,12 @@ const formModal = () => () => {
     body = `<p class="fmh"><b>${Fd.n}</b> <span>Lv ${lv}/${FORM_MAX} · ${Fd.tag}</span></p>
       <p class="fmk">Khắc <b>${FORMS[nb].n}</b> (${FORM_WHY[sel]}) · bị <b>${FORMS[by].n}</b> khắc · khắc Tán Trận</p>
       <div class="fmb"><div class="fmr"><span class="fml">Trước</span>${cell(0)}${cell(1)}</div><div class="fmr"><span class="fml">Sau</span>${cell(2)}${cell(3)}</div></div>
-      <p class="sub fmtip">${FMPICK != null ? `Chạm thêm một vị nữa để đổi chỗ với vị ${FMPICK + 1}` : "Chạm một vị, rồi chạm vị khác, hai người đổi chỗ"}</p>
+      <p class="sub fmtip">${FMPICK != null ? `Chạm thêm một vị trí để đổi chỗ, hoặc chạm đồng hành bên dưới để người đó đứng vào vị trí ${FMPICK + 1}` : "Chạm một vị trí rồi chạm vị trí khác để đổi chỗ, hoặc chạm đồng hành bên dưới để người đó vào trận"}</p>${fmBench(sel)}
       <div class="fmact">${sel !== cur ? `<button class="btn sm" data-act="fmuse" data-arg="${sel}">Bày trận này</button>` : "<button class=\"btn sm\" disabled>Đang dùng</button>"}
         ${lv < FORM_MAX ? `<button class="btn sm ghost" ${SAVE.mats >= c ? '' : 'disabled'} data-act="fmup" data-arg="${sel}">Lên Lv ${lv + 1} (hồn tinh ${c})</button>` : "<button class=\"btn sm ghost\" disabled>Tối đa</button>"}</div>`;
   }
   const eTxt = E ? `<p class="fmen">Trận yêu tầng này: <b>${FORMS[E.f].n}</b>${E.b ? ` · Yêu vương giữ ải: <b>${FORMS[E.b].n}</b>` : ''}</p>` : '';
-  return `<h2 class="mh">Trận pháp <small>Hồn tinh ${SAVE.mats}</small><button class="qhelp sm" data-act="fmhelp" aria-label="Giải thích">?</button></h2>${eTxt}
+  return `<h2 class="mh">Bày trận <small>Hồn tinh ${SAVE.mats}</small><button class="qhelp sm" data-act="fmhelp" aria-label="Giải thích">?</button></h2>${eTxt}
     <div class="fmlist">${list}</div><div class="fmbody">${body}</div>
     <div class="sheet-act"><button class="btn ghost" data-act="close">Xong</button></div>`;
 };
@@ -4269,6 +4303,15 @@ const ACT = {
   defhelp: () => { const prev = MODALFN; openModal(defHelpModal()); BACK = prev; },
   teamopen: () => { BACK = null; openModal(teamModal()); },
   fmopen: () => { BACK = null; FMSEL = null; FMPICK = null; formCheckUnlock(); openModal(formModal()); },
+  fmbench: c => {   // 布阵里点伙伴：先点了号位就让他站到那个号位（带满了就把那个号位上的伙伴换下来）；没点号位就是上阵 / 下阵
+    const sel = FMSEL || formCur() || 'san', T = teamOf(), inT = T.includes(c), N = teamSlots();
+    if (FMPICK != null && sel !== 'san') {
+      const occ = formSlots(sel, fmMembers(), SAVE.cls)[FMPICK];
+      if (!inT) { if (T.length >= N) { if (occ && occ !== 'hero') SAVE.team = T.filter(x => x !== occ); else return toast(`Đồng hành đã đủ (${N} người): chạm một vị trí đang có đồng hành đứng, rồi chạm người này để đổi`); } SAVE.team = [...teamOf(), c]; }
+      const keys = fmMembers(), j = formSlots(sel, keys, SAVE.cls).indexOf(c); if (j >= 0 && j !== FMPICK) formSwap(sel, SAVE.cls, keys, j, FMPICK);
+      FMPICK = null; save(); SFX.play('click'); return refresh(); }
+    if (inT) SAVE.team = T.filter(x => x !== c); else if (T.length < N) SAVE.team = [...T, c]; else return toast(`Đồng hành đã đủ (${N} người): chạm một vị trí trước, rồi chạm người này để thay người đang đứng ở đó`);
+    save(); SFX.play('click'); refresh(); },
   fmsel: id => { FMSEL = id; FMPICK = null; refresh(); },
   fmslot: i => { i = +i; const sel = FMSEL || formCur(); if (!sel || sel === 'san') return; if (FMPICK == null) { FMPICK = i; refresh(); return; }
     if (FMPICK !== i) { formSwap(sel, SAVE.cls, fmMembers(), FMPICK, i); save(); SFX.play('click'); } FMPICK = null; refresh(); },

@@ -20,7 +20,7 @@ const uid = () => (++_uid).toString(36) + Math.random().toString(36).slice(2, 7)
 // ---------------- 减法改版（2026-11-26 用户定）----------------
 // 封存的功能：代码和存档数据都留着，把这里的开关改成 false 就回来（以后当新版本放出）。
 // form 阵法（妖物也不摆阵）；zy 镇妖录（小妖精魄、每页属性、后记；首领精魄照掉，役使要用）；jy 九幽品质和玄晶（太古到顶）；mods 加难度
-const SHELF = { form: true, zy: true, jy: true, mods: true };
+const SHELF = { zy: true, jy: true, mods: true };   // 2026-11-26 阵法放回来了（用户定：和伙伴合在一起，选伙伴就是往号位上放）
 const shelved = k => !!SHELF[k];
 const PRESLIM_KEY = 'jy_backup_preslim';   // 改版前的存档原样留一份在本机
 // ---------------- 存档 ----------------
