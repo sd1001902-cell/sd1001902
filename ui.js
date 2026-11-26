@@ -2143,7 +2143,7 @@ function showRes() {
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
   const wxl = false && T0 && T0.wx ? `<div class="wxl wx-${T0.wx}">${Array.from({ length: 14 }, () => `<i style="left:${Math.random() * 100}%;top:${Math.random() * 100}%;animation-delay:-${(Math.random() * 8).toFixed(1)}s;animation-duration:${(5 + Math.random() * 6).toFixed(1)}s"></i>`).join('')}</div>` : '';
-  const deco = [0.08, 0.3, 0.55, 0.8].map((x, i) => { const D = T.d[i % T.d.length]; return `<span class="svd" style="left:${x * 100}%">${SPR.img(D[0], 44 + i * 6, D[1])}</span>`; }).join('');
+  const deco = [0.04, 0.96].map((x, i) => { const D = T.d[i % T.d.length]; return `<span class="svd" style="left:${x * 100}%">${SPR.img(D[0], 44 + i * 6, D[1])}</span>`; }).join('');
   return `${battleBar(run)}
     <div class="arena sv ${T0 ? 'k-' + T0.kind : ''}" id="arena" style="--bg:${T0 ? T0.bg : themeOf(run).bg};--g:${T.g};--p:${T.p}">${typeof GFX !== 'undefined' ? `<div class="sv-paint" style="background-image:url(${GFX.background(run.theme || (run.mode === 'rift' ? 'rift' + (themeOf(run).n || '') : 'gen'), T0 || { kind: T.kind || 'field', bg: themeOf(run).bg, g: T.g, p: T.p, wx: T.wx }, B && B.kind === 'boss')})"></div>` : ''}<div class="sv-back">${deco}</div>${wxl}
       <div class="turnbar" id="turnbar"></div><button class="fbadge" id="fbadge" data-act="fminfo" hidden></button><div class="wardbar" id="wardbar" hidden></div><div class="side allies" id="allies"></div><div class="side foes" id="foes"></div>
@@ -2649,7 +2649,8 @@ function applyStep(o, anim) {
   const foes0 = aliveOf(B, 'e'), tg = foes0.find(f => f.id === B.target) || foes0[0];
   const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}${heroKeyChips(P)}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? '普' : payOn ? '收' : k.ap ? STATES[k.ap].n[0] : k.pay ? '收' : '';
-      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`; }).join('') + '</div>';
+      const cdp = B._cdp || (B._cdp = {}), lit = cdp[k.id] && k.left <= 0; cdp[k.id] = k.left > 0;
+      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${lit ? 'lit' : ''} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-cd="${k.left > 0 ? k.left : ''}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`; }).join('') + '</div>';
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100, n = Math.floor(r / 100), U = ULTS[P.cls];   // 2026-11-24 第二版：能存两格
     $('#ultfill').style.width = (full ? 100 : r) + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq); ub.classList.toggle('two', n >= 2);
     $('#ultpct').textContent = B.ultReq ? '马上' : n >= 2 ? '满两格' : full ? `一格 · ${r - 100}%` : `${r}%`; ub.disabled = B.over;

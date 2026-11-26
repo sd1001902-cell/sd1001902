@@ -347,10 +347,11 @@ const GFX = (() => {
   function background(key, T, boss) {
     if (typeof document === 'undefined' || !T) return '';
     const kind = T.kind || 'field', fam = FAM[key] || (kind === 'room' ? 'inn' : kind === 'hall' ? 'hall' : kind === 'dungeon' ? 'cave' : kind === 'town' ? 'town' : 'field');
-    const ck = key + '|' + kind + '|' + (boss ? 'B' : '');
+    const tall = typeof innerWidth === 'undefined' || innerWidth <= 700;   // 手机竖屏画竖幅；电脑宽屏战场是横的，画矮一点
+    const ck = key + '|' + kind + '|' + (boss ? 'B' : '') + (tall ? '' : '|w');
     if (bgCache[ck]) return bgCache[ck];
-    const w = 160, h = 140, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'), rnd = seeded(ck);
-    const bg = T.bg || '#141010', gr = T.g || '#2a2418', pa = T.p || '#4a4030', hz = Math.round(h * 0.48), M = hexMix;
+    const w = 160, h = tall ? 200 : 150, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'), rnd = seeded(ck);
+    const bg = T.bg || '#141010', gr = T.g || '#2a2418', pa = T.p || '#4a4030', hz = Math.round(h * (tall ? 0.28 : 0.36)), M = hexMix;
     const RR = (a, b) => a + rnd() * (b - a), RI = (a, b) => Math.floor(RR(a, b + 1));
     const F = (col, X, Y, W2, H2) => { x.fillStyle = col; x.fillRect(Math.round(X), Math.round(Y), Math.round(W2), Math.round(H2)); };
     const grad = (X, Y, W2, H2, a, b, c2) => { const g1 = x.createLinearGradient(0, Y, 0, Y + H2); g1.addColorStop(0, a); if (c2) g1.addColorStop(0.55, c2); g1.addColorStop(1, b); x.fillStyle = g1; x.fillRect(X, Y, W2, H2); };
@@ -496,12 +497,38 @@ const GFX = (() => {
         else if (fam === 'forest' || fam === 'swamp') { const tx = w * 0.72; F('#1a140e', tx - 10, 0, 20, hz + 6); for (let k = 0; k < 6; k++) line(tx, hz - 30 + k * 3, tx + (k % 2 ? 26 : -26), hz - 40 + k * 2, '#1a140e'); }
         else { grad(0, 0, w, hz, 'rgba(120,10,10,.35)', 'rgba(0,0,0,0)'); moon(w * 0.7, 20, 11, '#c83a2a'); } };
     }
+    // —— 竖画幅的近景（2026-11-26）：地面加几道近疏远密的纹（有纵深），正中一片亮地（两边对阵的地方），两边摆这一处的东西，越往下越大（近大远小），中间留给人站，最下面两角压两块黑影 ——
+    { const roomy = fam === 'inn' || fam === 'hall' || fam === 'temple', cavy = ['web', 'lava', 'abyss', 'ice', 'yin', 'cave'].includes(fam);
+      const lc2 = fam === 'ice' ? '#9fd8ff' : fam === 'lava' || fam === 'volcano' ? '#ff8a3a' : fam === 'abyss' ? '#ff5a3a' : fam === 'swamp' ? '#9ac06a' : fam === 'snow' ? '#ffffff' : fam === 'web' || fam === 'yin' ? '#c0a0ff' : roomy ? '#ffb85a' : fam === 'dream' ? '#ffe0a0' : '#e8dcc0';
+      if (!roomy) for (let yy = hz + 9, st = 4; yy < h - 4; yy += st, st *= 1.2) dith(0, Math.round(yy), w, 1, M(gr, fam === 'snow' ? '#5a6a7a' : '#fff', fam === 'snow' ? 0.25 : 0.1), 0.3);
+      const [lr, lg, lb] = rgb(lc2), lp = x.createRadialGradient(w * 0.5, h * 0.57, 4, w * 0.5, h * 0.57, w * 0.6); lp.addColorStop(0, `rgba(${lr},${lg},${lb},${fam === 'snow' ? 0.1 : 0.15})`); lp.addColorStop(0.55, `rgba(${lr},${lg},${lb},0.05)`); lp.addColorStop(1, `rgba(${lr},${lg},${lb},0)`);
+      x.save(); x.scale(1, 0.62); x.translate(0, h * 0.57 * (1 / 0.62 - 1)); x.fillStyle = lp; x.fillRect(0, 0, w, h / 0.62); x.restore();
+      const rock = (cx, by, sz, col) => { poly([[cx - sz, by], [cx - sz * 0.7, by - sz * 0.7], [cx - sz * 0.1, by - sz], [cx + sz * 0.6, by - sz * 0.75], [cx + sz, by]], col); poly([[cx - sz * 0.7, by - sz * 0.7], [cx - sz * 0.1, by - sz], [cx, by - sz * 0.45]], M(col, '#fff', 0.14)); };
+      const post = (cx, by, ht, col) => { F('#241810', cx, by - ht, 1, ht); F('#241810', cx - 2, by - ht, 5, 1); const gl = M(col, bg, 0.72); circ(cx + 2, by - ht + 4, 4, gl); F(col, cx + 1, by - ht + 2, 3, 4); F(M(col, '#fff', 0.5), cx + 2, by - ht + 3, 1, 2); F('#241810', cx - 1, by, 3, 1); };
+      const tc2 = (T.treePal && T.treePal.G) || '#22402a', N = 7;
+      for (let k = 0; k < N; k++) { const t = (k + rnd() * 0.5) / N, by = Math.round(hz + 18 + t * (h - hz - 34)), sc = 0.9 + t * 1.3, left = k % 2 === 0, cx = Math.round(left ? RR(11, 21) : w - RR(11, 21));
+        if (roomy) { if (k % 3 === 0) post(cx, by, 12 * sc, '#c4291f'); else { F(M('#4a2a16', bg, 0.2), cx - 5 * sc, by - 4 * sc, 10 * sc, 2); F(M('#2a160c', bg, 0.2), cx - 4 * sc, by - 3 * sc, 1, 4 * sc); F(M('#2a160c', bg, 0.2), cx + 3 * sc, by - 3 * sc, 1, 4 * sc); } }
+        else if (fam === 'ice') { if (k % 2) shard(cx, by, 12 * sc, M('#7ad0ff', bg, 0.2), '#f4fcff'); else rock(cx, by, 5 * sc, M('#5a7a8a', bg, 0.3)); }
+        else if (fam === 'web') { if (k % 2) shard(cx, by, 10 * sc, M('#8a3a9a', bg, 0.25), '#f0c0ff'); else cocoon(cx, by - 16 * sc, 9 * sc, M('#e8e0d0', bg, 0.3)); }
+        else if (fam === 'yin') { if (k % 2) tomb(cx, by, 4 * sc); else shard(cx, by, 10 * sc, M('#6a3aaa', bg, 0.25), '#e0c0ff'); }
+        else if (cavy) { rock(cx, by, 6 * sc, M(T.wall || '#3a2a22', '#000', 0.25)); if (fam !== 'cave' && k % 2) F(M(lc2, bg, 0.3), cx - 2, by - 1, 4, 1); }
+        else if (fam === 'grave' || key === 'ghostday') { if (k % 2) tomb(cx, by, 4.5 * sc); else dead(cx, by, 13 * sc, M(bg, '#000', 0.45)); }
+        else if (fam === 'market') { if (k % 2) post(cx, by, 13 * sc, k % 4 === 1 ? '#c4291f' : '#e8e0d0'); else tomb(cx, by, 4 * sc); }
+        else if (fam === 'town' || fam === 'yamen' || fam === 'yard') { if (k % 2) post(cx, by, 13 * sc, '#ffb04a'); else pine(cx, by, 14 * sc, M(tc2, bg, 0.4)); }
+        else if (fam === 'swamp') { dead(cx, by, 14 * sc, M(bg, '#000', 0.45)); for (let j = 0; j < 4; j++) line(cx + RR(-5, 5), by, cx + RR(-6, 6), by - RR(4, 9) * sc, M('#4a5a2a', bg, 0.2)); }
+        else if (fam === 'volcano') { if (k % 2) dead(cx, by, 13 * sc, M(bg, '#000', 0.5)); else { rock(cx, by, 6 * sc, '#1a0c08'); F('#ff7a1a', cx - 1, by - 2, 3, 1); } }
+        else if (fam === 'snow') { pine(cx, by, 14 * sc, M('#2a4a44', '#c8d8e4', 0.25)); F('#f4f8fc', cx - 3, by, 7, 1); }
+        else { if (k % 3 === 2) rock(cx, by, 5 * sc, M(pa, '#000', 0.45)); else pine(cx, by, 15 * sc, M(tc2, bg, 0.4)); } }
+      const fgc = M(bg, '#000', 0.72);
+      if (roomy) { F(fgc, 0, h - 9, 22, 9); F(M(fgc, '#fff', 0.06), 0, h - 9, 22, 1); F(fgc, w - 20, h - 7, 20, 7); F(M(fgc, '#fff', 0.06), w - 20, h - 7, 20, 1); }
+      else { poly([[0, h], [0, h - 20], [6, h - 25], [15, h - 19], [22, h - 9], [30, h]], fgc); poly([[w, h], [w, h - 16], [w - 8, h - 21], [w - 18, h - 12], [w - 26, h]], fgc);
+        line(0, h - 20, 6, h - 25, M(fgc, lc2, 0.2)); line(6, h - 25, 15, h - 19, M(fgc, lc2, 0.2)); line(w - 8, h - 21, w, h - 16, M(fgc, lc2, 0.2)); } }
     if (accent) accent();
     // 首领战：天色压红、四角压暗
     if (boss) { const rg = x.createRadialGradient(w * 0.7, hz, 10, w * 0.7, hz, w * 0.8); rg.addColorStop(0, 'rgba(120,20,10,.18)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = rg; x.fillRect(0, 0, w, h); }
     fogBand(hz - 6, hz + 8, M(bg, '#bbb', 0.12), 0.35);
     const vg = x.createLinearGradient(0, h * 0.76, 0, h); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)'); x.fillStyle = vg; x.fillRect(0, h * 0.76, w, h * 0.24);
-    const vs = x.createLinearGradient(0, 0, w, 0); vs.addColorStop(0, 'rgba(0,0,0,.35)'); vs.addColorStop(0.15, 'rgba(0,0,0,0)'); vs.addColorStop(0.85, 'rgba(0,0,0,0)'); vs.addColorStop(1, 'rgba(0,0,0,.35)'); x.fillStyle = vs; x.fillRect(0, 0, w, h);
+    const vs = x.createLinearGradient(0, 0, w, 0); vs.addColorStop(0, 'rgba(0,0,0,.3)'); vs.addColorStop(0.09, 'rgba(0,0,0,0)'); vs.addColorStop(0.91, 'rgba(0,0,0,0)'); vs.addColorStop(1, 'rgba(0,0,0,.3)'); x.fillStyle = vs; x.fillRect(0, 0, w, h);
     return (bgCache[ck] = c.toDataURL());
   }
   // ======== 场景天气：火星、雪、孢子、鬼火、雾、落叶、花瓣、灰、水滴 ========
