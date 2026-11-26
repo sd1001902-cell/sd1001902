@@ -2105,6 +2105,14 @@ html[lang=vi] .gbar .sub{font-size:calc(12px * var(--fs,1))}html[lang=vi] .gbar-
 .stats.one{grid-template-columns:1fr;margin:6px 0 10px}.stats.one div{gap:10px}.stats.one span{flex:1 1 0;min-width:0}.stats.one b{flex:none}
 .statbox{max-height:calc(90dvh - 132px);overflow-y:auto;overscroll-behavior:contain}.statbox .stats{margin-top:4px}
 .autosum{margin:0 0 8px;font-size:calc(13px * var(--fs,1));color:var(--ink);line-height:1.6}.autofold>summary{cursor:pointer;color:var(--gold2);font-size:calc(13px * var(--fs,1));padding:6px 0}
+/* 布阵弹窗收紧（2026-11-26 用户嫌太大）：六个阵一行、号位格压矮、伙伴一行六个 */
+html body .fmlist{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin:2px 0 5px}html body .fmo{padding:3px 1px 2px;border-radius:2px;min-width:0}html body .fmo b{font-size:12px;white-space:nowrap}html body .fmo small{font-size:9px;line-height:1.1}
+html body .fmh{margin:0 0 4px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}html body .fmh span{font-size:11px}html body .fmh span b{color:var(--ink)}html body .fmen{margin:0 0 3px;font-size:11px}
+html body .fmb{gap:4px}html body .fmr{grid-template-columns:18px 1fr 1fr;gap:4px}html body .fml{font-size:10px}
+html body .fmc{position:relative;min-height:0;padding:3px 6px 4px;gap:1px;border-radius:2px}html body .fmc .fmn{position:absolute;right:5px;top:3px;font-size:9.5px}html body .fmc .fmw img{width:24px;height:24px}html body .fme i{font-size:10px;line-height:1.2}
+html body .fmtip{margin:4px 0 2px;font-size:10.5px}html body .fmbench{margin:4px 0 0}html body .fmbl{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin-top:3px}
+html body .fmbc{padding:2px 1px 3px}html body .fmbc b{font-size:10.5px}html body .fmbc small{font-size:9px;line-height:1.1}html body .fmact{margin-top:5px}
+html[lang=vi] body .fmlist,html[lang=vi] body .fmbl{grid-template-columns:repeat(3,minmax(0,1fr))}html[lang=vi] body .fmh{white-space:normal}html[lang=vi] body .fmo b{font-size:11px;white-space:normal;line-height:1.1}
 /* 出征页：幻境关隘图 */
 .rgate{position:relative;height:clamp(150px,24dvh,192px);border:1px solid #4a3524;border-radius:2px;overflow:hidden;margin-bottom:8px;background:linear-gradient(180deg,#0a1216 0,#10222a 44%,#1a2c2e 62%,#151d1a 62%,#0c100e 100%);box-shadow:inset 0 0 0 1px #000,inset 0 0 30px rgba(0,0,0,.6)}
 .rg-moon{position:absolute;right:15%;top:9%;width:32px;height:32px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#fff6d8,#e8d9a0 60%,#bfae78);box-shadow:0 0 22px 6px rgba(240,220,150,.22)}
