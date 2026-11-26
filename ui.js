@@ -4144,8 +4144,16 @@ function creditsHTML() {
 }
 
 // ---------- 弹窗 ----------
-function openModal(fn) { MODALFN = fn; sheet.innerHTML = fn(); modal.hidden = false; const t = document.querySelector('#toast'); if (t) t.style.top = ''; }   // 弹窗打开时，提示条回到顶上，不压着弹窗里的字
-function closeModal() { if (BACK) { MODALFN = BACK; BACK = null; sheet.innerHTML = MODALFN(); return; } MODALFN = null; modal.hidden = true; }
+// 2026-11-26 高弹窗底下加「返回」（用户：单手够不着顶上的关闭）。所有弹窗统一处理：关闭按钮在上半屏、底下又没有别的能关的按钮，就在右下角钉一个「返回」，内容滚动时它不动
+function sheetBack() {
+  const old = sheet.querySelector(':scope > .mback'); if (old) old.remove(); if (modal.hidden) return;
+  const cl = [...sheet.querySelectorAll('[data-act=close]')], sr = sheet.getBoundingClientRect(), tops = cl.map(e => e.getBoundingClientRect().top);
+  if (!cl.length && sr.height < innerHeight * 0.55) return;   // 没有关闭按钮的矮弹窗：点外面就关了，不加
+  if (tops.some(t => t > innerHeight * 0.45 && t < innerHeight - 24)) return;   // 下半屏已经有一个看得见的关闭：够得着，不用加（关闭在顶上、或者要滚到最底下才看得见的，才加）
+  sheet.insertAdjacentHTML('beforeend', '<div class="mback"><button class="btn ghost" data-act="close">返回</button></div>');
+}
+function openModal(fn) { MODALFN = fn; sheet.innerHTML = fn(); modal.hidden = false; const t = document.querySelector('#toast'); if (t) t.style.top = ''; sheetBack(); }   // 弹窗打开时，提示条回到顶上，不压着弹窗里的字
+function closeModal() { if (BACK) { MODALFN = BACK; BACK = null; sheet.innerHTML = MODALFN(); sheetBack(); return; } MODALFN = null; modal.hidden = true; }
 function findItem(id) {
   const s = SAVE.stash.find(x => x.id === id); if (s) return { it: s, where: 'stash' };
   for (const c of CLASS_IDS) for (const sl in SAVE.chars[c].eq) if (SAVE.chars[c].eq[sl] && SAVE.chars[c].eq[sl].id === id) return { it: SAVE.chars[c].eq[sl], where: 'eq', cls: c };
@@ -4367,7 +4375,7 @@ async function pushNow() {
 function refresh() { save(); if (VIEW !== 'battle') render(); else applyStep(null); if (MODALFN) setSheet(MODALFN()); }
 // 重画弹窗时，框里滚到哪儿还在哪儿（原来点一下就跳回顶上，比如清点库房里单独留下一件）
 function setSheet(html) { const keep = { _: sheet.scrollTop }; sheet.querySelectorAll('[data-scroll]').forEach(e => { keep[e.dataset.scroll] = e.scrollTop; });
-  sheet.innerHTML = html; if (keep._) sheet.scrollTop = keep._; sheet.querySelectorAll('[data-scroll]').forEach(e => { const v = keep[e.dataset.scroll]; if (v) e.scrollTop = v; }); }
+  sheet.innerHTML = html; sheetBack(); if (keep._) sheet.scrollTop = keep._; sheet.querySelectorAll('[data-scroll]').forEach(e => { const v = keep[e.dataset.scroll]; if (v) e.scrollTop = v; }); }
 const split = a => a.split('|');
 function playActsTown(acts) { runCommon(acts, () => render()); }
 function npcTalk(id) {
@@ -4599,7 +4607,7 @@ const ACT = {
   ungem: a => { const [id, i] = split(a); const r = unsocket(findOwned(id), +i); if (r.err) return toast(r.err); toast('玉石已取下'); refresh(); },
   rr: a => { const [id, i] = split(a); const r = rerollStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   rrpick: a => { const [id, i] = split(a); rerollPick(findOwned(id), +i); SFX.play('forge'); toast('洗炼完成'); refresh(); },
-  btyacc: id => { const r = wBtyAccept(wch(), id); BTYMSG = r.err || r.ok; SFX.play(r.err ? 'fail' : 'rare'); if (MODALFN) sheet.innerHTML = MODALFN(); },
+  btyacc: id => { const r = wBtyAccept(wch(), id); BTYMSG = r.err || r.ok; SFX.play(r.err ? 'fail' : 'rare'); if (MODALFN) sheet.innerHTML = MODALFN(); sheetBack(); },
   btyshop: () => { const prev = MODALFN; SHOPID = 'shangyin'; SHOPTAB = 'buy'; SHOPMSG = ''; SHOPSEL = -1; openModal(shopModal); if (prev === npcModal) BACK = prev; },
   form: a => { const [i, z] = split(a); const ch = SAVE.chars.necro; ch.form = necroForm(ch.level, ch.form); ch.form[+i] = z; save(); SFX.play('click'); refresh(); },
   rf: a => { const [id, i] = split(a); const r = refineStart(findOwned(id), +i); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
@@ -4612,7 +4620,7 @@ const ACT = {
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`升阶完成：现在是${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => { const prev = MODALFN; openModal(cubeModal(+i)); if (prev === cubeBagModal) BACK = prev; },
-  cpf: a => { const [k, v] = split(a); if (k === 'g') { CPF.g = v; CPF.s = ''; } else CPF.s = v; if (MODALFN) sheet.innerHTML = MODALFN(); },
+  cpf: a => { const [k, v] = split(a); if (k === 'g') { CPF.g = v; CPF.s = ''; } else CPF.s = v; if (MODALFN) sheet.innerHTML = MODALFN(); sheetBack(); },
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
   combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast('没有能合的玉石'); SFX.play('rare'); toast(`合了 ${r.n} 次，得到 ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join('、')); save(); refresh(); burstFx('jade'); },
   combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast('合成了 ' + gemName(r.key)); refresh(); burstFx('jade'); },
@@ -4705,7 +4713,7 @@ const ACT = {
   minigo: k => { const ch = wch(), S = wstate(ch), D = wScene(ch), m = wmap(ch);
     const T = k === 'boss' ? D.mons.find(o => o.boss) : k === 'exit' ? (m.pts['2'] || [])[0] : (D.orbs || []).slice().sort((a, b) => wdist(a, S.pos) - wdist(b, S.pos))[0];
     if (!T) return qtoast('现在没有可去的地方'); miniWalk(T.x, T.y); },
-  maptab: k => { MAPTAB = k; if (MODALFN) { sheet.innerHTML = MODALFN(); drawMini(); } },
+  maptab: k => { MAPTAB = k; if (MODALFN) { sheet.innerHTML = MODALFN(); sheetBack(); drawMini(); } },
   mapgo: sc => {
     const ch = wch(), S = wstate(ch), blk = wTeleBlock(ch); if (blk) return toast(blk);
     const L = wLitCamps(ch, sc); if (!L.length) return toast('那边还没点过篝火');
