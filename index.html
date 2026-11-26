@@ -2338,6 +2338,53 @@ body.fx0 .hud .hs-grid .skb2.lit{animation:none}
 .arena.sv #allies .unit .hpbar{border-color:#1f4a3c}.arena.sv #allies .unit .hpbar i{background:linear-gradient(180deg,#58c49a,#1f6a4e)}
 /* 两边的摆设挪到最边上、压在阵线上 */
 .arena.sv .sv-back{top:28%;height:30%;opacity:.7;filter:brightness(.6)}
+/* ===== 美化第二批（2026-11-26）：一次性的小动作 ===== */
+/* 朱门打开 */
+#doorfx{position:fixed;inset:0;z-index:9500;display:none;pointer-events:none;overflow:hidden}#doorfx.on{display:block}
+#doorfx i{position:absolute;top:0;bottom:0;width:50.4%;background:radial-gradient(circle,#ffe9a8 0 3px,#b98f24 3.3px 6.5px,rgba(0,0,0,.35) 6.8px 8.6px,transparent 8.9px) 0 0/25% 11%,linear-gradient(180deg,#b02c1b,#6e160e);box-shadow:inset 0 0 0 3px #4a120c,inset 0 0 70px rgba(0,0,0,.5)}
+#doorfx .dl{left:0;border-right:3px solid #d9b866;animation:doorL .52s cubic-bezier(.55,0,.3,1) .08s both}#doorfx .dr{right:0;border-left:3px solid #d9b866;animation:doorR .52s cubic-bezier(.55,0,.3,1) .08s both}
+#doorfx i::after{content:"";position:absolute;top:50%;width:36px;height:36px;margin-top:-18px;border:5px solid #e8c97a;border-radius:50%;box-shadow:0 3px 0 rgba(0,0,0,.5),inset 0 0 0 2px #7a5a1a}#doorfx .dl::after{right:20px}#doorfx .dr::after{left:20px}
+@keyframes doorL{from{transform:none}to{transform:translateX(-103%)}}@keyframes doorR{from{transform:none}to{transform:translateX(103%)}}
+/* 屏幕中间一下 */
+#burst{position:fixed;left:50%;top:36%;width:0;height:0;z-index:9300;pointer-events:none;display:none;--c:#ffd75a}#burst.on{display:block}
+#burst.jade{--c:#59c9b5}#burst.purple{--c:#c39cff}#burst.fail{--c:#8a8480}
+#burst i{position:absolute;left:-34px;top:-34px;width:68px;height:68px;border-radius:50%;border:3px solid var(--c);box-shadow:0 0 18px var(--c),inset 0 0 14px var(--c);animation:bstRing .6s ease-out both}
+#burst b{position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 -34px 0 var(--c),24px -24px 0 var(--c),34px 0 0 var(--c),24px 24px 0 var(--c),0 34px 0 var(--c),-24px 24px 0 var(--c),-34px 0 0 var(--c),-24px -24px 0 var(--c);animation:bstSpark .62s ease-out both}
+#burst.fail i{border-style:dashed;animation:bstFail .5s ease-out both}#burst.fail b{display:none}
+@keyframes bstRing{from{transform:scale(.25);opacity:1}to{transform:scale(2.3);opacity:0}}@keyframes bstSpark{from{transform:scale(.3) rotate(0);opacity:1}to{transform:scale(2.4) rotate(40deg);opacity:0}}
+@keyframes bstFail{0%{transform:scale(.6);opacity:1}30%{transform:scale(1) translateX(-5px)}50%{transform:scale(1) translateX(5px)}70%{transform:scale(1) translateX(-3px)}100%{transform:scale(1.1) translateY(14px);opacity:0}}
+/* 小仪式 */
+#cere{position:fixed;inset:0;z-index:9400;display:none;place-items:center;background:radial-gradient(ellipse at center,rgba(8,6,5,.9),rgba(8,6,5,.6) 55%,rgba(8,6,5,.15));cursor:pointer}#cere.on{display:grid;animation:ceIn .18s ease-out}
+.ce-box{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px}
+.ce-rays{position:absolute;left:50%;top:44px;width:240px;height:240px;margin:-120px 0 0 -120px;border-radius:50%;background:repeating-conic-gradient(from 0deg,color-mix(in srgb,var(--c) 34%,transparent) 0 8deg,transparent 8deg 22deg);-webkit-mask-image:radial-gradient(circle,#000 0 30%,transparent 68%);mask-image:radial-gradient(circle,#000 0 30%,transparent 68%);animation:ceSpin 1.6s ease-out both}
+.ce-ic{position:relative;display:grid;place-items:center;width:104px;height:104px;animation:cePop .32s cubic-bezier(.2,1.5,.4,1) both}.ce-ic img{image-rendering:pixelated;filter:drop-shadow(0 0 14px var(--c))}
+.ce-ic .jb-seal{position:absolute;right:-6px;bottom:-2px;animation:jbStamp .26s cubic-bezier(.2,1.4,.4,1) .4s both}
+.ce-box b{position:relative;font:400 30px/1.1 "Ma Shan Zheng","Noto Serif SC",serif;color:#f6e9cf;letter-spacing:4px;text-shadow:0 0 16px var(--c),0 2px 0 #000;animation:jbUp .25s ease-out .25s both}
+.ce-box small{position:relative;font:700 14px "Noto Serif SC",serif;color:var(--c);animation:jbUp .25s ease-out .35s both}
+@keyframes ceIn{from{opacity:0}to{opacity:1}}@keyframes ceSpin{from{transform:rotate(0) scale(.5);opacity:0}25%{opacity:1}to{transform:rotate(70deg) scale(1.15);opacity:.55}}@keyframes cePop{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+html[lang=vi] .ce-box b{font:700 20px "Playfair Display","Noto Serif",serif;letter-spacing:1px}
+/* 捷报：卷轴展开、印盖下去、牌子和掉落一个个出来（只在刚出来时动一次） */
+@keyframes jbUnroll{from{clip-path:inset(0 50% 0 50%)}to{clip-path:inset(0 0 0 0)}}
+@keyframes jbStamp{0%{transform:rotate(-7deg) scale(2.8);opacity:0}55%{opacity:1}100%{transform:rotate(-7deg) scale(1);opacity:1}}
+@keyframes jbUp{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+@keyframes jbPop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.res.jb.in .jb-top{animation:jbUnroll .3s ease-out both}.res.jb.in .jb-top b{animation:jbUp .2s ease-out .22s both}
+.res.jb.in .jb-seal{animation:jbStamp .26s cubic-bezier(.2,1.4,.4,1) .3s both}
+.res.jb.in .jb-rw .rtile,.res.jb.in>p,.res.jb.in .btn.big{animation:jbUp .22s ease-out .42s both}.res.jb.in .jb-rw .rtile:nth-child(2){animation-delay:.47s}.res.jb.in .jb-rw .rtile:nth-child(3){animation-delay:.52s}.res.jb.in .jb-rw .rtile:nth-child(4){animation-delay:.57s}
+.res.jb.in .lootg .bgc,.endp.in .lootg .bgc,.rwm.in .lootg .bgc{animation:jbPop .22s cubic-bezier(.2,1.5,.4,1) both;animation-delay:calc(.56s + var(--i,0) * .045s)}
+.jbsc.in .jb-juan{animation:jbUnroll .34s ease-out .1s both}.jbsc.in .jb-juan .jb-seal{animation:jbStamp .26s cubic-bezier(.2,1.4,.4,1) .5s both}.jbsc.in .jb-me{animation:jbUp .3s ease-out both}
+.endp.in .jb-st .rtile{animation:jbUp .22s ease-out both;animation-delay:.45s}.endp.in .jb-st .rtile:nth-child(n+4){animation-delay:.52s}.endp.in .lootg .bgc{animation-delay:calc(.66s + var(--i,0) * .04s)}
+.jb-rec{position:absolute;left:10px;bottom:-9px;padding:1px 8px 2px;font:400 14px/1.2 "Ma Shan Zheng","Noto Serif SC",serif;font-style:normal;color:#ffe9c9;background:#b9321f;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(255,220,180,.4),0 2px 4px rgba(0,0,0,.5);transform:rotate(-3deg)}
+.jbsc.in .jb-rec{animation:jbRec .28s cubic-bezier(.2,1.4,.4,1) .78s both}@keyframes jbRec{from{transform:rotate(-3deg) scale(2.4);opacity:0}to{transform:rotate(-3deg) scale(1);opacity:1}}
+html[lang=vi] .jb-rec{font:700 10.5px/1.5 "Noto Serif",serif}
+/* 开箱 */
+.rwm{text-align:center}.rw-chest{display:flex;justify-content:center;margin:0 0 2px}.rw-chest img{image-rendering:pixelated;filter:drop-shadow(0 4px 3px rgba(0,0,0,.6))}
+.rwm.in .rw-chest img{animation:rwShake .5s ease-in-out both}.rwm.in .mh,.rwm.in .jb-rw,.rwm.in .jb-note{animation:jbUp .22s ease-out .42s both}.rwm.in .lootg .bgc{animation-delay:calc(.5s + var(--i,0) * .06s)}
+@keyframes rwShake{0%{transform:scale(.7);filter:brightness(1)}20%{transform:rotate(-7deg)}40%{transform:rotate(7deg)}60%{transform:rotate(-5deg)}80%{transform:rotate(4deg) scale(1.12);filter:brightness(2.2) drop-shadow(0 0 14px #ffd75a)}100%{transform:none;filter:brightness(1) drop-shadow(0 0 10px rgba(255,215,90,.6))}}
+/* 换页签：新页面滑进来一下；招式牌换选时晃一下；层数匾换层时落一下 */
+.tcont.tin>*{animation:tin .2s ease-out}@keyframes tin{from{opacity:.15;transform:translateY(9px)}to{opacity:1;transform:none}}
+.xl-hang.sw .slc.on{animation:plqSway .5s ease-out;transform-origin:50% -9px}@keyframes plqSway{0%{transform:translateY(3px) rotate(0)}25%{transform:translateY(3px) rotate(-5deg)}55%{transform:translateY(3px) rotate(3.5deg)}80%{transform:translateY(3px) rotate(-1.5deg)}100%{transform:translateY(3px) rotate(0)}}
+.rg-plaque.chg{animation:plqDrop .26s cubic-bezier(.2,1.5,.4,1)}@keyframes plqDrop{from{transform:translateX(-50%) translateY(-9px) scale(1.12)}to{transform:translateX(-50%)}}
 /* 布阵弹窗收紧（2026-11-26 用户嫌太大）：六个阵一行、号位格压矮、伙伴一行六个 */
 html body .fmlist{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin:2px 0 5px}html body .fmo{padding:3px 1px 2px;border-radius:2px;min-width:0}html body .fmo b{font-size:12px;white-space:nowrap}html body .fmo small{font-size:9px;line-height:1.1}
 html body .fmh{margin:0 0 4px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}html body .fmh span{font-size:11px}html body .fmh span b{color:var(--ink)}html body .fmen{margin:0 0 3px;font-size:11px}
