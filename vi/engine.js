@@ -442,7 +442,8 @@ const ANC_P = [0.05, 0.003];   // 上古、太古的几率（原来 10%、0.6%�
 // 上古、太古跟着幻境层数走：30 层以内 5% / 0.3%，往上每层 +0.25% / +0.03%（69 层约 14.8% / 1.5%），封顶 20% / 2%。幻境以外（主线、赌装备、铸兵）按底数
 const ANC_STEP = [0.0025, 0.0005], ANC_CAP = [0.2, 0.02], ANC_FROM = 30, ANC_COST = 500, PRIMAL_COST = 1000, PRIMAL_FROM = 90, PRIMAL_P0 = 0.005;   // 太古：幻境 90 层起才出，90 层 0.5%，每层 +0.05%，120 层到 2% 封顶
 const ancRate = N => { const d = Math.max(0, (N || 0) - ANC_FROM); return [Math.min(ANC_CAP[0], ANC_P[0] + d * ANC_STEP[0]), (N || 0) >= JY_FROM && !shelved('jy') ? 2 * jyRate(N) : (N || 0) >= PRIMAL_FROM ? Math.min(ANC_CAP[1], PRIMAL_P0 + (N - PRIMAL_FROM) * ANC_STEP[1]) : 0]; };   // 400 层起太古 = 九幽的两倍（400 层 2%，500 层 6%）
-const ancNow = () => ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0);
+var ANC_FORCE = 0;   // 山海异兽必掉的那一件：直接定品（不掷）
+const ancNow = () => { const r = ancRate(SAVE && SAVE.run && SAVE.run.mode === 'rift' ? SAVE.run.riftLv : 0), k = SAVE && shOn(SAVE.run) ? SH.anc : 1; return [r[0] * k, r[1] * k]; };   // 山海经副本：上古、太古几率 ×1.5
 // 九幽（2026-11-24 用户定）：太古之上第四档。全属性再 +30%（合计普通的 1.69 倍），5–6 条满值词条，外加 1 条九幽词条。
 // 只在幻境 400 层起掉：400 层 1%，每层 +0.02%，500 层 3% 封顶；保底：太古点化成九幽（2000 魂晶 + 10 颗九幽玄晶，要到过 400 层）；九幽词条可以花 2 颗玄晶重洗
 const JY_FROM = 400, JY_P0 = 0.01, JY_STEP = 0.0002, JY_CAP = 0.03, JY_COST = 2000, JY_XJ = 10, JY_WASH = 2;
@@ -497,7 +498,7 @@ function finishItem(it, noSocket) {
   it.tier = tierOf(it.ilvl);
   it.plus = 0; it.gems = []; it.sockets = 0;   // 2026-11-26 孔记在部位上，掉落的装备不再自带孔
   if (it.rarity === 'legend' || it.rarity === 'set') {
-    const ap = ancNow(), ak = mfAnc(DROP_MF); it.anc = jyOK() && RNG.ch(jyRate(SAVE.run.riftLv) * ak) ? 3 : primalOK() && RNG.ch(ap[1] * ak) ? 2 : RNG.ch(ap[0] * ak) ? 1 : 0;
+    const ap = ancNow(), ak = mfAnc(DROP_MF); it.anc = ANC_FORCE ? ANC_FORCE : jyOK() && RNG.ch(jyRate(SAVE.run.riftLv) * ak) ? 3 : primalOK() && RNG.ch(ap[1] * ak) ? 2 : RNG.ch(ap[0] * ak) ? 1 : 0;
     if (it.anc === 3) jyUp(it);
     else {
       if (PG_AFF() && it.anc) { const want = (it.anc === 2 ? 4 : 3) + (RNG.ch(0.5) ? 1 : 0); if (it.aff.length < want) addAffixes(it, want - it.aff.length); }   // 通关后：上古 3–4 条，太古 4–5 条
@@ -1856,9 +1857,10 @@ function makeEncounter(run, kind, cell) {
     if (run.chapter === 1) { u.maxHp = u.hp = Math.round(u.hp * 0.7); u.atk *= 0.85; }
     out.push(u);
   } else if (kind === 'boss') {
-    const twin = F.boss.twin;
-    const boss = makeMonster(F.boss, lv + 2, run, 'boss');
-    if (run.mode === 'rift') { boss.name = "Giữ Ải Ảo Cảnh ·" + F.boss.n; boss.maxHp = boss.hp = Math.round(boss.hp * 1.15); }
+    const BD = shOn(run) ? SH_BEASTS[run.rw.sh] : null;   // 山海经副本：守关的换成异兽
+    const twin = BD ? null : F.boss.twin;
+    const boss = makeMonster(BD || F.boss, lv + 2, run, 'boss');
+    if (run.mode === 'rift') { boss.name = BD ? "Dị thú Sơn Hải·" + BD.n : "Giữ Ải Ảo Cảnh ·" + F.boss.n; boss.maxHp = boss.hp = Math.round(boss.hp * 1.15); }
     else { boss.maxHp = boss.hp = Math.round(boss.hp * BOSS_HP); boss.atk *= BOSS_ATK; }
     if (run.mode === 'story' && run.chapter === 1 && run.diff === 'normal' && !run.world) { boss.maxHp = boss.hp = Math.round(boss.hp * 0.7); boss.atk *= 0.85; }
     out.push(boss);
@@ -2871,11 +2873,11 @@ function doAbility(b, u, A, out, now) {
   const hasKey = k => typeof SAVE !== 'undefined' && SAVE.keys && SAVE.keys[k];
   if (A.key && hasKey(A.key)) { out.lines.push(A.foil); out.pops.push([u.id, "Bị khắc chế", 'miss']); out.cast = { id: 'roar', elem: 'phys', target: u.id, enemy: true }; (out.foil = out.foil || []).push(A.foil); (out.foilKey = out.foilKey || []).push(A.key); return true; }
   if (A.t === 'devour' && !now) { u.charging = A; out.cast = { id: 'charge', elem: 'poison', enemy: true, target: u.id }; out.pops.push([u.id, "Tụ lực", 'crit']); bossSay(u, out, A.say); out.lines.push(`${u.name} há to miệng — đánh choáng nó là ngắt được!`); return true; }
-  if (A.t === 'gavel' && !now) { u.charging = A; out.cast = { id: 'charge', elem: 'holy', enemy: true, target: u.id }; out.pops.push([u.id, "Tụ lực", 'crit']); bossSay(u, out, A.say); out.lines.push(`${u.name} giơ cao kinh đường mộc…`); return true; }
+  if (A.t === 'gavel' && !now) { u.charging = A; out.cast = { id: 'charge', elem: A.elem || 'holy', enemy: true, target: u.id }; out.pops.push([u.id, "Tụ lực", 'crit']); bossSay(u, out, A.say); out.lines.push(A.pre || `${u.name} giơ cao kinh đường mộc…`); return true; }
   switch (A.t) {
     case 'shell':
       bossSay(u, out, A.say); u.shield = Math.max(u.shield || 0, Math.round(u.maxHp * (A.pct || 0.15) * (u.kind === 'elite' && !u.bty ? Math.pow(0.7, u.shellN = (u.shellN || 0) + 1) / 0.7 : 1))); u.lavaShell = true;
-      out.pops.push([u.id, "Vỏ dung nham", 'buff']); out.lines.push(`${u.name} kết một lớp vỏ dung nham — “Đóng băng” làm nó nứt ra`); out.cast = { id: 'roar', elem: 'fire', target: u.id, enemy: true }; return true;
+      out.pops.push([u.id, A.nm || "Vỏ dung nham", 'buff']); out.lines.push(A.note || `${u.name} kết một lớp vỏ dung nham — “Đóng băng” làm nó nứt ra`); out.cast = { id: 'roar', elem: 'fire', target: u.id, enemy: true }; return true;
     case 'devour':
       if (b.P.hp <= 0) return false;
       bossSay(u, out, A.bite || "Nuốt —!"); out.cast = { id: 'bossAoe', elem: 'poison', target: 'P', enemy: true };
@@ -2886,14 +2888,18 @@ function doAbility(b, u, A, out, now) {
       for (let i = 0; i < (A.n || 2) && aliveOf(b, 'e').length < 5; i++) { const m = makeMonster(def, Math.max(1, u.lv - 2), b.run, 'normal'); m.g = 0; m.protect = true; m.name = "Hộ giá" + m.name; b.units.push(m); }
       bossSay(u, out, A.say); out.lines.push(A.note || "Khi yêu vật hộ giá còn sống, thủ lĩnh nhận ít đi hơn ba phần sát thương"); out.cast = { id: 'summon', elem: 'magic', enemy: true }; return true;
     }
+    case 'chaos':   // 帝江：混沌——我方的出手条全被打乱（往回拨到开头附近）
+      bossSay(u, out, A.say); out.cast = { id: 'bossAoe', elem: 'magic', aoe: true, enemy: true };
+      allies.forEach(t => { t.g = Math.min(t.g, RNG.f(10, 50)); out.pops.push([t.id, "Hỗn độn", 'cold']); }); out.lines.push(`${u.name} phồng mình lên — trời đất lẫn lộn, cả bọn rối loạn thế trận`);
+      return true;
     case 'gavel':
-      bossSay(u, out, "Bốp!!"); out.cast = { id: 'bossAoe', elem: 'holy', aoe: true, enemy: true };
-      allies.forEach(t => { hit(b, u, t, A.mult || 0.8, 'holy', out, { proc: 1 }); if (t.hp > 0) { t.st.frozen = true; out.pops.push([t.id, "Choáng", 'cold']); } });
+      bossSay(u, out, A.boom || "Bốp!!"); out.cast = { id: 'bossAoe', elem: A.elem || 'holy', aoe: true, enemy: true };
+      allies.forEach(t => { hit(b, u, t, A.mult || 0.8, A.elem || 'holy', out, { proc: 1 }); if (t.hp > 0) { t.st.frozen = true; out.pops.push([t.id, "Choáng", 'cold']); } });
       return true;
     case 'brush':
       if (b.P.hp <= 0) return false;
       bossSay(u, out, A.say); out.cast = { id: 'web', elem: 'magic', target: 'P', enemy: true };
-      hit(b, u, b.P, 0.6, 'magic', out, { proc: 1 }); if (b.P.hp > 0) { b.P.st.poison = { d: b.P.maxHp * (A.pct || 0.03), t: 3 }; out.pops.push(['P', "Câu Hồn", 'poison']); }
+      hit(b, u, b.P, 0.6, 'magic', out, { proc: 1 }); if (b.P.hp > 0) { b.P.st.poison = { d: b.P.maxHp * (A.pct || 0.03), t: 3 }; out.pops.push(['P', A.nm || "Câu Hồn", 'poison']); }
       return true;
     case 'summon': {
       if (aliveOf(b, 'e').length >= 5) return false;
@@ -3306,6 +3312,7 @@ function resolveDeaths(b, out) {
   if (P && P.fx && P.fx.has('yinBing4') && P.hp > 0) for (const u of b.units) if (u.kind === 'minion' && u.hp > 0 && !u.dead && !ZOMBIES[u.zt].ult && u.hp < u.maxHp * YINBING_SELF) { u.hp = 0; u.selfBoom = true; }   // 阴兵借道 4 件：僵尸气血低于四成自己炸开（2026-11-25 用户：不然阴兵爆很少用到）
   for (const u of b.units) {
     if (u.hp > 0 || u.dead) continue;
+    if (u.side === 'e' && u.def && u.def.revive && !u.revived) { u.revived = true; u.hp = Math.round(u.maxHp * u.def.revive); u.atk *= 1.08; out.pops.push([u.id, "Đứt đầu không chết", 'crit']); out.say = [u.id, "(Nó lại đứng dậy.)"]; out.lines.push(`${u.name} ngã xuống, rồi chống rìu đứng dậy — thêm lần nữa`); continue; }   // 刑天：倒下一次再起
     if (u.kind === 'hero' && u.fx && u.fx.has('lastBreath') && !b.lastBreath) { b.lastBreath = true; u.hp = 1; u.st.butui = 2; out.pops.push([u.id, "Bất Tử", 'buff']); out.lines.push("Còn một hơi thở — bạn vẫn đứng vững!"); continue; }
     if (u.kind === 'hero' && run && run.tishen > 0) { run.tishen--; u.hp = Math.round(u.maxHp * 0.3); out.pops.push([u.id, "Hình nhân thế mạng", 'buff']); out.lines.push(`Một hình nhân giấy “phụt” một cái đỡ thay bạn đòn này, cháy thành tro (còn ${run.tishen} cái)`); continue; }
     if (u.side === 'e' && P && P.cls === 'assassin' && P.hp > 0) heal(P, P.maxHp * sustV(P, 'c') / 100, out);
@@ -3357,6 +3364,8 @@ function resolveDeaths(b, out) {
     let n = 0; while (b.reinf.length && aliveOf(b, 'e').length < R_STAGE) { const u = b.reinf.shift(); u.g = RNG.i(0, 40); b.units.push(u); n++; }
     if (n) out.lines.push(`Thêm ${n} con yêu vật nữa vây tới (phía sau còn ${b.reinf.length} con)`);
   }
+  // 刑天再起之后，同一手里又被余波（尸爆之类）打到 0：上面那一圈已经走过它了，再收一遍，免得它「没死也不在场」，打赢了却不算掉落
+  if (!b._rd && b.units.some(u => u.side === 'e' && u.hp <= 0 && !u.dead && u.revived)) { b._rd = 1; try { resolveDeaths(b, out); } finally { b._rd = 0; } return; }
   if (P.hp <= 0 || b.wardDown) { b.over = true; b.win = false; }
   else if (!aliveOf(b, 'e').length) { b.over = true; b.win = true; }
 }
@@ -3392,7 +3401,11 @@ function finishBattle(b) {
     if (u.rare) res.items.push(dropItem(run, 'boss', u.lv + 1, s.mf));
     if (run.mode === 'rift') {
       const g = zyGrade(run.riftLv), nm = u.def.n;
-      if (q === 'boss') zyTake(res, nm, g);
+      if (q === 'boss' && u.def.sh) {   // 山海异兽：必出一件定品的神兵（开了太古给太古，没开给上古），头一回打赢得坐骑；不进镇妖录
+        ANC_FORCE = featureOn('anc') ? (primalOK() ? 2 : 1) : 0; res.items.push(makeItem({ ilvl: u.lv + 1, rarity: 'legend', cls: run.cls })); ANC_FORCE = 0;
+        if (!SAVE.mounts) SAVE.mounts = {};
+        if (!SAVE.mounts[u.def.sh]) { SAVE.mounts[u.def.sh] = 1; res.mount = u.def.sh; if (!SAVE.mount) { SAVE.mount = u.def.sh; res.mountOn = true; } }
+      } else if (q === 'boss') zyTake(res, nm, g);
       else if (shelved('zy')) { if ((q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6)) || (u.kind === 'normal' && RNG.ch(0.01 * (rw ? 0.4 : 1)))) res.mats += 2; }
       else if (q === 'elite' && RNG.ch(u.rare ? 1 : rw ? 0.3 : 0.6)) zyTake(res, nm, g);
       else if (u.kind === 'normal' && RNG.ch((zyOf(nm) < g ? 0.05 : 0.01) * (rw ? 0.4 : 1))) zyTake(res, nm, g);
@@ -3409,6 +3422,7 @@ function finishBattle(b) {
     if (run.mode === 'rift' && run.riftLv >= JY_FROM && !shelved('jy')) res.jyx = (res.jyx || 0) + (u.kind === 'boss' ? RNG.i(1, 2) : q === 'elite' && RNG.ch(u.rare ? 0.5 : 0.1) ? 1 : 0);   // 九幽玄晶：400 层起，守关妖王 1–2 颗，精英一成几率
   }
   if (s.fx.has('gFast') && (b.pr || 0) <= 8) b.extraLoot++;                                                                   // 铁算盘
+  if (shOn(run)) { res.gold = Math.round(res.gold * SH.gold); res.mats = Math.round(res.mats * SH.mats); }   // 山海经副本：银两、魂晶 +50%
   if (b.midas) res.gold += Math.round(b.midas * (2 + lv * 1.2) * 10 * (1 + s.gf / 100));                                         // 点金手
   for (let i = 0; i < b.extraLoot; i++) res.items.push(dropItem(run, 'normal', cellLv(run, curCell(run)), s.mf));
   DROP_LUCK = 0; DROP_MF = 0;

@@ -424,6 +424,8 @@ const lockNote = (txt) => `<div class="locknote">${SPR.img('lock', 22)}<span>${t
 
 // ---------- 青石镇（营地） ----------
 // 2026-11-26 减法改版：背包独立成页（五门共用）；设置缩成右上角齿轮
+// 山海异兽坐骑：图鉴页最上面一排；没见过的只有剪影
+const mountPanel = () => { const M = SAVE.mounts || {}; return `<section class="panel mtp"><h3>山海异兽 <small>${Object.keys(MOUNTS).filter(k => M[k]).length}/${Object.keys(MOUNTS).length} · 打赢了就能骑，只是好看</small></h3><div class="mts">${Object.keys(MOUNTS).map(id => { const m = MOUNTS[id], got = M[id], on = got && SAVE.mount === id; return `<button class="mt ${got ? '' : 'no'} ${on ? 'on' : ''}" data-act="mount" data-arg="${id}">${SPR.img(m.spr, 44)}<b>${got ? m.n : '？？'}</b><small>${on ? '骑着' : got ? '点了骑上' : '没见过'}</small></button>`; }).join('')}</div></section>`; };
 const TOWN_TABS = [['go', '出征'], ['gear', '人物'], ['bag', '背包'], ['hero', '修炼'], ['col', '江湖录']];
 function dots() {
   const d = {}, cls = SAVE.cls;
@@ -1556,7 +1558,7 @@ function colTab() {
   if (!tabs.some(t => t[0] === CTAB)) CTAB = tabs[0][0];
   const sec = {
     ach: `<section class="panel"><h3>成就 <small>${nGot}/${ACHIEVEMENTS.length}</small></h3><div class="achs">${ach}</div></section>`,
-    dex: `<section class="panel"><h3>传奇图鉴 <small>${Object.keys(SAVE.codex || {}).filter(k => LEGENDS.some(l => l.id === k)).length}/${LEGENDS.length} · 本职业的专属传奇标了职业名</small></h3><div class="codex">${LEGENDS.map(L => { const got = SAVE.codex && SAVE.codex[L.id];
+    dex: `${mountPanel()}<section class="panel"><h3>传奇图鉴 <small>${Object.keys(SAVE.codex || {}).filter(k => LEGENDS.some(l => l.id === k)).length}/${LEGENDS.length} · 本职业的专属传奇标了职业名</small></h3><div class="codex">${LEGENDS.map(L => { const got = SAVE.codex && SAVE.codex[L.id];
       return `<div class="${got ? 'got' : 'no'}"><b>${got ? L.n : '？？？'}</b><i>${(SLOTS.find(x => x.id === L.slot) || {}).n || ''}${L.cls ? ' · ' + CLASSES[L.cls].n : ' · 通用'}${L.ch ? ' · 多见于第' + L.ch + '章' : ''}</i><br>${got ? L.d : '尚未得到'}</div>`; }).join('')}</div></section>
       <section class="panel"><h3>百妖谱 <small>每种妖物斩 ${BESTIARY_TIERS.join(' / ')} 只点亮一颗星</small></h3><div class="mons">${mons}</div></section>`,
     rec: `<section class="panel"><h3>个人纪录 <small>凡尘难度各章最快用时</small></h3><div class="stats">${rec.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div></section>
@@ -2003,6 +2005,7 @@ function endBattle() {
     for (const it of good) if (it.anc === 3) jyBanner(it); else qtoast(`得到 <b class="r-${it.rarity}">${esc(itemTitle(it))}</b>`);
     if (BRES.jyx) qtoast(`九幽玄晶 +${BRES.jyx}`);
     if (BRES.zy && BRES.zy.length) qtoast(`精魄 +${BRES.zy.length}`);
+    if (BRES.mount) qtoast(`得到坐骑「<b>${MOUNTS[BRES.mount].n}</b>」${BRES.mountOn ? '，已经骑上了' : '（在江湖录的图鉴里换）'}`);
     if (BRES.yiNew) qtoast(`解锁役使「<b>${YISHI[BRES.yiNew].n}</b>」${BRES.yiOn ? '，已经带上了' : '（在出征页点役使那一行换上）'}`);
     if (BRES.levels) qtoast(SAVE.chars[run.cls].level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}` : `升级！现在 ${SAVE.chars[run.cls].level} 级`);
     achToast(BRES.ach); BRES.items.forEach(i => delete i.auto);
@@ -2027,6 +2030,7 @@ function showRes() {
     BRES.goblin === 'killed' ? '<b style="color:var(--gold2)">金蟾被你拿下了！</b>' : BRES.goblin === 'fled' ? '金蟾溜走了……' : ''].filter(Boolean).join('　·　');
   const lvText = BRES.levels ? `　<b style="color:var(--gold2)">${ch.level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}！` : `升级！现在 ${ch.level} 级，获得心法点`}</b>` : '';
   const cont = run.world ? '继续' : B.kind === 'boss' ? (run.mode === 'rift' ? '完成幻境' : run.floor < 3 ? '前往下一层' : '本章完结') : '继续探索';
+  if (BRES.mount) { BTOAST.push(`打赢了山海异兽，得到坐骑「<b>${MOUNTS[BRES.mount].n}</b>」${BRES.mountOn ? '，已经骑上了' : ''}。坐骑只是走路好看，不加属性；在江湖录的图鉴里换。`); flushBattleToasts(); }
   if (BRES.yiNew) { const Y = YISHI[BRES.yiNew]; BTOAST.push(`收服了首领的精魄，解锁役使「<b>${Y.n}</b>」${BRES.yiOn ? '，已经带上了' : '（役使已满两只，在出征页点役使那一行换）'}：${Y.d(yiGrade(BRES.yiNew))}。下一场起它会跟在你身边。`); flushBattleToasts(); }
   const autoEq = BRES.items.filter(i => i.auto);
   if (autoEq.length) { toast('空着的位置自动穿上了：' + autoEq.map(i => `<b>${esc(i.name)}</b>`).join('、')); autoEq.forEach(i => delete i.auto); }
@@ -2894,7 +2898,7 @@ function wDraw(cv, dpr, ts, t) {
     if (!(wInSight(ch, mn.x, mn.y) || (bell && d2 <= W_BELL * W_BELL) || (mn.tag === 'walker' && bell))) continue;
     const P0 = WMONP[mn.id] || (WMONP[mn.id] = { x: mn.x, y: mn.y });
     { const k = 1 - Math.pow(0.82, WF); P0.x += (mn.x - P0.x) * k; P0.y += (mn.y - P0.y) * k; if (Math.abs(mn.x - P0.x) + Math.abs(mn.y - P0.y) > 0.02) WMOVING = true; }
-    const C0 = CHAPTERS[(mn.c || ch) - 1] || CHAPTERS[0], def = mn.boss ? C0.boss : (C0.mons[mn.m] || {}), px = ox + P0.x * ts, py = oy + P0.y * ts;
+    const C0 = CHAPTERS[(mn.c || ch) - 1] || CHAPTERS[0], def = mn.boss ? (mn.z === 'rb' && shOn(SAVE.run) ? SH_BEASTS[SAVE.run.rw.sh] : C0.boss) : (C0.mons[mn.m] || {}), px = ox + P0.x * ts, py = oy + P0.y * ts;
     const size = mn.boss ? ts * 1.7 : mn.big ? ts * 1.35 : mn.rare ? ts * 1.3 : mn.elite ? ts * 1.15 : ts * 0.95, bob = mn.beh === 'sleep' ? 0 : Math.sin(t / 220 + mn.x) * 2;
     if (mn.elite || mn.boss) { g.fillStyle = mn.boss ? `rgba(255,50,40,${0.3 + 0.15 * pulse})` : mn.rare ? 'rgba(190,120,255,.35)' : 'rgba(255,120,40,.25)'; g.beginPath(); g.ellipse(px + ts / 2, py + ts * 0.85, ts * (mn.boss ? 0.8 : 0.5), ts * (mn.boss ? 0.28 : 0.18), 0, 0, 7); g.fill(); }
     g.globalAlpha = wInSight(ch, mn.x, mn.y) ? 1 : 0.55;
@@ -2928,16 +2932,21 @@ function wDraw(cv, dpr, ts, t) {
   // 主角
   const walking = !!(WALK || WHERO.mv), ph = (WHERO.dist || 0) * Math.PI, hb = walking ? Math.abs(Math.sin(ph)) * 2 : Math.sin(t / 400) * 1, lean = walking ? Math.sin(ph) * 0.04 : 0;
   const wf = walking ? [1, 0, 3, 0][Math.floor((WHERO.dist || 0) * 2.5) % 4] : 0;   // 迈步：左、并、右、并
-  g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.ellipse(ox + (WHERO.x + 0.5) * ts, oy + (WHERO.y + 0.9) * ts, ts * 0.32, ts * 0.12, 0, 0, 7); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); { const mtOn = SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount]; g.ellipse(ox + (WHERO.x + 0.5) * ts, oy + (WHERO.y + 0.9) * ts, ts * (mtOn ? 0.6 : 0.32), ts * (mtOn ? 0.16 : 0.12), 0, 0, 7); } g.fill();
   const HS = m.def.heroSpr, hsN = HS ? HS[0] : CLASSES[SAVE.run.cls].spr, hsP = HS ? HS[1] : CLASSES[SAVE.run.cls].pal;   // 梦里是十五岁的阿土
   const rigC = !HS && typeof HERO !== 'undefined' && HERO.has(SAVE.run.cls) ? SAVE.run.cls : null, wi = Math.floor((WHERO.dist || 0) * 2.5) % 4;
-  const hc = rigC ? HERO.cv(rigC, WHERO.back && walking ? 'b' + wi : WHERO.back ? 'b0' : walking ? 'w' + wi : Math.floor(t / 560) % 2 ? 'idle2' : 'idle') : WHERO.back ? SPR.backCv(hsN, hsP, wf) : SPR.walkCv(hsN, hsP, wf);
+  const MT = rigC && SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount] && SPR.T[MOUNTS[SAVE.mount].spr] ? MOUNTS[SAVE.mount] : null;   // 山海坐骑：只在地图上走路时骑着，不加属性
+  const hc = MT ? HERO.cv(rigC, 'ride') : rigC ? HERO.cv(rigC, WHERO.back && walking ? 'b' + wi : WHERO.back ? 'b0' : walking ? 'w' + wi : Math.floor(t / 560) % 2 ? 'idle2' : 'idle') : WHERO.back ? SPR.backCv(hsN, hsP, wf) : SPR.walkCv(hsN, hsP, wf);
   // 走路扬尘
   if (walking && wf !== WHERO.lastWf) { WHERO.lastWf = wf; if (wf) (WHERO.dust || (WHERO.dust = [])).push({ x: WHERO.x + 0.5 + (Math.random() - 0.5) * 0.2, y: WHERO.y + 0.88, t }); }
   if (WHERO.dust) { WHERO.dust = WHERO.dust.filter(d => t - d.t < 520); for (const d of WHERO.dust) { const k = (t - d.t) / 520; g.fillStyle = `rgba(190,170,140,${(0.45 * (1 - k)).toFixed(3)})`; const r = ts * (0.06 + k * 0.14); g.beginPath(); g.ellipse(ox + d.x * ts, oy + d.y * ts - k * ts * 0.12, r * 1.4, r, 0, 0, 7); g.fill(); } }
   if (hc) { g.save(); const hx = ox + (WHERO.x + 0.5) * ts, hy = oy + (WHERO.y + 0.8) * ts - hb;
-    g.translate(hx, rigC ? hy + hb : hy); g.rotate(lean); if (WHERO.flip) g.scale(-1, 1);
-    if (rigC) { const u = ts * 1.12 / 30; g.drawImage(hc, -28 * u, -44 * u, HERO.W * u, HERO.H * u); } else g.drawImage(hc, -ts * 0.55, -ts * 1.1, ts * 1.1, ts * 1.1 * hc.height / hc.width);
+    g.translate(hx, rigC ? hy + hb : hy); g.rotate(MT ? 0 : lean); if (WHERO.flip) g.scale(-1, 1);
+    if (MT) { const cell = ts * 0.057, u = ts * 1.12 / 30, hopK = walking ? Math.abs(Math.sin(ph)) : 0, mb = MT.hop ? -hopK * ts * 0.24 : walking ? -hopK * 1.6 : Math.sin(t / 500) * 0.8;
+      const fb = walking && (MT.hop ? hopK > 0.3 : Math.floor((WHERO.dist || 0) * 2.5) % 2 === 1), mc = SPR.cv(MT.spr + (fb ? '_b' : '')), mx0 = -MT.seat[0] * cell, my0 = ts * 0.1 - 31 * cell + mb;
+      if (mc) g.drawImage(mc, mx0, my0, 32 * cell, 32 * cell);
+      g.drawImage(hc, -28 * u, my0 + MT.seat[1] * cell - 33 * u, HERO.W * u, HERO.H * u); }
+    else if (rigC) { const u = ts * 1.12 / 30; g.drawImage(hc, -28 * u, -44 * u, HERO.W * u, HERO.H * u); } else g.drawImage(hc, -ts * 0.55, -ts * 1.1, ts * 1.1, ts * 1.1 * hc.height / hc.width);
     g.restore(); }
   // 天气
   wCrowd(g, ch, m, S, ox, oy, ts, t, spr);
@@ -3186,7 +3195,7 @@ function wRun(acts, i = 0) {
   if (doCommon(a, next)) return;
   if (a.enter) { WHERO = null; WMONP = {}; render(); const D = WMAPS[wch()].scenes[a.enter]; banner(D.n, '', 1100); SFX.play('door'); return setTimeout(next, 350); }
   if (a.fight) { WKEY = { key: a.key, rest: acts.slice(i + 1) }; return beginWorldBattle(a.fight); }
-  if (a.rboss) { WALK = null; render();   /* 自动闯关开着就接着去打妖王 */ banner('守关妖王现身', `${a.rboss} · ${a.d || ''}`, 2200); SFX.play('gong'); return setTimeout(next, 600); }
+  if (a.rboss) { WALK = null; render();   /* 自动闯关开着就接着去打妖王 */ banner(a.sh ? '山海异兽现身' : '守关妖王现身', `${a.rboss} · ${a.d || ''}`, a.sh ? 2800 : 2200); SFX.play('gong'); return setTimeout(next, 600); }
   if (a.rdone) { const run = SAVE.run; riftComplete(run); SFX.play('legend'); return finishRunView(run, 'win'); }
   if (a.chest) { const run = SAVE.run; run.encCell = { lv: wmap(wch()).zoneAt(wstate(wch()).pos.x, wstate(wch()).pos.y).lv };
     CHEST = openChest(run, a.q); VIEW = 'chest'; SFX.play('loot'); WKEY = { rest: acts.slice(i + 1) }; return render(); }
@@ -4190,6 +4199,7 @@ function npcTalk(id) {
 const ACT = {
   tab: c => { SAVE.cls = c; FILTER = 'all'; GSLOT = null; if (!seen('clstip')) markSeen('clstip'); refresh(); },
   tt: k => { TT = k; refresh(); },
+  mount: id => { if (!(SAVE.mounts || {})[id]) return toast('还没见过这只异兽——幻境里偶尔会碰上山海经副本'); SAVE.mount = SAVE.mount === id ? null : id; save(); refresh(); toast(SAVE.mount ? `骑上了${MOUNTS[id].n}，到地图上走走看` : '下来了'); },
   diff: d => { SAVE.diff = d; refresh(); },
   chap: k => { SAVE.chapter = +k; refresh(); },
   chnav: d => { const cl = storyCleared(SAVE.diff), maxCh = Math.min(10, cl + 1); SAVE.chapter = Math.max(1, Math.min(maxCh, SAVE.chapter + +d)); SFX.play('page'); refresh(); },
@@ -4299,6 +4309,7 @@ const ACT = {
       SAVE.run = newRiftRun(SAVE.cls, SAVE.riftLv); RTICK = 0;
       VIEW = 'world'; WHERO = null; WAUTO = false; WGOAL = null; WALK = null; refresh(); window.scrollTo(0, 0);
       banner(`九幽幻境 · ${SAVE.run.riftLv} 层`, WMAPS[RCH].scenes.f0.n, 2000);
+      if (shOn(SAVE.run)) setTimeout(() => { if (shOn(SAVE.run) && VIEW === 'world') { banner('山海经副本', '这一局有异兽守关 · 掉落更多', 2800); SFX.play('gong'); } }, 2200);
       if (!seen('rift2')) { markSeen('rift2'); save(); setTimeout(() => openModal(riftHelpModal), 2200); }
       return;
     }

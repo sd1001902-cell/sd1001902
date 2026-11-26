@@ -157,6 +157,7 @@ html[lang=vi] .statb{font-family:"Noto Serif",serif !important;}
 html[lang=vi] details.bcard>summary small{font-family:"Noto Sans",sans-serif !important;}
 html[lang=vi] html body .pop{font-family:"Noto Sans",sans-serif !important;letter-spacing:normal;}
 html[lang=vi] .twhead b{font-family:"Playfair Display","Noto Serif",serif !important;font-weight:700;}
+html[lang=vi] .mt b{font-family:"Noto Serif",serif !important;}
 html[lang=vi] body.gf .th1 h1{font-family:"Playfair Display","Noto Serif",serif !important;letter-spacing:normal;font-weight:700;}
 html[lang=vi] body.gf .th1 h1::after{font-family:"Playfair Display","Noto Serif",serif !important;letter-spacing:normal;font-weight:700;}
 html[lang=vi] body.gf .ttab{font-family:"Playfair Display","Noto Serif",serif !important;letter-spacing:normal;font-weight:700;}
