@@ -321,6 +321,19 @@ const HERO = (() => {
     md:    { y: 6, lean: -4, nh: 82, nk: 122, fh: -8, fk: 112, ns: 150, ne: 10, fs: 140, fe: 20, w: 180, wl: 'f', tail: 1 },                 // 跪地结印
     pm:    { x: 2, y: 2, lean: 20, nh: 50, nk: 40, fh: -40, fk: 6, ns: 92, ne: 0, fs: -40, fe: 60, w: 210, wl: 'b', tail: 3 },               // 出掌
     rr:    { lean: -14, hy: -1, nh: 30, nk: 14, fh: -26, fk: 8, ns: -50, ne: 40, fs: -62, fe: 40, w: 235, wl: 'b', tail: 3 },                // 怒吼
+    // —— 国风样板：赶尸人摇铃、待机小动作 ——
+    ya:    { y: -1, lean: -9, nh: 18, nk: 8, fh: -16, fk: 4, ns: 166, ne: 0, fs: 72, fe: 100, w: -42, wl: 'f', tail: 1 },                   // 举铃·往后荡
+    yb:    { y: -1, lean: 3, nh: 22, nk: 12, fh: -18, fk: 4, ns: 150, ne: 8, fs: 72, fe: 100, w: 62, wl: 'f', tail: 2 },                    // 举铃·往前荡
+    yc:    { x: 1, y: 1, lean: 16, nh: 44, nk: 30, fh: -32, fk: 8, ns: 100, ne: -6, fs: -40, fe: 50, w: 78, wl: 'f', tail: 3 },             // 落铃·指向妖物
+    ib:    { lean: 3, hy: 1, ns: 78, ne: 74, w: 4, wl: 'f' },                                                                               // 待机：把铃提到眼前看一眼
+    ic:    { lean: 2, ns: 80, ne: 70, w: -30, wl: 'f' },                                                                                    // 待机：提着铃轻轻晃——往后
+    id:    { lean: 2, ns: 80, ne: 70, w: 36, wl: 'f' },                                                                                     // 待机：提着铃轻轻晃——往前
+    // —— 国风：另外四个职业的待机小动作 ——
+    kd:    { lean: -4, ns: 152, ne: 68, w: 250, wl: 'b', fs: -10, fe: 30 },                                                                 // 狂刀客：把刀往肩上一扛
+    mo:    { lean: 8, ns: 52, ne: 50, w: 100, wl: 'f', two: 1 },                                                                            // 狂刀客：横刀抹一把
+    z1:    { ns: 58, ne: 70, w: 120, wl: 'f' },                                                                                             // 刺客：转匕首——刀尖朝前
+    z2:    { ns: 58, ne: 70, w: 300, wl: 'f' },                                                                                             // 刺客：转匕首——刀尖朝后
+    lk:    { lean: -3, hx: -1 },                                                                                                            // 回头看一眼（手上照站姿）
     b0: { view: 'back', walk: 0 }, b1: { view: 'back', walk: 1, y: -1 }, b2: { view: 'back', walk: 2 }, b3: { view: 'back', walk: 3, y: -1 },
   };
   // 各职业的修正：武器握法不一样
@@ -495,7 +508,7 @@ const HERO = (() => {
   // ---------- 拼一帧 ----------
   function build(cls, pose) {
     const L = LOOK[cls] || LOOK.berserker, TW = TWEAK[cls] || {}, TI = TW.idle || {}, inh = {};
-    if (/^(idle2|w\d)$/.test(pose) && !TW[pose]) for (const k of ['w', 'wl', 'ne', 'lean', 'y']) if (TI[k] !== undefined && (k !== 'y' || pose === 'idle2')) inh[k] = TI[k] + (k === 'y' && pose === 'idle2' ? 0 : 0);
+    if (/^(idle2|w\d|lk)$/.test(pose) && !TW[pose]) for (const k of ['w', 'wl', 'ne', 'lean', 'y']) if (TI[k] !== undefined && (k !== 'y' || pose === 'idle2')) inh[k] = TI[k] + (k === 'y' && pose === 'idle2' ? 0 : 0);
     const P = Object.assign({}, BASE, POSES[pose] || POSES.idle, inh, TW[pose] || {});
     const back = newBuf(), body = newBuf(), front = newBuf();
     const hip = [28 + P.x, 33 + P.y], tv = [Math.sin(rad(P.lean)), -Math.cos(rad(P.lean))], neck = add(hip, tv, 7);

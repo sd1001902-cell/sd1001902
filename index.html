@@ -2105,9 +2105,154 @@ html[lang=vi] .gbar .sub{font-size:calc(12px * var(--fs,1))}html[lang=vi] .gbar-
 .stats.one{grid-template-columns:1fr;margin:6px 0 10px}.stats.one div{gap:10px}.stats.one span{flex:1 1 0;min-width:0}.stats.one b{flex:none}
 .statbox{max-height:calc(90dvh - 132px);overflow-y:auto;overscroll-behavior:contain}.statbox .stats{margin-top:4px}
 .autosum{margin:0 0 8px;font-size:calc(13px * var(--fs,1));color:var(--ink);line-height:1.6}.autofold>summary{cursor:pointer;color:var(--gold2);font-size:calc(13px * var(--fs,1));padding:6px 0}
+/* ---- 国风样板（志怪·阴间）：只在 body.gf 下生效，原样式一行没动 ---- */
+body.gf{--zhu:#b9321f;--zhu2:#8a1b12;--zhi:#d9b866;--zhi2:#f0d9a8;--ming:#59c9b5;--tong:#4f7466;
+  --gf-hui:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='7'%3E%3Cpath d='M.5 6.5V.5H10.5V6.5H3.5V3.5H7.5' fill='none' stroke='%23a8873f' stroke-width='1'/%3E%3C/svg%3E");
+  --gf-c1:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M.5 14V.5H14M4.5 14V4.5H14M8.5 11.5V8.5H11.5' fill='none' stroke='%23c9a45c' stroke-width='1'/%3E%3C/svg%3E");
+  --gf-c2:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M13.5 14V.5H0M9.5 14V4.5H0M5.5 11.5V8.5H2.5' fill='none' stroke='%23c9a45c' stroke-width='1'/%3E%3C/svg%3E");
+  --gf-c3:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M.5 0V13.5H14M4.5 0V9.5H14M8.5 2.5V5.5H11.5' fill='none' stroke='%23c9a45c' stroke-width='1'/%3E%3C/svg%3E");
+  --gf-c4:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Cpath d='M13.5 0V13.5H0M9.5 0V9.5H0M5.5 2.5V5.5H2.5' fill='none' stroke='%23c9a45c' stroke-width='1'/%3E%3C/svg%3E");
+  background:radial-gradient(120% 60% at 50% -10%,#3b0f0a 0%,transparent 55%),radial-gradient(90% 45% at 50% 112%,#0c2a26 0%,transparent 62%),var(--bg)}
+/* 顶栏：毛笔字标题 + 一方小印；银两、魂晶做成腰牌；设置换成罗盘 */
+body.gf .th1 h1{font:400 calc(27px * var(--fs,1))/1 "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:3px;color:var(--zhi2);text-shadow:0 2px 0 #000}
+body.gf .th1 h1::after{content:"幽";display:inline-block;vertical-align:7px;margin-left:4px;width:15px;height:15px;font:400 12px/15px "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:0;text-align:center;color:#ffe9c9;background:var(--zhu);border-radius:2px 3px 2px 4px;box-shadow:inset 0 0 0 1px rgba(255,220,180,.45);text-shadow:none}
+body.gf .th1 .rescur .pill{border-radius:3px;border-color:#6b5228;background:linear-gradient(180deg,#1c140e,#100b08);box-shadow:inset 0 0 0 1px #000}
+body.gf .th1 .homeb,body.gf .th1 .setb{border-radius:3px;border-color:#6b5228;background:linear-gradient(180deg,#261a13,#17100c);box-shadow:inset 0 0 0 1px #000}
+body.gf .th1 .setb{font-size:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='none' stroke='%23d9b866' stroke-width='1.1'%3E%3Ccircle cx='10' cy='10' r='7.5'/%3E%3Ccircle cx='10' cy='10' r='3.6'/%3E%3Cpath d='M10 1v3M10 16v3M1 10h3M16 10h3M3.6 3.6l2 2M14.4 14.4l2 2M3.6 16.4l2-2M14.4 5.6l2-2'/%3E%3C/g%3E%3Cpath d='M10 6.6l1.4 3.4L10 13.4 8.6 10z' fill='%23b9321f'/%3E%3C/svg%3E") center/19px 19px no-repeat,linear-gradient(180deg,#261a13,#17100c)}
+body.gf .th1 .setb.on{box-shadow:inset 0 0 0 1px #000,0 0 6px rgba(217,184,102,.5)}
+/* 门派头像：神龛一样的拱顶小格 */
+body.gf .ct{border-radius:15px 15px 3px 3px;border-color:#4a3524;background:radial-gradient(circle at 50% 30%,#22170f,#0e0a08)}
+body.gf .ct.on{border-color:var(--zhi);background:radial-gradient(circle at 50% 30%,#3a2410,#150e08);box-shadow:0 0 6px rgba(217,184,102,.35)}
+/* 页签：五块令牌，选中的是朱砂牌 */
+body.gf[data-view=town] .ttabs{background:none;border:0;border-radius:0;gap:5px;overflow:visible;margin:8px 0 6px}
+body.gf .ttab{position:relative;isolation:isolate;min-height:40px;padding:0 2px;border:0;font:400 calc(20px * var(--fs,1))/1 "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:1px;color:#b9a27c;
+  background:#5a4030;clip-path:polygon(9px 0,calc(100% - 9px) 0,100% 9px,100% 100%,0 100%,0 9px)}
+body.gf .ttab::before{content:"";position:absolute;inset:1px;z-index:-1;clip-path:polygon(8.5px 0,calc(100% - 8.5px) 0,100% 8.5px,100% 100%,0 100%,0 8.5px);background:linear-gradient(180deg,#2a1d15,#15100c)}
+body.gf .ttab.on{color:#ffe9c9;background:var(--zhi);text-shadow:0 1px 0 #3a0603}
+body.gf .ttab.on::before{background:linear-gradient(180deg,#bd3523,#7c160f)}
+body.gf .ttab .dot{top:5px;right:8px}
+/* 面板：方角、双线、四角回纹 */
+body.gf .panel{position:relative;border-radius:2px;border-color:#4a3524;background:linear-gradient(180deg,#1b1410,#110c0a);box-shadow:inset 0 0 0 1px #000,0 8px 24px rgba(0,0,0,.5)}
+body.gf .panel::before{content:"";position:absolute;inset:2px;pointer-events:none;opacity:.75;
+  background:var(--gf-c1) left top/13px 13px no-repeat,var(--gf-c2) right top/13px 13px no-repeat,var(--gf-c3) left bottom/13px 13px no-repeat,var(--gf-c4) right bottom/13px 13px no-repeat}
+/* 属性框：一张名帖，左边一道朱砂 */
+body.gf .kstats{border-radius:2px;border-color:#4a3524;background:linear-gradient(90deg,rgba(185,50,31,.10),transparent 28%),linear-gradient(180deg,#19120e,#0f0b09);box-shadow:inset 3px 0 0 var(--zhu),inset 0 0 0 1px #000}
+body.gf .gfit .kstats{padding-left:13px}
+body.gf .kstats b{color:var(--zhi2)}
+body.gf .kstats .ksfx i{border-radius:2px;border-color:#4a3524;background:#0c0908}
+body.gf .kstats em{font-family:"Ma Shan Zheng","Noto Serif SC",serif;font-size:calc(14px * var(--fs,1));color:var(--zhi)}
+/* 装备格：多宝格。上古青铜边，太古朱砂描金，左上角盖一方小印 */
+body.gf .gsb{border-radius:2px;border-color:#3d2c1f;background:linear-gradient(180deg,#15100c,#0b0807);box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(201,164,92,.08)}
+body.gf .gsb .gi{border-radius:50%;background:radial-gradient(circle at 50% 38%,#221912,#060404 72%);box-shadow:inset 0 0 0 1px #33251b,0 2px 0 #000}
+body.gf .gsb.b-set{border-color:#2c6a3a}body.gf .gsb.b-legend{border-color:#8a5320}
+body.gf .gsb.ancient{border-color:var(--tong);box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px #2f4a40}
+body.gf .gsb.primal{border-color:#b08c3e;box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(217,184,102,.42)}
+body.gf .gsb.ancient::after,body.gf .gsb.primal::after{position:absolute;left:4px;top:4px;width:15px;height:15px;font:400 12px/15px "Ma Shan Zheng","Noto Serif SC",serif;text-align:center;color:#ffe9c9;border-radius:2px 3px 2px 4px;box-shadow:inset 0 0 0 1px rgba(255,220,180,.4)}
+body.gf .gsb.ancient::after{content:"古";background:#3d6a5c}
+body.gf .gsb.primal::after{content:"太";background:var(--zhu)}
+body.gf .gsb em{border-radius:2px;background:var(--ming);color:#06201c;box-shadow:0 0 8px rgba(89,201,181,.55)}
+body.gf .gsb.locked{border-style:dashed}
+/* 按钮：朱砂印（主按钮）、木牌（次按钮） */
+body.gf .btn{border-radius:3px 4px 3px 5px;border-color:#5e170e;background:linear-gradient(180deg,#bd3523,#8a1b12);color:#ffe9c9;letter-spacing:1px;text-shadow:0 1px 0 #4a0a05;
+  box-shadow:inset 0 0 0 2px #8a1b12,inset 0 0 0 3px rgba(255,214,170,.5),0 2px 0 #2a0503}
+body.gf .btn.ghost{border-color:#5a4030;background:linear-gradient(180deg,#281b13,#17100c);color:#e7d6b4;text-shadow:none;box-shadow:inset 0 0 0 2px #17100c,inset 0 0 0 3px rgba(201,164,92,.26),0 2px 0 #000}
+body.gf .btn:disabled{filter:grayscale(.7) brightness(.72)}
+body.gf .upn{border-radius:2px;background:var(--ming);color:#06201c}
+/* 弹窗：一幅卷轴。上面一根木轴，两头铜帽；标题毛笔字，左边一道朱砂 */
+body.gf .sheet{border-color:#4a3524;border-radius:0;padding-top:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.013) 0 2px,transparent 2px 7px),linear-gradient(180deg,#1e1612,#120d0a)}
+body.gf .sheet::before{content:"";display:block;position:sticky;top:0;z-index:4;height:13px;margin:0 -12px 10px;box-shadow:0 3px 6px rgba(0,0,0,.65);
+  background:radial-gradient(circle at 8px 50%,#f0d48a 0 2.5px,#8a6a2a 2.5px 5.5px,transparent 6px) left/16px 100% no-repeat,radial-gradient(circle at 8px 50%,#f0d48a 0 2.5px,#8a6a2a 2.5px 5.5px,transparent 6px) right/16px 100% no-repeat,
+    linear-gradient(180deg,transparent 5px,rgba(240,212,138,.35) 5px 6px,transparent 6px),linear-gradient(180deg,#6a4426,#33200f 55%,#1a0f09)}
+body.gf .mh{font-family:"Ma Shan Zheng","Noto Serif SC",serif;font-weight:400;letter-spacing:2px;padding-left:10px;border-left:4px solid var(--zhu)}
+body.gf .sub-h{color:var(--zhi)}
+body.gf .svc-go .chip{border-radius:3px;border-color:#6a4a1a;background:linear-gradient(180deg,#2b1d13,#18100b);color:var(--zhi2);font:400 calc(19px * var(--fs,1))/1 "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:1px;box-shadow:inset 0 0 0 2px #18100b,inset 0 0 0 3px rgba(201,164,92,.3)}
+body.gf .icard{border-radius:2px}
+body.gf .icard.ancient{border-color:var(--tong);box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px #2f4a40}
+body.gf .icard.primal{border-color:#b08c3e;box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(217,184,102,.38)}
+body.gf .icard .lab{color:var(--zhi)}
+body.gf .stats b{color:var(--zhi2)}
+/* 越南文：毛笔字体没有越南文，页签、木牌退回原来的字体和字号 */
+html[lang=vi] body.gf .ttab{font:700 calc(12.5px * var(--fs,1))/1.1 "Noto Serif",serif;letter-spacing:0}
+html[lang=vi] body.gf .svc-go .chip{font:700 calc(12.5px * var(--fs,1))/1 "Noto Serif",serif;letter-spacing:0}
+html[lang=vi] body.gf .th1 h1{font:700 calc(17px * var(--fs,1))/1 "Playfair Display","Noto Serif",serif;letter-spacing:0}
+html[lang=vi] body.gf .kstats em,html[lang=vi] body.gf .mh{font-family:"Noto Serif",serif;letter-spacing:0}
+/* —— 国风样板·战斗特效（赶尸人） —— */
+.fx.yin{width:var(--s);height:var(--s);border-radius:50%;border:2px solid var(--c);box-shadow:0 0 8px var(--c),inset 0 0 6px color-mix(in srgb,var(--c) 60%,transparent);animation-name:fxyin;z-index:6}
+.fx.yin.thin{border-width:1px;box-shadow:0 0 5px var(--c);opacity:.8}
+@keyframes fxyin{0%{transform:translate(-50%,-50%) scale(.1);opacity:1}70%{opacity:.75}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+.fx.yinwave{width:var(--s);height:calc(var(--s) * .3);border-radius:50%;border:2px solid var(--c);box-shadow:0 0 12px var(--c),inset 0 0 14px color-mix(in srgb,var(--c) 45%,transparent);animation-name:fxyinw;z-index:0}
+@keyframes fxyinw{0%{transform:translate(-50%,-50%) scale(.12);opacity:1}60%{opacity:.7}100%{transform:translate(-50%,-50%) scale(1);opacity:0}}
+.fx.fu{width:6px;height:15px;border-radius:1px;background:linear-gradient(#b9321f,#b9321f) 50% 2px/4px 1px no-repeat,linear-gradient(#b9321f,#b9321f) 50% 4px/1px 8px no-repeat,linear-gradient(#b9321f,#b9321f) 50% 8px/3px 1px no-repeat,linear-gradient(180deg,#f2d259,#d9ab2c);
+  box-shadow:0 0 5px rgba(232,193,58,.65);animation-name:fxfu;animation-delay:var(--dl,0ms);animation-timing-function:cubic-bezier(.2,.7,.4,1);opacity:0;z-index:6}
+@keyframes fxfu{0%{transform:translate(-50%,-50%) rotate(var(--r0));opacity:0}12%{opacity:1}70%{opacity:1}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--r1));opacity:0}}
+.fx.fuflash{width:7px;height:11px;border-radius:1px;background:#fff3b8;box-shadow:0 0 7px 2px var(--c),0 0 12px 3px color-mix(in srgb,var(--c) 40%,transparent);animation-name:fxfufl;z-index:6}
+@keyframes fxfufl{0%{transform:translate(-50%,-50%) scale(.4);opacity:0}25%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(.9);opacity:0}}
+.fx.hopdust{width:26px;height:8px;border-radius:50%;background:radial-gradient(ellipse,color-mix(in srgb,var(--c) 70%,transparent),transparent 70%);animation-name:fxhopd;z-index:0}
+@keyframes fxhopd{0%{transform:translate(-50%,-50%) scale(.5);opacity:.9}100%{transform:translate(-50%,-50%) scale(1.7);opacity:0}}
+/* —— 秘技特写：半秒水墨定格 —— */
+body.gf .arena.gfink>:not(.cutin):not(.fxl){filter:grayscale(.85) contrast(1.15) brightness(.82);transition:filter .08s}
+body.gf .cutin.ultink{display:block;background:none;animation:none}
+body.gf .cutin.ultink .uk-wash{position:absolute;left:-6%;right:-6%;top:50%;height:132px;transform:translateY(-50%) rotate(-4deg);
+  background:radial-gradient(ellipse 60% 62% at 50% 50%,rgba(8,6,6,.96) 0 52%,rgba(8,6,6,.7) 68%,transparent 82%);
+  -webkit-mask:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%);mask:linear-gradient(90deg,transparent 0,#000 9%,#000 91%,transparent 100%);
+  animation:ukwash var(--cd,.5s) cubic-bezier(.2,.9,.3,1) forwards}
+body.gf .cutin.ultink .uk-wash::before,body.gf .cutin.ultink .uk-wash::after{content:"";position:absolute;left:4%;right:4%;height:7px;border-radius:50%;background:linear-gradient(90deg,transparent,var(--uc) 20%,#fff 50%,var(--uc) 80%,transparent);opacity:.75;filter:blur(1px)}
+body.gf .cutin.ultink .uk-wash::before{top:9px}body.gf .cutin.ultink .uk-wash::after{bottom:9px}
+@keyframes ukwash{0%{clip-path:inset(0 100% 0 0);opacity:1}22%{clip-path:inset(0 0 0 0)}82%{clip-path:inset(0 0 0 0);opacity:1}100%{clip-path:inset(0 0 0 100%);opacity:.2}}
+body.gf .cutin.ultink .uk-row{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;gap:10px}
+body.gf .cutin.ultink .uk-art{display:flex;align-items:flex-end;animation:ukart var(--cd,.5s) ease-out forwards}
+body.gf .cutin.ultink .uk-art img{image-rendering:pixelated;filter:drop-shadow(0 0 10px var(--uc))}
+@keyframes ukart{0%{transform:translateX(-70px);opacity:0}24%{transform:translateX(0);opacity:1}85%{opacity:1}100%{transform:translateX(10px);opacity:0}}
+body.gf .cutin.ultink .uk-g{font:400 104px/1 "Ma Shan Zheng","Noto Serif SC",serif;color:#f6f1e4;text-shadow:0 0 18px var(--uc),0 0 40px var(--uc),3px 3px 0 #000;animation:ukg var(--cd,.5s) cubic-bezier(.2,1.3,.4,1) forwards}
+@keyframes ukg{0%{transform:scale(2.6) rotate(-8deg);opacity:0}22%{transform:scale(1) rotate(-3deg);opacity:1}85%{transform:scale(1.04) rotate(-3deg);opacity:1}100%{transform:scale(1.25) rotate(-3deg);opacity:0}}
+body.gf .cutin.ultink .uk-seal{writing-mode:vertical-rl;font:900 15px/1.05 "Noto Serif SC",serif;letter-spacing:3px;color:#f6e7c8;background:#b9321f;border:2px solid #7a1a10;box-shadow:inset 0 0 0 1px rgba(255,235,200,.45),0 2px 6px rgba(0,0,0,.6);padding:7px 4px 5px;border-radius:3px;animation:ukseal var(--cd,.5s) ease-out forwards}
+@keyframes ukseal{0%,26%{transform:scale(1.9);opacity:0}40%{transform:scale(1);opacity:1}85%{opacity:1}100%{opacity:0}}
+html[lang=vi] body.gf .cutin.ultink .uk-g{font:800 54px/1 "Playfair Display","Noto Serif",serif;letter-spacing:1px}
+html[lang=vi] body.gf .cutin.ultink .uk-art img{width:72px;height:72px}
+html[lang=vi] body.gf .cutin.ultink .uk-seal{writing-mode:horizontal-tb;font:700 12px/1.25 "Noto Serif",serif;letter-spacing:.3px;padding:4px 7px;max-width:92px;text-align:center}
+/* —— 国风：五个职业出招的点缀（墨刀光、八卦、莲花、一闪） —— */
+.fx.mohen{width:var(--s);height:calc(var(--s) * .32);background:linear-gradient(90deg,#0c0706 0,#1a0c0a 45%,var(--c) 100%);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 50'%3E%3Cpath d='M2 40 C36 4 112 -4 158 26 C118 10 56 14 2 40Z'/%3E%3Cpath d='M20 40 C52 20 108 16 150 34 C112 24 62 26 20 40Z' opacity='.55'/%3E%3C/svg%3E") center/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 50'%3E%3Cpath d='M2 40 C36 4 112 -4 158 26 C118 10 56 14 2 40Z'/%3E%3Cpath d='M20 40 C52 20 108 16 150 34 C112 24 62 26 20 40Z' opacity='.55'/%3E%3C/svg%3E") center/100% 100% no-repeat;animation-name:fxmohen;animation-timing-function:cubic-bezier(.2,.8,.3,1);z-index:6;filter:drop-shadow(0 0 3px color-mix(in srgb,var(--c) 60%,transparent))}
+@keyframes fxmohen{0%{transform:translate(-50%,-50%) rotate(var(--rot)) scale(var(--fx,1),1);clip-path:inset(0 100% 0 0);opacity:1}35%{clip-path:inset(0 0 0 0);opacity:1}70%{opacity:.9}100%{transform:translate(-50%,-50%) rotate(var(--rot)) scale(var(--fx,1),1) translateX(8px);clip-path:inset(0 0 0 0);opacity:0}}
+.fx.bagua{width:var(--s);height:var(--s);background:radial-gradient(circle,#fff 0 12%,var(--c) 40%,color-mix(in srgb,var(--c) 70%,#fff) 100%);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23000' stroke-width='2'%3E%3Ccircle cx='50' cy='50' r='47'/%3E%3Ccircle cx='50' cy='50' r='13'/%3E%3C/g%3E%3Cpath d='M50 37a13 13 0 0 1 0 26a6.5 6.5 0 0 1 0-13a6.5 6.5 0 0 0 0-13Z'/%3E%3Ccircle cx='50' cy='43.5' r='2'/%3E%3Cg stroke='%23000' stroke-width='2.6'%3E%3Cpath d='M76.0 43.0L76.0 57.0'/%3E%3Cpath d='M82.0 43.0L82.0 57.0'/%3E%3Cpath d='M88.0 43.0L88.0 57.0'/%3E%3Cpath d='M73.3 63.4L69.7 67.1'/%3E%3Cpath d='M67.1 69.7L63.4 73.3'/%3E%3Cpath d='M77.6 67.7L67.7 77.6'/%3E%3Cpath d='M81.8 71.9L71.9 81.8'/%3E%3Cpath d='M57.0 76.0L43.0 76.0'/%3E%3Cpath d='M57.0 82.0L51.8 82.0'/%3E%3Cpath d='M48.2 82.0L43.0 82.0'/%3E%3Cpath d='M57.0 88.0L43.0 88.0'/%3E%3Cpath d='M36.6 73.3L32.9 69.7'/%3E%3Cpath d='M30.3 67.1L26.7 63.4'/%3E%3Cpath d='M32.3 77.6L28.6 73.9'/%3E%3Cpath d='M26.1 71.4L22.4 67.7'/%3E%3Cpath d='M28.1 81.8L18.2 71.9'/%3E%3Cpath d='M24.0 57.0L24.0 43.0'/%3E%3Cpath d='M18.0 57.0L18.0 43.0'/%3E%3Cpath d='M12.0 57.0L12.0 51.8'/%3E%3Cpath d='M12.0 48.2L12.0 43.0'/%3E%3Cpath d='M26.7 36.6L30.3 32.9'/%3E%3Cpath d='M32.9 30.3L36.6 26.7'/%3E%3Cpath d='M22.4 32.3L32.3 22.4'/%3E%3Cpath d='M18.2 28.1L21.9 24.4'/%3E%3Cpath d='M24.4 21.9L28.1 18.2'/%3E%3Cpath d='M43.0 24.0L57.0 24.0'/%3E%3Cpath d='M43.0 18.0L48.2 18.0'/%3E%3Cpath d='M51.8 18.0L57.0 18.0'/%3E%3Cpath d='M43.0 12.0L48.2 12.0'/%3E%3Cpath d='M51.8 12.0L57.0 12.0'/%3E%3Cpath d='M63.4 26.7L67.1 30.3'/%3E%3Cpath d='M69.7 32.9L73.3 36.6'/%3E%3Cpath d='M67.7 22.4L71.4 26.1'/%3E%3Cpath d='M73.9 28.6L77.6 32.3'/%3E%3Cpath d='M71.9 18.2L75.6 21.9'/%3E%3Cpath d='M78.1 24.4L81.8 28.1'/%3E%3C/g%3E%3C/svg%3E") center/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23000' stroke-width='2'%3E%3Ccircle cx='50' cy='50' r='47'/%3E%3Ccircle cx='50' cy='50' r='13'/%3E%3C/g%3E%3Cpath d='M50 37a13 13 0 0 1 0 26a6.5 6.5 0 0 1 0-13a6.5 6.5 0 0 0 0-13Z'/%3E%3Ccircle cx='50' cy='43.5' r='2'/%3E%3Cg stroke='%23000' stroke-width='2.6'%3E%3Cpath d='M76.0 43.0L76.0 57.0'/%3E%3Cpath d='M82.0 43.0L82.0 57.0'/%3E%3Cpath d='M88.0 43.0L88.0 57.0'/%3E%3Cpath d='M73.3 63.4L69.7 67.1'/%3E%3Cpath d='M67.1 69.7L63.4 73.3'/%3E%3Cpath d='M77.6 67.7L67.7 77.6'/%3E%3Cpath d='M81.8 71.9L71.9 81.8'/%3E%3Cpath d='M57.0 76.0L43.0 76.0'/%3E%3Cpath d='M57.0 82.0L51.8 82.0'/%3E%3Cpath d='M48.2 82.0L43.0 82.0'/%3E%3Cpath d='M57.0 88.0L43.0 88.0'/%3E%3Cpath d='M36.6 73.3L32.9 69.7'/%3E%3Cpath d='M30.3 67.1L26.7 63.4'/%3E%3Cpath d='M32.3 77.6L28.6 73.9'/%3E%3Cpath d='M26.1 71.4L22.4 67.7'/%3E%3Cpath d='M28.1 81.8L18.2 71.9'/%3E%3Cpath d='M24.0 57.0L24.0 43.0'/%3E%3Cpath d='M18.0 57.0L18.0 43.0'/%3E%3Cpath d='M12.0 57.0L12.0 51.8'/%3E%3Cpath d='M12.0 48.2L12.0 43.0'/%3E%3Cpath d='M26.7 36.6L30.3 32.9'/%3E%3Cpath d='M32.9 30.3L36.6 26.7'/%3E%3Cpath d='M22.4 32.3L32.3 22.4'/%3E%3Cpath d='M18.2 28.1L21.9 24.4'/%3E%3Cpath d='M24.4 21.9L28.1 18.2'/%3E%3Cpath d='M43.0 24.0L57.0 24.0'/%3E%3Cpath d='M43.0 18.0L48.2 18.0'/%3E%3Cpath d='M51.8 18.0L57.0 18.0'/%3E%3Cpath d='M43.0 12.0L48.2 12.0'/%3E%3Cpath d='M51.8 12.0L57.0 12.0'/%3E%3Cpath d='M63.4 26.7L67.1 30.3'/%3E%3Cpath d='M69.7 32.9L73.3 36.6'/%3E%3Cpath d='M67.7 22.4L71.4 26.1'/%3E%3Cpath d='M73.9 28.6L77.6 32.3'/%3E%3Cpath d='M71.9 18.2L75.6 21.9'/%3E%3Cpath d='M78.1 24.4L81.8 28.1'/%3E%3C/g%3E%3C/svg%3E") center/100% 100% no-repeat;animation-name:fxbagua;animation-timing-function:linear;z-index:0;filter:drop-shadow(0 0 4px var(--c))}
+@keyframes fxbagua{0%{transform:translate(-50%,-50%) scaleY(.34) rotate(0deg) scale(.3);opacity:0}18%{transform:translate(-50%,-50%) scaleY(.34) rotate(40deg) scale(1);opacity:1}80%{opacity:.9}100%{transform:translate(-50%,-50%) scaleY(.34) rotate(200deg) scale(1.06);opacity:0}}
+.fx.lian{width:var(--s);height:var(--s);background:radial-gradient(circle,#fff6c8 0 14%,#ffd75a 34%,#f0a0a8 78%,#e87a90 100%);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(0 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(45 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(90 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(135 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(180 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(225 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(270 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(315 50 50)'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(22.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(67.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(112.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(157.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(202.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(247.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(292.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(337.5 50 50)' opacity='.7'/%3E%3Ccircle cx='50' cy='50' r='8'/%3E%3C/svg%3E") center/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(0 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(45 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(90 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(135 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(180 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(225 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(270 50 50)'/%3E%3Cellipse cx='50' cy='21' rx='11' ry='21' transform='rotate(315 50 50)'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(22.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(67.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(112.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(157.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(202.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(247.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(292.5 50 50)' opacity='.7'/%3E%3Cellipse cx='50' cy='31' rx='7' ry='13' transform='rotate(337.5 50 50)' opacity='.7'/%3E%3Ccircle cx='50' cy='50' r='8'/%3E%3C/svg%3E") center/100% 100% no-repeat;animation-name:fxlian;z-index:0;filter:drop-shadow(0 0 5px #ffd75a)}
+@keyframes fxlian{0%{transform:translate(-50%,-50%) scaleY(.36) scale(.2) rotate(-30deg);opacity:0}30%{transform:translate(-50%,-50%) scaleY(.36) scale(1) rotate(0deg);opacity:1}75%{opacity:.85}100%{transform:translate(-50%,-50%) scaleY(.36) scale(1.12) rotate(8deg);opacity:0}}
+.fx.yishan{width:var(--s);height:2px;background:linear-gradient(90deg,transparent,#fff 30%,#fff 70%,transparent);box-shadow:0 0 6px 1px var(--c);animation-name:fxyishan;animation-timing-function:cubic-bezier(.1,.9,.2,1);z-index:6}
+@keyframes fxyishan{0%{transform:translate(-50%,-50%) rotate(var(--rot)) scaleX(0);opacity:1}30%{transform:translate(-50%,-50%) rotate(var(--rot)) scaleX(1);opacity:1}100%{transform:translate(-50%,-50%) rotate(var(--rot)) scaleX(1.1) scaleY(.2);opacity:0}}
+.fx.yeyan{width:var(--s);height:calc(var(--s) * .6);border-radius:50%;background:radial-gradient(ellipse,rgba(40,20,60,.85),rgba(20,10,30,.5) 55%,transparent 72%);animation-name:fxyeyan;z-index:0}
+@keyframes fxyeyan{0%{transform:translate(-50%,-50%) scale(.4);opacity:.95}100%{transform:translate(-50%,-60%) scale(1.5);opacity:0}}
+/* —— 国风：按钮字体收一收（木牌按钮字多，不用毛笔字，免得折行） —— */
+body.gf .btn.ghost{font-family:"Noto Serif SC",serif;font-weight:700;letter-spacing:.5px}
+html[lang=vi] body.gf .btn,html[lang=vi] body.gf .btn.ghost{letter-spacing:0}
+/* —— 国风：战斗界面 —— */
+body.gf .runbar.bbar{position:relative;border-radius:2px;border-color:#4a3524;background:linear-gradient(180deg,#1b1410,#110c0a);box-shadow:inset 0 0 0 1px #000}
+body.gf .runbar.bbar::before{content:"";position:absolute;inset:2px;pointer-events:none;opacity:.7;background:var(--gf-c1) left top/11px 11px no-repeat,var(--gf-c2) right top/11px 11px no-repeat,var(--gf-c3) left bottom/11px 11px no-repeat,var(--gf-c4) right bottom/11px 11px no-repeat}
+html:not([lang=vi]) body.gf .bbar .fl{font:400 18px/1.15 "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:1px;color:var(--zhi2)}
+body.gf .arena{border-radius:2px;border-color:#4a3524;box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(201,164,92,.2)}
+html body.gf .sbar{border-radius:2px;border-color:#4a3524;background:linear-gradient(180deg,#1b1410,#110c0a);box-shadow:inset 0 0 0 1px #000}
+html body.gf .sbar .sbh b{color:var(--zhi2)}
+html body.gf .hud .spdc{border-radius:2px;border-color:#4a3524}
+html body.gf .hud .spdc button{border-radius:1px}
+html body.gf .hud .spdc button.on{background:linear-gradient(180deg,#bd3523,#8a1b12);color:#ffe9c9;box-shadow:inset 0 0 0 1px rgba(255,220,170,.3)}
+/* 招式牌：木牌，上平下圆 */
+html body.gf .hud .hs-grid .skb2{border-radius:2px 2px 10px 10px;background:linear-gradient(180deg,color-mix(in srgb,var(--c) 15%,#261911),#120c09 85%);border-color:color-mix(in srgb,var(--c) 45%,#4a3524);box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(201,164,92,.14)}
+html body.gf .hud .hs-grid .skb2.rdy{box-shadow:inset 0 0 0 1px #000,inset 0 0 0 2px rgba(201,164,92,.14),inset 0 -3px 0 color-mix(in srgb,var(--c) 70%,transparent)}
+html:not([lang=vi]) body.gf .hud .hs-grid .skb2 b{font:400 19px/1.05 "Ma Shan Zheng","Noto Serif SC",serif;letter-spacing:1px;color:#f6e9cf;text-shadow:0 1px 0 #000}
+/* 秘技：一方朱砂大印 */
+html body.gf .hud .ultb{border-radius:3px 4px 3px 5px;border-color:#5e170e;background:#1a0b08;box-shadow:inset 0 0 0 2px #1a0b08,inset 0 0 0 3px rgba(255,220,170,.28)}
+html:not([lang=vi]) body.gf .hud .ultb b{font-size:22px;letter-spacing:2px}
+body.gf .ultb.ready{border-color:var(--zhi)}
+/* —— 国风：背包、清单里的一行 —— */
+body.gf .irow,body.gf .bagrow{border-radius:2px}
+body.gf .irow2{border-radius:2px;border-color:#3a2a1e;background:linear-gradient(180deg,#17110d,#0f0b09)}
+body.gf .irow2.isup{border-color:#2f5a33;background:linear-gradient(90deg,#10190f,#0f0b09 60%)}
+body.gf .irow2.ancient{box-shadow:inset 0 0 0 1px #000,inset 3px 0 0 var(--tong)}
+body.gf .irow2.primal{box-shadow:inset 0 0 0 1px #000,inset 3px 0 0 #b08c3e}
+body.gf .runbar{border-radius:2px;border-color:#4a3524}
+/* ---- 国风样板 完 ---- */
 </style>
 </head>
-<body>
+<body class="gf">
 <div class="wrap" id="app"></div>
 <div id="modal" hidden><div class="sheet" id="sheet"></div></div>
 <div id="toast" role="status"></div>
