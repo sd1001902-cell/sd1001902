@@ -2245,18 +2245,18 @@ document.addEventListener(typeof PointerEvent !== 'undefined' ? 'pointerdown' : 
 function drawStPop() {
   const el = document.getElementById('stpop'); if (!el) return;
   const sc = document.getElementById('statc'); if (sc) sc.classList.toggle('on', !!(STPOP && STPOP.full));
-  if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">本场统计</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; if (el._h !== h) { el._h = h; el.innerHTML = h; } return; }
-  el.classList.remove('full'); el._h = '';
+  if (STPOP && STPOP.full && B) { el.hidden = false; el.classList.add('full'); const h = `<b style="color:#e8c88a">本场统计</b><span class="stx">✕</span>${statHero(B.stat, B.hs)}`; setH(el, h); return; }
+  el.classList.remove('full');
   if (STPOP && STPOP.ult && B) {   // 点右下角的秘技：看说明（攒满了就顺手放出去）
     const U = ULTS[B.P.cls], r = Math.round(B.P.rage || 0);
-    el.hidden = false; el.innerHTML = `<b style="color:#ffcf6a">秘技 · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? '放出去了' : `攒满 ${Math.floor(r / 100)} 格`) : `还差 ${100 - r}%`} · 最多存两格，不占出手</p>`; return; }
+    el.hidden = false; setH(el, `<b style="color:#ffcf6a">秘技 · ${U.n}</b><span class="stx">✕</span><p>${U.d}</p><p class="sub">${r >= 100 ? (B.ultReq ? '放出去了' : `攒满 ${Math.floor(r / 100)} 格`) : `还差 ${100 - r}%`} · 最多存两格，不占出手</p>`); return; }
   if (STPOP && STPOP.sk && B) {   // 战斗里点招式：看说明（2026-11-25）
     const k = B.P.skills.find(x => x.id === STPOP.sk); if (!k) { STPOP = null; el.hidden = true; return; }
     const r = B.P.runes && B.P.runes[k.id], R = r && RUNES[k.id] ? RUNES[k.id][r === 'a' ? 0 : 1] : null;
-    el.hidden = false; el.innerHTML = `<b style="color:#f1e2c6">${k.n}</b>${k.cd ? skcTag(B.P.cls, k) : ''}<span class="stx">✕</span><p>${k.d}${R ? `<br><span style="color:#d9c48c">变招「${R.n}」：${R.d}</span>` : ''}</p><p class="sub">${!k.cd ? '基本招式' : k.left > 0 ? `还要冷却 ${k.left} 招` : '就绪'}${!B.castAuto && B.castReq === k.id ? ' · 下一招放它' : ''}</p>`; return; }
+    el.hidden = false; setH(el, `<b style="color:#f1e2c6">${k.n}</b>${k.cd ? skcTag(B.P.cls, k) : ''}<span class="stx">✕</span><p>${k.d}${R ? `<br><span style="color:#d9c48c">变招「${R.n}」：${R.d}</span>` : ''}</p><p class="sub">${!k.cd ? '基本招式' : k.left > 0 ? `还要冷却 ${k.left} 招` : '就绪'}${!B.castAuto && B.castReq === k.id ? ' · 下一招放它' : ''}</p>`); return; }
   const u = STPOP && B && B.units.find(x => x.id === STPOP.id), D = u && stDesc(u, STPOP.k);
   if (!D) { STPOP = null; el.hidden = true; return; }
-  el.hidden = false; el.innerHTML = `<b style="color:${D.c}">${D.n}</b><span class="stx">✕</span><p>${esc(u.side === 'e' ? u.name : u.id === 'P' ? '你' : u.name)}：${D.d}</p>`;
+  el.hidden = false; setH(el, `<b style="color:${D.c}">${D.n}</b><span class="stx">✕</span><p>${esc(u.side === 'e' ? u.name : u.id === 'P' ? '你' : u.name)}：${D.d}</p>`);
 }
 // 状态栏：左边你，右边选中的目标（没选就是首领／精英，只有小怪就合计）
 function sbChips(u, aff) {
@@ -2266,6 +2266,17 @@ function sbChips(u, aff) {
 }
 const sbHp = (h, m, c) => `<div class="sbhp"><i style="width:${Math.max(0, Math.min(100, h / Math.max(1, m) * 100))}%;background:${c}"></i></div>`;
 const setH = (el, h) => { if (el._h === h) return false; el._h = h; el.innerHTML = h; return true; };   // 内容没变就不动 DOM
+// 招式牌：L = [[招式 id, 这块牌的 HTML], …]。牌子还是那几块、顺序没变，就只把变了的 class、属性、字改掉，按钮本身不换
+function skSync(grid, L) {
+  const key = L.map(x => x[0]).join('|');
+  if (grid._k !== key || grid.children.length !== L.length) { grid._k = key; grid.innerHTML = L.map(x => x[1]).join(''); for (let i = 0; i < L.length; i++) if (grid.children[i]) grid.children[i]._h = L[i][1]; return; }
+  const tp = skSync.t || (skSync.t = document.createElement('template'));
+  for (let i = 0; i < L.length; i++) { const b = grid.children[i], h = L[i][1]; if (b._h === h) continue; b._h = h; tp.innerHTML = h; const n = tp.content.firstElementChild; if (!n) continue;
+    const cn = n.className + (b.classList.contains('tapd') ? ' tapd' : ''); if (b.className !== cn) b.className = cn;
+    for (const a of n.attributes) if (a.name !== 'class' && b.getAttribute(a.name) !== a.value) b.setAttribute(a.name, a.value);
+    const bc = b.children, nc = n.children; if (bc.length !== nc.length) { b.innerHTML = n.innerHTML; continue; }
+    for (let j = 0; j < nc.length; j++) if (bc[j].innerHTML !== nc[j].innerHTML) bc[j].innerHTML = nc[j].innerHTML; }
+}
 function drawSbar() {   // 三段分开更新：名字和数字、血条、状态——状态没变就不重排（原来每一步整块重写还要重新量一遍状态放不放得下）
   const me = $('#sbme'), fo = $('#sbfoe'); if (!me || !fo || !B) return;
   const P = B.P, run = SAVE.run, pc = run ? run.potions : 0;
@@ -2673,20 +2684,24 @@ function applyStep(o, anim) {
   if (refit) fitSides();
   const P = B.P, rb = $('#rbhp');
   const foes0 = aliveOf(B, 'e'), tg = foes0.find(f => f.id === B.target) || foes0[0];
-  const hs = $('#hudsk'); if (hs) hs.innerHTML = `<div class="hs-top">${resChip(P)}${heroKeyChips(P)}</div><div class="hs-grid">` + [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
+  // 2026-11-26 手感：招式条原来每一步整条重写（三倍速一秒重建五六十回按钮）——手指按下到抬起之间按钮已经换了一个，苹果手机上这一下就白点了。现在两块分开，没变就不动；招式牌本身永远是同一个，只改变了的字和样子
+  const hs = $('#hudsk'); if (hs) { if (!hs._top || hs._top.parentNode !== hs) { hs.innerHTML = '<div class="hs-top"></div><div class="hs-grid"></div>'; hs._top = hs.firstElementChild; hs._grid = hs.lastElementChild; }
+    setH(hs._top, resChip(P) + heroKeyChips(P)); const cdp = B._cdp || (B._cdp = {}), litT = B._lit || (B._lit = {}), nowT = performance.now();
+    skSync(hs._grid, [...P.skills.filter(k => k.cd), ...(B.castAuto ? [] : P.skills.filter(k => !k.cd))].map(k => { const st = k.ap || (k.pay && k.pay.s !== 'any' ? k.pay.s : null), c = st ? STATES[st].c : '#e8b0ff';
       const payOn = k.pay && tg && (k.pay.s === 'any' ? stHas(tg, 'any') : stHas(tg, k.pay.s)), tag = !k.cd ? '普' : payOn ? '收' : k.ap ? STATES[k.ap].n[0] : k.pay ? '收' : '';
-      const cdp = B._cdp || (B._cdp = {}), lit = cdp[k.id] && k.left <= 0; cdp[k.id] = k.left > 0;
-      return `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${lit ? 'lit' : ''} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-cd="${k.left > 0 ? k.left : ''}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`; }).join('') + '</div>';
+      if (cdp[k.id] && k.left <= 0) litT[k.id] = nowT; cdp[k.id] = k.left > 0; const lit = litT[k.id] && nowT - litT[k.id] < 600;   // 冷却刚好：亮一下，亮完再摘（牌子不换，这一下能亮完）
+      return [k.id, `<button class="skb2 ${k.left > 0 ? 'cd' : 'rdy'} ${lit ? 'lit' : ''} ${payOn && k.left <= 0 ? 'payon' : ''} auto" style="--c:${c}" data-cd="${k.left > 0 ? k.left : ''}" data-act="castq" data-arg="${k.id}" title="${esc(k.n)}"><b>${skShort(k.n)}</b><small>${k.left > 0 ? `冷却 ${k.left}` : payOn ? '收招！' : !k.cd ? '普攻' : '就绪'}</small></button>`]; })); }
   const ub = $('#ultb'); if (ub) { const r = Math.round(P.rage || 0), full = r >= 100, n = Math.floor(r / 100), U = ULTS[P.cls];   // 2026-11-24 第二版：能存两格
-    $('#ultfill').style.width = (full ? 100 : r) + '%'; ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq); ub.classList.toggle('two', n >= 2);
-    $('#ultpct').textContent = B.ultReq ? '马上' : n >= 2 ? '满两格' : full ? `一格 · ${r - 100}%` : `${r}%`; ub.disabled = B.over;
+    const uf = $('#ultfill'), uw = (full ? 100 : r) + '%'; if (uf._w !== uw) { uf._w = uw; uf.style.width = uw; } ub.classList.toggle('ready', full); ub.classList.toggle('manual', full); ub.classList.toggle('queued', !!B.ultReq); ub.classList.toggle('two', n >= 2);
+    const up = $('#ultpct'), ut = B.ultReq ? '马上' : n >= 2 ? '满两格' : full ? `一格 · ${r - 100}%` : `${r}%`; if (up._t !== ut) { up._t = ut; up.textContent = ut; } if (ub.disabled !== !!B.over) ub.disabled = !!B.over;
     if (full && !B.over && !SAVE.flags.ult3) { SAVE.flags.ult3 = 1; setTimeout(() => toast(`秘技改了：攒得慢，能存两格，留着打妖王。点「${U.n}」——${U.d}。不占出手，还能打断妖王蓄力；怒气留到下一场。开着自动出招时，只用第二格替你打断蓄力，永远给你留一格`, 7000), 300); } }
-  if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; rb.querySelector('span').textContent = `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`; }
-  const pot = $('#rbpot'); if (pot) pot.textContent = '丹药 ' + SAVE.run.potions;
+  const setT = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };   // 字没变就不写（原来每一步都重写一遍「进度」「香」，顶上那条跟着每一步重排）
+  if (rb) { rb.querySelector('i').style.width = Math.max(0, P.hp / P.maxHp * 100) + '%'; setT(rb.querySelector('span'), `${fmtBig(Math.max(0, Math.round(P.hp)) * uK(P))} / ${fmtBig(P.maxHp * uK(P))}`); }
+  const pot = $('#rbpot'); if (pot) setT(pot, '丹药 ' + SAVE.run.potions);
   drawSbar(); drawStPop();
-  const pr = $('#rbprog'); if (pr) pr.lastChild.textContent = `进度 ${Math.floor(SAVE.run.prog)}%`;
-  const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); xg.textContent = `香 ${xiangTxt(SAVE.run)}`; xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
-  const log = $('#blog'); if (log) log.innerHTML = B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>';
+  const pr = $('#rbprog'); if (pr) setT(pr.lastChild, `进度 ${Math.floor(SAVE.run.prog)}%`);
+  const xg = $('#rbxiang'); if (xg) { const L = xiangLeft(SAVE.run); setT(xg, `香 ${xiangTxt(SAVE.run)}`); xg.classList.toggle('low', L > 0 && L < 0.25); xg.classList.toggle('out', L <= 0); }
+  const log = $('#blog'); if (log) setH(log, B.logs.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('') || '<div>……</div>');
 }
 function finishRunView(run, outcome) {
   if (run && run.mode === 'rift') setTimeout(() => lbSync(), 800);   // 排行榜：幻境破纪录就传
@@ -4801,9 +4816,28 @@ let musicStarted = false;
 document.addEventListener('input', e => { const el = e.target.closest && e.target.closest('[data-vol]'); if (!el) return; const v = (+el.value || 0) / 100; SAVE.mvol = v; SFX.vol(v); const b = document.querySelector('#mvolv'); if (b) b.textContent = Math.round(v * 100) + '%';
   if (v > 0 && !SAVE.music) { SAVE.music = true; SFX.ensure(); SFX.set(SAVE.sound, true); } });
 document.addEventListener('change', e => { if (e.target.closest && e.target.closest('[data-vol]')) save(); });
+// 2026-11-26 手感：战斗里的按钮，手指一按下就算数。原来等的是「点击」——手指抬起来以后浏览器才合成，战斗忙的时候从按下到生效要 0.3 秒上下，手上就是「按了没反应」
+// 只管打架时用的这几样（招式、秘技、倍速、跳过、丹药、点妖物、点状态）；结算框、弹窗、能滑动的地方还是老样子等点击，免得滑一下就误触
+const FAST_ACT = { castq: 1, ult: 1, speed: 1, skip: 1, bpot: 1, btarget: 1, stinfo: 1, statfull: 1, fminfo: 1 };
+let FASTHIT = null;
+function tapFx(el) { if (!el || !el.classList) return; el.classList.add('tapd'); clearTimeout(el._tp); el._tp = setTimeout(() => el.classList.remove('tapd'), 140); }
+if (typeof PointerEvent !== 'undefined') document.addEventListener('pointerdown', e => {
+  FASTHIT = null;
+  if (VIEW !== 'battle' || !B || DLG || e.button > 0 || !e.target.closest) return;
+  const t = e.target.closest('[data-act]'); if (!t || t.disabled || !FAST_ACT[t.dataset.act] || t.closest('#stpop,#bres,#modal,.modal')) return;
+  const a = t.dataset.act, g = t.dataset.arg, f = ACT[a]; if (!f) return;
+  FASTHIT = { a, g };
+  tapFx(t);
+  if (!['skip', 'speed'].includes(a)) SFX.play('click');
+  f(g, t);
+});
+// 手指抬起来以后那一下点击要是没来（按钮已经变灰、或者浏览器把这一下当成了滑动），记号过一会儿自己清掉，免得吞掉后面不相干的点击
+if (typeof PointerEvent !== 'undefined') { document.addEventListener('pointerup', () => { const h = FASTHIT; if (h) setTimeout(() => { if (FASTHIT === h) FASTHIT = null; }, 400); }, true);
+  document.addEventListener('pointercancel', () => { FASTHIT = null; }, true); }
 document.addEventListener('click', e => {
   if (!musicStarted) { musicStarted = true; SFX.ensure(); if (SAVE.music) SFX.set(SAVE.sound, true); }
   if (DLG) { if (e.target.closest('.dlg-skip')) endDlg(); else nextLine(); return; }
+  if (FASTHIT) { FASTHIT = null; return; }   // 这一下按下时已经办过了：跟着来的点击不再办第二遍（哪怕画面已经换了、点击落在了别的东西上）
   const t = e.target.closest('[data-act]');
   if (!t || t.disabled) return;
   const f = ACT[t.dataset.act]; if (!f) return;

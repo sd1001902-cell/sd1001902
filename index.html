@@ -2385,6 +2385,14 @@ html[lang=vi] .jb-rec{font:700 10.5px/1.5 "Noto Serif",serif}
 .tcont.tin>*{animation:tin .2s ease-out}@keyframes tin{from{opacity:.15;transform:translateY(9px)}to{opacity:1;transform:none}}
 .xl-hang.sw .slc.on{animation:plqSway .5s ease-out;transform-origin:50% -9px}@keyframes plqSway{0%{transform:translateY(3px) rotate(0)}25%{transform:translateY(3px) rotate(-5deg)}55%{transform:translateY(3px) rotate(3.5deg)}80%{transform:translateY(3px) rotate(-1.5deg)}100%{transform:translateY(3px) rotate(0)}}
 .rg-plaque.chg{animation:plqDrop .26s cubic-bezier(.2,1.5,.4,1)}@keyframes plqDrop{from{transform:translateX(-50%) translateY(-9px) scale(1.12)}to{transform:translateX(-50%)}}
+/* ===== 手感（2026-11-26）：战斗里的按钮 ===== */
+/* 按下去那一下：按钮自己缩一下、亮一下（0.14 秒，只动一次） */
+html body .hud .tapd,html body .sbar .tapd,.statb.tapd{scale:.93;filter:brightness(1.5)}
+/* 倍速、跳过、丹药、统计这几个小按钮：样子不变，能点中的范围往外放一圈（原来只有 23 像素高，手指肚一半落在外面就不算数） */
+html body .hud .spdc button,html body .sbar .potb{position:relative}
+html body .hud .spdc button::after{content:"";position:absolute;inset:-12px -1px -5px}
+html body .sbar .potb::after{content:"";position:absolute;inset:-10px -8px -9px}
+.statb::after{content:"";position:absolute;inset:-9px}
 /* ===== 美化第四批（2026-11-26）：幻境地图 ===== */
 /* 一炷香：真是一根香——没烧的是香身，烧到哪儿火头在哪儿，烧过的剩一线灰；字写在下面 */
 .xiangbar{height:27px;padding-top:12px;box-sizing:border-box;background:none;border:0;border-radius:0;overflow:visible}
