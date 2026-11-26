@@ -2108,6 +2108,11 @@ function tick() {
   const o = battleStep(B); const nl = narrate(o); if (nl && !(o.lines.length && !o.pops.some(p => /^\d+$/.test(p[1])))) B.logs.push(nl); B.logs.push(...o.lines); updBattle(o, true);
   if (B.over) setTimeout(endBattle, o.ult ? ULT_MS() + 300 : 250); else schedule(o);
 }
+// 跳过要等几秒（2026-11-26 用户：跳过战斗设一个限制）：这一场开打满 SKIP_WAIT 秒才能跳；没到的时候按钮是暗的，右上角一个小圆点倒数
+const SKIP_WAIT = 5; let SKIPT = { b: null, t: 0, h: 0 };
+function skipLeft() { if (!B) return 0; if (SKIPT.b !== B) { SKIPT.b = B; SKIPT.t = performance.now(); } return Math.max(0, SKIP_WAIT - (performance.now() - SKIPT.t) / 1000); }
+function skipTick() { clearTimeout(SKIPT.h); const b = typeof document !== 'undefined' && document.querySelector('.skipb'); if (!b || !B) return; const L = B.over ? 0 : Math.ceil(skipLeft()), w = L > 0 ? String(L) : '';
+  if ((b.dataset.w || '') !== w) { b.dataset.w = w; b.classList.toggle('wait', L > 0); } if (L > 0) SKIPT.h = setTimeout(skipTick, 200); }
 function skipBattle() {
   clearTimeout(timer); let n = 0; B.ultAuto = true; B.castAuto = true;
   while (!B.over && n++ < 8000) { const o = battleStep(B); B.logs.push(...o.lines); }
@@ -4732,7 +4737,7 @@ const ACT = {
   kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast("Đã xóa bộ phối đồ này (trang bị vẫn còn)"); },
   kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
     const k = kitsOf(SAVE.cls)[+i]; toast(`Đã thay "<b>${esc(k.n)}</b>"${r.miss.length ? `. Không tìm thấy: ${r.miss.join(", ")} (các ô này giữ nguyên)` : ''}${r.away.length ? `. Có trang bị đang mặc trên người ${r.away.join(", ")}, không lấy qua` : ''}${r.gmiss && r.gmiss.length ? `. Thiếu ${r.gmiss.length} viên ngọc: ${gemMissTxt(r.gmiss)} (lỗ để trống)` : ''}`); },
-  skip: () => skipBattle(),
+  skip: () => { if (!B || B.over) return; if (skipLeft() > 0) return skipTick(); skipBattle(); },
   bcont: () => battleContinue(),
   choice: i => { EVRES = resolveEvent(SAVE.run, curCell(SAVE.run).ev, +i); if (!EVRES.fight) clearCell(SAVE.run); SFX.play(EVRES.items && EVRES.items.length ? 'loot' : 'magic'); refresh(); },
   evcont: () => { const run = SAVE.run;
@@ -4879,7 +4884,7 @@ function render() {
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast("Bạn đã thu phục tinh phách thủ lĩnh, có thể mang hai <b>Dịch Sứ</b> ra trận (ô “Dịch Sứ” trong bảng Ảo Cảnh). Mang rồi chúng sẽ theo bên cạnh bạn, khi bản lĩnh kích hoạt sẽ lóe sáng."), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`Đồng hành mới: <b>${COMPANIONS[c].n}</b> (${COMPANIONS[c].role}) đồng ý theo bạn vào Ảo Cảnh. Vào mục “Đồng hành” trong bảng Ảo Cảnh để mang theo.`), 600 + i * 2800)); } }
-  if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SCENE_THEMES[SAVE.run.sth || SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); showRes(); } else VFX.setup(null);
+  if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SCENE_THEMES[SAVE.run.sth || SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); skipTick(); showRes(); } else VFX.setup(null);
   if (VIEW === 'world') wSetup();
   try { SFX.mood(curMood()); } catch (e) {}
   if (VIEW === 'map' && AUTO && !WALKING) { clearTimeout(autoT); autoT = setTimeout(autoStep, 420); }
