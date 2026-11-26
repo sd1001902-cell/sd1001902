@@ -2448,7 +2448,10 @@ function ultimate(b, P, foes, out, autoCut) {
 }
 function skillReady(b, P, sk, foes) {
   switch (sk.id) {
-    case 'whirl': return foes.length >= 2 || P.fx.has('buSi4');
+    case 'whirl': { if (foes.length >= 2 || P.fx.has('buSi4')) return true;
+      // 2026-11-26 只剩一个敌人：旋风刀比劈砍（100%）划算就放。原来一律不放——那是连招之前定的规则，后来打破甲的敌人有「破军」×1.7（119%），规则没跟着改，打首领时旋风刀冷却好了也一直晾着
+      const f = foes[0], R = P.runes && P.runes.whirl; if (!f) return false;
+      return 0.7 * (R === 'b' ? 1.5 : 1) * (P.fx.has('whirl2') ? 2 : 1) * (f.st.melt ? 1.7 : 1) + (P.fx.has('wXiuluo') ? 0.6 : 0) > 1; }
     case 'fan': return foes.length >= 2 || P.fx.has('qianJi4');
     case 'warcry': return !P.st.warcry;
     case 'zhenyue': return !P.st.zhenyue;
