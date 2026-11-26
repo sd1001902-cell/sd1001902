@@ -224,14 +224,18 @@ const VFX = (() => {
   function setPose(act, pose) {
     if (!isRig(act)) return; let over = null; try { over = JSON.parse(act.dataset.over || 'null'); } catch (e) {}
     poseSfx(act, act.dataset.pose, pose);
-    const F = HERO.url(act.dataset.rig, pose, over); if (!F) return;
+    const F = HERO.url(act.dataset.rig, act.dataset.mt ? (pose === 'idle' || pose === 'idle2' ? 'ride' : pose + '@r') : pose, over); if (!F) return;   // 骑着坐骑：站姿换成骑姿，别的招式只换上半身
     const [b, m, f] = act.querySelectorAll(':scope > img'); if (b) b.src = F.back; if (m) m.src = F.body; if (f) f.src = F.front;
     act.dataset.pose = pose; act.dataset.tx = F.tip[0].toFixed(3); act.dataset.ty = F.tip[1].toFixed(3); act.dataset.hx = F.hand[0].toFixed(3); act.dataset.hy = F.hand[1].toFixed(3);
   }
   function rigHeroHTML(u, S, key, over0) {
-    const k = S / 32, w = 56 * k, h = 46 * k, wr = u.kind === 'hero' && typeof SAVE !== 'undefined' && SAVE.chars && SAVE.chars[u.cls] && SAVE.chars[u.cls].eq && SAVE.chars[u.cls].eq.weapon ? SAVE.chars[u.cls].eq.weapon.rarity : null;
-    key = key || u.cls; const over = u.kind === 'hero' ? (WR_OVER[wr] || null) : (over0 || null), F = HERO.url(key, 'idle', over);
-    return `<div class="pose" style="--bt:${(1.8 + Math.random() * 0.8).toFixed(2)}s;--bd:-${(Math.random() * 2).toFixed(2)}s"><div class="act rig${u.side === 'e' ? ' flip' : ''}" data-rig="${key}" data-pose="idle" data-over='${JSON.stringify(over)}' data-tx="${F.tip[0].toFixed(3)}" data-ty="${F.tip[1].toFixed(3)}" data-hx="${F.hand[0].toFixed(3)}" data-hy="${F.hand[1].toFixed(3)}" style="--rw:${w.toFixed(1)}px;--rh:${h.toFixed(1)}px;--rl:${((S - w) / 2).toFixed(1)}px;--rt:${(S - 44 * k).toFixed(1)}px"><img class="hb" src="${F.back}" alt="" draggable="false"><img class="spr" src="${F.body}" alt="" draggable="false"><img class="hf" src="${F.front}" alt="" draggable="false"></div></div>`;
+    const k = S / 32, wr = u.kind === 'hero' && typeof SAVE !== 'undefined' && SAVE.chars && SAVE.chars[u.cls] && SAVE.chars[u.cls].eq && SAVE.chars[u.cls].eq.weapon ? SAVE.chars[u.cls].eq.weapon.rarity : null;
+    // 2026-11-26 战斗里也骑着坐骑（只有主角）：坐骑垫在脚下占格子的下面八成，人缩到和坐骑一样的像素大小坐在鞍上；整格大小不变，不加属性
+    const mt = !key && u.kind === 'hero' && u.side !== 'e' && typeof SAVE !== 'undefined' && typeof MOUNTS !== 'undefined' && SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount] && SPR.T[MOUNTS[SAVE.mount].spr] ? MOUNTS[SAVE.mount] : null;
+    key = key || u.cls; const over = u.kind === 'hero' ? (WR_OVER[wr] || null) : (over0 || null), F = HERO.url(key, mt ? 'ride' : 'idle', over);
+    const Sm = S * 0.8, cm = Sm / 32, kk = mt ? cm * 0.98 : k, w = 56 * kk, h = 46 * kk, rl = mt ? S / 2 - 28 * kk : (S - w) / 2, rt = mt ? S - Sm + mt.seat[1] * cm - 33 * kk : S - 44 * k;
+    const mtw = mt ? `<i class="mtw" style="left:${(S / 2 - mt.seat[0] * cm).toFixed(1)}px;top:${(S - Sm).toFixed(1)}px;width:${Sm.toFixed(1)}px;height:${Sm.toFixed(1)}px"><img src="${SPR.url(mt.spr)}" alt="" draggable="false"></i>` : '';
+    return `<div class="pose" style="--bt:${(1.8 + Math.random() * 0.8).toFixed(2)}s;--bd:-${(Math.random() * 2).toFixed(2)}s"><div class="act rig${u.side === 'e' ? ' flip' : ''}" data-rig="${key}" data-pose="idle"${mt ? ' data-mt="1"' : ''} data-over='${JSON.stringify(over)}' data-tx="${F.tip[0].toFixed(3)}" data-ty="${F.tip[1].toFixed(3)}" data-hx="${F.hand[0].toFixed(3)}" data-hy="${F.hand[1].toFixed(3)}" style="--rw:${w.toFixed(1)}px;--rh:${h.toFixed(1)}px;--rl:${rl.toFixed(1)}px;--rt:${rt.toFixed(1)}px">${mtw}<img class="hb" src="${F.back}" alt="" draggable="false"><img class="spr" src="${F.body}" alt="" draggable="false"><img class="hf" src="${F.front}" alt="" draggable="false"></div></div>`;
   }
   function rigHTML(u, img, S, spr) {
     if (typeof HERO !== 'undefined') {
