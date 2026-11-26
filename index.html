@@ -2405,6 +2405,10 @@ html body .hud .hs-top{padding-right:116px}
 .skipb.wait::before{content:attr(data-w);position:absolute;right:-6px;top:-8px;min-width:17px;height:17px;box-sizing:border-box;padding:0 3px;border-radius:9px;background:#8a1b12;border:1px solid #d9b866;color:#ffe9c9;font:700 11px/15px system-ui,sans-serif;letter-spacing:0;text-indent:0;text-align:center}
 /* 战斗状态栏右上角的小字（精英 100% +2）不许被挤扁：原来名字长的时候它和名字一起缩，字就顶出框外，越南语版战斗页会被撑宽几像素（2026-11-26 顺手修） */
 html body .sbar .sbh small{flex:none}html body .sbar .sbh b{min-width:0}
+/* 高弹窗右下角钉着的「返回」（2026-11-26）：内容在它底下滚，它不动；左边那一截是透的，不挡下面的东西 */
+.mback{position:sticky;bottom:0;z-index:6;display:flex;justify-content:flex-end;margin:10px -12px 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom));pointer-events:none;background:radial-gradient(ellipse 150px 76px at 100% 100%,rgba(18,13,10,.96) 55%,rgba(18,13,10,0) 100%)}
+.mback .btn{pointer-events:auto;min-width:96px;min-height:48px;margin:0;font:700 17px/1 "Noto Serif SC",serif;letter-spacing:3px;text-indent:3px;box-shadow:0 2px 0 #000,0 0 0 1px #000}
+html[lang=vi] .mback .btn{letter-spacing:0;text-indent:0;font-size:15px;white-space:nowrap}
 /* 清点库房：最下面一排「返回 + 分解/卖掉」（2026-11-26 用户：单手够不着顶上的关闭） */
 .bk2-btns{display:flex;flex-direction:row-reverse;gap:8px;align-items:stretch}   /* 返回放右边（用户：方便操作） */
 .bk2-btns .btn.big{flex:1;min-width:0;width:auto;margin:0}
