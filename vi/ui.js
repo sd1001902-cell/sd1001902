@@ -949,24 +949,40 @@ const KS_EXTRA = [['healPct', "Trị liệu"], ['regen', "Hồi máu"], ['regenP
 function keyStats(cls) {
   const ch = SAVE.chars[cls], s = charStats(cls);
   const L = [["Khí huyết", hpTxt(s.maxHp, ch.level)], ["Công", fmtBig(s.atk)], ["Hộ giáp", fmtBig(s.armorT)], ["Kháng toàn bộ", s.res + '%'], ["Bạo kích", s.crit + '%'], ["Sát thương", '+' + s.dmgPct + '%']];
+  // 屏幕高、底下还空着的时候多放几行（fitKstats 量着空出来的地方一行一行放）；只列不是 0 的
+  const dg = Math.round((s.dodge + (cls === 'assassin' ? SUST.assassin.a * sustLv(ch.level) : 0)) * 10) / 10;
+  const X = [["ST bạo kích", s.critDmg + '%', 1], ["Tốc độ", s.speed, 1], ["Hút máu", s.leech + '%', s.leech], ["Thuật pháp", '+' + s.elem + '%', s.elem], ["Né tránh", dg + '%', dg], ["Phúc duyên", '+' + s.mf + '%', s.mf],
+    ["Hồi máu", fmtBig(hpShow(s.regen || 0, ch.level)), s.regen], ["Giảm ST", (s.xDr || 0) + '%', s.xDr], ["Phản chấn", '+' + (s.thornDmg || 0) + '%', s.thornDmg], ["Đồng hành", '+' + (s.allyPct || 0) + '%', s.allyPct],
+    ["Bạc", '+' + (s.gf || 0) + '%', s.gf], ["Trị liệu", '+' + (s.healPct || 0) + '%', s.healPct]].filter(x => x[2]);
   // 身上的套装几件、生效中的神兵特效（只写名字，详情在「全部属性」）
   const sets = SETS.filter(S => S.cls === cls && (s.setCount[S.id] || 0) >= 2).map(S => `<i class="r-set">${esc(S.n)} ${s.setCount[S.id]}/${S.pieces.length}</i>`);
   const fx = [...s.fx].map(f => { const Lg = LEGENDS.find(l => l.fx === f); return Lg ? `<i class="r-legend">${esc(Lg.n)}</i>` : ''; }).filter(Boolean);
   const chips = [...sets, ...fx];
-  return `<button class="kstats" data-act="statall">${L.map(([n, v]) => `<div class="ksi"><span>${n}</span><b>${v}</b></div>`).join('')}${chips.length ? `<p class="ksfx">${chips.join('')}</p>` : ''}<em>Tất cả chỉ số ›</em></button>`;
+  return `<button class="kstats" data-act="statall">${L.map(([n, v]) => `<div class="ksi"><span>${n}</span><b>${v}</b></div>`).join('')}${X.map(([n, v]) => `<div class="ksi x"><span>${n}</span><b>${v}</b></div>`).join('')}${chips.length ? `<p class="ksfx">${chips.join('')}</p>` : ''}<em>Tất cả chỉ số ›</em></button>`;
 }
 addEventListener('resize', () => fitKstats()); try { document.fonts && document.fonts.ready.then(() => fitKstats()); } catch (e) {}
 // 属性框只放整行：放不下的那几行藏起来（不出现半行）
 function fitKstats() {
-  const k = document.querySelector('.gfit .kstats'); if (!k) return; const it = [...k.querySelectorAll(':scope > .ksi')], fx = k.querySelector(':scope > .ksfx');
+  const k = document.querySelector('.gfit .kstats'); if (!k) return; const it = [...k.querySelectorAll(':scope > .ksi:not(.x)')], fx = k.querySelector(':scope > .ksfx'), xs = [...k.querySelectorAll(':scope > .ksi.x')];
+  xs.forEach(d => d.classList.remove('show'));
   it.forEach(d => { d.style.display = ''; }); if (fx) { fx.style.display = ''; fx.style.maxHeight = ''; }
+  fitKbase(k, it, fx);
+  // 底下还空着（屏幕高的手机）：多出来的属性一行一行放进来，放到不够一行为止
+  const g = k.closest('.gfit'), bar = g && g.querySelector(':scope > .gbar'); if (!bar || !xs.length || !it.length) return;
+  const cs2 = getComputedStyle(k), cols = Math.max(1, cs2.gridTemplateColumns.split(' ').filter(Boolean).length), rowH = it[0].getBoundingClientRect().height + (parseFloat(cs2.rowGap) || 0);
+  // 能用的地方 = 底下空着的 + 装备格比「每格 100 高」多出来的（装备格会自己让出来）
+  const doll = g.querySelector(':scope > .gdoll'), dr = doll ? Math.ceil(doll.children.length / 4) : 0, dollMin = dr * 100 + Math.max(0, dr - 1) * 5;
+  let free = g.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom - 4 + (doll ? Math.max(0, doll.getBoundingClientRect().height - dollMin) : 0);
+  for (let i = 0; i < xs.length && rowH > 0 && free >= rowH; i += cols) { xs.slice(i, i + cols).forEach(d => d.classList.add('show')); free -= rowH; }
+}
+function fitKbase(k, it, fx) {
   const cs = getComputedStyle(k), bot = k.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom) - parseFloat(cs.borderBottomWidth);
   let cut = it.findIndex(d => d.getBoundingClientRect().bottom > bot + 0.5);
   if (cut >= 0) { cut -= cut % 3; it.slice(Math.max(3, cut)).forEach(d => { d.style.display = 'none'; }); if (fx) fx.style.display = 'none'; return; }
   if (fx) { const top = fx.getBoundingClientRect().top, ch = 22, n = Math.floor((bot - top) / ch);   // 特效小标签：放得下几行就留几行
     if (n < 1) fx.style.display = 'none'; else if (fx.scrollHeight > n * ch + 1) fx.style.maxHeight = n * ch + 'px'; }
 }
-const statAllModal = cls => () => `<h2 class="mh">${CLASSES[cls].n} · Toàn bộ thuộc tính</h2>${statPage(cls)}<div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">Được rồi</button></div>`;
+const statAllModal = cls => () => `<h2 class="mh">${CLASSES[cls].n} · Toàn bộ thuộc tính</h2><div class="statbox" data-scroll="statbox">${statPage(cls)}</div><div class="row" style="justify-content:center;margin-top:8px"><button class="btn ghost" data-act="close">Được rồi</button></div>`;
 function statFull(cls) {
   const s = charStats(cls);
   const fxList = [...s.fx].map(f => { const L = LEGENDS.find(l => l.fx === f); if (L) return `<li><b class="r-legend">${L.n}</b>: ${L.d}</li>`;
@@ -1117,7 +1133,28 @@ function statBlock(cls) {
   const mfTxt = `Phúc duyên +${s.mf}%: tỉ lệ rơi ×${mfK(s.mf).toFixed(2)} · thượng cổ ×${mfAnc(s.mf).toFixed(2)}${s.mf > MF_CAP ? ` (tối đa +${MF_CAP}%)` : ''}`;
   const R = armorRef(), red = armorRed(s.armorT, R.lv);
   const defTxt = `<span>Với ${R.short}: giảm vật lý <b>${red}%</b>, giảm thuật pháp <b>${s.res}%</b></span><button class="qhelp sm" data-act="defhelp" aria-label="Giải thích">?</button>`;
-  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div><p class="help-p defp">${defTxt}</p><p class="help-p sustp">${sustShort(cls, s)}<button class="qhelp sm" data-act="mechhelp" aria-label="Giải thích">?</button></p><p class="help-p">${mfTxt}</p>`;
+  return `<div class="stats">${stats.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>${statMore(cls, s)}<p class="help-p defp">${defTxt}</p><p class="help-p sustp">${sustShort(cls, s)}<button class="qhelp sm" data-act="mechhelp" aria-label="Giải thích">?</button></p><p class="help-p">${mfTxt}</p>`;
+}
+// 全部属性里「其他属性」（2026-11-26 用户说点进去属性不全）：上面 12 项之外，凡是不为 0 的都列出来
+const STAT_BASE = new Set(['atk', 'hp', 'armor', 'crit', 'critDmg', 'spd', 'leech', 'res', 'dmgPct', 'elem', 'mf', 'dodge', 'maxHp', 'armorT', 'critRaw', 'resRaw', 'speed', 'level', 'sust', 'thorns', 'pAtk', 'pHp', 'pArmor', 'atkPct', 'hpPct', 'armorPct', 'regen', 'regenPct', 'poison', 'minion', 'gDr']);
+STAT_NAMES.poisonPct = STAT_NAMES.poisonPct || "Sát thương trúng độc"; STAT_NAMES.ironPct = STAT_NAMES.ironPct || "Khí huyết Thiết Giáp Thi"; STAT_NAMES.kiPct = STAT_NAMES.kiPct || "Đòn kết liễu: mỗi điểm Sát ý tăng thêm";
+const STAT_ORDER = ['xDr', 'xLast', 'xShield', 'xTen', 'thornDmg', 'thornK', 'lowHpK', 'xBoss', 'xExec', 'xBreak', 'xDouble', 'xCritNext', 'xFirst', 'xHaste', 'xKill', 'xRage', 'furyGain', 'lianPct', 'cdSkip', 'freeze', 'poisonPct', 'healPct', 'minionPct', 'ironPct', 'allyPct', 'gf', 'xLuck'];
+function statMore(cls, s) {
+  const ch = SAVE.chars[cls], r1 = v => Math.round(v * 10) / 10, L = [], add = (n, v) => L.push([n, v]);
+  if (s.atkPct) add("Cộng thêm công", '+' + r1(s.atkPct) + '%');
+  if (s.hpPct) add("Cộng thêm khí huyết tối đa", '+' + r1(s.hpPct) + '%');
+  if (s.armorPct) add("Cộng thêm hộ giáp", '+' + r1(s.armorPct) + '%');
+  if (s.pAtk || s.pHp || s.pArmor) add("Căn cơ tu vi (công / khí huyết / hộ giáp)", `+${s.pAtk || 0}%/+${s.pHp || 0}%/+${s.pArmor || 0}%`);
+  if (s.regen || s.regenPct) add("Hồi khí huyết mỗi lượt", [s.regen ? fmtBig(hpShow(s.regen, ch.level)) : '', s.regenPct ? r1(s.regenPct) + "% khí huyết tối đa" : ''].filter(Boolean).join(' + '));
+  if (s.gDr) add("Kim Chung Ngọc giảm ST (khí huyết dưới 30% thì gấp đôi)", r1(s.gDr) + '%');
+  if (s.poison) add("Đòn đánh gây trúng độc", `mỗi lượt ${r1(s.poison)}% công`);
+  if (s.minion) add(STAT_NAMES.minion, '+' + s.minion);
+  const seen = new Set(), bare = new Set(['xDr', 'xLast', 'xShield', 'xTen', 'xDouble', 'xFirst', 'cdSkip', 'freeze', 'xKill', 'thornK']);   // bare：几率、减伤这些，前面不写加号
+  const one = k => { const v = s[k]; if (seen.has(k) || typeof v !== 'number' || !v || !STAT_NAMES[k]) return; seen.add(k);
+    const pct = PCT_STATS.has(k) || /Pct$|Gain$/.test(k); add(STAT_NAMES[k], (bare.has(k) ? '' : '+') + r1(v) + (pct ? '%' : '')); };
+  STAT_ORDER.forEach(one); for (const k in s) if (!STAT_BASE.has(k)) one(k);
+  for (const id in s.sk || {}) { const sk = CLASSES[cls].skills.find(x => x.id === id); if (sk && s.sk[id]) add(`ST ${sk.n}`, '+' + r1(s.sk[id]) + '%'); }
+  return L.length ? `<h4 class="sub-h">Thuộc tính khác</h4><div class="stats one">${L.map(([n, v]) => `<div><span>${n}</span><b>${v}</b></div>`).join('')}</div>` : '';
 }
 // 护甲减伤：物理伤害 × 系数 ÷（系数 + 护甲），系数 = 40 + 妖物等级 × 9（和 engine hit() 里一样）
 const armorK = lv => 40 + lv * 9;
