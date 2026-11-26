@@ -453,7 +453,7 @@ function fmBench(sel) {
   const T = teamOf(), N = teamSlots(), all = Object.keys(COMPANIONS).filter(compOpen), sl = sel !== 'san' ? formSlots(sel, fmMembers(), SAVE.cls) : null;
   if (!all.length) return '';
   return `<div class="fmbench"><span class="sub">Đồng hành ${T.length}/${N}<button class="linkbtn" data-act="teamopen">Tài của từng người ›</button></span><div class="fmbl">${all.map(c => { const on = T.includes(c), i = sl ? sl.indexOf(c) : -1;
-    return `<button class="fmbc ${on ? 'on' : ''}" data-act="fmbench" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 30, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b><small>${on ? (i >= 0 ? `Vị trí ${i + 1}` : natRow(c, SAVE.cls) ? "Hậu tuyến" : "Tiền tuyến") : "Chưa mang"}</small></button>`; }).join('')}</div></div>`;
+    return `<button class="fmbc ${on ? 'on' : ''}" data-act="fmbench" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 26, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b><small>${on ? (i >= 0 ? `Vị trí ${i + 1}` : natRow(c, SAVE.cls) ? "Hậu tuyến" : "Tiền tuyến") : "Chưa mang"}</small></button>`; }).join('')}</div></div>`;
 }
 const TOWN_TABS = [['go', "Xuất chinh"], ['gear', "Nhân vật"], ['bag', "Túi đồ"], ['hero', "Tu luyện"], ['col', "Giang Hồ Lục"]];
 function dots() {
@@ -1319,10 +1319,9 @@ const formModal = () => () => {
     const cell = i => { const k = sl[i], e = formFx(sel, i, lv);
       return `<button class="fmc ${FMPICK === i ? 'pick' : ''} ${k ? '' : 'empty'}" data-act="fmslot" data-arg="${i}"><span class="fmn">Vị ${i + 1}</span>${k ? `<span class="fmw">${fmIcon(k)}<b>${esc(fmName(k))}</b></span>` : "<span class=\"fmw\"><b class=\"dim\">Trống</b></span>"}<span class="fme">${fmTxt(e) || "<i>Không có tăng ích</i>"}</span></button>`; };
     const nb = FORM_BEAT[sel], by = fmBeatBy(sel), c = formCost(lv);
-    body = `<p class="fmh"><b>${Fd.n}</b> <span>Lv ${lv}/${FORM_MAX} · ${Fd.tag}</span></p>
-      <p class="fmk">Khắc <b>${FORMS[nb].n}</b> (${FORM_WHY[sel]}) · bị <b>${FORMS[by].n}</b> khắc · khắc Tán Trận</p>
+    body = `<p class="fmh"><b>${Fd.n}</b> <span>Lv ${lv}/${FORM_MAX} · ${Fd.tag} · khắc <b>${FORMS[nb].n}</b> · bị <b>${FORMS[by].n}</b> khắc</span></p>
       <div class="fmb"><div class="fmr"><span class="fml">Trước</span>${cell(0)}${cell(1)}</div><div class="fmr"><span class="fml">Sau</span>${cell(2)}${cell(3)}</div></div>
-      <p class="sub fmtip">${FMPICK != null ? `Chạm thêm một vị trí để đổi chỗ, hoặc chạm đồng hành bên dưới để người đó đứng vào vị trí ${FMPICK + 1}` : "Chạm một vị trí rồi chạm vị trí khác để đổi chỗ, hoặc chạm đồng hành bên dưới để người đó vào trận"}</p>${fmBench(sel)}
+      <p class="sub fmtip">${FMPICK != null ? `Chạm thêm một vị trí để đổi chỗ, hoặc chạm đồng hành để đứng vào vị trí ${FMPICK + 1}` : "Chạm một vị trí, rồi chạm vị trí khác hoặc đồng hành bên dưới"}</p>${fmBench(sel)}
       <div class="fmact">${sel !== cur ? `<button class="btn sm" data-act="fmuse" data-arg="${sel}">Bày trận này</button>` : "<button class=\"btn sm\" disabled>Đang dùng</button>"}
         ${lv < FORM_MAX ? `<button class="btn sm ghost" ${SAVE.mats >= c ? '' : 'disabled'} data-act="fmup" data-arg="${sel}">Lên Lv ${lv + 1} (hồn tinh ${c})</button>` : "<button class=\"btn sm ghost\" disabled>Tối đa</button>"}</div>`;
   }

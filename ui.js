@@ -452,7 +452,7 @@ function fmBench(sel) {
   const T = teamOf(), N = teamSlots(), all = Object.keys(COMPANIONS).filter(compOpen), sl = sel !== 'san' ? formSlots(sel, fmMembers(), SAVE.cls) : null;
   if (!all.length) return '';
   return `<div class="fmbench"><span class="sub">伙伴 ${T.length}/${N}<button class="linkbtn" data-act="teamopen">各人的本事 ›</button></span><div class="fmbl">${all.map(c => { const on = T.includes(c), i = sl ? sl.indexOf(c) : -1;
-    return `<button class="fmbc ${on ? 'on' : ''}" data-act="fmbench" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 30, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b><small>${on ? (i >= 0 ? `${i + 1} 号` : natRow(c, SAVE.cls) ? '后排' : '前排') : '没带'}</small></button>`; }).join('')}</div></div>`;
+    return `<button class="fmbc ${on ? 'on' : ''}" data-act="fmbench" data-arg="${c}">${unitIcon(c === 'ngoc' ? 'ngocfox' : COMPANIONS[c].spr, 26, null, '', 'head')}<b>${c === 'ngoc' ? 'Ngoc' : COMPANIONS[c].n}</b><small>${on ? (i >= 0 ? `${i + 1} 号` : natRow(c, SAVE.cls) ? '后排' : '前排') : '没带'}</small></button>`; }).join('')}</div></div>`;
 }
 const TOWN_TABS = [['go', '出征'], ['gear', '人物'], ['bag', '背包'], ['hero', '修炼'], ['col', '江湖录']];
 function dots() {
@@ -1318,10 +1318,9 @@ const formModal = () => () => {
     const cell = i => { const k = sl[i], e = formFx(sel, i, lv);
       return `<button class="fmc ${FMPICK === i ? 'pick' : ''} ${k ? '' : 'empty'}" data-act="fmslot" data-arg="${i}"><span class="fmn">${i + 1}号</span>${k ? `<span class="fmw">${fmIcon(k)}<b>${esc(fmName(k))}</b></span>` : '<span class="fmw"><b class="dim">空</b></span>'}<span class="fme">${fmTxt(e) || '<i>没有加成</i>'}</span></button>`; };
     const nb = FORM_BEAT[sel], by = fmBeatBy(sel), c = formCost(lv);
-    body = `<p class="fmh"><b>${Fd.n}</b> <span>Lv ${lv}/${FORM_MAX} · ${Fd.tag}</span></p>
-      <p class="fmk">克 <b>${FORMS[nb].n}</b>（${FORM_WHY[sel]}）· 被 <b>${FORMS[by].n}</b> 克 · 克散阵</p>
+    body = `<p class="fmh"><b>${Fd.n}</b> <span>Lv ${lv}/${FORM_MAX} · ${Fd.tag} · 克 <b>${FORMS[nb].n}</b> · 被 <b>${FORMS[by].n}</b> 克</span></p>
       <div class="fmb"><div class="fmr"><span class="fml">前排</span>${cell(0)}${cell(1)}</div><div class="fmr"><span class="fml">后排</span>${cell(2)}${cell(3)}</div></div>
-      <p class="sub fmtip">${FMPICK != null ? `再点一个号位换位置，或者点底下的伙伴，让他站到 ${FMPICK + 1} 号` : '点一个号位，再点另一个号位换位置，或者点底下的伙伴让他站上来'}</p>${fmBench(sel)}
+      <p class="sub fmtip">${FMPICK != null ? `再点一个号位换位，或点伙伴站到 ${FMPICK + 1} 号` : '点号位，再点另一个号位或底下的伙伴'}</p>${fmBench(sel)}
       <div class="fmact">${sel !== cur ? `<button class="btn sm" data-act="fmuse" data-arg="${sel}">摆这个阵</button>` : '<button class="btn sm" disabled>正在用</button>'}
         ${lv < FORM_MAX ? `<button class="btn sm ghost" ${SAVE.mats >= c ? '' : 'disabled'} data-act="fmup" data-arg="${sel}">升到 Lv ${lv + 1}（魂晶 ${c}）</button>` : '<button class="btn sm ghost" disabled>满级</button>'}</div>`;
   }
