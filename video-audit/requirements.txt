@@ -1,0 +1,5 @@
+anthropic>=2.14
+pydantic>=2.0
+PyYAML>=6.0
+# 可选：在本机把语音转成文字，用来审核语音内容（不装就只审画面，或用 --subtitles 提供字幕）
+# faster-whisper>=1.0

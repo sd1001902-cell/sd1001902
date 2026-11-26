@@ -1,0 +1,104 @@
+# 审核规则。可以复制一份按自己的平台/业务改，用 --policy 指定。
+#
+# action：
+#   reject —— 严重度为 high 且置信度 ≥ reject_confidence 时直接判「不通过」，其它情况送人工复核
+#   review —— 只送人工复核，不会自动判不通过
+#
+# 模型输出的 category 只能是下面这些 id（另外固定有一个 other = 其他，送人工复核）。
+
+name: 通用短视频审核规则
+
+thresholds:
+  reject_confidence: 0.8   # 达到这个置信度的 high 级违规，直接判不通过
+  review_confidence: 0.4   # 低于这个置信度的疑点不计入结果（仍保留在 JSON 里）
+
+# 给模型的补充说明，比如发布平台、目标市场、业务特殊要求。留空也行。
+extra_instructions: |
+  这些视频准备发布到面向大众的短视频平台，观众可能包含未成年人。
+
+categories:
+  - id: sexual
+    name: 色情低俗
+    action: reject
+    description: 裸露性器官或女性乳头、性行为或模拟性行为、明显的性暗示动作与镜头、低俗挑逗。
+    examples: [裸露隐私部位, 刻意特写胸部或臀部的擦边镜头, 性暗示舞蹈动作, 色情网站或招嫖信息]
+    exceptions: [正常泳装/运动服装, 哺乳与医学科普, 不带性暗示的艺术作品]
+
+  - id: minor_safety
+    name: 未成年人安全
+    action: reject
+    description: 对未成年人的性化描绘、虐待、危险使唤，或让未成年人参与不适宜的活动。
+    examples: [儿童穿着暴露的擦边内容, 打骂虐待儿童, 未成年人喝酒抽烟, 让儿童做危险动作]
+
+  - id: violence
+    name: 暴力血腥
+    action: reject
+    description: 真实的斗殴伤人、血腥伤口与尸体、虐待动物、酷刑、令人极度不适的画面。
+    examples: [真实打架斗殴, 大量流血的伤口, 虐杀动物]
+    exceptions: [明显是影视特效或游戏画面且不过度血腥, 正规体育格斗比赛, 烹饪处理食材]
+
+  - id: self_harm
+    name: 自杀自残
+    action: reject
+    description: 展示、美化或鼓励自杀、自残、进食障碍等伤害自己的行为。
+    exceptions: [心理健康科普与求助信息]
+
+  - id: extremism
+    name: 恐怖与极端主义
+    action: reject
+    description: 宣扬恐怖组织、极端主义，展示其标志、旗帜或宣传材料，美化恐怖袭击。
+
+  - id: hate
+    name: 仇恨与歧视
+    action: reject
+    description: 基于种族、民族、宗教、性别、性取向、残障等身份的侮辱、贬低、仇恨言论或仇恨符号。
+
+  - id: weapons_drugs
+    name: 违禁品
+    action: reject
+    description: 吸毒或展示毒品，枪支弹药、管制刀具、爆炸物的展示与交易，违禁药品买卖。
+    exceptions: [厨房刀具正常使用, 合法射击运动场所, 禁毒宣传]
+
+  - id: gambling
+    name: 赌博
+    action: reject
+    description: 赌博过程、推广赌博或博彩平台、网络赌博引流。
+    exceptions: [不涉及金钱的棋牌娱乐]
+
+  - id: dangerous
+    name: 危险行为
+    action: review
+    description: 容易被模仿、可能造成严重伤害的危险挑战与动作，危险驾驶，玩火玩电等。
+    exceptions: [有专业防护和明确提示的专业表演]
+
+  - id: harassment
+    name: 辱骂与人身攻击
+    action: review
+    description: 脏话粗口、侮辱谩骂、针对特定个人的攻击、霸凌、恶意曝光。
+
+  - id: fraud_misinfo
+    name: 虚假与欺诈
+    action: review
+    description: 夸大或虚假的医疗/保健功效，保本高收益等理财诈骗话术，冒充官方，明显的虚假信息。
+    examples: [包治百病, 三天瘦二十斤, 稳赚不赔, 冒充客服或公检法]
+
+  - id: ad_diversion
+    name: 广告导流
+    action: review
+    description: 引导用户离开平台私下交易或联系：手机号、微信号/QQ号/Telegram/Zalo 等账号、二维码、外部网址；未标注的硬广。
+    exceptions: [平台允许的商品橱窗或官方带货组件]
+
+  - id: privacy
+    name: 隐私泄露
+    action: review
+    description: 清晰可见的身份证、银行卡、手机号、住址、车牌、聊天记录中的他人个人信息。
+
+  - id: tobacco_alcohol
+    name: 烟酒
+    action: review
+    description: 吸烟（含电子烟）的特写或推广，劝酒、酗酒，烟草广告。
+
+  - id: ip_watermark
+    name: 搬运与侵权
+    action: review
+    description: 带有其他平台水印或台标的搬运内容，未经授权的影视剧、综艺、体育赛事画面。
