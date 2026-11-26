@@ -2757,6 +2757,8 @@ function wTerrDraw(g, T, S, m, c, x, y, px, py, ts, h, t) {
   }
 }
 let spr = () => {};
+// 山海异兽坐骑：seat = 骑的人屁股落在图上的哪一格；hop = 独脚的，一蹦一蹦地走
+const MOUNTS = { dijiang: { n: '帝江', spr: 'mt_dijiang', seat: [14, 12] }, kui: { n: '夔', spr: 'mt_kui', seat: [13, 13], hop: 1 }, taotie: { n: '饕餮', spr: 'mt_taotie', seat: [12, 13] } };
 function wDraw(cv, dpr, ts, t) {
   const g = cv.getContext('2d'), ch = wch(), m = wmap(ch), S = wstate(ch), T = wTheme(), K = T.kind;
   const Wp = cv.width / dpr, Hp = cv.height / dpr;
@@ -2928,16 +2930,21 @@ function wDraw(cv, dpr, ts, t) {
   // 主角
   const walking = !!(WALK || WHERO.mv), ph = (WHERO.dist || 0) * Math.PI, hb = walking ? Math.abs(Math.sin(ph)) * 2 : Math.sin(t / 400) * 1, lean = walking ? Math.sin(ph) * 0.04 : 0;
   const wf = walking ? [1, 0, 3, 0][Math.floor((WHERO.dist || 0) * 2.5) % 4] : 0;   // 迈步：左、并、右、并
-  g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.ellipse(ox + (WHERO.x + 0.5) * ts, oy + (WHERO.y + 0.9) * ts, ts * 0.32, ts * 0.12, 0, 0, 7); g.fill();
+  g.fillStyle = 'rgba(0,0,0,.45)'; g.beginPath(); g.ellipse(ox + (WHERO.x + 0.5) * ts, oy + (WHERO.y + 0.9) * ts, ts * (SAVE.mount && MOUNTS[SAVE.mount] ? 0.6 : 0.32), ts * (SAVE.mount && MOUNTS[SAVE.mount] ? 0.16 : 0.12), 0, 0, 7); g.fill();
   const HS = m.def.heroSpr, hsN = HS ? HS[0] : CLASSES[SAVE.run.cls].spr, hsP = HS ? HS[1] : CLASSES[SAVE.run.cls].pal;   // 梦里是十五岁的阿土
   const rigC = !HS && typeof HERO !== 'undefined' && HERO.has(SAVE.run.cls) ? SAVE.run.cls : null, wi = Math.floor((WHERO.dist || 0) * 2.5) % 4;
-  const hc = rigC ? HERO.cv(rigC, WHERO.back && walking ? 'b' + wi : WHERO.back ? 'b0' : walking ? 'w' + wi : Math.floor(t / 560) % 2 ? 'idle2' : 'idle') : WHERO.back ? SPR.backCv(hsN, hsP, wf) : SPR.walkCv(hsN, hsP, wf);
+  const MT = rigC && SAVE.mount && MOUNTS[SAVE.mount] && SPR.T[MOUNTS[SAVE.mount].spr] ? MOUNTS[SAVE.mount] : null;   // 山海坐骑：只在地图上走路时骑着，不加属性
+  const hc = MT ? HERO.cv(rigC, 'ride') : rigC ? HERO.cv(rigC, WHERO.back && walking ? 'b' + wi : WHERO.back ? 'b0' : walking ? 'w' + wi : Math.floor(t / 560) % 2 ? 'idle2' : 'idle') : WHERO.back ? SPR.backCv(hsN, hsP, wf) : SPR.walkCv(hsN, hsP, wf);
   // 走路扬尘
   if (walking && wf !== WHERO.lastWf) { WHERO.lastWf = wf; if (wf) (WHERO.dust || (WHERO.dust = [])).push({ x: WHERO.x + 0.5 + (Math.random() - 0.5) * 0.2, y: WHERO.y + 0.88, t }); }
   if (WHERO.dust) { WHERO.dust = WHERO.dust.filter(d => t - d.t < 520); for (const d of WHERO.dust) { const k = (t - d.t) / 520; g.fillStyle = `rgba(190,170,140,${(0.45 * (1 - k)).toFixed(3)})`; const r = ts * (0.06 + k * 0.14); g.beginPath(); g.ellipse(ox + d.x * ts, oy + d.y * ts - k * ts * 0.12, r * 1.4, r, 0, 0, 7); g.fill(); } }
   if (hc) { g.save(); const hx = ox + (WHERO.x + 0.5) * ts, hy = oy + (WHERO.y + 0.8) * ts - hb;
-    g.translate(hx, rigC ? hy + hb : hy); g.rotate(lean); if (WHERO.flip) g.scale(-1, 1);
-    if (rigC) { const u = ts * 1.12 / 30; g.drawImage(hc, -28 * u, -44 * u, HERO.W * u, HERO.H * u); } else g.drawImage(hc, -ts * 0.55, -ts * 1.1, ts * 1.1, ts * 1.1 * hc.height / hc.width);
+    g.translate(hx, rigC ? hy + hb : hy); g.rotate(MT ? 0 : lean); if (WHERO.flip) g.scale(-1, 1);
+    if (MT) { const cell = ts * 0.057, u = ts * 1.12 / 30, hopK = walking ? Math.abs(Math.sin(ph)) : 0, mb = MT.hop ? -hopK * ts * 0.24 : walking ? -hopK * 1.6 : Math.sin(t / 500) * 0.8;
+      const fb = walking && (MT.hop ? hopK > 0.3 : Math.floor((WHERO.dist || 0) * 2.5) % 2 === 1), mc = SPR.cv(MT.spr + (fb ? '_b' : '')), mx0 = -MT.seat[0] * cell, my0 = ts * 0.1 - 31 * cell + mb;
+      if (mc) g.drawImage(mc, mx0, my0, 32 * cell, 32 * cell);
+      g.drawImage(hc, -28 * u, my0 + MT.seat[1] * cell - 33 * u, HERO.W * u, HERO.H * u); }
+    else if (rigC) { const u = ts * 1.12 / 30; g.drawImage(hc, -28 * u, -44 * u, HERO.W * u, HERO.H * u); } else g.drawImage(hc, -ts * 0.55, -ts * 1.1, ts * 1.1, ts * 1.1 * hc.height / hc.width);
     g.restore(); }
   // 天气
   wCrowd(g, ch, m, S, ox, oy, ts, t, spr);
