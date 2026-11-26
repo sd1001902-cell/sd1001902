@@ -333,6 +333,7 @@ const HERO = (() => {
     mo:    { lean: 8, ns: 52, ne: 50, w: 100, wl: 'f', two: 1 },                                                                            // 狂刀客：横刀抹一把
     z1:    { ns: 58, ne: 70, w: 120, wl: 'f' },                                                                                             // 刺客：转匕首——刀尖朝前
     z2:    { ns: 58, ne: 70, w: 300, wl: 'f' },                                                                                             // 刺客：转匕首——刀尖朝后
+    ride:  { lean: 3, nh: 82, nk: 78, fh: 74, fk: 70, ns: 26, ne: 46, fs: 34, fe: 40 },                                                    // 骑在坐骑上：两腿往前跨着
     lk:    { lean: -3, hx: -1 },                                                                                                            // 回头看一眼（手上照站姿）
     b0: { view: 'back', walk: 0 }, b1: { view: 'back', walk: 1, y: -1 }, b2: { view: 'back', walk: 2 }, b3: { view: 'back', walk: 3, y: -1 },
   };
@@ -508,7 +509,7 @@ const HERO = (() => {
   // ---------- 拼一帧 ----------
   function build(cls, pose) {
     const L = LOOK[cls] || LOOK.berserker, TW = TWEAK[cls] || {}, TI = TW.idle || {}, inh = {};
-    if (/^(idle2|w\d|lk)$/.test(pose) && !TW[pose]) for (const k of ['w', 'wl', 'ne', 'lean', 'y']) if (TI[k] !== undefined && (k !== 'y' || pose === 'idle2')) inh[k] = TI[k] + (k === 'y' && pose === 'idle2' ? 0 : 0);
+    if (/^(idle2|w\d|lk|ride)$/.test(pose) && !TW[pose]) for (const k of ['w', 'wl', 'ne', 'lean', 'y']) if (TI[k] !== undefined && (k !== 'y' || pose === 'idle2')) inh[k] = TI[k] + (k === 'y' && pose === 'idle2' ? 0 : 0);
     const P = Object.assign({}, BASE, POSES[pose] || POSES.idle, inh, TW[pose] || {});
     const back = newBuf(), body = newBuf(), front = newBuf();
     const hip = [28 + P.x, 33 + P.y], tv = [Math.sin(rad(P.lean)), -Math.cos(rad(P.lean))], neck = add(hip, tv, 7);

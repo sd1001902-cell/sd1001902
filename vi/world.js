@@ -1343,7 +1343,7 @@ function newRiftRun(cls, riftLv) {
   const run = { world: true, cls, mode: 'rift', diff: 'normal', riftLv: riftLv || 1, chapter: RCH, mods: featureOn('mods') ? (SAVE.mods || []).slice() : [], floor: 1, buffs: {}, loot: [], goldGot: 0, xpGot: 0, gemsGot: 0,
     matsGot: 0, kills: 0, t0: Date.now(), lvStart: SAVE.chars[cls].level, paraStart: SAVE.para.lv, hp: 0, ended: null, rooms: 0, xpMul: 1.75, prog: 0, clock: 0, pts: 0, fights: 0,
     maze: { v: 2, cells: [], maxDist: 1 }, pos: 0, hasKey: true, theme: floors[0].c - 1,
-    rw: { floors, f: 0, bossC: RNG.i(1, 10), boss: 0 } };
+    rw: { floors, f: 0, bossC: RNG.i(1, 10), boss: 0, sh: RNG.ch(SH.rate) ? shPick() : null } };   // sh：山海经副本，守关的是哪只异兽（进去时不告诉玩家）
   run.ngoc = pgOr(0) && SAVE.ngocJoin ? 'fox' : null; run.comp = !run.ngoc && (SAVE.comps || {})[SAVE.comp] ? SAVE.comp : null;
   if (pgOr(0)) { run.team = teamOf(); run.ngoc = null; run.comp = null; }   // 通关后的幻境：组队
   for (const id of run.mods) { const M = DUNGEON_MODS.find(x => x.id === id); if (!M) continue;   // 2026-11-24 加难度在幻境里也生效（原来幻境开局清单是空的，选了等于没选）
@@ -1464,10 +1464,10 @@ function rCheckBoss(ch, run) {
   const S = wstate(ch), D = wScene(ch); let at = null;
   for (let r = 2; r <= 6 && !at; r++) { const c = []; for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = S.pos.x + dx, y = S.pos.y + dy; if (wPassMon(ch, x, y) && wPath(ch, x, y)) c.push({ x, y }); } if (c.length) at = RNG.pick(c); }
   if (!at) at = { x: S.pos.x, y: S.pos.y };
-  const B = CHAPTERS[run.rw.bossC - 1].boss;
+  const sh = shOn(run), B = sh ? SH_BEASTS[run.rw.sh] : CHAPTERS[run.rw.bossC - 1].boss;
   D.mons.push(wNewMon(ch, { x: at.x, y: at.y, z: 'rb', m: -1, c: run.rw.bossC, lv: riftLvCap(run, rBase(run) + rFloorOf(ch).fi), beh: 'guard', boss: 1 }));
   run.rw.boss = 1; run.rw.bossF = rFloorOf(ch).fi;
-  return [{ rboss: B.n, d: B.d }];
+  return [{ rboss: (sh ? "Dị thú Sơn Hải·" : '') + B.n, d: B.d, sh }];
 }
 function rWon(ch, key, run) {
   const S = wstate(ch), D = wScene(ch), acts = [], R = rFloorOf(ch);

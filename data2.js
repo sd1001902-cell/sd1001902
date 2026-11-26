@@ -391,3 +391,33 @@ const YISHI = {
   niuma:    { pg: 8, n: '勾魂', d: g => `普通妖物气血低于 ${YI_HOOK(g)}% 时，直接被勾走（精英和首领不算）` },
   mozun:    { pg: 9, n: '魔气', d: g => `伤害 +${8 + g * 4}%，但受到的伤害 +8%` },
 };
+
+// ============ 山海经副本（2026-11-26 用户定）============
+// 进幻境有一成几率触发：守关妖王换成《山海经》里的异兽（打到才知道是哪只），整局掉率变高；
+// 异兽比同层妖王厚一两成，各带三招自己的。数字怎么定的（模拟过）：高层妖王一下最多打掉四成气血，攻击系数高低几乎不影响输赢，
+// 真正决定难度的是「它有多少手在平砍」——守关妖王的大招老玩家都有克制道具，放出来就被破、等于白丢一手；异兽的招没有道具能破，
+// 所以给它们排的多是怒吼、护体、小口咬这类不伤筋骨的招，隔五手才来一下真的。一招不配（每手都平砍）反而最难打。
+var SH = { rate: 0.1, anc: 1.5, gold: 1.5, mats: 1.5 };
+const SH_BEASTS = {
+  xingtian: { n: '刑天', spr: 'xingtian32', hp: 1.0, atk: 1, sh: 'xingtian', d: '举盾、抡斧；倒下一次还会再站起来', revive: 0.2,
+    abs: [{ t: 'roar', every: 3, mult: 1.1, cap: 3, say: '——！（它没有头，是肚脐在吼）' }, { t: 'shell', every: 4, pct: 0.06, nm: '举盾', note: '刑天把盾举到了身前——「冰冻」能让它的架势松开', say: '（盾举起来了）' },
+          { t: 'aoe', every: 5, mult: 0.8, elem: 'phys', say: '（斧子抡圆了）' }], half: { say: '（它把盾一扔，两手握住了斧子）', enrage: true }, die: '（它终于不动了，斧子还攥在手里。）' },
+  taotie: { n: '饕餮', spr: 'taotie32', hp: 1.25, atk: 1, sh: 'taotie', d: '一口吞人、越吃越凶；半血后发狂',
+    abs: [{ t: 'devour', every: 5, mult: 2.0, say: '饿……饿……', bite: '吞——！' }, { t: 'roar', every: 3, mult: 1.08, cap: 2, say: '还要……还要吃……' }, { t: 'brush', every: 4, pct: 0.03, nm: '涎毒', say: '（它舔了你一口）' }],
+    half: { say: '还不够……还不够吃！', enrage: true }, die: '（它把吞下去的东西全吐了出来。）' },
+  xiangliu: { n: '相柳', spr: 'xiangliu32', hp: 1.1, atk: 1, sh: 'xiangliu', d: '九个头轮番喷毒、盘身护体；半血后九首齐出',
+    abs: [{ t: 'poison', every: 7, mult: 0.3, dot: 0.08, say: '嘶——嘶——嘶——' }, { t: 'roar', every: 3, mult: 1.08, cap: 2, say: '（又一个头抬了起来）' },
+          { t: 'shell', every: 4, pct: 0.05, nm: '盘成一团', note: '相柳把身子盘了起来，九个头缩在中间——「冰冻」能让它松开', say: '（它把身子盘紧了）' }],
+    half: { say: '（九个头一齐抬了起来）', enrage: true }, die: '（九个头一个接一个垂了下去。）' },
+  kui: { n: '夔', spr: 'kui32', hp: 1.1, atk: 1, sh: 'kui', d: '一声雷鼓震晕全队、雷光护体；半血后发狂',
+    abs: [{ t: 'gavel', every: 8, mult: 0.25, elem: 'light', pre: '夔单脚一顿，天上的闷雷滚了过来……', boom: '轰——！！' }, { t: 'roar', every: 3, mult: 1.08, cap: 3, say: '哞——' },
+          { t: 'shell', every: 4, pct: 0.05, nm: '雷光护体', note: '夔身上的光罩住了它——「冰冻」能让光散掉', say: '（它身上的光亮得像日头）' }], half: { say: '（雷声一阵紧过一阵）', enrage: true }, die: '（雷声远了。）' },
+  dijiang: { n: '帝江', spr: 'dijiang32', hp: 1.2, atk: 1, sh: 'dijiang', d: '混沌：打乱你们的出手；扇火、缩成一团',
+    abs: [{ t: 'chaos', every: 3, say: '（它没有脸，可你觉得它在看你）' }, { t: 'aoe', every: 5, mult: 0.8, elem: 'fire', say: '（四只翅膀一齐扇了起来）' },
+          { t: 'shell', every: 4, pct: 0.05, nm: '缩成一团', note: '帝江缩成了一团——「冰冻」能让它舒展开', say: '（它缩成了一团）' }], half: { say: '（它滚成了一团火，分不清哪边是前）', enrage: true }, die: '（它瘪了下去，像个漏了气的皮囊。）' },
+};
+// 坐骑：seat = 骑的人屁股落在图上的哪一格；hop = 独脚的，一蹦一蹦地走
+const MOUNTS = { dijiang: { n: '帝江', spr: 'mt_dijiang', seat: [14, 12] }, kui: { n: '夔', spr: 'mt_kui', seat: [13, 13], hop: 1 }, taotie: { n: '饕餮', spr: 'mt_taotie', seat: [12, 13] },
+  xingtian: { n: '刑天', spr: 'mt_xingtian', seat: [15.5, 5] }, xiangliu: { n: '相柳', spr: 'mt_xiangliu', seat: [12, 16] } };
+const shOn = run => !!(run && run.mode === 'rift' && run.rw && run.rw.sh && SH_BEASTS[run.rw.sh]);
+function shPick() { const ids = Object.keys(SH_BEASTS), got = (typeof SAVE !== 'undefined' && SAVE && SAVE.mounts) || {}, need = ids.filter(id => !got[id]); return RNG.pick(need.length ? need : ids); }

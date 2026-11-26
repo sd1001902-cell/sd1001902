@@ -391,3 +391,33 @@ const YISHI = {
   niuma:    { pg: 8, n: "Câu Hồn", d: g => `Yêu vật thường dưới ${YI_HOOK(g)}% khí huyết thì bị câu đi luôn (tinh anh và thủ lĩnh không tính)` },
   mozun:    { pg: 9, n: "Ma Khí", d: g => `Sát thương +${8 + g * 4}%, nhưng sát thương phải nhận +8%` },
 };
+
+// ============ 山海经副本（2026-11-26 用户定）============
+// 进幻境有一成几率触发：守关妖王换成《山海经》里的异兽（打到才知道是哪只），整局掉率变高；
+// 异兽比同层妖王厚一两成，各带三招自己的。数字怎么定的（模拟过）：高层妖王一下最多打掉四成气血，攻击系数高低几乎不影响输赢，
+// 真正决定难度的是「它有多少手在平砍」——守关妖王的大招老玩家都有克制道具，放出来就被破、等于白丢一手；异兽的招没有道具能破，
+// 所以给它们排的多是怒吼、护体、小口咬这类不伤筋骨的招，隔五手才来一下真的。一招不配（每手都平砍）反而最难打。
+var SH = { rate: 0.1, anc: 1.5, gold: 1.5, mats: 1.5 };
+const SH_BEASTS = {
+  xingtian: { n: "Hình Thiên", spr: 'xingtian32', hp: 1.0, atk: 1, sh: 'xingtian', d: "Giơ khiên, vung rìu; ngã một lần vẫn đứng dậy lần nữa", revive: 0.2,
+    abs: [{ t: 'roar', every: 3, mult: 1.1, cap: 3, say: "——! (Nó không có đầu, là cái rốn đang gầm)" }, { t: 'shell', every: 4, pct: 0.06, nm: "Giơ khiên", note: "Hình Thiên giơ khiên ra trước người — “Đóng băng” làm nó lỏng thế thủ", say: "(Khiên đã giơ lên)" },
+          { t: 'aoe', every: 5, mult: 0.8, elem: 'phys', say: "(Cây rìu quay tròn)" }], half: { say: "(Nó quăng khiên, hai tay nắm chặt rìu)", enrage: true }, die: "(Cuối cùng nó không động nữa, tay vẫn nắm chặt rìu.)" },
+  taotie: { n: "Thao Thiết", spr: 'taotie32', hp: 1.25, atk: 1, sh: 'taotie', d: "Nuốt chửng một miếng, càng ăn càng dữ; dưới nửa máu thì phát cuồng",
+    abs: [{ t: 'devour', every: 5, mult: 2.0, say: "Đói… đói…", bite: "Nuốt —!" }, { t: 'roar', every: 3, mult: 1.08, cap: 2, say: "Nữa… ăn nữa…" }, { t: 'brush', every: 4, pct: 0.03, nm: "Dãi độc", say: "(Nó liếm ngươi một cái)" }],
+    half: { say: "Chưa đủ… ăn chưa đủ!", enrage: true }, die: "(Nó nôn hết những thứ đã nuốt ra.)" },
+  xiangliu: { n: "Tương Liễu", spr: 'xiangliu32', hp: 1.1, atk: 1, sh: 'xiangliu', d: "Chín đầu thay nhau phun độc, cuộn mình hộ thể; dưới nửa máu thì chín đầu cùng ra",
+    abs: [{ t: 'poison', every: 7, mult: 0.3, dot: 0.08, say: "Xì—— xì—— xì——" }, { t: 'roar', every: 3, mult: 1.08, cap: 2, say: "(Lại một cái đầu ngẩng lên)" },
+          { t: 'shell', every: 4, pct: 0.05, nm: "Cuộn tròn", note: "Tương Liễu cuộn mình lại, chín đầu rụt vào giữa — “Đóng băng” làm nó lỏng ra", say: "(Nó cuộn chặt mình lại)" }],
+    half: { say: "(Chín cái đầu cùng ngẩng lên)", enrage: true }, die: "(Chín cái đầu lần lượt gục xuống.)" },
+  kui: { n: "Quỳ", spr: 'kui32', hp: 1.1, atk: 1, sh: 'kui', d: "Một hồi trống sấm làm cả đội choáng, lôi quang hộ thể; dưới nửa máu thì phát cuồng",
+    abs: [{ t: 'gavel', every: 8, mult: 0.25, elem: 'light', pre: "Quỳ giậm một chân, sấm rền trên trời lăn tới…", boom: "Ầm——!!" }, { t: 'roar', every: 3, mult: 1.08, cap: 3, say: "Ụm bò——" },
+          { t: 'shell', every: 4, pct: 0.05, nm: "Lôi quang hộ thể", note: "Ánh sáng trên mình Quỳ bao lấy nó — “Đóng băng” làm ánh sáng tan đi", say: "(Ánh sáng trên mình nó chói như mặt trời)" }], half: { say: "(Tiếng sấm dồn dập từng hồi)", enrage: true }, die: "(Tiếng sấm xa dần.)" },
+  dijiang: { n: "Đế Giang", spr: 'dijiang32', hp: 1.2, atk: 1, sh: 'dijiang', d: "Hỗn độn: làm loạn lượt ra tay của các ngươi; quạt lửa, co tròn lại",
+    abs: [{ t: 'chaos', every: 3, say: "(Nó không có mặt, nhưng ngươi thấy nó đang nhìn mình)" }, { t: 'aoe', every: 5, mult: 0.8, elem: 'fire', say: "(Bốn cái cánh cùng quạt lên)" },
+          { t: 'shell', every: 4, pct: 0.05, nm: "Co tròn lại", note: "Đế Giang co tròn lại — “Đóng băng” làm nó duỗi ra", say: "(Nó co tròn lại)" }], half: { say: "(Nó lăn thành một quả cầu lửa, không rõ đâu là đằng trước)", enrage: true }, die: "(Nó xẹp xuống, như cái túi da xì hơi.)" },
+};
+// 坐骑：seat = 骑的人屁股落在图上的哪一格；hop = 独脚的，一蹦一蹦地走
+const MOUNTS = { dijiang: { n: "Đế Giang", spr: 'mt_dijiang', seat: [14, 12] }, kui: { n: "Quỳ", spr: 'mt_kui', seat: [13, 13], hop: 1 }, taotie: { n: "Thao Thiết", spr: 'mt_taotie', seat: [12, 13] },
+  xingtian: { n: "Hình Thiên", spr: 'mt_xingtian', seat: [15.5, 5] }, xiangliu: { n: "Tương Liễu", spr: 'mt_xiangliu', seat: [12, 16] } };
+const shOn = run => !!(run && run.mode === 'rift' && run.rw && run.rw.sh && SH_BEASTS[run.rw.sh]);
+function shPick() { const ids = Object.keys(SH_BEASTS), got = (typeof SAVE !== 'undefined' && SAVE && SAVE.mounts) || {}, need = ids.filter(id => !got[id]); return RNG.pick(need.length ? need : ids); }
