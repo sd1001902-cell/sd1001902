@@ -4582,7 +4582,7 @@ const ACT = {
   },
   bkpick: () => { const f = $('#bkf'); if (!f) return; f.onchange = () => { const file = f.files && f.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => tryImport(String(rd.result || '')); rd.onerror = () => toast('文件读不出来'); rd.readAsText(file); f.value = ''; }; f.click(); },
   redeem: () => { const v = ($('#rdmIn') || {}).value || ''; if (!v.trim()) return toast('先把兑换码填进去'); const r = redeemCode(v); if (r.err) return toast(r.err);
-    save(); SFX.play('forge'); toast(`兑换成功：${({ M: '魂晶', G: '银两', X: '九幽玄晶' })[r.k]} +${fmtBig(r.n)}`); refresh(); },
+    save(); SFX.play('forge'); toast(r.mount ? `兑换成功：坐骑「<b>${MOUNTS[r.mount].n}</b>」，已经骑上了` : `兑换成功：${({ M: '魂晶', G: '银两', X: '九幽玄晶' })[r.k]} +${fmtBig(r.n)}`); refresh(); },
   import: () => { const v = ($('#imp') || {}).value || ''; if (!v.trim()) return toast('先把存档码粘贴到输入框里'); tryImport(v); },
   imcancel: () => { IMPORTING = null; closeModal(); },
   doimport: () => { if (!IMPORTING) return; clearOverlays(); SAVE = IMPORTING; IMPORTING = null; persist(true); toast('已恢复，正在重新载入……'); setTimeout(() => location.reload(), 500); },

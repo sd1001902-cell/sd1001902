@@ -1091,17 +1091,19 @@ function affQ(it, k, v) { const r = affRange(k, it.ilvl, genMult(it)); if (!r ||
 const affStars = q => 1 + Math.min(4, Math.floor(q * 5));
 function itemQ(it) { if (!it.aff || !it.aff.length) return null; return it.aff.reduce((s, [k, v]) => s + affQ(it, k, v), 0) / it.aff.length; }
 const busyRoll = it => !!(it.rfPending || it.wsPending || it.rrPending);
-// 兑换码（2026-11-26）：码里写着给什么（M 魂晶、G 银两、X 九幽玄晶）、给多少、第几号，后面 6 位是校验。同一个存档每个码只能用一次
-const RDM_KIND = { M: 'mats', G: 'gold', X: 'jyx' }, RDM_CAP = { M: 100000, G: 1e9, X: 1000 }, RDM_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+// 兑换码（2026-11-26）：码里写着给什么（M 魂晶、G 银两、X 九幽玄晶、Z 山海坐骑）、给多少（Z 是第几只：1 刑天 2 饕餮 3 相柳 4 夔 5 帝江）、第几号，后面 6 位是校验。同一个存档每个码只能用一次
+const RDM_KIND = { M: 'mats', G: 'gold', X: 'jyx' }, RDM_CAP = { M: 100000, G: 1e9, X: 1000, Z: 5 }, RDM_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function rdmHash(str) { let h1 = 0xdeadbeef ^ 7, h2 = 0x41c6ce57 ^ 7; for (let i = 0; i < str.length; i++) { const ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909); return 4294967296 * (2097151 & h2) + (h1 >>> 0); }
 function rdmSig(body) { let h = rdmHash('jiuyou|' + body + '|huilang'), s = ''; for (let i = 0; i < 6; i++) { s += RDM_ABC[h % 32]; h = Math.floor(h / 32); } return s; }
 function redeemCode(raw) {
-  const m = String(raw || '').toUpperCase().replace(/\s+/g, '').match(/^([MGX])(\d{1,9})-?([A-Z2-9]{4})-?([A-Z2-9]{6})$/); if (!m) return { err: '兑换码不对' };
+  const m = String(raw || '').toUpperCase().replace(/\s+/g, '').match(/^([MGXZ])(\d{1,9})-?([A-Z2-9]{4})-?([A-Z2-9]{6})$/); if (!m) return { err: '兑换码不对' };
   const k = m[1], n = +m[2], id = k + n + m[3];
   if (!n || n > RDM_CAP[k] || rdmSig(id) !== m[4]) return { err: '兑换码不对' };
   SAVE.rdm = SAVE.rdm || {}; if (SAVE.rdm[id]) return { err: '这个兑换码已经用过了' };
-  SAVE.rdm[id] = Date.now(); const f = RDM_KIND[k]; SAVE[f] = (SAVE[f] || 0) + n; return { ok: true, k, n };
+  SAVE.rdm[id] = Date.now();
+  if (k === 'Z') { const mt = Object.keys(SH_BEASTS)[n - 1]; if (!SAVE.mounts) SAVE.mounts = {}; SAVE.mounts[mt] = 1; SAVE.mount = mt; return { ok: true, k, n, mount: mt }; }   // 坐骑：直接给，顺手骑上
+  const f = RDM_KIND[k]; SAVE[f] = (SAVE[f] || 0) + n; return { ok: true, k, n };
 }
 // 淬炼：一条词条的数值重新摇一次，新旧二选一
 function refineCost(it) { const n = it.rfn || 0; return { gold: Math.round((30 + it.ilvl * 5) * (1 + n * 0.25)), mats: 2 + Math.floor(n / 2) }; }
