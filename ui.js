@@ -2107,11 +2107,7 @@ function tick() {
   const o = battleStep(B); const nl = narrate(o); if (nl && !(o.lines.length && !o.pops.some(p => /^\d+$/.test(p[1])))) B.logs.push(nl); B.logs.push(...o.lines); updBattle(o, true);
   if (B.over) setTimeout(endBattle, o.ult ? ULT_MS() + 300 : 250); else schedule(o);
 }
-// 跳过要等几秒（2026-11-26 用户：跳过战斗设一个限制 → 定 3 秒，不要倒计时）：这一场开打满 SKIP_WAIT 秒才能跳；没到的时候按钮是暗的，能点了就变亮
-const SKIP_WAIT = 3; let SKIPT = { b: null, t: 0, h: 0 };
-function skipLeft() { if (!B) return 0; if (SKIPT.b !== B) { SKIPT.b = B; SKIPT.t = performance.now(); } return Math.max(0, SKIP_WAIT - (performance.now() - SKIPT.t) / 1000); }
-function skipTick() { clearTimeout(SKIPT.h); const b = typeof document !== 'undefined' && document.querySelector('.skipb'); if (!b || !B) return; const L = B.over ? 0 : skipLeft();
-  if (b.classList.contains('wait') !== (L > 0)) b.classList.toggle('wait', L > 0); if (L > 0) SKIPT.h = setTimeout(skipTick, Math.min(200, L * 1000 + 20)); }
+// 跳过战斗：不设等待（2026-11-26 试过等 5 秒带倒数、等 3 秒，用户最后定「把选择权给用户，取消限制」）
 function skipBattle() {
   clearTimeout(timer); let n = 0; B.ultAuto = true; B.castAuto = true;
   while (!B.over && n++ < 8000) { const o = battleStep(B); B.logs.push(...o.lines); }
@@ -4745,7 +4741,7 @@ const ACT = {
   kitdel: i => { kitsOf(SAVE.cls)[+i] = null; closeModal(); save(); refresh(); toast('删掉了这一套配装（装备还在）'); },
   kituse: i => { const r = kitUse(SAVE.cls, +i); if (r.err) return toast(r.err); SFX.play('loot'); save(); refresh();
     const k = kitsOf(SAVE.cls)[+i]; toast(`换上了「<b>${esc(k.n)}</b>」${r.miss.length ? `。找不到：${r.miss.join('、')}（这些格子没动）` : ''}${r.away.length ? `。有装备穿在${r.away.join('、')}身上，没拿过来` : ''}${r.gmiss && r.gmiss.length ? `。玉石缺 ${r.gmiss.length} 颗：${gemMissTxt(r.gmiss)}（孔先空着）` : ''}`); },
-  skip: () => { if (!B || B.over) return; if (skipLeft() > 0) return skipTick(); skipBattle(); },
+  skip: () => { if (!B || B.over) return; skipBattle(); },
   bcont: () => battleContinue(),
   choice: i => { EVRES = resolveEvent(SAVE.run, curCell(SAVE.run).ev, +i); if (!EVRES.fight) clearCell(SAVE.run); SFX.play(EVRES.items && EVRES.items.length ? 'loot' : 'magic'); refresh(); },
   evcont: () => { const run = SAVE.run;
@@ -4892,7 +4888,7 @@ function render() {
   app.querySelectorAll('[data-scroll]').forEach(e => { const v = keepS[e.dataset.scroll]; if (v) e.scrollTop = v; });
   if (VIEW === 'town' && SAVE.flags && !SAVE.flags.yiTip && featureOn('rift') && !(SAVE.chars[SAVE.cls].yi || []).length && Object.keys(YISHI).some(k => yiGrade(k))) { SAVE.flags.yiTip = 1; save(); setTimeout(() => toast('你收服过首领的精魄，可以带两只<b>役使</b>上阵（幻境面板里的「役使」空位）。带上以后它们会跟在你身边，本事触发时会闪一下。'), 900); }
   if (VIEW === 'town' || VIEW === 'end') { const met = compMeetCheck(); if (met.length) { save(); met.forEach((c, i) => setTimeout(() => toast(`新伙伴：<b>${COMPANIONS[c].n}</b>（${COMPANIONS[c].role}）愿意跟你进幻境了。去幻境面板的「伙伴」里带上。`), 600 + i * 2800)); } }
-  if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SCENE_THEMES[SAVE.run.sth || SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); skipTick(); showRes(); } else VFX.setup(null);
+  if (VIEW === 'battle') { VFX.setup($('#arena'), SAVE.speed); if (typeof GFX !== 'undefined' && SAVE.run) { const T0 = SAVE.run.world && SCENE_THEMES[SAVE.run.sth || SAVE.run.theme]; GFX.ambient((T0 || terrainOf(SAVE.run) || {}).wx); } applyStep(null); showRes(); } else VFX.setup(null);
   if (VIEW === 'world') wSetup();
   try { SFX.mood(curMood()); } catch (e) {}
   if (VIEW === 'map' && AUTO && !WALKING) { clearTimeout(autoT); autoT = setTimeout(autoStep, 420); }
