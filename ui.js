@@ -2807,9 +2807,17 @@ function wFloor(g, T, c, x, y, px, py, ts, h) {
     return;
   }
   if (K === 'dungeon') {
-    g.fillStyle = c === ',' ? shade(T.p, 10) : shade(T.g, 16 + h * 8); g.fillRect(px, py, ts + 1, ts + 1);
-    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1; g.strokeRect(px + 0.5, py + 0.5, ts - 1, ts - 1);
-    if (h > 0.85) { g.fillStyle = 'rgba(120,200,190,.08)'; g.fillRect(px + h * ts * 0.6, py + ts * 0.5, ts * 0.3, 2); }
+    // 2026-11-26 美化第四批：石板有深有浅（一片一片的，不是每格乱跳），缝是暗的、上沿左沿有一线亮，偶尔一道裂纹、几粒碎石、一点反光
+    const big = hash2(x >> 2, y >> 2, 5), h2 = hash2(x, y, 9);
+    g.fillStyle = c === ',' ? shade(T.p, 10) : shade(T.g, 12 + Math.round(big * 9) + Math.round(h * 5)); g.fillRect(px, py, ts + 1, ts + 1);
+    g.fillStyle = 'rgba(255,255,255,.045)'; g.fillRect(px + 1, py + 1, ts - 2, 1); g.fillRect(px + 1, py + 1, 1, ts - 2);
+    g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px, py + ts - 1, ts + 1, 1); g.fillRect(px + ts - 1, py, 1, ts + 1);
+    if (h2 > 0.9) { g.fillStyle = 'rgba(0,0,0,.24)'; const cx = px + ts * (0.18 + h * 0.3), cy = py + ts * (0.22 + big * 0.3), v = Math.floor(h * 3);   // 裂纹三种走向
+      if (v === 0) { g.fillRect(cx, cy, ts * 0.2, 1); g.fillRect(cx + ts * 0.18, cy + 1, ts * 0.12, 1); g.fillRect(cx + ts * 0.28, cy + 2, 1, ts * 0.16); }
+      else if (v === 1) { g.fillRect(cx + ts * 0.2, cy, 1, ts * 0.14); g.fillRect(cx + ts * 0.14, cy + ts * 0.14, ts * 0.07, 1); g.fillRect(cx + ts * 0.14, cy + ts * 0.14, 1, ts * 0.2); g.fillRect(cx + ts * 0.04, cy + ts * 0.33, ts * 0.11, 1); }
+      else { g.fillRect(cx, cy + ts * 0.2, ts * 0.12, 1); g.fillRect(cx + ts * 0.11, cy + ts * 0.14, 1, ts * 0.07); g.fillRect(cx + ts * 0.11, cy + ts * 0.14, ts * 0.16, 1); g.fillRect(cx + ts * 0.26, cy + ts * 0.05, 1, ts * 0.1); } }
+    else if (h2 > 0.82) { g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px + ts * (0.2 + h * 0.5), py + ts * (0.55 + big * 0.25), 3, 2); g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(px + ts * (0.2 + h * 0.5), py + ts * (0.55 + big * 0.25), 2, 1); g.fillStyle = 'rgba(0,0,0,.26)'; g.fillRect(px + ts * (0.55 - h * 0.3), py + ts * (0.3 + big * 0.2), 2, 2); }
+    else if (h2 < 0.07) { g.fillStyle = T.wx === 'snow' ? 'rgba(210,240,255,.16)' : T.wx === 'ember' ? 'rgba(255,120,40,.16)' : 'rgba(120,200,190,.1)'; g.fillRect(px + ts * (0.15 + h * 0.4), py + ts * (0.3 + big * 0.4), ts * 0.34, 2); g.fillRect(px + ts * (0.25 + h * 0.4), py + ts * (0.3 + big * 0.4) + 3, ts * 0.16, 1); }
     return;
   }
   if (K === 'town' && c === '=') { g.fillStyle = shade(T.p, 4 + h * 10); g.fillRect(px, py, ts + 1, ts + 1); g.strokeStyle = 'rgba(0,0,0,.25)'; g.strokeRect(px + 0.5, py + 0.5, ts / 2, ts / 2); g.strokeRect(px + ts / 2 + 0.5, py + ts / 2 + 0.5, ts / 2 - 1, ts / 2 - 1); return; }
@@ -2824,9 +2832,18 @@ function wSolid(g, T, m, c, x, y, px, py, ts, spr) {
   if (c === '^') {
     const base = T.wall || '#2e2622';
     g.fillStyle = base; g.fillRect(px, py, ts + 1, ts + 1);
-    if (K === 'dungeon') { g.fillStyle = shade(base, 14); for (let r = 0; r < 3; r++) g.fillRect(px + (r % 2 ? 0 : ts / 2) + 1, py + r * ts / 3 + 1, ts / 2 - 2, ts / 3 - 2); }
-    else { g.fillStyle = shade(base, 16); g.fillRect(px + 2, py + 2, ts - 4, ts * 0.45); }
-    if (dn !== '^') { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(px, py + ts - 4, ts + 1, 4); }
+    if (K === 'dungeon') {   // 2026-11-26：墙是一整块石头——上面是顶面（平的、亮一点），朝下那面是立面（砌砖、暗一点），底下压一道黑
+      const hw = hash2(x, y, 4), face = dn !== '^', fh = face ? Math.round(ts * 0.42) : 0, lf = wTile(m, x - 1, y) !== '^', rt = wTile(m, x + 1, y) !== '^';
+      g.fillStyle = shade(base, 20 + Math.round(hw * 8)); g.fillRect(px, py, ts + 1, ts + 1 - fh);
+      g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(px + ts * (0.15 + hw * 0.4), py + (ts - fh) * (0.25 + hw * 0.3), ts * 0.3, 2); if (hw > 0.5) g.fillRect(px + ts * (0.55 - hw * 0.3), py + (ts - fh) * 0.7, ts * 0.2, 2);
+      if (up !== '^') { g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(px, py, ts + 1, 2); }
+      if (lf) { g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(px, py, 2, ts + 1 - fh); }
+      if (rt) { g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(px + ts - 1, py, 2, ts + 1 - fh); }
+      if (face) { const fy = py + ts + 1 - fh; g.fillStyle = shade(base, 2); g.fillRect(px, fy, ts + 1, fh);
+        g.fillStyle = 'rgba(0,0,0,.34)'; g.fillRect(px, fy, ts + 1, 1); g.fillRect(px, fy + Math.round(fh / 2), ts + 1, 1); g.fillRect(px + Math.round(ts * 0.5), fy, 1, Math.round(fh / 2)); g.fillRect(px + Math.round(ts * 0.22), fy + Math.round(fh / 2), 1, fh - Math.round(fh / 2)); g.fillRect(px + Math.round(ts * 0.76), fy + Math.round(fh / 2), 1, fh - Math.round(fh / 2));
+        g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(px, fy + 1, ts + 1, 1);
+        g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(px, py + ts - 2, ts + 1, 3); } }
+    else { g.fillStyle = shade(base, 16); g.fillRect(px + 2, py + 2, ts - 4, ts * 0.45); if (dn !== '^') { g.fillStyle = 'rgba(0,0,0,.5)'; g.fillRect(px, py + ts - 4, ts + 1, 4); } }
   } else if (c === 'H') {
     const roof = '#3b2c30', wall = '#6a4a32';
     if (dn !== 'H') { g.fillStyle = wall; g.fillRect(px, py, ts + 1, ts + 1); g.fillStyle = '#2a1a12'; g.fillRect(px + ts * 0.3, py + ts * 0.25, ts * 0.4, ts * 0.45);
@@ -2916,6 +2933,14 @@ function wDraw(cv, dpr, ts, t) {
     if ('*"_~:%&()'.includes(c)) { wTerrDraw(g, T, S, m, c, x, y, px, py, ts, h, t); continue; }
     const isBar = (c === 'R' || c === 'Q') && !m.def.pts[c];
     wFloor(g, T, W_BLOCK.includes(c) || isBar ? '.' : c, x, y, px, py, ts, h);
+    if (K === 'dungeon') {   // 墙压在地上的影子（上面有墙：一道深一道浅；左边有墙：窄窄一条）；靠墙的格子偶尔堆几块碎石
+      const wu = wTile(m, x, y - 1) === '^', wl = wTile(m, x - 1, y) === '^';
+      if (wu) { g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(px, py, ts + 1, Math.round(ts * 0.16)); g.fillStyle = 'rgba(0,0,0,.14)'; g.fillRect(px, py + Math.round(ts * 0.16), ts + 1, Math.round(ts * 0.18)); }
+      if (wl) { g.fillStyle = 'rgba(0,0,0,.16)'; g.fillRect(px, py, Math.round(ts * 0.14), ts + 1); }
+      if ((wu || wl || wTile(m, x + 1, y) === '^') && hash2(x, y, 7) > 0.8 && c === '.') { const rx = px + (wl ? ts * 0.08 : ts * 0.56), ry = py + (wu ? ts * 0.34 : ts * 0.6), rc = shade(T.wall || '#2e2622', 22);
+        const gem = { snow: '#9fd8ff', ember: '#ff8a3a', wisp: '#c0a0ff', spore: '#9ac06a' }[T.wx];
+        if (gem && hash2(x, y, 8) > 0.5) { g.fillStyle = 'rgba(0,0,0,.3)'; g.fillRect(rx - 1, ry + 6, 12, 2); g.fillStyle = gem; g.globalAlpha = 0.75; g.fillRect(rx + 1, ry - 2, 3, 8); g.fillRect(rx + 5, ry + 1, 3, 5); g.fillRect(rx + 8, ry + 3, 2, 3); g.globalAlpha = 1; g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(rx + 1, ry - 2, 1, 6); g.fillRect(rx + 5, ry + 1, 1, 4); }   // 这一处的小东西：冰碴、火晶、幽晶、苔
+        else { g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(rx - 1, ry + 5, 13, 3); g.fillStyle = rc; g.fillRect(rx, ry + 1, 6, 5); g.fillRect(rx + 5, ry + 3, 5, 4); g.fillStyle = 'rgba(255,255,255,.14)'; g.fillRect(rx, ry + 1, 6, 1); g.fillRect(rx + 5, ry + 3, 5, 1); } } }
     if (isBar) {
       const up2 = !S.flags.barsJammed && (c === 'R' ? !S.flags.bar : !!S.flags.bar), col = c === 'R' ? '#c4291f' : '#2ab8a8';
       if (up2) { g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(px, py + ts * 0.8, ts, ts * 0.2); g.fillStyle = col; for (let i = 0; i < 4; i++) g.fillRect(px + 3 + i * (ts - 6) / 3.3, py - ts * 0.15, 4, ts * 1.05); g.fillRect(px, py + ts * 0.1, ts, 3); }
@@ -3076,6 +3101,9 @@ function wDraw(cv, dpr, ts, t) {
       g.drawImage(hc, -28 * u, my0 + MT.seat[1] * cell - 33 * u, HERO.W * u, HERO.H * u); }
     else if (rigC) { const u = ts * 1.12 / 30; g.drawImage(hc, -28 * u, -44 * u, HERO.W * u, HERO.H * u); } else g.drawImage(hc, -ts * 0.55, -ts * 1.1, ts * 1.1, ts * 1.1 * hc.height / hc.width);
     g.restore(); }
+  // 主角身边一圈暖光（洞里、屋里才有；画在天气和迷雾前面）
+  if (K === 'dungeon' || K === 'room') { const lx = ox + (WHERO.x + 0.5) * ts, ly = oy + (WHERO.y + 0.55) * ts, lg = g.createRadialGradient(lx, ly, ts * 0.3, lx, ly, ts * 3.4);
+    lg.addColorStop(0, 'rgba(255,214,150,.13)'); lg.addColorStop(0.5, 'rgba(255,190,120,.05)'); lg.addColorStop(1, 'rgba(255,190,120,0)'); g.globalCompositeOperation = 'lighter'; g.fillStyle = lg; g.fillRect(lx - ts * 3.5, ly - ts * 3.5, ts * 7, ts * 7); g.globalCompositeOperation = 'source-over'; }
   // 天气
   wCrowd(g, ch, m, S, ox, oy, ts, t, spr);
   if (SAVE.gfx !== 0) wWeather(g, T.wx, Wp, Hp, t);
