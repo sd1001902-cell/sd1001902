@@ -426,6 +426,14 @@ const lockNote = (txt) => `<div class="locknote">${SPR.img('lock', 22)}<span>${t
 // 2026-11-26 减法改版：背包独立成页（五门共用）；设置缩成右上角齿轮
 // 山海异兽坐骑：图鉴页最上面一排；没见过的只有剪影
 const mountPanel = () => { const M = SAVE.mounts || {}; return `<section class="panel mtp"><h3>山海异兽 <small>${Object.keys(MOUNTS).filter(k => M[k]).length}/${Object.keys(MOUNTS).length} · 打赢了就能骑，只是好看</small></h3><div class="mts">${Object.keys(MOUNTS).map(id => { const m = MOUNTS[id], got = M[id], on = got && SAVE.mount === id; return `<button class="mt ${got ? '' : 'no'} ${on ? 'on' : ''}" data-act="mount" data-arg="${id}">${SPR.img(m.spr, 44)}<b>${got ? m.n : '？？'}</b><small>${on ? '骑着' : got ? '点了骑上' : '没见过'}</small></button>`; }).join('')}</div></section>`; };
+// 出征页关隘图里的主角：有坐骑就骑着，没有就站着（三层姿势图叠起来，和地图上是同一套）
+function heroFig(cls, S) {
+  if (typeof HERO === 'undefined' || !HERO.has(cls)) return heroSpr(cls, S);
+  const mt = SAVE.mount && (SAVE.mounts || {})[SAVE.mount] && MOUNTS[SAVE.mount], cell = S / 32, u = cell * 0.655 * 30 / 30, F = HERO.url(cls, mt ? 'ride' : 'idle', null); if (!F) return heroSpr(cls, S);
+  const w = 56 * u * 1.5, h = 46 * u * 1.5, k = u * 1.5, lay = (x, y) => ['back', 'body', 'front'].map(l => `<img src="${F[l]}" style="position:absolute;left:${x.toFixed(1)}px;top:${y.toFixed(1)}px;width:${w.toFixed(1)}px;height:${h.toFixed(1)}px;image-rendering:pixelated" alt="" draggable="false">`).join('');
+  if (!mt) return `<div class="hfig" style="width:${(S * 0.7).toFixed(0)}px;height:${S}px">${lay(S * 0.35 - 28 * k, S - 44 * k)}</div>`;
+  return `<div class="hfig" style="width:${S}px;height:${S}px"><img src="${SPR.url(mt.spr)}" style="position:absolute;left:0;top:0;width:${S}px;height:${S}px;image-rendering:pixelated" alt="" draggable="false">${lay(mt.seat[0] * cell - 28 * k, mt.seat[1] * cell - 33 * k)}</div>`;
+}
 const TOWN_TABS = [['go', '出征'], ['gear', '人物'], ['bag', '背包'], ['hero', '修炼'], ['col', '江湖录']];
 function dots() {
   const d = {}, cls = SAVE.cls;
@@ -649,11 +657,18 @@ function goTab() {
     const cu = catchUpMul(cls), rec = SAVE.riftRec[cls], ar = ancRate(SAVE.riftLv);
     const info = [['上古', `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · 太古 ${(ar[1] * 100).toFixed(2)}%` : ''}${jyRate(SAVE.riftLv) && !shelved('jy') ? ` · <b class="jyc">九幽 ${(jyRate(SAVE.riftLv) * 100).toFixed(2)}%</b>` : ''}`], ['一炷香', `${Math.round(riftLimit(SAVE.riftLv) / 60000)} 分钟`],
       ['纪录', rec ? riftRecTxt(rec) : '还没有'], ['套装', SAVE.riftLv >= RSET2_LV ? '两套都掉' : SAVE.riftLv >= RSET_LV ? '掉一套' : `${RSET_LV} 层起`], ['精魄', ZY_CN[zyGrade(SAVE.riftLv)]], ['最高', `${maxR} 层`]];
-    body = `<div class="rift-pick"><button class="btn ghost" data-act="rlv" data-arg="-5">-5</button><button class="btn ghost" data-act="rlv" data-arg="-1">-1</button>
-        <div class="rl"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div>
-        <button class="btn ghost" data-act="rlv" data-arg="1">+1</button><button class="btn ghost" data-act="rlv" data-arg="5">+5</button></div>
-      <div class="rquick"><button data-act="rlvto" data-arg="1" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>1 层</button><button data-act="rlv" data-arg="-50" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-50</button><button data-act="rlv" data-arg="-10" ${SAVE.riftLv <= 1 ? 'disabled' : ''}>-10</button><button data-act="rlv" data-arg="10" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+10</button><button data-act="rlv" data-arg="50" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>+50</button>${rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? `<button data-act="rlvto" data-arg="${rec.lv}" class="rq-rec">纪录 ${rec.lv}</button>` : ''}<button data-act="rlvto" data-arg="${maxR}" ${SAVE.riftLv >= maxR ? 'disabled' : ''}>最高 ${maxR}</button></div>
-      <div class="rinfo">${[0, 2, 1, 5, 3, 4].map(i => info[i]).map(([k, v], i) => `<div class="${i < 2 ? 'full' : ''}"><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+    // 2026-11-26 出征页重排：上面一幅「幻境关隘」图（牌楼、匾额上写层数、主角和伙伴站在门前），底下是木牌快捷键和四块带图标的信息
+    const dq = (arg, txt, dis) => `<button data-act="rlv" data-arg="${arg}" ${dis ? 'disabled' : ''}>${txt}</button>`, atMin = SAVE.riftLv <= 1, atMax = SAVE.riftLv >= maxR;
+    const tm = (typeof teamOf === 'function' ? teamOf() : []).map(c => COMPANIONS[c]).filter(Boolean).slice(0, 3);
+    const tile = (ic, k, v, act) => `<${act ? `button data-act="rlvto" data-arg="${act}"` : 'div'} class="rtile">${SPR.img(ic, 26)}<span><small>${k}</small><b>${v}</b></span></${act ? 'button' : 'div'}>`;
+    body = `<div class="rgate"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i><i class="rg-path"></i>
+        <div class="rg-arch"><i class="rg-portal"></i><i class="rg-pl"></i><i class="rg-pr"></i><i class="rg-roof"></i><i class="rg-beam"><em>九幽幻境</em></i><i class="rg-lan l"></i><i class="rg-lan r"></i>
+          <div class="rg-plaque"><b>${SAVE.riftLv}</b><small>层 · 妖物约 ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)} 级</small></div></div>
+        <button class="rg-arr l" data-act="rlv" data-arg="-1" ${atMin ? 'disabled' : ''} aria-label="低一层">‹</button><button class="rg-arr r" data-act="rlv" data-arg="1" ${atMax ? 'disabled' : ''} aria-label="高一层">›</button>
+        <div class="rg-hero">${heroFig(cls, 68)}</div><div class="rg-team">${tm.map(C2 => unitIcon(C2.spr, 40, null, '', 'full')).join('')}</div>
+        <span class="rg-sh">${SPR.img('mt_dijiang', 16)}偶遇<b>山海异兽</b> · 坐骑 ${Object.keys(MOUNTS).filter(k => (SAVE.mounts || {})[k]).length}/${Object.keys(MOUNTS).length}</span></div>
+      <div class="rquick"><button data-act="rlvto" data-arg="1" ${atMin ? 'disabled' : ''}>1层</button>${dq(-50, '-50', atMin)}${dq(-10, '-10', atMin)}${dq(-5, '-5', atMin)}${dq(5, '+5', atMax)}${dq(10, '+10', atMax)}${dq(50, '+50', atMax)}<button data-act="rlvto" data-arg="${maxR}" ${atMax ? 'disabled' : ''}>最高</button></div>
+      <div class="rtiles">${tile('fire', '一炷香', info[1][1])}${tile('i_weapon', ar[1] ? '上古 · 太古' : '上古', `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · ${(ar[1] * 100).toFixed(2)}%` : ''}`)}${tile('chest', '套装 · 精魄', `${info[3][1]} · ${info[4][1]}`)}${tile('scroll', '纪录 · 最高', `${info[2][1]} · ${maxR} 层`, rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? rec.lv : 0)}</div>
       ${rpOn() ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">追赶中：战斗经验 <b>×${cuTxt(cu)}</b>（比最高的角色低 ${topLevel() - SAVE.chars[cls].level} 级）</p>` : ''}
       ${teamRow()}${formRow()}${yiRow(cls)}`;
