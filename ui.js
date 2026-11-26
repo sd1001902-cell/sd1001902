@@ -178,6 +178,28 @@ function banner(title, sub, ms = 2000) {
   b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); SFX.play('gong');
   setTimeout(() => b.classList.remove('on'), ms);
 }
+// ===== 美化第二批（2026-11-26）：一次性的小动作——点一下动一次，不循环，不费电 =====
+// 朱门：整屏两扇门，从关着到打开。先把新画面换好（fn 立刻执行，不耽误），门再开
+function doorFx(fn) {
+  if (typeof document === 'undefined' || !document.body.classList.contains('gf')) return fn();
+  let el = document.getElementById('doorfx'); if (!el) { el = document.createElement('div'); el.id = 'doorfx'; document.body.appendChild(el); }
+  el.innerHTML = '<i class="dl"></i><i class="dr"></i>'; el.className = 'on'; clearTimeout(el._t); el._t = setTimeout(() => { el.className = ''; el.innerHTML = ''; }, 660);
+  try { SFX.play('door'); } catch (e) {}
+  return fn();
+}
+// 屏幕中间一下：金（强化成了、换上了）、青（玉）、紫（灵玉）、灰（没成）
+function burstFx(kind) {
+  if (typeof document === 'undefined') return; let el = document.getElementById('burst'); if (!el) { el = document.createElement('div'); el.id = 'burst'; el.innerHTML = '<i></i><b></b>'; document.body.appendChild(el); }
+  el.className = ''; void el.offsetWidth; el.className = 'on ' + (kind || 'gold'); clearTimeout(el._t); el._t = setTimeout(() => { el.className = ''; }, 720);
+}
+// 小仪式：东西放在正中，一圈光转一下，印盖上去，写一行字。点一下或者一秒半以后自己收
+function ceremony(o) {
+  if (typeof document === 'undefined') return; let el = document.getElementById('cere'); if (!el) { el = document.createElement('div'); el.id = 'cere'; document.body.appendChild(el); el.addEventListener('click', () => { el.className = ''; }); }
+  el.innerHTML = `<div class="ce-box" style="--c:${o.c || '#d9b866'}"><i class="ce-rays"></i><span class="ce-ic">${o.icon || ''}${o.seal ? `<i class="jb-seal">${o.seal}</i>` : ''}</span><b>${o.title || ''}</b>${o.sub ? `<small>${o.sub}</small>` : ''}</div>`;
+  el.className = ''; void el.offsetWidth; el.className = 'on'; clearTimeout(el._t); el._t = setTimeout(() => { el.className = ''; }, o.ms || 1600);
+  if (o.seal) setTimeout(() => { try { SFX.play('thud'); } catch (e) {} }, 420);
+}
+let TT_LAST = null, SK_LAST = null, RLV_LAST = null, CLS_LAST = null;   // 上一次画的时候在哪个页签、选的哪块招式牌、第几层、哪个门派：变了才动一下
 const seen = k => !!SAVE.story.seen[k];
 const markSeen = k => { SAVE.story.seen[k] = 1; };
 
@@ -261,7 +283,7 @@ function lootGrid(items, gems, zy) {
   const a = (items || []).map(it => { const u = up(it); return `<div class="bgc b-${it.rarity} ${ancCls(it)} ${u ? 'isup' : ''}"><button class="bgm" data-act="item" data-arg="${it.id}">${SPR.item(it, 28)}<b class="r-${it.rarity}">${esc(it.name)}</b></button>${u ? '<em class="bgup">▲</em>' : ''}</div>`; });
   const b = (gems || []).map(k => `<div class="bgc gm"><span class="bgm">${gemImg(k, 28)}<b>${gemName(k)}</b></span></div>`);
   const c = (zy || []).map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n); return `<div class="bgc zy"><span class="bgm">${d ? SPR.img(d.spr, 28, d.pal) : ''}<b>精魄·${n}</b><small class="up">${ZY_CN[g]} · ${old ? '升品' : '新收服'}</small></span></div>`; });
-  const all = [...a, ...b, ...c]; return all.length ? `<div class="bggrid lootg">${all.join('')}</div>` : '';
+  const all = [...a, ...b, ...c].map((h, i) => h.replace('<div class="bgc ', `<div style="--i:${Math.min(i, 16)}" class="bgc `)); return all.length ? `<div class="bggrid lootg">${all.join('')}</div>` : '';
 }
 const zyChips = zy => zy && zy.length ? `<div class="loot">${zy.map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n);
   return `<span class="lchip zy">${d ? SPR.img(d.spr, 24, d.pal) : ''}<span>精魄·${n}<b>${ZY_CN[g]}</b>${old ? '<small>升品</small>' : '<small>新收服</small>'}</span></span>`; }).join('')}</div>` : '';
@@ -484,6 +506,7 @@ function townHTML() {
   const tabs = CLASS_IDS.map(id => `<button class="ct ${id === cls ? 'on' : ''}" data-act="tab" data-arg="${id}" title="${CLASSES[id].n}">${heroSpr(id, 30)}<span>${SAVE.chars[id].level}</span></button>`).join('');
   const body = ({ go: goTab, gear: gearTab, bag: bagTab, hero: heroTab, col: colTab, set: setTab }[TT] || goTab)();
   const xpk = top ? SAVE.para.xp / paraNeed(SAVE.para.lv) : ch.xp / need;
+  const tin = TT_LAST != null && (TT_LAST !== TT || CLS_LAST !== cls) ? 'tin' : ''; TT_LAST = TT; CLS_LAST = cls;
   // 2026-11 一屏：顶上两条（资源一条，角色切换＋当前角色一条），下面一排页签，再下面内容区；整页不滚，只在内容区里的框滚
   return `<div class="thead"><div class="th1"><button class="homeb" data-act="home" aria-label="主页">‹</button><h1>九幽回廊</h1>
       <div class="rescur"><span class="pill gold">${SPR.img('ingot', 16)}${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 16)}${fmtBig(SAVE.mats)}</span><button class="setb ${TT === 'set' ? 'on' : ''}" data-act="tt" data-arg="set" aria-label="设置">⚙</button></div></div>
@@ -492,7 +515,7 @@ function townHTML() {
         <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}修为 ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `${ch.level} 级${featureOn('para') && SAVE.para.lv ? ` · 修为 ${realmName(SAVE.para.lv)}` : ` · 经验 ${ch.xp}/${need}`}`}</small></div></div></div>
   ${storageOK ? '' : '<p class="warn">当前浏览器不允许保存进度，关闭页面后进度会丢失。</p>'}
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>
-  <main class="tcont t-${TT}" data-scroll="tc-${TT}">${body}</main>`;   // 页签放在上面（原来钉在屏幕最底下）
+  <main class="tcont t-${TT} ${tin}" data-scroll="tc-${TT}">${body}</main>`;   // 页签放在上面（原来钉在屏幕最底下）
 }
 function npcList() {
   const c = storyCleared('normal');
@@ -696,9 +719,10 @@ function goTab() {
     // 2026-11-26 出征页重排：上面一幅「幻境关隘」图（牌楼、匾额上写层数、主角和伙伴站在门前），底下是木牌快捷键和四块带图标的信息
     const dq = (arg, txt, dis) => `<button data-act="rlv" data-arg="${arg}" ${dis ? 'disabled' : ''}>${txt}</button>`, atMin = SAVE.riftLv <= 1, atMax = SAVE.riftLv >= maxR;
     const tile = (ic, k, v, act) => `<${act ? `button data-act="rlvto" data-arg="${act}"` : 'div'} class="rtile">${SPR.img(ic, 26)}<span><small>${k}</small><b>${v}</b></span></${act ? 'button' : 'div'}>`;
+    setTimeout(() => { RLV_LAST = SAVE.riftLv; }, 0);   // 这一遍画完再记：层数变了，匾才落一下
     body = `<div class="rgate"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i><i class="rg-path"></i>
         <div class="rg-arch"><i class="rg-portal"></i><i class="rg-pl"></i><i class="rg-pr"></i><i class="rg-roof"></i><i class="rg-beam"><em>九幽幻境</em></i><i class="rg-lan l"></i><i class="rg-lan r"></i>
-          <div class="rg-plaque"><b>${SAVE.riftLv}</b><small>层</small></div></div>
+          <div class="rg-plaque ${RLV_LAST != null && RLV_LAST !== SAVE.riftLv ? 'chg' : ''}"><b>${SAVE.riftLv}</b><small>层</small></div></div>
         <button class="rg-arr l" data-act="rlv" data-arg="-1" ${atMin ? 'disabled' : ''} aria-label="低一层">‹</button><button class="rg-arr r" data-act="rlv" data-arg="1" ${atMax ? 'disabled' : ''} aria-label="高一层">›</button>
         ${gateTeam(cls)}
         <span class="rg-sh">${SPR.img('mt_dijiang', 16)}偶遇<b>山海异兽</b> · 坐骑 ${Object.keys(MOUNTS).filter(k => (SAVE.mounts || {})[k]).length}/${Object.keys(MOUNTS).length}</span></div>
@@ -1266,9 +1290,9 @@ function statPage(cls) {
 }
 // 修炼页的场景（2026-11-26 设计语言）：一根横梁，上面挂东西——武学挂五块招式牌，心法挂三卷经，修为挂三枚根基印；梁上写这一页最要紧的那句；底下练功场里站着主角和木人桩
 const PARA_IC = { pAtk: 'i_weapon', pArmor: 'st_arm', pHp: 'st_hp', dmgPct: 'fire', hpPct: 'st_hp', armorPct: 'st_arm', critDmg: 'st_cd', crit: 'st_crit', spd: 'st_spd', res: 'st_res', mf: 'st_mf', gf: 'ingot' };
-function xlScene(cls, beam, hang, signs) {
+function xlScene(cls, beam, hang, signs, hcls) {
   return `<div class="xlsc"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
-    <div class="xl-beam">${beam}</div><div class="xl-hang">${hang}</div>
+    <div class="xl-beam">${beam}</div><div class="xl-hang ${hcls || ''}">${hang}</div>
     <span class="xl-me">${heroFig(cls, 68, true)}</span><span class="xl-dummy">${SPR.img('dummy', 50)}</span>${signs || ''}</div>`;
 }
 function heroTab() {
@@ -1455,7 +1479,8 @@ function skillPanel(cls, inBag) {
     ${slotGrid(cls, L, null, 'sksel', SKSEL)}
     <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">基础 · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">秘技 · ${U.n}</button></div>`
     : `${xlScene(cls, `<em>${M[0]}</em><small>本门功法</small><button class="qhelp sm" data-act="mechhelp" aria-label="说明">?</button>`, slotGrid(cls, L, null, 'sksel', SKSEL),
-      `<button class="xl-sign l ${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic"><small>基础</small><b>${basic.n}</b></button><button class="xl-sign r ${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult"><small>秘技</small><b>${U.n}</b></button>`)}${wxrow}`;
+      `<button class="xl-sign l ${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic"><small>基础</small><b>${basic.n}</b></button><button class="xl-sign r ${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult"><small>秘技</small><b>${U.n}</b></button>`, SK_LAST != null && SK_LAST !== SKSEL ? 'sw' : '')}${wxrow}`;
+  if (!inBag) SK_LAST = SKSEL;
   return `${top}
     ${det}
     <details class="wxinfo skfold skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
@@ -2129,16 +2154,17 @@ function showRes() {
   const tile = (ic, k, v) => `<div class="rtile">${SPR.img(ic, 20)}<span><small>${k}</small><b>${v}</b></span></div>`;
   const rw = [tile('st_para', `经验${BRES.cu ? ` ×${cuTxt(BRES.cu)}` : ''}`, '+' + fmtBig(BRES.xp)), tile('ingot', '银两', '+' + fmtBig(BRES.gold)), BRES.mats ? tile('shard', '魂晶', '+' + BRES.mats) : '', BRES.jyx ? tile('gem', '九幽玄晶', '+' + BRES.jyx) : ''].filter(Boolean);
   const notes = [BRES.levels ? (ch.level >= MAX_LV ? `修为突破：${realmName(SAVE.para.lv)}！` : `升级！现在 ${ch.level} 级，获得心法点`) : '', BRES.key ? '得到钥匙！' : '', BRES.goblin === 'killed' ? '金蟾被你拿下了！' : ''].filter(Boolean).map(t => `<b>${t}</b>`).join('') + (BRES.goblin === 'fled' ? '<i>金蟾溜走了……</i>' : '');
-  const drop = lootGrid(BRES.items, BRES.gems, BRES.zy);
+  const drop = lootGrid(BRES.items, BRES.gems, BRES.zy), fin = BRES._an ? '' : 'in';
+  if (!BRES._an) { BRES._an = 1; if (BRES.win) setTimeout(() => { try { SFX.play('thud'); } catch (e) {} }, 330); if (BRES.mount) setTimeout(() => ceremony({ icon: SPR.img(MOUNTS[BRES.mount].spr, 104), title: '得到坐骑', sub: MOUNTS[BRES.mount].n, c: '#59c9b5', ms: 2200 }), 700); }
   el.innerHTML = BRES.win
-    ? `<div class="res win jb"><div class="jb-top"><i class="jb-seal">胜</i><b>捷报</b></div>
+    ? `<div class="res win jb ${fin}"><div class="jb-top"><i class="jb-seal">胜</i><b>捷报</b></div>
        <div class="rtiles c${Math.min(4, Math.max(2, rw.length))} jb-rw">${rw.join('')}</div>${notes ? `<p class="jb-note">${notes}</p>` : ''}
        ${drop || '<p class="sub jb-none">这次没有掉装备</p>'}
        ${BRES.stat ? `<details class="bstat-d"><summary>本场统计</summary>${statHero(BRES.stat, BRES.hs)}</details>` : ''}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
-    : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose jb"><div class="jb-top"><b>撑不住了</b></div><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
-      : run.mode === 'rift' ? `<div class="res lose jb"><div class="jb-top"><b>倒下了</b></div><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
-      : `<div class="res lose jb"><div class="jb-top"><b>败</b></div><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
+    : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose jb ${fin}"><div class="jb-top"><b>撑不住了</b></div><p>它太强了。你握刀的手在发抖——</p><button class="btn big" data-act="bcont">……</button></div>`
+      : run.mode === 'rift' ? `<div class="res lose jb ${fin}"><div class="jb-top"><b>倒下了</b></div><p>幻境不收你的命，只收你的香：你会被吐回入口，香烧掉一截（倒得越多烧得越多）。打倒你的那群妖物还在原地。</p><button class="btn big" data-act="bcont">爬起来</button></div>`
+      : `<div class="res lose jb ${fin}"><div class="jb-top"><b>败</b></div><p>这次得到的装备、材料、经验都已保留。${run.world ? '你会在最近的篝火边醒来。' : run.ngoc ? 'Ngoc 把你拖回了镇上。' : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? '回到篝火' : '回镇上'}</button></div>`);
 }
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
@@ -4041,12 +4067,13 @@ function endHTML() {
   const seal = rift && r.riftDone ? `<i class="jb-seal g-${tl2 >= 0.5 ? 'a' : tl2 >= 0.25 ? 'b' : tl2 > 0 ? 'c' : 'd'} n${String(r.grade).length}">${r.grade}</i>` : win ? '<i class="jb-seal">胜</i>' : '';
   const sub = rift && r.riftDone ? (r.world ? `用时 ${fmtClock(r.clock || 0)} · 香还剩 ${fmtClock(tl2 * riftLimit(r.riftLv))}` : `用时 ${Math.round((r.clock || 0) / 100)} 回合 · 香还剩 ${Math.round(tl2 * 100)}%`) + (r.deaths ? ` · 倒下 ${r.deaths} 次` : '')
     : `${CLASSES[r.cls].n} · ${rift ? '九幽幻境' : DIFFS[r.diff].n}${r.world ? '' : ` · 探索 ${r.rooms} 个房间`}`;
-  const head = `<div class="jbsc ${win ? 'win' : 'lose'}"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+  const fin = r._an ? '' : 'in'; if (!r._an) { r._an = 1; if (seal) setTimeout(() => { try { SFX.play('thud'); } catch (e) {} }, 520); }
+  const head = `<div class="jbsc ${win ? 'win' : 'lose'} ${fin}"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
       <span class="jb-me">${win ? heroFig(r.cls, 78) + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 40, null, '', 'full') : '') : SPR.img('skeleton', 56)}</span>
-      <div class="jb-juan"><h2>${title}</h2><p>${sub}</p>${seal}</div></div>`;
+      <div class="jb-juan"><h2>${title}</h2><p>${sub}</p>${seal}${r.record ? '<i class="jb-rec">新纪录</i>' : ''}</div></div>`;
   const stats = [tile('st_time', rift && r.world ? '香烧了' : '用时', rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)), tile('st_kill', '斩妖', r.kills), tile('st_para', '等级', `${r.lvStart} → ${SAVE.chars[r.cls].level}`),
     tile('ingot', '银两', '+' + fmtBig(r.goldGot)), tile(SPR.img('gem', 20, { G: '#59c9b5' }), '玉石', '+' + r.gemsGot), tile('shard', '魂晶', '+' + fmtBig(r.matsGot)), r.jyxGot ? tile('rune', '九幽玄晶', '+' + r.jyxGot) : '', SAVE.para.lv > r.paraStart ? tile('st_para', '修为', realmName(SAVE.para.lv)) : ''].join('');
-  return `<div class="scene endv"><div class="panel endp">${head}
+  return `<div class="scene endv"><div class="panel endp ${fin}">${head}
     <div class="endscroll" data-scroll="end">
     ${r.record && !rift ? '<p class="evres">刷新了本章最快纪录！</p>' : ''}
     <div class="rtiles c3 jb-st">${stats}</div>
@@ -4237,9 +4264,12 @@ const retreatModal = () => () => `<h2 class="mh">撤回青石镇？</h2><p>这�
   <div class="row"><button class="btn" data-act="doretreat">确认撤回</button><button class="btn ghost" data-act="close">再想想</button></div>`;
 const resetModal = () => () => `<h2 class="mh" style="color:var(--blood2)">删除全部存档？</h2><p>所有角色、等级、装备、玉石、建筑、剧情进度都会清空，无法恢复。</p>
   <div class="row"><button class="btn" data-act="doreset">确认删除</button><button class="btn ghost" data-act="close">取消</button></div>`;
-const rewardModal = (title, r) => () => `<h2 class="mh">${title}</h2>
-  <p>${[r.xp ? `经验 +${r.xp}` : '', r.gold ? `银两 +${r.gold}` : '', r.mats ? `魂晶 +${r.mats}` : '', r.ups ? `<b style="color:var(--gold2)">升了 ${r.ups} 级！</b>` : ''].filter(Boolean).join('　·　')}</p>
-  ${lootChips(r.items)}${gemChips(r.gems || (r.gem ? [r.gem] : []))}<div class="row" style="justify-content:center"><button class="btn" data-act="close">好</button></div>`;
+const rewardModal = (title, r) => { let first = true;   // 开箱：箱子晃一下、亮一下，东西一格一格跳出来（只在刚打开时动一次）
+  return () => { const f = first; first = false; const tile = (ic, k, v) => `<div class="rtile">${SPR.img(ic, 20)}<span><small>${k}</small><b>${v}</b></span></div>`;
+    const rw = [r.xp ? tile('st_para', '经验', '+' + fmtBig(r.xp)) : '', r.gold ? tile('ingot', '银两', '+' + fmtBig(r.gold)) : '', r.mats ? tile('shard', '魂晶', '+' + r.mats) : ''].filter(Boolean);
+    return `<div class="rwm ${f ? 'in' : ''}"><div class="rw-chest">${SPR.img('chest', 64)}</div><h2 class="mh">${title}</h2>
+      ${rw.length ? `<div class="rtiles c${Math.max(2, rw.length)} jb-rw">${rw.join('')}</div>` : ''}${r.ups ? `<p class="jb-note"><b>升了 ${r.ups} 级！</b></p>` : ''}
+      ${lootGrid(r.items, r.gems || (r.gem ? [r.gem] : []))}<div class="row" style="justify-content:center"><button class="btn" data-act="close">好</button></div></div>`; }; };
 
 // ---------- 云存档（当前环境不可用时自动退回本机） ----------
 const CLOUD = { db: null, uid: null, status: 'connecting', at: 0, pushing: false, dirty: false, timerH: null };
@@ -4316,7 +4346,7 @@ const ACT = {
   logt: () => { const l = $('#blog'); if (l) l.classList.toggle('open'); },
   auto: () => { if (AUTO) { stopAuto(); return; } AUTO = true; const b = document.querySelector('.autob'); if (b) { b.classList.remove('ghost'); b.textContent = '自动探索中…'; } autoStep(); },
   mode: m => { SAVE.mode = m; refresh(); },
-  twgo: () => twGo(),
+  twgo: () => { const T = twState(SAVE.cls); if (SAVE.run || T.pend || T.fl > TW.top) return twGo(); doorFx(twGo); },
   twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
   twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
   twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls); let p = S.pend && (i === 'x' ? { t: 'all' } : S.pend[+i]); if (!p) return;
@@ -4367,7 +4397,7 @@ const ACT = {
   gemhelp: () => toast(`三块相同的玉石可以合成高一阶，现在最高合成到「${GEM_TIERS[gemCap()]}」。玉器坊管到「极品」；后四档「无瑕、通灵、天成、九幽」要幻境最高层打到 ${GEM_RIFT.join('、')} 层。「一键镶最好的」把身上每个孔换上玉石包里最合适的那颗，免费。`, 8000),
   bagall: () => { GSLOT = null; FILTER = 'all'; refresh(); },
   tobag: sl => { closeModal(); MODALFN = null; modal.hidden = true; BACK = null; GSLOT = sl || null; TT = 'bag'; BAGV = 'eq'; FILTER = 'all'; VIEW = 'town'; refresh(); },
-  gemfit: () => { const r = gemAutoFit(ctxCls()); save(); if (r.n) SFX.play('forge'); toast(r.n ? `换上了 ${r.n} 颗更合适的玉` : '身上的玉已经是最合适的了（或者玉石包里没有更好的）'); refresh(); },
+  gemfit: () => { const r = gemAutoFit(ctxCls()); save(); if (r.n) SFX.play('forge'); toast(r.n ? `换上了 ${r.n} 颗更合适的玉` : '身上的玉已经是最合适的了（或者玉石包里没有更好的）'); refresh(); if (r.n) burstFx('jade'); },
   zyopen: () => { if (shelved('zy')) return ACT.yiopen(); TT = 'col'; CTAB = 'zy'; ZYOPEN = true; VIEW = 'town'; refresh(); setTimeout(() => { const e = document.getElementById('zylu'); if (e) e.scrollIntoView({ block: 'start' }); }, 50); },
   zyp: a => { ZYPG = ZYPG === +a ? -1 : +a; refresh(); },
   yi: id => { const r = setYi(SAVE.cls, id); if (r.err) return toast(r.err); save(); refresh(); },
@@ -4406,7 +4436,8 @@ const ACT = {
       return playActsTown(acts); }
     npcTalk(id);
   },
-  start: () => {
+  start: () => { const story = !(riftUnlocked() && SAVE.mode === 'rift'); if (story && !chapterUnlocked(SAVE.diff, SAVE.chapter)) return ACT.start0(); doorFx(ACT.start0); },
+  start0: () => {
     AUTO = false;
     const mode = riftUnlocked() && SAVE.mode === 'rift' ? 'rift' : 'story';
     if (mode === 'story' && !chapterUnlocked(SAVE.diff, SAVE.chapter)) return toast('这一章还没解锁');
@@ -4440,7 +4471,7 @@ const ACT = {
       if (!seen('i' + run.chapter)) { markSeen('i' + run.chapter); save(); playDialog(C.intro, C.boss, show); } else show();
     } else { banner(`九幽幻境 · ${run.riftLv} 层`, themeOf(run).n, 1800); }
   },
-  resume: () => { VIEW = SAVE.run.world ? 'world' : 'map'; WHERO = null; refresh(); window.scrollTo(0, 0); },
+  resume: () => doorFx(() => { VIEW = SAVE.run.world ? 'world' : 'map'; WHERO = null; refresh(); window.scrollTo(0, 0); }),
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
   town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); snowCatchUp(); },
@@ -4496,7 +4527,7 @@ const ACT = {
   },
   sitem: i => openModal(itemModal(null, +i)),
   close: () => closeModal(),
-  equip: id => { const f0 = findItem(id); if (f0 && equipItem(ctxCls(), id, gpos(f0.it))) { SFX.play('loot'); toast('已装备'); closeModal(); refresh(); achToast(checkAch()); } },
+  equip: id => { const f0 = findItem(id); if (f0 && equipItem(ctxCls(), id, gpos(f0.it))) { SFX.play('loot'); toast('已装备'); closeModal(); refresh(); burstFx('gold'); achToast(checkAch()); } },
   unequip: sl => { unequip(ctxCls(), sl); closeModal(); refresh(); },
   sell: id => { const g = sellItem(id); SFX.play('coin'); toast(`卖了 ${g} 两`); closeModal(); refresh(); },
   salv: id => { const m = salvage(id); SFX.play('forge'); toast(`分解得到 ${m} 颗魂晶`); closeModal(); refresh(); },
@@ -4507,7 +4538,7 @@ const ACT = {
   junk: () => { const r = sellJunk(); if (r.n) SFX.play('coin'); toast(r.n ? `卖掉 ${r.n} 件，得到 ${r.g} 两` : '没有可以卖的凡品和灵品（强化过或镶了玉的不会卖）'); refresh(); },
   salvjunk: () => { const r = salvageJunk(); if (r.n) SFX.play('forge'); toast(r.n ? `分解 ${r.n} 件，得到 ${r.m} 颗魂晶` : '没有可以分解的凡品和灵品'); refresh(); },
   filter: f => { FILTER = f; refresh(); },
-  enh: id => { const it = findOwned(id); const r = enhance(it); if (r.err) return toast(r.err); SFX.play(r.ok ? 'forge' : 'fail'); toast(r.ok ? `强化成功！现在是 +${it.plus}` : '张大锤：「这次……手滑了。」材料损失了'); refresh(); achToast(checkAch()); },
+  enh: id => { const it = findOwned(id); const r = enhance(it); if (r.err) return toast(r.err); SFX.play(r.ok ? 'forge' : 'fail'); toast(r.ok ? `强化成功！现在是 +${it.plus}` : '张大锤：「这次……手滑了。」材料损失了'); refresh(); burstFx(r.ok ? 'gold' : 'fail'); achToast(checkAch()); },
   sock: id => { const r = addSocket(findOwned(id)); if (r.err) return toast(r.err); SFX.play('forge'); toast('打孔成功'); refresh(); },
   gem: a => { const [id, k] = split(a); const r = socketGem(findOwned(id), k); if (r.err) return toast(r.err); SFX.play('rare'); toast('镶嵌成功'); refresh(); },
   boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast('三个孔都满了，先取下一颗'); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
@@ -4528,14 +4559,14 @@ const ACT = {
   ws: id => { const it = findOwned(id); const r = washStart(it, [...wlockOf(it)]); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   wspick: a => { const [id, i] = split(a); washPick(findOwned(id), +i); SFX.play('forge'); toast(+i ? '洗炼完成：换上了新词条' : '留下了原样'); refresh(); },
   jywash: id => { const it = findOwned(id); const r = jyWash(it); if (r.err) return toast(r.err); SFX.play('rare'); toast(`九幽词条：${esc(jyText(it.jy))}`); save(); refresh(); },
-  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); if (r.jy) jyBanner(it); toast(`点化成了：<b>${esc(itemTitle(it))}</b>${r.jy ? `，九幽词条：${esc(jyText(it.jy))}` : r.add ? '，多长了一条词条' : ''}`); save(); refresh(); achToast(checkAch()); },
+  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); if (r.jy) jyBanner(it); toast(`点化成了：<b>${esc(itemTitle(it))}</b>${r.jy ? `，九幽词条：${esc(jyText(it.jy))}` : r.add ? '，多长了一条词条' : ''}`); save(); refresh(); if (!r.jy) ceremony({ icon: SPR.item(it, 72), seal: it.anc === 2 ? '太' : '古', title: '点化成了', sub: esc(itemTitle(it)), c: it.anc === 2 ? '#ff8a6a' : '#59c9b5' }); achToast(checkAch()); },
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`升阶完成：现在是${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast('神兵之魂收进了乾坤袋，去「装备」页把它放进格子'); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => { const prev = MODALFN; openModal(cubeModal(+i)); if (prev === cubeBagModal) BACK = prev; },
   cpf: a => { const [k, v] = split(a); if (k === 'g') { CPF.g = v; CPF.s = ''; } else CPF.s = v; if (MODALFN) sheet.innerHTML = MODALFN(); },
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
-  combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast('没有能合的玉石'); SFX.play('rare'); toast(`合了 ${r.n} 次，得到 ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join('、')); save(); refresh(); },
-  combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast('合成了 ' + gemName(r.key)); refresh(); },
+  combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast('没有能合的玉石'); SFX.play('rare'); toast(`合了 ${r.n} 次，得到 ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join('、')); save(); refresh(); burstFx('jade'); },
+  combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast('合成了 ' + gemName(r.key)); refresh(); burstFx('jade'); },
   learn: a => { const [br, i] = split(a); if (learnTalent(ctxCls(), br, +i)) { SFX.play('buff'); refresh(); } },
   respec: () => { if (resetTalents(ctxCls())) { toast('散功完毕，心法点已退回'); refresh(); } },
   para: a => { const [k, n] = split(a); if (addPara(k, +n)) { SFX.play('buff'); refresh(); achToast(checkAch()); } },
@@ -4560,7 +4591,7 @@ const ACT = {
     if (r === 'cat') { const c = skCat(cls, id); return toast(`两个自由格都用掉了，放不下这个${SK_CAT[c]}招式：先卸下一个多带的招式`); } SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
   bclaim: i => { const r = claimBounty(+i); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal('悬赏宝箱', r)); achToast(checkAch()); },
   bbonus: () => { const r = claimBountyBonus(); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal('赏金大箱', r)); achToast(checkAch()); },
-  lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? '灵玉升级成功！' : '升级失败'); refresh(); achToast(checkAch()); },
+  lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? '灵玉升级成功！' : '升级失败'); refresh(); burstFx(ok ? 'purple' : 'fail'); achToast(checkAch()); },
   cell: i => { stopAuto(); walkTo(i); },
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; STPOP = { ult: 1 }; drawStPop(); if ((B.P.rage || 0) < 100) return; B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
@@ -4707,7 +4738,7 @@ const ACT = {
   bknudge: () => { ACT.tsave(); },
   tcls: c => { TCLS = c; refresh(); },
   home: () => { stopAuto(); closeModal(); VIEW = 'title'; render(); window.scrollTo(0, 0); },
-  tcont: () => { closeModal(); if (SAVE.run) { ACT.resume(); return snowCatchUp(); } VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); snowCatchUp(); },
+  tcont: () => { closeModal(); if (SAVE.run) { ACT.resume(); return snowCatchUp(); } doorFx(() => { VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); }); playPrologue(); snowCatchUp(); },
   tnew: () => openModal(resetModal()),
   ttest: () => openModal(() => `${testPanel()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">关闭</button></div>`),
   tsave: () => openModal(() => `${setSave()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">关闭</button></div>`),

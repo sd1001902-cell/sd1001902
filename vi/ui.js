@@ -178,6 +178,28 @@ function banner(title, sub, ms = 2000) {
   b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); SFX.play('gong');
   setTimeout(() => b.classList.remove('on'), ms);
 }
+// ===== 美化第二批（2026-11-26）：一次性的小动作——点一下动一次，不循环，不费电 =====
+// 朱门：整屏两扇门，从关着到打开。先把新画面换好（fn 立刻执行，不耽误），门再开
+function doorFx(fn) {
+  if (typeof document === 'undefined' || !document.body.classList.contains('gf')) return fn();
+  let el = document.getElementById('doorfx'); if (!el) { el = document.createElement('div'); el.id = 'doorfx'; document.body.appendChild(el); }
+  el.innerHTML = '<i class="dl"></i><i class="dr"></i>'; el.className = 'on'; clearTimeout(el._t); el._t = setTimeout(() => { el.className = ''; el.innerHTML = ''; }, 660);
+  try { SFX.play('door'); } catch (e) {}
+  return fn();
+}
+// 屏幕中间一下：金（强化成了、换上了）、青（玉）、紫（灵玉）、灰（没成）
+function burstFx(kind) {
+  if (typeof document === 'undefined') return; let el = document.getElementById('burst'); if (!el) { el = document.createElement('div'); el.id = 'burst'; el.innerHTML = '<i></i><b></b>'; document.body.appendChild(el); }
+  el.className = ''; void el.offsetWidth; el.className = 'on ' + (kind || 'gold'); clearTimeout(el._t); el._t = setTimeout(() => { el.className = ''; }, 720);
+}
+// 小仪式：东西放在正中，一圈光转一下，印盖上去，写一行字。点一下或者一秒半以后自己收
+function ceremony(o) {
+  if (typeof document === 'undefined') return; let el = document.getElementById('cere'); if (!el) { el = document.createElement('div'); el.id = 'cere'; document.body.appendChild(el); el.addEventListener('click', () => { el.className = ''; }); }
+  el.innerHTML = `<div class="ce-box" style="--c:${o.c || '#d9b866'}"><i class="ce-rays"></i><span class="ce-ic">${o.icon || ''}${o.seal ? `<i class="jb-seal">${o.seal}</i>` : ''}</span><b>${o.title || ''}</b>${o.sub ? `<small>${o.sub}</small>` : ''}</div>`;
+  el.className = ''; void el.offsetWidth; el.className = 'on'; clearTimeout(el._t); el._t = setTimeout(() => { el.className = ''; }, o.ms || 1600);
+  if (o.seal) setTimeout(() => { try { SFX.play('thud'); } catch (e) {} }, 420);
+}
+let TT_LAST = null, SK_LAST = null, RLV_LAST = null, CLS_LAST = null;   // 上一次画的时候在哪个页签、选的哪块招式牌、第几层、哪个门派：变了才动一下
 const seen = k => !!SAVE.story.seen[k];
 const markSeen = k => { SAVE.story.seen[k] = 1; };
 
@@ -261,7 +283,7 @@ function lootGrid(items, gems, zy) {
   const a = (items || []).map(it => { const u = up(it); return `<div class="bgc b-${it.rarity} ${ancCls(it)} ${u ? 'isup' : ''}"><button class="bgm" data-act="item" data-arg="${it.id}">${SPR.item(it, 28)}<b class="r-${it.rarity}">${esc(it.name)}</b></button>${u ? '<em class="bgup">▲</em>' : ''}</div>`; });
   const b = (gems || []).map(k => `<div class="bgc gm"><span class="bgm">${gemImg(k, 28)}<b>${gemName(k)}</b></span></div>`);
   const c = (zy || []).map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n); return `<div class="bgc zy"><span class="bgm">${d ? SPR.img(d.spr, 28, d.pal) : ''}<b>Tinh phách·${n}</b><small class="up">${ZY_CN[g]} · ${old ? "Lên phẩm" : "Mới thu phục"}</small></span></div>`; });
-  const all = [...a, ...b, ...c]; return all.length ? `<div class="bggrid lootg">${all.join('')}</div>` : '';
+  const all = [...a, ...b, ...c].map((h, i) => h.replace('<div class="bgc ', `<div style="--i:${Math.min(i, 16)}" class="bgc `)); return all.length ? `<div class="bggrid lootg">${all.join('')}</div>` : '';
 }
 const zyChips = zy => zy && zy.length ? `<div class="loot">${zy.map(([n, g, old]) => { const d = allMonsterDefs().find(x => x.n === n);
   return `<span class="lchip zy">${d ? SPR.img(d.spr, 24, d.pal) : ''}<span>Tinh phách · ${n}<b>${ZY_CN[g]}</b>${old ? "<small>Lên phẩm</small>" : "<small>Mới thu phục</small>"}</span></span>`; }).join('')}</div>` : '';
@@ -485,6 +507,7 @@ function townHTML() {
   const tabs = CLASS_IDS.map(id => `<button class="ct ${id === cls ? 'on' : ''}" data-act="tab" data-arg="${id}" title="${CLASSES[id].n}">${heroSpr(id, 30)}<span>${SAVE.chars[id].level}</span></button>`).join('');
   const body = ({ go: goTab, gear: gearTab, bag: bagTab, hero: heroTab, col: colTab, set: setTab }[TT] || goTab)();
   const xpk = top ? SAVE.para.xp / paraNeed(SAVE.para.lv) : ch.xp / need;
+  const tin = TT_LAST != null && (TT_LAST !== TT || CLS_LAST !== cls) ? 'tin' : ''; TT_LAST = TT; CLS_LAST = cls;
   // 2026-11 一屏：顶上两条（资源一条，角色切换＋当前角色一条），下面一排页签，再下面内容区；整页不滚，只在内容区里的框滚
   return `<div class="thead"><div class="th1"><button class="homeb" data-act="home" aria-label="Trang chủ">‹</button><h1>Cửu U Hồi Lang</h1>
       <div class="rescur"><span class="pill gold">${SPR.img('ingot', 16)}${fmtBig(SAVE.gold)}</span><span class="pill">${SPR.img('shard', 16)}${fmtBig(SAVE.mats)}</span><button class="setb ${TT === 'set' ? 'on' : ''}" data-act="tt" data-arg="set" aria-label="Cài đặt">⚙</button></div></div>
@@ -493,7 +516,7 @@ function townHTML() {
         <div class="xp xpm ${top ? 'pxp' : ''}"><i style="width:${Math.min(100, xpk * 100)}%"></i></div><small>${top ? `${featureOn('para') && SAVE.para.lv ? realmName(SAVE.para.lv) + ' · ' : ''}Tu vi ${SAVE.para.xp}/${paraNeed(SAVE.para.lv)}` : `Cấp ${ch.level}${featureOn('para') && SAVE.para.lv ? ` · Tu vi ${realmName(SAVE.para.lv)}` : ` · Kinh nghiệm ${ch.xp}/${need}`}`}</small></div></div></div>
   ${storageOK ? '' : "<p class=\"warn\">Trình duyệt này không cho lưu tiến độ, đóng trang là mất hết.</p>"}
   <nav class="ttabs">${TOWN_TABS.map(([k, n]) => `<button class="ttab ${TT === k ? 'on' : ''}" data-act="tt" data-arg="${k}">${n}${dt[k] ? '<i class="dot"></i>' : ''}</button>`).join('')}</nav>
-  <main class="tcont t-${TT}" data-scroll="tc-${TT}">${body}</main>`;   // 页签放在上面（原来钉在屏幕最底下）
+  <main class="tcont t-${TT} ${tin}" data-scroll="tc-${TT}">${body}</main>`;   // 页签放在上面（原来钉在屏幕最底下）
 }
 function npcList() {
   const c = storyCleared('normal');
@@ -697,13 +720,14 @@ function goTab() {
     // 2026-11-26 出征页重排：上面一幅「幻境关隘」图（牌楼、匾额上写层数、主角和伙伴站在门前），底下是木牌快捷键和四块带图标的信息
     const dq = (arg, txt, dis) => `<button data-act="rlv" data-arg="${arg}" ${dis ? 'disabled' : ''}>${txt}</button>`, atMin = SAVE.riftLv <= 1, atMax = SAVE.riftLv >= maxR;
     const tile = (ic, k, v, act) => `<${act ? `button data-act="rlvto" data-arg="${act}"` : 'div'} class="rtile">${SPR.img(ic, 26)}<span><small>${k}</small><b>${v}</b></span></${act ? 'button' : 'div'}>`;
+    setTimeout(() => { RLV_LAST = SAVE.riftLv; }, 0);   // 这一遍画完再记：层数变了，匾才落一下
     body = `<div class="rgate"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i><i class="rg-path"></i>
         <div class="rg-arch"><i class="rg-portal"></i><i class="rg-pl"></i><i class="rg-pr"></i><i class="rg-roof"></i><i class="rg-beam"><em>Ảo Cảnh Cửu U</em></i><i class="rg-lan l"></i><i class="rg-lan r"></i>
-          <div class="rg-plaque"><small>Tầng</small><b>${SAVE.riftLv}</b></div></div>
+          <div class="rg-plaque ${RLV_LAST != null && RLV_LAST !== SAVE.riftLv ? 'chg' : ''}"><b>${SAVE.riftLv}</b><small>tầng</small></div></div>
         <button class="rg-arr l" data-act="rlv" data-arg="-1" ${atMin ? 'disabled' : ''} aria-label="Thấp hơn một tầng">‹</button><button class="rg-arr r" data-act="rlv" data-arg="1" ${atMax ? 'disabled' : ''} aria-label="Cao hơn một tầng">›</button>
         ${gateTeam(cls)}
         <span class="rg-sh">${SPR.img('mt_dijiang', 16)}Có thể gặp <b>dị thú Sơn Hải</b> · thú cưỡi ${Object.keys(MOUNTS).filter(k => (SAVE.mounts || {})[k]).length}/${Object.keys(MOUNTS).length}</span></div>
-      <div class="rquick"><button data-act="rlvto" data-arg="1" ${atMin ? 'disabled' : ''}>T.1</button>${dq(-50, '-50', atMin)}${dq(-10, '-10', atMin)}${dq(-5, '-5', atMin)}${dq(5, '+5', atMax)}${dq(10, '+10', atMax)}${dq(50, '+50', atMax)}<button data-act="rlvto" data-arg="${maxR}" ${atMax ? 'disabled' : ''}>Max</button></div>
+      <div class="rquick"><button data-act="rlvto" data-arg="1" ${atMin ? 'disabled' : ''}>Tầng 1</button>${dq(-50, '-50', atMin)}${dq(-10, '-10', atMin)}${dq(-5, '-5', atMin)}${dq(5, '+5', atMax)}${dq(10, '+10', atMax)}${dq(50, '+50', atMax)}<button data-act="rlvto" data-arg="${maxR}" ${atMax ? 'disabled' : ''}>Cao nhất</button></div>
       <div class="rtiles">${tile('fire', "Một nén hương · yêu vật", `${info[1][1]} · khoảng cấp ${riftLvCap({ riftLv: SAVE.riftLv, cls }, riftD(SAVE.riftLv).base)}`)}${tile('i_weapon', ar[1] ? "Thượng Cổ · Thái Cổ" : "Thượng Cổ", `${(ar[0] * 100).toFixed(1)}%${ar[1] ? ` · ${(ar[1] * 100).toFixed(2)}%` : ''}`)}${tile('chest', "Bộ · Tinh phách", `${info[3][1]} · ${info[4][1]}`)}${tile('scroll', "Kỷ lục · Cao nhất", `${info[2][1]} · tầng ${maxR}`, rec && rec.lv !== SAVE.riftLv && rec.lv <= maxR ? rec.lv : 0)}</div>
       ${rpOn() ? rpathRow() : ''}
       ${cu > 1 ? `<p class="cu-note s1">Đang đuổi theo: kinh nghiệm chiến đấu <b>×${cuTxt(cu)}</b> (thấp hơn nhân vật cao nhất ${topLevel() - SAVE.chars[cls].level} cấp)</p>` : ''}
@@ -1267,9 +1291,9 @@ function statPage(cls) {
 }
 // 修炼页的场景（2026-11-26 设计语言）：一根横梁，上面挂东西——武学挂五块招式牌，心法挂三卷经，修为挂三枚根基印；梁上写这一页最要紧的那句；底下练功场里站着主角和木人桩
 const PARA_IC = { pAtk: 'i_weapon', pArmor: 'st_arm', pHp: 'st_hp', dmgPct: 'fire', hpPct: 'st_hp', armorPct: 'st_arm', critDmg: 'st_cd', crit: 'st_crit', spd: 'st_spd', res: 'st_res', mf: 'st_mf', gf: 'ingot' };
-function xlScene(cls, beam, hang, signs) {
+function xlScene(cls, beam, hang, signs, hcls) {
   return `<div class="xlsc"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
-    <div class="xl-beam">${beam}</div><div class="xl-hang">${hang}</div>
+    <div class="xl-beam">${beam}</div><div class="xl-hang ${hcls || ''}">${hang}</div>
     <span class="xl-me">${heroFig(cls, 68, true)}</span><span class="xl-dummy">${SPR.img('dummy', 50)}</span>${signs || ''}</div>`;
 }
 function heroTab() {
@@ -1456,7 +1480,8 @@ function skillPanel(cls, inBag) {
     ${slotGrid(cls, L, null, 'sksel', SKSEL)}
     <div class="slx"><button class="${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic">Cơ bản · ${basic.n}</button><button class="${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult">Bí kỹ · ${U.n}</button></div>`
     : `${xlScene(cls, `<em>${M[0]}</em><small>Công pháp bản môn</small><button class="qhelp sm" data-act="mechhelp" aria-label="Giải thích">?</button>`, slotGrid(cls, L, null, 'sksel', SKSEL),
-      `<button class="xl-sign l ${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic"><small>Cơ bản</small><b>${basic.n}</b></button><button class="xl-sign r ${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult"><small>Bí kỹ</small><b>${U.n}</b></button>`)}${wxrow}`;
+      `<button class="xl-sign l ${SKSEL === 'basic' ? 'on' : ''}" data-act="sksel" data-arg="basic"><small>Cơ bản</small><b>${basic.n}</b></button><button class="xl-sign r ${SKSEL === 'ult' ? 'on' : ''}" data-act="sksel" data-arg="ult"><small>Bí kỹ</small><b>${U.n}</b></button>`, SK_LAST != null && SK_LAST !== SKSEL ? 'sw' : '')}${wxrow}`;
+  if (!inBag) SK_LAST = SKSEL;
   return `${top}
     ${det}
     <details class="wxinfo skfold skrule"><summary>${skRuleTxt(cls, L)}</summary><p class="help-p">${SK_RULE}</p></details>
@@ -2130,16 +2155,17 @@ function showRes() {
   const tile = (ic, k, v) => `<div class="rtile">${SPR.img(ic, 20)}<span><small>${k}</small><b>${v}</b></span></div>`;
   const rw = [tile('st_para', `Kinh nghiệm${BRES.cu ? ` ×${cuTxt(BRES.cu)}` : ''}`, '+' + fmtBig(BRES.xp)), tile('ingot', "Bạc", '+' + fmtBig(BRES.gold)), BRES.mats ? tile('shard', "Hồn tinh", '+' + BRES.mats) : '', BRES.jyx ? tile('gem', "Cửu U Huyền Tinh", '+' + BRES.jyx) : ''].filter(Boolean);
   const notes = [BRES.levels ? (ch.level >= MAX_LV ? `Đột phá tu vi: ${realmName(SAVE.para.lv)}!` : `Lên cấp! Giờ là cấp ${ch.level}, nhận điểm tâm pháp`) : '', BRES.key ? "Lấy được chìa khóa!" : '', BRES.goblin === 'killed' ? "Bắt được Kim Thiềm rồi!" : ''].filter(Boolean).map(t => `<b>${t}</b>`).join('') + (BRES.goblin === 'fled' ? "<i>Kim Thiềm chuồn mất rồi…</i>" : '');
-  const drop = lootGrid(BRES.items, BRES.gems, BRES.zy);
+  const drop = lootGrid(BRES.items, BRES.gems, BRES.zy), fin = BRES._an ? '' : 'in';
+  if (!BRES._an) { BRES._an = 1; if (BRES.win) setTimeout(() => { try { SFX.play('thud'); } catch (e) {} }, 330); if (BRES.mount) setTimeout(() => ceremony({ icon: SPR.img(MOUNTS[BRES.mount].spr, 104), title: "Nhận thú cưỡi", sub: MOUNTS[BRES.mount].n, c: '#59c9b5', ms: 2200 }), 700); }
   el.innerHTML = BRES.win
-    ? `<div class="res win jb"><div class="jb-top"><i class="jb-seal">Thắng</i><b>Tin thắng</b></div>
+    ? `<div class="res win jb ${fin}"><div class="jb-top"><i class="jb-seal">Thắng</i><b>Tin thắng</b></div>
        <div class="rtiles c${Math.min(4, Math.max(2, rw.length))} jb-rw">${rw.join('')}</div>${notes ? `<p class="jb-note">${notes}</p>` : ''}
        ${drop || "<p class=\"sub jb-none\">Lần này không rơi trang bị</p>"}
        ${BRES.stat ? `<details class="bstat-d"><summary>Thống kê trận này</summary>${statHero(BRES.stat, BRES.hs)}</details>` : ''}
        <button class="btn big" data-act="bcont">${cont}</button></div>`
-    : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose jb"><div class="jb-top"><b>Không trụ nổi</b></div><p>Nó mạnh quá. Bàn tay cầm đao của bạn run lên —</p><button class="btn big" data-act="bcont">……</button></div>`
-      : run.mode === 'rift' ? `<div class="res lose jb"><div class="jb-top"><b>Ngã xuống rồi</b></div><p>Ảo Cảnh không lấy mạng bạn, chỉ lấy hương: bạn bị ném về lối vào, hương cháy mất một đoạn (ngã càng nhiều cháy càng nhiều). Bầy yêu vật vừa hạ bạn vẫn ở chỗ cũ.</p><button class="btn big" data-act="bcont">Đứng dậy</button></div>`
-      : `<div class="res lose jb"><div class="jb-top"><b>Bại</b></div><p>Trang bị, nguyên liệu, kinh nghiệm lần này đều được giữ lại. ${run.world ? "Bạn sẽ tỉnh lại bên đống lửa trại gần nhất." : run.ngoc ? "Ngoc đã kéo bạn về trấn." : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? "Về lửa trại" : "Về trấn"}</button></div>`);
+    : (WKEY && WKEY.key && WKEY.key.scripted ? `<div class="res lose jb ${fin}"><div class="jb-top"><b>Không trụ nổi</b></div><p>Nó mạnh quá. Bàn tay cầm đao của bạn run lên —</p><button class="btn big" data-act="bcont">……</button></div>`
+      : run.mode === 'rift' ? `<div class="res lose jb ${fin}"><div class="jb-top"><b>Ngã xuống rồi</b></div><p>Ảo Cảnh không lấy mạng bạn, chỉ lấy hương: bạn bị ném về lối vào, hương cháy mất một đoạn (ngã càng nhiều cháy càng nhiều). Bầy yêu vật vừa hạ bạn vẫn ở chỗ cũ.</p><button class="btn big" data-act="bcont">Đứng dậy</button></div>`
+      : `<div class="res lose jb ${fin}"><div class="jb-top"><b>Bại</b></div><p>Trang bị, nguyên liệu, kinh nghiệm lần này đều được giữ lại. ${run.world ? "Bạn sẽ tỉnh lại bên đống lửa trại gần nhất." : run.ngoc ? "Ngoc đã kéo bạn về trấn." : ''}</p>${bossMissHTML()}<button class="btn big" data-act="bcont">${run.world ? "Về lửa trại" : "Về trấn"}</button></div>`);
 }
 function battleHTML() {
   const run = SAVE.run, T0 = run.world && SCENE_THEMES[run.sth || run.theme], T = T0 || terrainOf(run), U = ULTS[run.cls];
@@ -4042,12 +4068,13 @@ function endHTML() {
   const seal = rift && r.riftDone ? `<i class="jb-seal g-${tl2 >= 0.5 ? 'a' : tl2 >= 0.25 ? 'b' : tl2 > 0 ? 'c' : 'd'} n${String(r.grade).length}">${r.grade}</i>` : win ? "<i class=\"jb-seal\">Thắng</i>" : '';
   const sub = rift && r.riftDone ? (r.world ? `Thời gian ${fmtClock(r.clock || 0)} · hương còn ${fmtClock(tl2 * riftLimit(r.riftLv))}` : `${Math.round((r.clock || 0) / 100)} lượt · hương còn ${Math.round(tl2 * 100)}%`) + (r.deaths ? ` · ngã ${r.deaths} lần` : '')
     : `${CLASSES[r.cls].n} · ${rift ? "Ảo Cảnh Cửu U" : DIFFS[r.diff].n}${r.world ? '' : ` · khám phá ${r.rooms} phòng`}`;
-  const head = `<div class="jbsc ${win ? 'win' : 'lose'}"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
+  const fin = r._an ? '' : 'in'; if (!r._an) { r._an = 1; if (seal) setTimeout(() => { try { SFX.play('thud'); } catch (e) {} }, 520); }
+  const head = `<div class="jbsc ${win ? 'win' : 'lose'} ${fin}"><i class="rg-moon"></i><i class="rg-mt"></i><i class="rg-mist"></i><i class="rg-ground"></i>
       <span class="jb-me">${win ? heroFig(r.cls, 78) + (r.ngoc ? unitIcon(r.ngoc === 'fox' ? 'ngocfox' : 'ngoc', 40, null, '', 'full') : '') : SPR.img('skeleton', 56)}</span>
-      <div class="jb-juan"><h2>${title}</h2><p>${sub}</p>${seal}</div></div>`;
+      <div class="jb-juan"><h2>${title}</h2><p>${sub}</p>${seal}${r.record ? "<i class=\"jb-rec\">Kỷ lục mới</i>" : ''}</div></div>`;
   const stats = [tile('st_time', rift && r.world ? "Hương đã cháy" : "Thời gian", rift && r.world ? fmtClock(r.clock || 0) : fmtTime(t)), tile('st_kill', "Diệt yêu", r.kills), tile('st_para', "Cấp", `${r.lvStart} → ${SAVE.chars[r.cls].level}`),
     tile('ingot', "Bạc", '+' + fmtBig(r.goldGot)), tile(SPR.img('gem', 20, { G: '#59c9b5' }), "Ngọc", '+' + r.gemsGot), tile('shard', "Hồn tinh", '+' + fmtBig(r.matsGot)), r.jyxGot ? tile('rune', "Cửu U Huyền Tinh", '+' + r.jyxGot) : '', SAVE.para.lv > r.paraStart ? tile('st_para', "Tu vi", realmName(SAVE.para.lv)) : ''].join('');
-  return `<div class="scene endv"><div class="panel endp">${head}
+  return `<div class="scene endv"><div class="panel endp ${fin}">${head}
     <div class="endscroll" data-scroll="end">
     ${r.record && !rift ? "<p class=\"evres\">Phá kỷ lục nhanh nhất của chương!</p>" : ''}
     <div class="rtiles c3 jb-st">${stats}</div>
@@ -4238,9 +4265,12 @@ const retreatModal = () => () => `<h2 class="mh">Rút về trấn Thanh Thạch?
   <div class="row"><button class="btn" data-act="doretreat">Xác nhận rút</button><button class="btn ghost" data-act="close">Nghĩ lại</button></div>`;
 const resetModal = () => () => `<h2 class="mh" style="color:var(--blood2)">Xóa toàn bộ bản lưu?</h2><p>Mọi nhân vật, cấp, trang bị, ngọc, công trình, tiến độ cốt truyện đều bị xóa sạch, không khôi phục được.</p>
   <div class="row"><button class="btn" data-act="doreset">Xác nhận xóa</button><button class="btn ghost" data-act="close">Hủy</button></div>`;
-const rewardModal = (title, r) => () => `<h2 class="mh">${title}</h2>
-  <p>${[r.xp ? `Kinh nghiệm +${r.xp}` : '', r.gold ? `Bạc +${r.gold}` : '', r.mats ? `Hồn tinh +${r.mats}` : '', r.ups ? `<b style="color:var(--gold2)">Lên ${r.ups} cấp!</b>` : ''].filter(Boolean).join(" · ")}</p>
-  ${lootChips(r.items)}${gemChips(r.gems || (r.gem ? [r.gem] : []))}<div class="row" style="justify-content:center"><button class="btn" data-act="close">Được</button></div>`;
+const rewardModal = (title, r) => { let first = true;   // 开箱：箱子晃一下、亮一下，东西一格一格跳出来（只在刚打开时动一次）
+  return () => { const f = first; first = false; const tile = (ic, k, v) => `<div class="rtile">${SPR.img(ic, 20)}<span><small>${k}</small><b>${v}</b></span></div>`;
+    const rw = [r.xp ? tile('st_para', "Kinh nghiệm", '+' + fmtBig(r.xp)) : '', r.gold ? tile('ingot', "Bạc", '+' + fmtBig(r.gold)) : '', r.mats ? tile('shard', "Hồn tinh", '+' + r.mats) : ''].filter(Boolean);
+    return `<div class="rwm ${f ? 'in' : ''}"><div class="rw-chest">${SPR.img('chest', 64)}</div><h2 class="mh">${title}</h2>
+      ${rw.length ? `<div class="rtiles c${Math.max(2, rw.length)} jb-rw">${rw.join('')}</div>` : ''}${r.ups ? `<p class="jb-note"><b>Lên ${r.ups} cấp!</b></p>` : ''}
+      ${lootGrid(r.items, r.gems || (r.gem ? [r.gem] : []))}<div class="row" style="justify-content:center"><button class="btn" data-act="close">Được</button></div></div>`; }; };
 
 // ---------- 云存档（当前环境不可用时自动退回本机） ----------
 const CLOUD = { db: null, uid: null, status: 'connecting', at: 0, pushing: false, dirty: false, timerH: null };
@@ -4317,7 +4347,7 @@ const ACT = {
   logt: () => { const l = $('#blog'); if (l) l.classList.toggle('open'); },
   auto: () => { if (AUTO) { stopAuto(); return; } AUTO = true; const b = document.querySelector('.autob'); if (b) { b.classList.remove('ghost'); b.textContent = "Đang tự khám phá…"; } autoStep(); },
   mode: m => { SAVE.mode = m; refresh(); },
-  twgo: () => twGo(),
+  twgo: () => { const T = twState(SAVE.cls); if (SAVE.run || T.pend || T.fl > TW.top) return twGo(); doorFx(twGo); },
   twnext: () => { SAVE.run = null; B = null; BRES = null; twGo(); },
   twhome: () => { SAVE.run = null; B = null; BRES = null; VIEW = 'town'; TT = 'go'; save(); render(); },
   twpick: i => { const cls = (SAVE.run && SAVE.run.mode === 'tower' && SAVE.run.cls) || SAVE.cls, S = twState(cls); let p = S.pend && (i === 'x' ? { t: 'all' } : S.pend[+i]); if (!p) return;
@@ -4368,7 +4398,7 @@ const ACT = {
   gemhelp: () => toast(`Ba viên ngọc giống nhau ghép được lên một bậc, hiện ghép cao nhất tới “${GEM_TIERS[gemCap()]}”. Tiệm ngọc lo tới “cực phẩm”; bốn bậc sau “vô hà, thông linh, thiên thành, cửu u” cần tầng Ảo Cảnh cao nhất đạt ${GEM_RIFT.join(", ")}. “Khảm ngọc tốt nhất” đổi mỗi lỗ trên người sang viên hợp nhất trong túi ngọc, miễn phí.`, 8000),
   bagall: () => { GSLOT = null; FILTER = 'all'; refresh(); },
   tobag: sl => { closeModal(); MODALFN = null; modal.hidden = true; BACK = null; GSLOT = sl || null; TT = 'bag'; BAGV = 'eq'; FILTER = 'all'; VIEW = 'town'; refresh(); },
-  gemfit: () => { const r = gemAutoFit(ctxCls()); save(); if (r.n) SFX.play('forge'); toast(r.n ? `Đã đổi ${r.n} viên ngọc hợp hơn` : "Ngọc trên người đã là hợp nhất rồi (hoặc trong túi ngọc không có viên tốt hơn)"); refresh(); },
+  gemfit: () => { const r = gemAutoFit(ctxCls()); save(); if (r.n) SFX.play('forge'); toast(r.n ? `Đã đổi ${r.n} viên ngọc hợp hơn` : "Ngọc trên người đã là hợp nhất rồi (hoặc trong túi ngọc không có viên tốt hơn)"); refresh(); if (r.n) burstFx('jade'); },
   zyopen: () => { if (shelved('zy')) return ACT.yiopen(); TT = 'col'; CTAB = 'zy'; ZYOPEN = true; VIEW = 'town'; refresh(); setTimeout(() => { const e = document.getElementById('zylu'); if (e) e.scrollIntoView({ block: 'start' }); }, 50); },
   zyp: a => { ZYPG = ZYPG === +a ? -1 : +a; refresh(); },
   yi: id => { const r = setYi(SAVE.cls, id); if (r.err) return toast(r.err); save(); refresh(); },
@@ -4407,7 +4437,8 @@ const ACT = {
       return playActsTown(acts); }
     npcTalk(id);
   },
-  start: () => {
+  start: () => { const story = !(riftUnlocked() && SAVE.mode === 'rift'); if (story && !chapterUnlocked(SAVE.diff, SAVE.chapter)) return ACT.start0(); doorFx(ACT.start0); },
+  start0: () => {
     AUTO = false;
     const mode = riftUnlocked() && SAVE.mode === 'rift' ? 'rift' : 'story';
     if (mode === 'story' && !chapterUnlocked(SAVE.diff, SAVE.chapter)) return toast("Chương này chưa mở khóa");
@@ -4441,7 +4472,7 @@ const ACT = {
       if (!seen('i' + run.chapter)) { markSeen('i' + run.chapter); save(); playDialog(C.intro, C.boss, show); } else show();
     } else { banner(`Ảo Cảnh Cửu U · tầng ${run.riftLv}`, themeOf(run).n, 1800); }
   },
-  resume: () => { VIEW = SAVE.run.world ? 'world' : 'map'; WHERO = null; refresh(); window.scrollTo(0, 0); },
+  resume: () => doorFx(() => { VIEW = SAVE.run.world ? 'world' : 'map'; WHERO = null; refresh(); window.scrollTo(0, 0); }),
   retreat: () => { stopAuto(); openModal(retreatModal()); },
   doretreat: () => { const r = SAVE.run; BACK = null; closeModal(); clearTimeout(timer); finishRunView(r, 'retreat'); },
   town: () => { VIEW = 'town'; TT = 'go'; LASTRUN = null; refresh(); window.scrollTo(0, 0); snowCatchUp(); },
@@ -4497,7 +4528,7 @@ const ACT = {
   },
   sitem: i => openModal(itemModal(null, +i)),
   close: () => closeModal(),
-  equip: id => { const f0 = findItem(id); if (f0 && equipItem(ctxCls(), id, gpos(f0.it))) { SFX.play('loot'); toast("Đã trang bị"); closeModal(); refresh(); achToast(checkAch()); } },
+  equip: id => { const f0 = findItem(id); if (f0 && equipItem(ctxCls(), id, gpos(f0.it))) { SFX.play('loot'); toast("Đã trang bị"); closeModal(); refresh(); burstFx('gold'); achToast(checkAch()); } },
   unequip: sl => { unequip(ctxCls(), sl); closeModal(); refresh(); },
   sell: id => { const g = sellItem(id); SFX.play('coin'); toast(`Bán được ${g} lượng`); closeModal(); refresh(); },
   salv: id => { const m = salvage(id); SFX.play('forge'); toast(`Phân giải được ${m} hồn tinh`); closeModal(); refresh(); },
@@ -4508,7 +4539,7 @@ const ACT = {
   junk: () => { const r = sellJunk(); if (r.n) SFX.play('coin'); toast(r.n ? `Bán ${r.n} món, được ${r.g} lượng` : "Không có Phàm/Linh phẩm nào để bán (đồ đã cường hóa hoặc khảm ngọc sẽ không bán)"); refresh(); },
   salvjunk: () => { const r = salvageJunk(); if (r.n) SFX.play('forge'); toast(r.n ? `Phân giải ${r.n} món, được ${r.m} hồn tinh` : "Không có Phàm/Linh phẩm nào để phân giải"); refresh(); },
   filter: f => { FILTER = f; refresh(); },
-  enh: id => { const it = findOwned(id); const r = enhance(it); if (r.err) return toast(r.err); SFX.play(r.ok ? 'forge' : 'fail'); toast(r.ok ? `Cường hóa thành công! Giờ là +${it.plus}` : "Trương Đại Chùy: “Lần này… trượt tay.” Mất nguyên liệu"); refresh(); achToast(checkAch()); },
+  enh: id => { const it = findOwned(id); const r = enhance(it); if (r.err) return toast(r.err); SFX.play(r.ok ? 'forge' : 'fail'); toast(r.ok ? `Cường hóa thành công! Giờ là +${it.plus}` : "Trương Đại Chùy: “Lần này… trượt tay.” Mất nguyên liệu"); refresh(); burstFx(r.ok ? 'gold' : 'fail'); achToast(checkAch()); },
   sock: id => { const r = addSocket(findOwned(id)); if (r.err) return toast(r.err); SFX.play('forge'); toast("Đục lỗ thành công"); refresh(); },
   gem: a => { const [id, k] = split(a); const r = socketGem(findOwned(id), k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Khảm thành công"); refresh(); },
   boxput: gid => { const cls = ctxCls(), i = boxOf(cls).indexOf(null); if (i < 0) return toast("Ba lỗ đều đầy, tháo một viên trước đã"); const r = boxSet(cls, i, gid); if (r.err) return toast(r.err); SFX.play('legend'); refresh(); achToast(checkAch()); },
@@ -4529,14 +4560,14 @@ const ACT = {
   ws: id => { const it = findOwned(id); const r = washStart(it, [...wlockOf(it)]); if (r.err) return toast(r.err); SFX.play('magic'); refresh(); },
   wspick: a => { const [id, i] = split(a); washPick(findOwned(id), +i); SFX.play('forge'); toast(+i ? "Tẩy luyện xong: đã đổi thuộc tính mới" : "Giữ nguyên"); refresh(); },
   jywash: id => { const it = findOwned(id); const r = jyWash(it); if (r.err) return toast(r.err); SFX.play('rare'); toast(`Từ tố Cửu U: ${esc(jyText(it.jy))}`); save(); refresh(); },
-  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); if (r.jy) jyBanner(it); toast(`Điểm hóa xong: <b>${esc(itemTitle(it))}</b>${r.jy ? `, từ tố Cửu U: ${esc(jyText(it.jy))}` : r.add ? ", mọc thêm một dòng" : ''}`); save(); refresh(); achToast(checkAch()); },
+  ancient: id => { const it = findOwned(id); const r = ancientize(it); if (r.err) return toast(r.err); SFX.play('legend'); if (r.jy) jyBanner(it); toast(`Điểm hóa xong: <b>${esc(itemTitle(it))}</b>${r.jy ? `, từ tố Cửu U: ${esc(jyText(it.jy))}` : r.add ? ", mọc thêm một dòng" : ''}`); save(); refresh(); if (!r.jy) ceremony({ icon: SPR.item(it, 72), seal: it.anc === 2 ? "Thái" : "Cổ", title: "Điểm hóa thành công", sub: esc(itemTitle(it)), c: it.anc === 2 ? '#ff8a6a' : '#59c9b5' }); achToast(checkAch()); },
   uptier: id => { const it = findOwned(id); const r = upTier(it, upTierTarget(ownerOf(it) || SAVE.cls)); if (r.err) return toast(r.err); SFX.play('forge'); toast(`Thăng giai xong: giờ là ${TIER_N[it.tier]}`); refresh(); },
   extract: id => { const r = extractLegend(id); if (r.err) return toast(r.err); SFX.play('legend'); toast("Hồn thần binh đã vào Túi Càn Khôn, sang trang “Trang bị” đặt nó vào ô"); closeModal(); refresh(); achToast(checkAch()); },
   cubepick: i => { const prev = MODALFN; openModal(cubeModal(+i)); if (prev === cubeBagModal) BACK = prev; },
   cpf: a => { const [k, v] = split(a); if (k === 'g') { CPF.g = v; CPF.s = ''; } else CPF.s = v; if (MODALFN) sheet.innerHTML = MODALFN(); },
   cubeset: a => { const [i, lid] = split(a); setCube(SAVE.cls, +i, lid || null); SFX.play('rare'); closeModal(); refresh(); },
-  combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast("Không có ngọc nào ghép được"); SFX.play('rare'); toast(`Đã ghép ${r.n} lần, được ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join(", ")); save(); refresh(); },
-  combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Đã ghép " + gemName(r.key)); refresh(); },
+  combineall: () => { const r = combineAllPlan(true); if (!r.n) return toast("Không có ngọc nào ghép được"); SFX.play('rare'); toast(`Đã ghép ${r.n} lần, được ` + Object.entries(r.got).sort((a, b) => b[0].split('_')[1] - a[0].split('_')[1]).map(([k, v]) => `${gemName(k)}×${v}`).join(", ")); save(); refresh(); burstFx('jade'); },
+  combine: k => { const r = combineGem(k); if (r.err) return toast(r.err); SFX.play('rare'); toast("Đã ghép " + gemName(r.key)); refresh(); burstFx('jade'); },
   learn: a => { const [br, i] = split(a); if (learnTalent(ctxCls(), br, +i)) { SFX.play('buff'); refresh(); } },
   respec: () => { if (resetTalents(ctxCls())) { toast("Tán công xong, đã hoàn lại điểm tâm pháp"); refresh(); } },
   para: a => { const [k, n] = split(a); if (addPara(k, +n)) { SFX.play('buff'); refresh(); achToast(checkAch()); } },
@@ -4561,7 +4592,7 @@ const ACT = {
     if (r === 'cat') { const c = skCat(cls, id); return toast(`Hai ô tự do đã dùng hết, không còn chỗ cho chiêu ${SK_CAT[c]} này: hãy gỡ bớt một chiêu thừa trước`); } SFX.play(r === 'on' ? 'buff' : 'click'); refresh(); },
   bclaim: i => { const r = claimBounty(+i); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal("Rương truy nã", r)); achToast(checkAch()); },
   bbonus: () => { const r = claimBountyBonus(); if (!r) return; SFX.play('legend'); save(); render(); openModal(rewardModal("Rương thưởng lớn", r)); achToast(checkAch()); },
-  lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? "Nâng linh ngọc thành công!" : "Nâng thất bại"); refresh(); achToast(checkAch()); },
+  lgup: gid => { const ok = upgradeLgem(LASTRUN, gid); if (ok == null) return; SFX.play(ok ? 'legend' : 'fail'); toast(ok ? "Nâng linh ngọc thành công!" : "Nâng thất bại"); refresh(); burstFx(ok ? 'purple' : 'fail'); achToast(checkAch()); },
   cell: i => { stopAuto(); walkTo(i); },
   bag: () => { stopAuto(); BACK = null; if (talentInfo(ctxCls()).free && !SAVE.stash.length) BAGTAB = 'tal'; openModal(bagModal()); },
   ult: () => { if (!B || B.over) return; STPOP = { ult: 1 }; drawStPop(); if ((B.P.rage || 0) < 100) return; B.ultReq = true; SFX.play('buff'); applyStep(null); if (B.waiting) { B.waiting = false; clearTimeout(timer); tick(); } },
@@ -4708,7 +4739,7 @@ const ACT = {
   bknudge: () => { ACT.tsave(); },
   tcls: c => { TCLS = c; refresh(); },
   home: () => { stopAuto(); closeModal(); VIEW = 'title'; render(); window.scrollTo(0, 0); },
-  tcont: () => { closeModal(); if (SAVE.run) { ACT.resume(); return snowCatchUp(); } VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); playPrologue(); snowCatchUp(); },
+  tcont: () => { closeModal(); if (SAVE.run) { ACT.resume(); return snowCatchUp(); } doorFx(() => { VIEW = 'town'; TT = 'go'; render(); window.scrollTo(0, 0); }); playPrologue(); snowCatchUp(); },
   tnew: () => openModal(resetModal()),
   ttest: () => openModal(() => `${testPanel()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">Đóng</button></div>`),
   tsave: () => openModal(() => `${setSave()}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn ghost" data-act="close">Đóng</button></div>`),
