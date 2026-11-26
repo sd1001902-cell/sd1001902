@@ -2385,6 +2385,18 @@ html[lang=vi] .jb-rec{font:700 10.5px/1.5 "Noto Serif",serif}
 .tcont.tin>*{animation:tin .2s ease-out}@keyframes tin{from{opacity:.15;transform:translateY(9px)}to{opacity:1;transform:none}}
 .xl-hang.sw .slc.on{animation:plqSway .5s ease-out;transform-origin:50% -9px}@keyframes plqSway{0%{transform:translateY(3px) rotate(0)}25%{transform:translateY(3px) rotate(-5deg)}55%{transform:translateY(3px) rotate(3.5deg)}80%{transform:translateY(3px) rotate(-1.5deg)}100%{transform:translateY(3px) rotate(0)}}
 .rg-plaque.chg{animation:plqDrop .26s cubic-bezier(.2,1.5,.4,1)}@keyframes plqDrop{from{transform:translateX(-50%) translateY(-9px) scale(1.12)}to{transform:translateX(-50%)}}
+/* ===== 美化第四批（2026-11-26）：幻境地图 ===== */
+/* 一炷香：真是一根香——没烧的是香身，烧到哪儿火头在哪儿，烧过的剩一线灰；字写在下面 */
+.xiangbar{height:27px;padding-top:12px;box-sizing:border-box;background:none;border:0;border-radius:0;overflow:visible}
+.xiangbar::before{content:"";position:absolute;left:0;right:0;top:4px;height:2px;background:linear-gradient(90deg,#3a3632,#57514a);border-radius:1px}
+.xiangbar i{inset:auto;left:0;top:2px;height:6px;border-radius:2px 0 0 2px;background:linear-gradient(180deg,#c07a3a,#7a4420);box-shadow:inset 0 1px 0 rgba(255,220,170,.3)}
+.xiangbar i::after{content:"";position:absolute;right:-4px;top:-2px;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle,#fff6c8 0 22%,#ff9a3a 46%,rgba(255,110,40,0) 72%);box-shadow:0 0 9px 2px rgba(255,140,60,.55)}
+.xiangbar em{top:0;bottom:auto;height:10px;width:1px;background:rgba(255,255,255,.28)}
+.xiangbar span{margin-top:0;line-height:14px;font-size:calc(11px * var(--fs,1));color:#e8c890;text-shadow:none}
+.xiangbar.low i{background:linear-gradient(180deg,#d05a3a,#7a2416)}.xiangbar.out i::after{display:none}
+/* 幻境进度：冥火青的一条，四成、八成两处挂小灯 */
+.rprog{height:16px;background:#0a100f;border-color:#2a4a44;border-radius:2px}.rprog i{background:linear-gradient(90deg,#1f5a50,#59c9b5)}.rprog span{line-height:14px;font-size:calc(11.5px * var(--fs,1))}
+.rprog em{top:2px;bottom:2px;width:5px;margin-left:-2px;border-radius:2px;background:radial-gradient(circle,#ffb04a,#c4291f 70%);box-shadow:0 0 6px 1px rgba(255,120,50,.5)}
 /* 布阵弹窗收紧（2026-11-26 用户嫌太大）：六个阵一行、号位格压矮、伙伴一行六个 */
 html body .fmlist{grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin:2px 0 5px}html body .fmo{padding:3px 1px 2px;border-radius:2px;min-width:0}html body .fmo b{font-size:12px;white-space:nowrap}html body .fmo small{font-size:9px;line-height:1.1}
 html body .fmh{margin:0 0 4px;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}html body .fmh span{font-size:11px}html body .fmh span b{color:var(--ink)}html body .fmen{margin:0 0 3px;font-size:11px}
