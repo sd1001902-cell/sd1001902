@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: "Công", hp: "Khí huyết", armor: "Hộ giáp", crit: "Tỉ lệ chí mạng", critDmg: "ST chí mạng",
   spd: "Tốc độ", leech: "Hút máu", res: "Kháng toàn bộ", dmgPct: "Sát thương", elem: "ST thuật pháp",
-  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", thornK: "Bội số phản chấn", thornDmg: "Sát thương phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Sát thương phản chấn",
+  hpPct: "Khí huyết tối đa", armorPct: "Hộ giáp", atkPct: "Công", fHp: "Khí huyết cuối", fAtk: "Công cuối", thornK: "Bội số phản chấn", thornDmg: "Sát thương phản chấn", lowHpK: "Tăng sát thương khi ít máu", regen: "Hồi khí huyết mỗi lượt", thorns: "Sát thương phản chấn",
   mf: "Phúc duyên", gf: "Thu hoạch bạc", freeze: "Tỉ lệ bất động", minion: "Giới hạn số cương thi",
   dodge: "Né tránh", poison: "Đòn đánh gây trúng độc", minionPct: "Sức mạnh cương thi", healPct: "Hiệu quả trị liệu", eva: "Né tránh", skd: "Sát thương một chiêu",
   xFirst: "Ra tay trước (thanh lượt)", xBoss: "Sát thương lên thủ lĩnh, tinh anh", xExec: "Trảm sát (sát thương lên địch sắp chết)", xBreak: "Phá thế (sát thương lên địch đang tụ lực)",

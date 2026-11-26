@@ -742,10 +742,10 @@ function calcStats(clsId, eq, level, buffs, ch) {
   s.sanN = sanK && !Object.keys(setCount).some(id => setCount[id] >= 2) ? sanK * nLeg : 0;
   if (SAVE) { const g = ch && ch.tower ? twGlobal() : globalStats(); for (const k in g) add(k, g[k]); }   // 通天塔：修为按统一的底子
   if (buffs) for (const k in buffs) add(k, buffs[k]);
-  s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100) * (fx.has('gGlass') ? 0.8 : 1) * (1 + (s.pHp || 0) / 100)));   // pHp／pArmor／pAtk：修为的「根基」，乘在最终数值上
+  s.maxHp = Math.max(1, Math.round(s.hp * (1 + s.hpPct / 100) * (fx.has('gGlass') ? 0.8 : 1) * (1 + (s.pHp || 0) / 100) * (1 + (s.fHp || 0) / 100)));   // pHp／pArmor／pAtk：修为的「根基」，乘在最终数值上
   s.cls = clsId; s.sust = clsId === 'berserker' ? 0 : Math.round(s.leech * 4);   // 别的职业：每 1% 吸血折成 4% 续航强度（本职的护体／替死／身法／金刚）
   s.armorT = Math.round(s.armor * (1 + s.armorPct / 100) * (1 + (s.pArmor || 0) / 100));
-  s.atk = Math.round(s.atk * (1 + (s.atkPct || 0) / 100) * (1 + (s.pAtk || 0) / 100));   // atkPct：赤玉
+  s.atk = Math.round(s.atk * (1 + (s.atkPct || 0) / 100) * (1 + (s.pAtk || 0) / 100) * (1 + (s.fAtk || 0) / 100));   // fHp／fAtk：套装给的「最终气血／最终攻击」（2026-11-27），也乘在最后   // atkPct：赤玉
   s.critRaw = Math.round(s.crit * 10) / 10; s.resRaw = Math.round(s.res * 10) / 10; s.crit = critSoft(s.critRaw); s.res = resSoft(s.resRaw);   // 2026-11-23 不再 75% 卡死：超出部分打折算
   s.spd = Math.min(SPD_CAP, Math.round(s.spd * 10) / 10); s.speed = 100 + s.spd; s.dmgPct = Math.round(s.dmgPct * 10) / 10; s.hpPct = Math.round(s.hpPct * 10) / 10; s.critDmg = Math.round(s.critDmg * 10) / 10; s.crit = Math.round(s.crit * 10) / 10;
   s.dodge = Math.min(45, s.dodge + (fx.has('dodge') ? 15 : 0));
@@ -2111,11 +2111,13 @@ const stExt = u => (u && u.fx && u.fx.has('baifuBelt') ? 2 : 0) + (u && u.lgv &&
 const setWeak = (f, t, v, out) => { if (f.hp > 0) { f.st.weak = Math.max(f.st.weak || 0, t); f.st.weakV = Math.max(f.st.weakV || 0, v); out.pops.push([f.id, '乏力', 'curse', 1]); } };
 let THORN_CAP = 0.15, CDSKIP_CAP = 40;
 let SAN_DMG = 0.05, SAN_DR = 0.015, SAN_DR_CAP = 0.5;   // 散件流：每件神兵、每枚扳指 +5% 伤害、-1.5% 受伤（十件神兵两枚扳指 = +100% / -30%）。38 层对打：比同路线的 6 件套略慢
-let YINBING_MUL = 1, YINBING_BIG = 0.5, YINBING_DR = 0.07, YINBING_SELF = 0.4, YINBING_BOOM = 2;   // 2026-11-25 晚：僵尸气血削到 0.58 后，阴兵爆 100% → 200%（用户：僵尸死了也要有贡献；700 层伤害占比 13% → 18%）   // 4 件：气血低于 SELF 自己炸，炸掉最大气血 × BOOM（2026-11-25：原来只在倒下时炸 50%）   // 2026-11-25 挡大招门槛 25% → 50%：推荐配装不放尸爆以后僵尸墙一直在，阴兵 550 层 89%/88% 太强（用户定的温和削法）   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
+let YINBING_MUL = 0.8, YINBING_BIG = 0.6, YINBING_DR = 0.07, YINBING_SELF = 0.4, YINBING_BOOM = 2;   // 2026-11-25 晚：僵尸气血削到 0.58 后，阴兵爆 100% → 200%（用户：僵尸死了也要有贡献；700 层伤害占比 13% → 18%）   // 4 件：气血低于 SELF 自己炸，炸掉最大气血 × BOOM（2026-11-25：原来只在倒下时炸 50%）   // 2026-11-25 挡大招门槛 25% → 50%：推荐配装不放尸爆以后僵尸墙一直在，阴兵 550 层 89%/88% 太强（用户定的温和削法）   // 阴兵借道 6 件：原来 ×4。僵尸改成开战就在场以后，这一套比别的门派快了一倍，收到 ×2
+// 2026-11-27 角色平衡（用户：差别可有，不能离谱；按真实的一整局重测）：阴兵 6 件僵尸攻击 ×0.8（YINBING_MUL 1 → 0.8）、挡大招门槛 50% → 60%（YINBING_BIG）；七杀终结 ×6 → ×8.5，归元 ×4 → ×5.5，千机 ×6 → ×7，毒行每个空位伤害 +60% → +90%；
+// 靠后的五套在 2 件上加「最终气血、最终攻击」（fHp / fAtk，乘在最后）：血海、毒行 +20%，归元、七杀、千机 +10%
 // 第二套幻境套装的数（调平衡只动这里）
 // 2026-11-24 流派平衡（毕业号模板对比后，用户：按你说的做）：只改各套自己的机制数字，加上套装 2 件的减伤
-let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 6, GUIYUAN_MUL = 4, GUIYUAN_SW = 0.4;
-let BUSI_HP = 0.04, BUSI_AOE = 5, WANFU_ST = 0.5, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.6, DUXING_DR = 0.13, DUXING_STACK = 8, DUXING_BURST = 0.25, QIANJI_MUL = 6, DARI_CAP = 0.5, DARI_DMG = 1.5, DARI_HIT = 2, DARI_REGEN = 0.12;
+let XUEHAI_DR = 0.35, XUEHAI_FURY = 0.03, QISHA_FIN = 8.5, GUIYUAN_MUL = 5.5, GUIYUAN_SW = 0.4;
+let BUSI_HP = 0.04, BUSI_AOE = 5, WANFU_ST = 0.5, WANFU_SPLASH = 0.8, WANFU_DET = 0.4, DUXING_DMG = 0.9, DUXING_DR = 0.13, DUXING_STACK = 8, DUXING_BURST = 0.25, QIANJI_MUL = 7, DARI_CAP = 0.5, DARI_DMG = 1.5, DARI_HIT = 2, DARI_REGEN = 0.12;
 const emptySlots = (b, P) => Math.max(0, Math.min(4, (P.minionCap || 3)) - zombiesOf(b).filter(z => !ZOMBIES[z.zt].ult).length);
 const DART_SK = new Set(['venom', 'bingpo', 'fan']), BUSI_SK = new Set(['whirl', 'liedi']);
 // ---------------- 赶尸人的僵尸 ----------------
@@ -2205,6 +2207,7 @@ let BNOW = null;
 const riftB = b => !!(b && b.run && ((b.run.mode === 'rift' && b.run.world) || b.run.mode === 'tower'));   // 通天塔照幻境的规矩打（久战破绽、妖王封顶、两段）
 // 幻境守关的蓄力大招（惊堂木、喷火、吞噬这些）：剧情里有道具能克，幻境里没得克，再乘上守关的攻击 ×2.2，满血一下就没（僵尸县令的惊堂木平均打掉 87%，最高 137%）。
 // 幻境里这类大招每下最多打掉目标一半气血：还是要命（后面接着眩晕和普攻），但不会满血秒人
+var R_ELITE_CAP = 0.6;   // 2026-11-27 幻境里精英一次出手（连带词缀的追击）最多打掉主角六成气血。原来只有守关妖王封顶，精英没有：500 层以上精英一下就是一整管血，比妖王还容易秒人，单打独斗的门派（狂刀客最明显）根本站不住
 var R_CAP_HIT = 0.5, R_BOSS_CAP = 0.4;   // 2026-11-24 守关妖王一次出手最多打掉四成气血（原来六成：高层两下就倒，除了罗汉谁都打不过首领）
 const wearyN = b => riftB(b) ? Math.max(0, (b.pr || 0) - R_WEARY[b.kind === 'boss' ? 2 : 0] + 1) : 0;
 // ---------------- 小队统计：输出、控制、治疗、护体挡下、承伤、挡刀（按人分；僵尸合一行） ----------------
@@ -2245,7 +2248,7 @@ function battleStep(b) {
   for (const u of live) u.g += bt * spdOf(u);
   actor.g = 0; out.actor = actor.id; out.dt = bt; b.curActor = actor;
   if (b.run && b.run.mode === 'rift' && !b.run.riftDone) b.run.clock = (b.run.clock || 0) + bt * (b.run.world ? R_BT_MS : 1);
-  b.capAcc = actor.kind === 'boss' ? {} : null;   // 守关妖王这一手打了谁多少（封顶用）
+  b.capAcc = actor.kind === 'boss' || (actor.kind === 'elite' && R_ELITE_CAP < 1 && riftB(b)) ? {} : null;   // 守关妖王这一手打了谁多少（封顶用）
   act(b, actor, out); b.capAcc = null;
   if (actor === b.P && actor.hp > 0 && !b.over && actor.jy && actor.jy.lianhuan && RNG.ch(actor.jy.lianhuan / 100)) { actor.g = 100; out.pops.push(['P', '疾影', 'buff']); }   // 九幽·疾影：马上再出手一次
   if (actor.duo && actor.hp > 0 && out.actor && !b.over && ++actor.nAct % actor.duo === 0) { actor.g = 100; out.pops.push([actor.id, '连动', 'crit']); out.lines.push(`${actor.name}身形一晃，紧跟着又是一招！`); }   // 守关妖王连动：马上再出一招
@@ -3125,8 +3128,8 @@ function hit(b, src, tgt, mult, elem, out, opt = {}) {
   if (src.side === 'e' && tgt.kind === 'hero' && elem !== 'phys' && b.run && b.run.mode === 'story' && b.run.world) d *= (W_TUNE[b.run.chapter] || [])[4] || 1;
   d = Math.max(1, Math.round(d * RNG.f(0.9, 1.1)));
   if (b.capHit && src.side === 'e' && tgt.side === 'p' && d > tgt.maxHp * b.capHit) d = Math.round(tgt.maxHp * b.capHit);   // 幻境守关蓄力的大招：一下最多打掉一半气血，不会满血被秒
-  else if (src.kind === 'boss' && tgt.side === 'p' && riftB(b) && b.capAcc) {   // 守关妖王出一次手（连带词缀的追击）对同一个人最多打掉六成气血，不会满血被秒
-    const used = b.capAcc[tgt.id] || 0, room = Math.max(0, Math.round(tgt.maxHp * R_BOSS_CAP) - used); if (d > room) d = Math.max(1, room); b.capAcc[tgt.id] = used + d; }
+  else if ((src.kind === 'boss' ? tgt.side === 'p' : src.kind === 'elite' && tgt === b.P) && riftB(b) && b.capAcc) {   // 守关妖王出一次手（连带词缀的追击）对同一个人最多打掉六成气血，不会满血被秒
+    const used = b.capAcc[tgt.id] || 0, room = Math.max(0, Math.round(tgt.maxHp * (src.kind === 'boss' ? R_BOSS_CAP : R_ELITE_CAP)) - used); if (d > room) d = Math.max(1, room); b.capAcc[tgt.id] = used + d; }
   if ((tgt.kind === 'boss' || tgt.bty) && src.side === 'p' && b.units.some(x => x.side === 'e' && x.hp > 0 && x.protect)) { d = Math.max(1, Math.round(d * 0.65)); if (RNG.ch(0.3)) out.pops.push([tgt.id, '护驾', 'miss']); }
   if (tgt.kind === 'hero' && tgt.cls === 'necro' && src.side === 'e' && !opt.proc && d > 1) {   // 替死：僵尸代受一部分
     const Z = zombiesOf(b).sort((x, y) => (y.taunt ? 1 : 0) - (x.taunt ? 1 : 0) || y.hp - x.hp)[0];
