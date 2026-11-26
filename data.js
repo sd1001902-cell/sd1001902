@@ -33,7 +33,7 @@ const RARITY_ORDER = ['normal', 'magic', 'rare', 'set', 'legend'];
 const STAT_NAMES = {
   atk: '攻击', hp: '气血', armor: '护甲', crit: '暴击率', critDmg: '暴击伤害',
   spd: '速度', leech: '吸血', res: '全抗', dmgPct: '伤害', elem: '术法伤害',
-  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', thornK: '反震倍率', thornDmg: '反震伤害', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震伤害',
+  hpPct: '最大气血', armorPct: '护甲', atkPct: '攻击', fHp: '最终气血', fAtk: '最终攻击', thornK: '反震倍率', thornDmg: '反震伤害', lowHpK: '残血增伤', regen: '每回合回复气血', thorns: '反震伤害',
   mf: '福缘', gf: '银两获取', freeze: '定身几率', minion: '僵尸数量上限',
   dodge: '闪避', poison: '攻击附带中毒', minionPct: '僵尸强度', healPct: '治疗效果', eva: '闪避', skd: '某一招伤害',
   xFirst: '先手（开战读条）', xBoss: '对首领、精英的伤害', xExec: '斩杀（对残血敌人伤害）', xBreak: '破势（对蓄力中的敌人伤害）',
