@@ -4785,7 +4785,7 @@ const ACT = {
   },
   bkpick: () => { const f = $('#bkf'); if (!f) return; f.onchange = () => { const file = f.files && f.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => tryImport(String(rd.result || '')); rd.onerror = () => toast("Không đọc được tệp"); rd.readAsText(file); f.value = ''; }; f.click(); },
   redeem: () => { const v = ($('#rdmIn') || {}).value || ''; if (!v.trim()) return toast("Hãy nhập mã đổi thưởng trước"); const r = redeemCode(v); if (r.err) return toast(r.err);
-    save(); SFX.play('forge'); toast(r.mount ? `Đổi thành công: thú cưỡi “<b>${MOUNTS[r.mount].n}</b>”, đã cưỡi lên rồi` : `Đổi thành công: ${({ M: "Hồn tinh", G: "Bạc", X: "Cửu U Huyền Tinh" })[r.k]} +${fmtBig(r.n)}`); refresh(); },
+    save(); SFX.play('forge'); toast(r.set ? `Đổi thành công: ${r.cnt} món “<b>${SETS.find(S => S.id === r.set).n}</b>” ${r.anc === 2 ? "Thái Cổ" : "Thượng Cổ"}, đã cất vào túi đồ` : r.mount ? `Đổi thành công: thú cưỡi “<b>${MOUNTS[r.mount].n}</b>”, đã cưỡi lên rồi` : `Đổi thành công: ${({ M: "Hồn tinh", G: "Bạc", X: "Cửu U Huyền Tinh" })[r.k]} +${fmtBig(r.n)}`); refresh(); },
   import: () => { const v = ($('#imp') || {}).value || ''; if (!v.trim()) return toast("Hãy dán mã lưu vào ô trước"); tryImport(v); },
   imcancel: () => { IMPORTING = null; closeModal(); },
   doimport: () => { if (!IMPORTING) return; clearOverlays(); SAVE = IMPORTING; IMPORTING = null; persist(true); toast("Đã khôi phục, đang tải lại…"); setTimeout(() => location.reload(), 500); },
