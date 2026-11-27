@@ -4633,7 +4633,7 @@ const ACT = {
   bcinfo: a => { const prev = MODALFN, h = bcInfoModal(ctxCls(), a); if (!h) return; openModal(() => h); BACK = prev; },
   sanhelp: () => { const prev = MODALFN, c = ctxCls(); openModal(() => sanModal(c)); BACK = prev; },
   bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');
-    toast(`Đã phối xong: mang ${r.sk} chiêu${r.miss ? ` (${r.miss} chiêu chưa học)` : ''}${r.cube ? `, Túi Càn Khôn đặt ${r.cube} món` : ''}${r.gems ? `, linh ngọc đặt ${r.gems} viên` : ''}`); refresh(); achToast(checkAch()); },
+    toast(`Đã phối xong: mang ${r.sk} chiêu${r.miss ? ` (${r.miss} chiêu chưa học)` : ''}${r.cube ? `, Túi Càn Khôn đặt ${r.cube} món` : ''}${r.gems ? `, linh ngọc đặt ${r.gems} viên` : ''}${r.eq ? `, mặc lên ${r.eq} món trang bị` : ''}${r.lack && r.lack.length ? `; trang bị còn thiếu ${r.lack.length} món: ${r.lack.slice(0, 4).join(", ")}${r.lack.length > 4 ? '…' : ''}` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
   sksel: i => { SKSEL = i === 'basic' || i === 'ult' ? i : +i; refresh(); },

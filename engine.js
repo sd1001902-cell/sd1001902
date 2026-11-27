@@ -1247,6 +1247,21 @@ function applyBuild(cls, i) {
   r.sk = L.length;
   if (featureOn('cube')) { const have = B.cube.filter(lid => SAVE.cube[lid]); if (have.length) { ch.cube = [0, 1, 2].map(j => have[j] || null); r.cube = have.length; } }
   if (boxOpen()) { const have = B.gems.map(t => SAVE.lgems.find(g => g.t === t)).filter(Boolean); if (have.length) { ch.lgs = [0, 1, 2].map(j => have[j] ? have[j].id : null); r.gems = have.length; } }
+  // 2026-11-27 装备也照配：背包里有的套装件、专属兵器、推荐神兵直接换上（强化、孔、玉跟着部位，不用拆）。原来只配招式、乾坤袋、灵玉，装备得自己一件件换（用户：点了装备没上去）
+  r.eq = 0; r.lack = [];
+  { const S = SETS.find(x => x.id === B.set), W = LEGENDS.find(l => l.w && l.set === B.set), want = [];
+    if (S) for (const [sl, n] of S.pieces) want.push({ t: sl, n, ok: it => it.set === S.id && it.slot === sl });
+    if (W) want.push({ t: W.slot, n: W.n, ok: it => it.legend === W.id });
+    for (const lid of B.leg || []) { const X = LEGENDS.find(l => l.id === lid); if (X) want.push({ t: X.slot, n: X.n, ok: it => it.legend === lid }); }
+    const open = eqSlots(), isWant = it => !!it && want.some(w => w.ok(it));
+    for (const w of want) { const pos = open.filter(p => slotType(p) === w.t); if (!pos.length) { r.lack.push(w.n); continue; }
+      if (pos.some(p => ch.eq[p] && w.ok(ch.eq[p]))) continue;   // 已经穿着
+      const cands = SAVE.stash.filter(it => w.ok(it) && canEquip(it, cls)); if (!cands.length) { r.lack.push(w.n); continue; }
+      const p = pos.find(q => !isWant(ch.eq[q])) || pos[0];
+      const pw = it => power(calcStats(cls, { ...ch.eq, [p]: slotSim(ch, p, it) }, ch.level, null, ch));   // 同一件有好几件：先看品级，再看换上后的战力
+      const best = cands.sort((x, y) => (y.anc || 0) - (x.anc || 0) || pw(y) - pw(x))[0];
+      SAVE.stash.splice(SAVE.stash.indexOf(best), 1); const old = slotTake(ch, p); if (old) SAVE.stash.push(old); slotPut(ch, p, best); r.eq++; }
+    if (r.eq) checkSet4(cls); }
   ch.bld = i; fixRunHp(cls, before); return r;
 }
 const gemKey = (t, tier) => t + '_' + tier;

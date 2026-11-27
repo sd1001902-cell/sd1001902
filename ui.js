@@ -4632,7 +4632,7 @@ const ACT = {
   bcinfo: a => { const prev = MODALFN, h = bcInfoModal(ctxCls(), a); if (!h) return; openModal(() => h); BACK = prev; },
   sanhelp: () => { const prev = MODALFN, c = ctxCls(); openModal(() => sanModal(c)); BACK = prev; },
   bldapply: i => { const r = applyBuild(ctxCls(), +i); if (!r) return; SFX.play('buff');
-    toast(`照配好了：带上 ${r.sk} 招${r.miss ? `（${r.miss} 招还没学会）` : ''}${r.cube ? `，乾坤袋放了 ${r.cube} 个` : ''}${r.gems ? `，灵玉放了 ${r.gems} 颗` : ''}`); refresh(); achToast(checkAch()); },
+    toast(`照配好了：带上 ${r.sk} 招${r.miss ? `（${r.miss} 招还没学会）` : ''}${r.cube ? `，乾坤袋放了 ${r.cube} 个` : ''}${r.gems ? `，灵玉放了 ${r.gems} 颗` : ''}${r.eq ? `，换上 ${r.eq} 件装备` : ''}${r.lack && r.lack.length ? `；装备还缺 ${r.lack.length} 件：${r.lack.slice(0, 4).join('、')}${r.lack.length > 4 ? '…' : ''}` : ''}`); refresh(); achToast(checkAch()); },
   skup: id => { moveSkill(ctxCls(), id, -1); refresh(); },
   skdn: id => { moveSkill(ctxCls(), id, 1); refresh(); },
   sksel: i => { SKSEL = i === 'basic' || i === 'ult' ? i : +i; refresh(); },
